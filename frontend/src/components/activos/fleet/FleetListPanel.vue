@@ -318,7 +318,7 @@
             </h3>
 
             <p class="mt-1 text-[11px] font-semibold leading-relaxed text-slate-500">
-              Sección preparada para listar zonas, revisar estados y administrar referencias del mapa.
+              Zonas y rutas creadas en el mapa. Puedes revisarlas y eliminarlas desde este panel.
             </p>
           </div>
 
@@ -340,14 +340,90 @@
           </div>
         </div>
 
-        <div class="rounded-xl border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-3">
-          <p class="text-[11px] font-black text-[#102372]">
-            Geocercas del mapa
+        <div
+          v-if="!geofenceItems.length"
+          class="flex min-h-[180px] flex-col items-center justify-center rounded-xl border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-4 text-center"
+        >
+          <p class="text-[12px] font-black text-[#102372]">
+            No hay geocercas creadas
           </p>
 
-          <p class="mt-1 text-[11px] font-semibold leading-relaxed text-slate-500">
-            La lógica actual de geocercas se mantiene en el mapa. Esta sección solo queda lista para conectarse visualmente después.
+          <p class="mt-1 max-w-[280px] text-[11px] font-semibold leading-relaxed text-slate-500">
+            Crea una geocerca desde las herramientas del mapa para verla en esta sección.
           </p>
+        </div>
+
+        <div
+          v-else-if="!filteredGeofenceItems.length"
+          class="flex min-h-[160px] flex-col items-center justify-center rounded-xl border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-4 text-center"
+        >
+          <p class="text-[12px] font-black text-[#102372]">
+            Sin resultados
+          </p>
+
+          <p class="mt-1 max-w-[280px] text-[11px] font-semibold leading-relaxed text-slate-500">
+            No encontramos geocercas con ese criterio de búsqueda.
+          </p>
+        </div>
+
+        <div
+          v-else
+          class="grid gap-2"
+        >
+          <article
+            v-for="geofence in filteredGeofenceItems"
+            :key="geofence.id"
+            class="group rounded-xl border bg-white p-3 shadow-sm transition hover:border-[#FF6600] hover:bg-[#fff7ed]"
+            :class="normalizeId(selectedGeofenceId) === normalizeId(geofence.id)
+              ? 'border-[#FF6600] bg-[#fff7ed]'
+              : 'border-[#d8dee8]'"
+          >
+            <button
+              type="button"
+              class="flex w-full cursor-pointer items-start gap-3 text-left"
+              @click="handleGeofenceSelect(geofence)"
+            >
+              <span
+                class="mt-1 h-3 w-3 shrink-0 rounded-full border border-slate-200"
+                :style="{ backgroundColor: getGeofenceColor(geofence) }"
+              ></span>
+
+              <span class="min-w-0 flex-1">
+                <span class="flex items-start justify-between gap-2">
+                  <span class="min-w-0">
+                    <span class="block truncate text-[12px] font-black text-[#172033]">
+                      {{ geofence.name }}
+                    </span>
+
+                    <span class="mt-1 block text-[10px] font-bold text-slate-500">
+                      {{ getGeofenceMeta(geofence) }}
+                    </span>
+                  </span>
+
+                  <span
+                    class="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black"
+                    :class="getGeofenceBadgeClass(geofence)"
+                  >
+                    {{ getGeofenceBadgeLabel(geofence) }}
+                  </span>
+                </span>
+              </span>
+            </button>
+
+            <div class="mt-3 flex items-center justify-between gap-2 rounded-lg bg-[#f8fafc] px-3 py-2">
+              <p class="min-w-0 truncate text-[10px] font-bold text-slate-500">
+                {{ getGeofenceDescription(geofence) }}
+              </p>
+
+              <button
+                type="button"
+                class="shrink-0 cursor-pointer rounded-md bg-red-50 px-2 py-1 text-[10px] font-black text-red-600 transition hover:bg-red-100"
+                @click.stop="confirmDeleteGeofence(geofence)"
+              >
+                Eliminar
+              </button>
+            </div>
+          </article>
         </div>
       </div>
     </div>
@@ -383,6 +459,13 @@ import FleetTable from "./FleetTable.vue"
 import FleetContextMenu from "./FleetContextMenu.vue"
 import { useFleetColumns } from "../../../composables/activos/fleet/useFleetColumns"
 import { useFleetSorting } from "../../../composables/activos/fleet/useFleetSorting"
+import {
+  getGeofenceBadgeClass,
+  getGeofenceBadgeLabel,
+  getGeofenceColor,
+  getGeofenceDescription,
+  getGeofenceMeta,
+} from "../../../utils/geofenceUtils.js"
 
 const props = defineProps({
   activos: {
@@ -392,6 +475,14 @@ const props = defineProps({
   allActivos: {
     type: Array,
     default: () => [],
+  },
+  geofences: {
+    type: Array,
+    default: () => [],
+  },
+  selectedGeofenceId: {
+    type: [String, Number],
+    default: null,
   },
   selectedId: {
     type: [Number, String],
@@ -437,6 +528,8 @@ const emit = defineEmits([
   "clear-route",
   "open-add-activo",
   "device-action",
+  "geofence-selected",
+  "geofence-delete",
 ])
 
 const showColumns = ref(false)
@@ -448,6 +541,10 @@ const deviceContextMenu = ref({
   y: 0,
   activo: null,
 })
+
+const normalizeId = (value) => {
+  return String(value ?? "")
+}
 
 const normalizeText = (value) => {
   return String(value || "")
@@ -514,12 +611,31 @@ const menuSections = computed(() => [
   {
     key: "geocercas",
     label: "Geocercas",
-    count: null,
+    count: props.geofences.length,
   },
 ])
 
 const itineraryActivos = computed(() => {
   return props.allActivos.length ? props.allActivos : props.activos
+})
+
+const geofenceItems = computed(() => {
+  return props.geofences || []
+})
+
+const filteredGeofenceItems = computed(() => {
+  const term = normalizeText(props.search)
+
+  if (!term) return geofenceItems.value
+
+  return geofenceItems.value.filter((geofence) => {
+    return (
+      normalizeText(geofence.name).includes(term) ||
+      normalizeText(geofence.type).includes(term) ||
+      normalizeText(getGeofenceBadgeLabel(geofence)).includes(term) ||
+      normalizeText(getGeofenceMeta(geofence)).includes(term)
+    )
+  })
 })
 
 const searchPlaceholder = computed(() => {
@@ -530,6 +646,23 @@ const searchPlaceholder = computed(() => {
 
   return placeholders[localActiveSection.value] || placeholders.activos
 })
+
+const confirmDeleteGeofence = (geofence) => {
+  if (!geofence?.id) return
+
+  const geofenceName = geofence.name || "esta geocerca"
+  const confirmed = window.confirm(`¿Eliminar la geocerca "${geofenceName}"?`)
+
+  if (!confirmed) return
+
+  emit("geofence-delete", geofence.id)
+}
+
+const handleGeofenceSelect = (geofence) => {
+  if (!geofence?.id) return
+
+  emit("geofence-selected", geofence)
+}
 
 const closeDeviceContextMenu = () => {
   deviceContextMenu.value = {

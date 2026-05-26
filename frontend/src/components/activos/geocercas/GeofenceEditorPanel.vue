@@ -112,7 +112,7 @@
           type="text"
           placeholder="Nombre de la geocerca"
           class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#102372]"
-          @input="$emit('update-editing-meta', 'name', $event.target.value)"
+          @change="$emit('update-editing-meta', 'name', $event.target.value)"
           @keydown.enter.prevent="$event.target.blur()"
         />
       </label>
@@ -127,7 +127,7 @@
             :value="editingStrokeColor"
             type="color"
             class="h-9 w-full cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
-            @input="$emit('update-editing-meta', 'strokeColor', $event.target.value)"
+            @change="$emit('update-editing-meta', 'strokeColor', $event.target.value)"
           />
         </label>
 
@@ -143,7 +143,7 @@
             :value="editingFillColor"
             type="color"
             class="h-9 w-full cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
-            @input="$emit('update-editing-meta', 'fillColor', $event.target.value)"
+            @change="$emit('update-editing-meta', 'fillColor', $event.target.value)"
           />
         </label>
 

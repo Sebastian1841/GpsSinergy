@@ -11,6 +11,8 @@
         <FleetListPanel
           :activos="filteredActivos"
           :all-activos="normalizedActivos"
+          :geofences="geofences"
+          :selected-geofence-id="selectedGeofenceId"
           :selected-id="selectedId"
           :active-filter="statusFilter"
           :active-section="activeSidebarSection"
@@ -25,6 +27,8 @@
           @clear-route="handleClearItineraryRoute"
           @open-add-activo="openAddActivoModal"
           @device-action="handleDeviceAction"
+          @geofence-selected="handleSidebarGeofenceSelected"
+          @geofence-delete="handleGeofenceDeleted"
         />
       </div>
 
@@ -53,6 +57,7 @@
             :activos="filteredActivos"
             :all-activos="normalizedActivos"
             :selected-id="selectedId"
+            :selected-geofence-id="selectedGeofenceId"
             :geofences="geofences"
             :itinerary-route="selectedItineraryRoute"
             :selected-itinerary-point="selectedItineraryPoint"
@@ -63,6 +68,7 @@
             @geofence-created="handleGeofenceCreated"
             @geofence-updated="handleGeofenceUpdated"
             @geofence-deleted="handleGeofenceDeleted"
+            @clear-geofence-selection="handleClearGeofenceSelection"
           />
         </div>
       </div>
@@ -95,8 +101,10 @@ import AddActivoModal from "../components/activos/fleet/AddActivoModal.vue"
 import FleetTerminalModal from "../components/activos/fleet/FleetTerminalModal.vue"
 
 import { useFleetTerminal } from "../composables/activos/fleet/useFleetTerminal"
+import { useGeofences } from "../composables/activos/geocercas/useGeofences.js"
 
 const selectedId = ref(mockActivos[0]?.id || null)
+const selectedGeofenceId = ref(null)
 const statusFilter = ref("all")
 const activeSidebarSection = ref("activos")
 
@@ -106,7 +114,13 @@ const sectionSearch = ref({
   geocercas: "",
 })
 
-const geofences = ref([])
+const {
+  geofences,
+  createGeofence,
+  updateGeofence,
+  deleteGeofence,
+} = useGeofences()
+
 const customActivos = ref([])
 const deletedActivoIds = ref([])
 const editedActivos = ref({})
@@ -598,20 +612,37 @@ const setSidebarSection = async (section) => {
 }
 
 const handleGeofenceCreated = async (geofence) => {
-  geofences.value.push(geofence)
+  createGeofence(geofence)
+
+  selectedGeofenceId.value = geofence?.id || null
+
   await refreshMapLayout(true)
 }
 
-const handleGeofenceUpdated = async (updatedGeofence) => {
-  geofences.value = geofences.value.map((geofence) => {
-    return geofence.id === updatedGeofence.id ? updatedGeofence : geofence
-  })
-
-  await refreshMapLayout(true)
+const handleGeofenceUpdated = (updatedGeofence) => {
+  updateGeofence(updatedGeofence)
 }
 
 const handleGeofenceDeleted = async (geofenceId) => {
-  geofences.value = geofences.value.filter((geofence) => geofence.id !== geofenceId)
+  deleteGeofence(geofenceId)
+
+  if (String(selectedGeofenceId.value) === String(geofenceId)) {
+    selectedGeofenceId.value = null
+  }
+
+  await refreshMapLayout(true)
+}
+
+const handleClearGeofenceSelection = () => {
+  selectedGeofenceId.value = null
+}
+
+const handleSidebarGeofenceSelected = async (geofence) => {
+  if (!geofence?.id) return
+
+  selectedGeofenceId.value = geofence.id
+  activeSidebarSection.value = "geocercas"
+
   await refreshMapLayout(true)
 }
 

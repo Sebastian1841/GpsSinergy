@@ -170,7 +170,7 @@ import {
   normalizeHistoryLog,
 } from "../../../utils/terminalUtils.js"
 
-import { useFloatingModal } from "../../../composables/activos/fleet/terminal/useFloatingModal.js"
+import { useFloatingModal } from "../../../composables/ui/useFloatingModal.js"
 
 const props = defineProps({
   modelValue: {

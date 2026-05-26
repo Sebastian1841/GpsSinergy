@@ -69,7 +69,7 @@
     <GeofenceSelectorModal
       v-model="showGeofenceModal"
       :geofence-items="geofenceItems"
-      :selected-geofence-id="selectedGeofenceId"
+      :selected-geofence-id="activeGeofenceId"
       :editing-draft="editingDraft"
       @select-edit="selectGeofenceToEdit"
       @open-history="openGeofenceHistory"
@@ -116,6 +116,10 @@ const props = defineProps({
     type: [Number, String],
     default: null,
   },
+  selectedGeofenceId: {
+    type: [Number, String],
+    default: null,
+  },
   activeFilter: {
     type: String,
     default: "all",
@@ -140,12 +144,13 @@ const emit = defineEmits([
   "geofence-created",
   "geofence-updated",
   "geofence-deleted",
+  "clear-geofence-selection",
 ])
 
 const mapRef = ref(null)
 const showGeofenceModal = ref(false)
 const showGeofenceHistoryModal = ref(false)
-const selectedGeofenceId = ref(null)
+const activeGeofenceId = ref(null)
 const selectedHistoryGeofence = ref(null)
 const selectedHistoryEvents = ref([])
 const showGeofences = ref(true)
@@ -188,6 +193,10 @@ const mapTypeOptions = [
   },
 ]
 
+const normalizeId = (value) => {
+  return String(value ?? "")
+}
+
 const currentMapTypeOption = computed(() => {
   return mapTypeOptions.find((option) => option.value === mapType.value) || mapTypeOptions[0]
 })
@@ -207,12 +216,20 @@ const visibleGeofences = computed(() => {
     return allGeofences
   }
 
-  if (selectedGeofenceId.value) {
-    return allGeofences.filter((geofence) => geofence.id === selectedGeofenceId.value)
+  if (activeGeofenceId.value) {
+    return allGeofences.filter((geofence) => {
+      return normalizeId(geofence.id) === normalizeId(activeGeofenceId.value)
+    })
   }
 
   return []
 })
+
+const getGeofenceById = (geofenceId) => {
+  return geofenceItems.value.find((geofence) => {
+    return normalizeId(geofence.id) === normalizeId(geofenceId)
+  })
+}
 
 const getNextGeofenceName = (type) => {
   const nextNumber = (props.geofences || []).length + 1
@@ -351,6 +368,14 @@ const resetHistoryState = () => {
   selectedHistoryEvents.value = []
 }
 
+const clearActiveGeofenceSelection = (notifyParent = true) => {
+  activeGeofenceId.value = null
+
+  if (notifyParent) {
+    emit("clear-geofence-selection")
+  }
+}
+
 const handleSelectFilter = (filter) => {
   emit("select-filter", filter)
 }
@@ -372,9 +397,9 @@ const handleToggleGeofenceVisibility = () => {
 
   if (!nextValue) {
     if (editingDraft.value?.id) {
-      selectedGeofenceId.value = editingDraft.value.id
+      activeGeofenceId.value = editingDraft.value.id
     } else {
-      selectedGeofenceId.value = null
+      clearActiveGeofenceSelection()
     }
   }
 
@@ -384,7 +409,7 @@ const handleToggleGeofenceVisibility = () => {
 const handleCreateCircle = () => {
   showGeofences.value = true
   showGeofenceModal.value = false
-  selectedGeofenceId.value = null
+  clearActiveGeofenceSelection()
   resetHistoryState()
   resetDraftGeofenceForm("circle")
   startCircleDraw()
@@ -393,7 +418,7 @@ const handleCreateCircle = () => {
 const handleCreatePolygon = () => {
   showGeofences.value = true
   showGeofenceModal.value = false
-  selectedGeofenceId.value = null
+  clearActiveGeofenceSelection()
   resetHistoryState()
   resetDraftGeofenceForm("polygon")
   startPolygonDraw()
@@ -402,7 +427,7 @@ const handleCreatePolygon = () => {
 const handleCreateRoute = () => {
   showGeofences.value = true
   showGeofenceModal.value = false
-  selectedGeofenceId.value = null
+  clearActiveGeofenceSelection()
   resetHistoryState()
   resetDraftGeofenceForm("route")
   startRouteDraw()
@@ -439,33 +464,70 @@ const openGeofenceHistory = (geofence) => {
 
 const selectGeofenceToEdit = (geofenceId) => {
   resetHistoryState()
-  selectedGeofenceId.value = geofenceId
+  activeGeofenceId.value = geofenceId
   showGeofenceModal.value = false
+  showGeofences.value = true
   startEditGeofence(geofenceId)
 }
 
+const handleExternalGeofenceSelection = (geofenceId) => {
+  if (!geofenceId) {
+    clearActiveGeofenceSelection(false)
+    return
+  }
+
+  const geofence = getGeofenceById(geofenceId)
+
+  if (!geofence) return
+
+  if (
+    normalizeId(activeGeofenceId.value) === normalizeId(geofence.id) &&
+    normalizeId(editingDraft.value?.id) === normalizeId(geofence.id)
+  ) {
+    return
+  }
+
+  if (drawMode.value) {
+    cancelAll()
+  }
+
+  resetHistoryState()
+  activeGeofenceId.value = geofence.id
+  showGeofenceModal.value = false
+  showGeofences.value = true
+
+  startEditGeofence(geofence.id)
+}
+
 const handleStopEditing = () => {
-  selectedGeofenceId.value = null
+  clearActiveGeofenceSelection()
   stopEditing()
 }
 
 const handleCancel = () => {
-  selectedGeofenceId.value = null
+  clearActiveGeofenceSelection()
   resetHistoryState()
   cancelAll()
 }
 
 const handleDeleteGeofence = (geofenceId) => {
-  if (selectedGeofenceId.value === geofenceId) {
-    selectedGeofenceId.value = null
+  if (normalizeId(activeGeofenceId.value) === normalizeId(geofenceId)) {
+    clearActiveGeofenceSelection()
   }
 
-  if (selectedHistoryGeofence.value?.id === geofenceId) {
+  if (normalizeId(selectedHistoryGeofence.value?.id) === normalizeId(geofenceId)) {
     resetHistoryState()
   }
 
   deleteGeofence(geofenceId)
 }
+
+watch(
+  () => props.selectedGeofenceId,
+  (geofenceId) => {
+    handleExternalGeofenceSelection(geofenceId)
+  },
+)
 
 watch(
   () => showGeofenceHistoryModal.value,

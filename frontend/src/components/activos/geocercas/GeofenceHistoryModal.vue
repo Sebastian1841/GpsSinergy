@@ -302,7 +302,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
 
-import { useFloatingModal } from "../../../composables/activos/fleet/terminal/useFloatingModal.js"
+import { useFloatingModal } from "../../../composables/ui/useFloatingModal.js"
 
 const DEFAULT_DATE_PRESET = "all"
 

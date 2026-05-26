@@ -140,7 +140,7 @@
                   type="button"
                   class="cursor-pointer rounded-lg bg-red-50 px-3 py-2 text-[11px] font-black text-red-600 transition hover:bg-red-100"
                   @pointerdown.stop
-                  @click="$emit('delete-geofence', geofence.id)"
+                  @click="confirmDeleteGeofence(geofence)"
                 >
                   Eliminar
                 </button>
@@ -213,7 +213,14 @@
 <script setup>
 import { nextTick, onBeforeUnmount, watch } from "vue"
 
-import { useFloatingModal } from "../../../composables/activos/fleet/terminal/useFloatingModal.js"
+import { useFloatingModal } from "../../../composables/ui/useFloatingModal.js"
+import {
+  getGeofenceBadgeClass,
+  getGeofenceBadgeLabel,
+  getGeofenceColor,
+  getGeofenceDescription,
+  getGeofenceMeta,
+} from "../../../utils/geofenceUtils.js"
 
 const props = defineProps({
   modelValue: {
@@ -263,6 +270,17 @@ const closeModal = () => {
   emit("update:modelValue", false)
 }
 
+const confirmDeleteGeofence = (geofence) => {
+  if (!geofence?.id) return
+
+  const geofenceName = geofence.name || "esta geocerca"
+  const confirmed = window.confirm(`¿Eliminar la geocerca "${geofenceName}"?`)
+
+  if (!confirmed) return
+
+  emit("delete-geofence", geofence.id)
+}
+
 const handleKeydown = (event) => {
   if (event.key === "Escape" && props.modelValue) {
     closeModal()
@@ -299,51 +317,4 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", keepFrameInsideViewport)
   window.removeEventListener("keydown", handleKeydown)
 })
-
-const getGeofenceColor = (geofence) => {
-  return geofence?.strokeColor || geofence?.color || "#FF6600"
-}
-
-const getGeofenceMeta = (geofence) => {
-  if (geofence?.type === "circle") {
-    return `Circular · ${geofence.radius || 0} m`
-  }
-
-  if (geofence?.type === "route") {
-    return `Ruta · ${geofence.coordinates?.length || 0} puntos`
-  }
-
-  return `Poligonal · ${geofence?.coordinates?.length || 0} puntos`
-}
-
-const getGeofenceBadgeLabel = (geofence) => {
-  if (geofence?.type === "circle") return "Radio"
-  if (geofence?.type === "route") return "Ruta"
-
-  return "Polígono"
-}
-
-const getGeofenceBadgeClass = (geofence) => {
-  if (geofence?.type === "circle") {
-    return "bg-[#eef3ff] text-[#102372]"
-  }
-
-  if (geofence?.type === "route") {
-    return "bg-emerald-50 text-emerald-700"
-  }
-
-  return "bg-[#fff3eb] text-[#FF6600]"
-}
-
-const getGeofenceDescription = (geofence) => {
-  if (geofence?.type === "circle") {
-    return "Permite editar centro, radio, nombre y colores."
-  }
-
-  if (geofence?.type === "route") {
-    return "Permite editar puntos del recorrido, nombre y color."
-  }
-
-  return "Permite editar puntos del perímetro, nombre y colores."
-}
 </script>
