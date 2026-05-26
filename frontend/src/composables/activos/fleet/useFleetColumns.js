@@ -7,10 +7,7 @@ const defaultNormalizeText = (value) => {
     .replace(/\s+/g, " ")
 }
 
-export function useFleetColumns({
-  columns,
-  normalizeText = defaultNormalizeText,
-} = {}) {
+export function useFleetColumns({ columns, normalizeText = defaultNormalizeText } = {}) {
   const columnSearch = ref("")
   const visibleColumnKeys = ref([])
 

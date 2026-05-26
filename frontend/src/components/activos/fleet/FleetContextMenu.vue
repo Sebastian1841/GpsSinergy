@@ -16,9 +16,7 @@
         class="group flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left text-[12px] font-semibold transition"
         :class="[
           action.separator ? 'mt-1 border-t border-[#edf1f5] pt-2' : '',
-          action.danger
-            ? 'text-red-600 hover:bg-red-50'
-            : 'text-[#172033] hover:bg-[#eef3ff]',
+          action.danger ? 'text-red-600 hover:bg-red-50' : 'text-[#172033] hover:bg-[#eef3ff]',
         ]"
         @click="handleDeviceAction(action)"
       >
@@ -116,10 +114,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits([
-  "close",
-  "action",
-])
+const emit = defineEmits(["close", "action"])
 
 const contextMenuRef = ref(null)
 

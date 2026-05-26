@@ -3,15 +3,17 @@
     ref="headerRef"
     class="relative z-30 border-b border-white/10 bg-gradient-to-r from-[#182230] via-[#1f2937] to-[#182230] shadow-[0_8px_30px_rgba(0,0,0,0.18)]"
   >
-    <div class="absolute inset-x-0 bottom-0 h-[2px] bg-gradient-to-r from-transparent via-[#ff6600]/70 to-transparent"></div>
+    <div
+      class="absolute inset-x-0 bottom-0 h-[2px] bg-gradient-to-r from-transparent via-[#ff6600]/70 to-transparent"
+    ></div>
 
     <div class="flex items-center justify-between gap-4 px-4 py-2.5">
       <div class="flex min-w-0 items-center gap-3">
         <button
           class="inline-flex h-10 w-10 items-center justify-center rounded-xl text-white transition-all duration-200 hover:bg-white/10 active:scale-95"
-          @click="$emit('toggle-sidebar')"
           aria-label="Abrir menú"
           type="button"
+          @click="emit('toggle-sidebar')"
         >
           <span class="text-2xl leading-none">☰</span>
         </button>
@@ -19,12 +21,14 @@
         <div
           class="relative flex h-[56px] w-[168px] shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm"
         >
-          <div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/[0.05] to-transparent"></div>
+          <div
+            class="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/[0.05] to-transparent"
+          ></div>
 
           <iframe
             src="/logo-sinergy.html"
             title="Logo Sinergy"
-            class="relative h-full w-full border-0 bg-transparent pointer-events-none"
+            class="pointer-events-none relative h-full w-full border-0 bg-transparent"
             scrolling="no"
           />
         </div>
@@ -32,12 +36,14 @@
 
       <div v-if="user.username" class="relative z-40 shrink-0">
         <button
-          @click="toggleDropdown"
           class="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-white backdrop-blur-sm transition-all duration-200 hover:border-white/20 hover:bg-white/[0.08]"
           aria-label="Abrir menú de usuario"
           type="button"
+          @click="toggleDropdown"
         >
-          <div class="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#ff6600] to-[#ff8c42] text-sm font-bold text-white shadow-[0_0_20px_rgba(255,102,0,0.20)]">
+          <div
+            class="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#ff6600] to-[#ff8c42] text-sm font-bold text-white shadow-[0_0_20px_rgba(255,102,0,0.20)]"
+          >
             {{ userInitial }}
           </div>
 
@@ -47,7 +53,9 @@
             </strong>
 
             <div class="flex items-center gap-2">
-              <span class="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(74,222,128,0.9)]"></span>
+              <span
+                class="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(74,222,128,0.9)]"
+              ></span>
               <span class="text-xs text-gray-300">
                 {{ userRole }}
               </span>
@@ -85,11 +93,13 @@
 
             <div class="p-2">
               <button
-                @click="logout"
                 class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white transition-all duration-200 hover:bg-[#ff6600] hover:shadow-[0_8px_24px_rgba(255,102,0,0.28)]"
                 type="button"
+                @click="logout"
               >
-                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 transition-colors duration-200 group-hover:bg-white/15">
+                <div
+                  class="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 transition-colors duration-200 group-hover:bg-white/15"
+                >
                   <SvgIcon name="logout" class="h-4 w-4" />
                 </div>
 
@@ -116,9 +126,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
-import SvgIcon from '../icons/SvgIcon.vue'
+import { computed, onBeforeUnmount, onMounted, ref } from "vue"
+import { useRouter } from "vue-router"
+import SvgIcon from "../icons/SvgIcon.vue"
+
+const emit = defineEmits(["toggle-sidebar"])
 
 const router = useRouter()
 
@@ -128,7 +140,7 @@ const headerRef = ref(null)
 
 const safeParseUser = () => {
   try {
-    const storedUser = localStorage.getItem('user')
+    const storedUser = localStorage.getItem("user")
     return storedUser ? JSON.parse(storedUser) : {}
   } catch {
     return {}
@@ -147,12 +159,8 @@ const normalizeLocalUser = (rawUser = {}) => {
       raw.user_metadata?.name ||
       raw.user_metadata?.full_name ||
       raw.email ||
-      '',
-    email:
-      raw.email ||
-      raw.correo ||
-      raw.user_metadata?.email ||
-      '',
+      "",
+    email: raw.email || raw.correo || raw.user_metadata?.email || "",
     avatar:
       raw.avatar ||
       raw.avatar_url ||
@@ -160,48 +168,41 @@ const normalizeLocalUser = (rawUser = {}) => {
       raw.photoURL ||
       raw.user_metadata?.avatar_url ||
       null,
-    role:
-      raw.role ||
-      raw.rol ||
-      raw.user_metadata?.role ||
-      null,
+    role: raw.role || raw.rol || raw.user_metadata?.role || null,
   }
 }
 
 onMounted(() => {
   user.value = normalizeLocalUser(safeParseUser())
 
-  document.addEventListener('click', handleClickOutside)
-  document.addEventListener('keydown', handleKeydown)
+  document.addEventListener("click", handleClickOutside)
+  document.addEventListener("keydown", handleKeydown)
 })
 
 onBeforeUnmount(() => {
-  document.removeEventListener('click', handleClickOutside)
-  document.removeEventListener('keydown', handleKeydown)
+  document.removeEventListener("click", handleClickOutside)
+  document.removeEventListener("keydown", handleKeydown)
 })
 
-const userName = computed(() => user.value.username || 'Invitado')
+const userName = computed(() => user.value.username || "Invitado")
 
 const userInitial = computed(() => {
-  const name = user.value.username || 'I'
+  const name = user.value.username || "I"
   return name.charAt(0).toUpperCase()
 })
 
 const userRole = computed(() => {
   const role = user.value?.role
 
-  const key =
-    typeof role === 'string'
-      ? role
-      : role?.key
+  const key = typeof role === "string" ? role : role?.key
 
-  if (!key) return 'Invitado'
+  if (!key) return "Invitado"
 
   const rolesMap = {
-    admin: 'Administrador',
-    tech: 'Administrador Técnico',
-    viewer: 'Visualizador',
-    mantenciones: 'Mantenciones',
+    admin: "Administrador",
+    tech: "Administrador Técnico",
+    viewer: "Visualizador",
+    mantenciones: "Mantenciones",
   }
 
   return rolesMap[key] || key
@@ -220,15 +221,15 @@ const handleClickOutside = (event) => {
 }
 
 const handleKeydown = (event) => {
-  if (event.key === 'Escape') {
+  if (event.key === "Escape") {
     showDropdown.value = false
   }
 }
 
 const logout = () => {
-  localStorage.removeItem('user')
+  localStorage.removeItem("user")
   user.value = {}
   showDropdown.value = false
-  router.push('/')
+  router.push("/")
 }
 </script>

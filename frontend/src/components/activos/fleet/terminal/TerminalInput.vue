@@ -5,7 +5,9 @@
   >
     <div class="flex flex-col gap-2 md:flex-row md:items-center">
       <div class="relative min-w-0 flex-1">
-        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm font-black text-[#FF6600]">
+        <span
+          class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm font-black text-[#FF6600]"
+        >
           &gt;
         </span>
 
@@ -43,8 +45,5 @@ defineProps({
   },
 })
 
-defineEmits([
-  "update:modelValue",
-  "submit-command",
-])
+defineEmits(["update:modelValue", "submit-command"])
 </script>

@@ -16,7 +16,9 @@
           </p>
         </div>
 
-        <span class="shrink-0 rounded-md bg-[#102372]/10 px-2 py-1 text-[10px] font-black text-[#102372]">
+        <span
+          class="shrink-0 rounded-md bg-[#102372]/10 px-2 py-1 text-[10px] font-black text-[#102372]"
+        >
           {{ rangeLabel }}
         </span>
       </div>
@@ -44,9 +46,7 @@
       </article>
 
       <article class="rounded-lg border border-[#d8dee8] bg-white p-3">
-        <p class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
-          Distancia
-        </p>
+        <p class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">Distancia</p>
 
         <p class="mt-1 truncate text-[16px] font-black text-[#102372]">
           {{ distanceLabel }}
@@ -54,9 +54,7 @@
       </article>
 
       <article class="rounded-lg border border-[#d8dee8] bg-white p-3">
-        <p class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
-          Movimiento
-        </p>
+        <p class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">Movimiento</p>
 
         <p class="mt-1 truncate text-[16px] font-black text-[#102372]">
           {{ movingLabel }}
@@ -77,9 +75,7 @@
 
       <div class="grid grid-cols-2 gap-2">
         <div class="rounded-lg bg-[#f8fafc] px-3 py-2">
-          <p class="text-[10px] font-bold text-slate-500">
-            Primer registro
-          </p>
+          <p class="text-[10px] font-bold text-slate-500">Primer registro</p>
 
           <p class="mt-0.5 truncate text-[11px] font-black text-[#102372]">
             {{ firstRecordLabel }}
@@ -87,9 +83,7 @@
         </div>
 
         <div class="rounded-lg bg-[#f8fafc] px-3 py-2">
-          <p class="text-[10px] font-bold text-slate-500">
-            Último registro
-          </p>
+          <p class="text-[10px] font-bold text-slate-500">Último registro</p>
 
           <p class="mt-0.5 truncate text-[11px] font-black text-[#102372]">
             {{ lastRecordLabel }}
@@ -131,20 +125,12 @@ const deviceCount = computed(() => {
 })
 
 const distanceLabel = computed(() => {
-  return (
-    props.summary.distanceLabel ||
-    props.summary.distance ||
-    props.summary.totalDistance ||
-    "-"
-  )
+  return props.summary.distanceLabel || props.summary.distance || props.summary.totalDistance || "-"
 })
 
 const movingLabel = computed(() => {
   return (
-    props.summary.movingLabel ||
-    props.summary.durationLabel ||
-    props.summary.totalMovingTime ||
-    "-"
+    props.summary.movingLabel || props.summary.durationLabel || props.summary.totalMovingTime || "-"
   )
 })
 

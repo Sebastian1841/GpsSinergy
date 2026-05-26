@@ -76,15 +76,28 @@ export function useFleetSorting({
       return statusOrder[activo.estado] || 99
     }
 
-    const value = typeof getCellValue === "function"
-      ? getCellValue(activo, column)
-      : activo?.[column.key]
+    const value =
+      typeof getCellValue === "function" ? getCellValue(activo, column) : activo?.[column.key]
 
-    if (["velocidad", "combustible", "odometro", "horometroDiario", "horometroTotal"].includes(column.key)) {
+    if (
+      ["velocidad", "combustible", "odometro", "horometroDiario", "horometroTotal"].includes(
+        column.key,
+      )
+    ) {
       return parseSortableNumber(value)
     }
 
-    if (["datosUlt", "last_report", "lastReport", "fecha", "fechaIngreso", "fechaBaja", "fechaSuspension"].includes(column.key)) {
+    if (
+      [
+        "datosUlt",
+        "last_report",
+        "lastReport",
+        "fecha",
+        "fechaIngreso",
+        "fechaBaja",
+        "fechaSuspension",
+      ].includes(column.key)
+    ) {
       return parseSortableDate(value)
     }
 

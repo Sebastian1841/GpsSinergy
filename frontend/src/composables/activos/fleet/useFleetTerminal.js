@@ -88,10 +88,7 @@ export function useFleetTerminal() {
 
     terminalHistoryByActivo.value = {
       ...terminalHistoryByActivo.value,
-      [key]: [
-        ...currentHistory,
-        ...logs.map(normalizeTerminalHistoryLog),
-      ],
+      [key]: [...currentHistory, ...logs.map(normalizeTerminalHistoryLog)],
     }
   }
 
@@ -100,10 +97,7 @@ export function useFleetTerminal() {
 
     const key = getTerminalHistoryKey(activo)
 
-    const {
-      [key]: _removedTerminalHistory,
-      ...nextTerminalHistory
-    } = terminalHistoryByActivo.value
+    const { [key]: _removedTerminalHistory, ...nextTerminalHistory } = terminalHistoryByActivo.value
 
     terminalHistoryByActivo.value = nextTerminalHistory
   }
@@ -120,12 +114,7 @@ export function useFleetTerminal() {
     terminalActivo.value = null
   }
 
-  const handleTerminalCommand = async ({
-    activo,
-    command,
-    channel,
-    done,
-  }) => {
+  const handleTerminalCommand = async ({ activo, command, channel, done }) => {
     if (!activo || !command) return
 
     const commandLog = createTerminalHistoryLog({
@@ -194,17 +183,15 @@ export function useFleetTerminal() {
 
       appendTerminalHistory(activo, [
         commandLog,
-        ...(
-          backendHistory.length
-            ? backendHistory
-            : [
-                createTerminalHistoryLog({
-                  type: response.ok ? "report" : "error",
-                  source: response.ok ? "Report" : "Error",
-                  message,
-                }),
-              ]
-        ),
+        ...(backendHistory.length
+          ? backendHistory
+          : [
+              createTerminalHistoryLog({
+                type: response.ok ? "report" : "error",
+                source: response.ok ? "Report" : "Error",
+                message,
+              }),
+            ]),
       ])
     } catch (error) {
       const message = error?.message || "Error al enviar comando."

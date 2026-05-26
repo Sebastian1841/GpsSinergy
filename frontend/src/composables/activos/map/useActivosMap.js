@@ -230,9 +230,11 @@ export function useActivosMap({ props, emit, mapRef }) {
       padding: 0.5,
     })
 
-    L.control.zoom({
-      position: "bottomright",
-    }).addTo(map)
+    L.control
+      .zoom({
+        position: "bottomright",
+      })
+      .addTo(map)
 
     layers.markerLayer = L.layerGroup().addTo(map)
     layers.geofenceLayer = L.featureGroup().addTo(map)

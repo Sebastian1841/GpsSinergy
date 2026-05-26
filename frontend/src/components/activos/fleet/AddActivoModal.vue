@@ -4,7 +4,9 @@
     class="fixed inset-0 z-[950] flex items-end justify-center bg-slate-950/45 p-2 sm:items-center sm:p-4"
     @click.self="closeModal"
   >
-    <section class="flex max-h-[calc(100%-16px)] w-full max-w-[920px] flex-col overflow-hidden rounded-t-2xl border border-[#d8dee8] bg-white shadow-2xl sm:max-h-[calc(100%-32px)] sm:rounded-2xl">
+    <section
+      class="flex max-h-[calc(100%-16px)] w-full max-w-[920px] flex-col overflow-hidden rounded-t-2xl border border-[#d8dee8] bg-white shadow-2xl sm:max-h-[calc(100%-32px)] sm:rounded-2xl"
+    >
       <!-- Header corporativo -->
       <header class="shrink-0 bg-[#102372] px-4 py-3 sm:px-5">
         <div class="flex items-center justify-between gap-3">
@@ -17,15 +19,10 @@
               {{ isEditMode ? "Modificar activo GPS" : "Registrar activo GPS" }}
             </h2>
 
-            <p
-              v-if="isEditMode"
-              class="mt-1 truncate text-[11px] font-semibold text-white/65"
-            >
+            <p v-if="isEditMode" class="mt-1 truncate text-[11px] font-semibold text-white/65">
               {{ form.displayName || form.name || "Activo seleccionado" }}
 
-              <span v-if="form.imei">
-                · IMEI {{ form.imei }}
-              </span>
+              <span v-if="form.imei"> · IMEI {{ form.imei }} </span>
             </p>
           </div>
 
@@ -59,18 +56,22 @@
                 :key="step.key"
                 type="button"
                 class="flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left transition"
-                :class="currentStep === index
-                  ? 'bg-[#102372] text-white shadow-sm'
-                  : 'text-[#102372] hover:bg-white hover:text-[#FF6600]'"
+                :class="
+                  currentStep === index
+                    ? 'bg-[#102372] text-white shadow-sm'
+                    : 'text-[#102372] hover:bg-white hover:text-[#FF6600]'
+                "
                 @click="goToStep(index)"
               >
                 <span
                   class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[11px] font-black"
-                  :class="currentStep === index
-                    ? 'bg-[#FF6600] text-white'
-                    : isStepCompleted(index)
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'bg-[#eef3ff] text-[#102372]'"
+                  :class="
+                    currentStep === index
+                      ? 'bg-[#FF6600] text-white'
+                      : isStepCompleted(index)
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'bg-[#eef3ff] text-[#102372]'
+                  "
                 >
                   {{ index + 1 }}
                 </span>
@@ -107,9 +108,9 @@
 
                   <span
                     class="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black"
-                    :class="item.done
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'bg-slate-100 text-slate-400'"
+                    :class="
+                      item.done ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400'
+                    "
                   >
                     {{ item.done ? "OK" : "Pend." }}
                   </span>
@@ -145,7 +146,9 @@
                   </h3>
                 </div>
 
-                <span class="shrink-0 rounded-full bg-[#102372]/10 px-2.5 py-1 text-[10px] font-black text-[#102372]">
+                <span
+                  class="shrink-0 rounded-full bg-[#102372]/10 px-2.5 py-1 text-[10px] font-black text-[#102372]"
+                >
                   {{ currentStep + 1 }} / {{ steps.length }}
                 </span>
               </div>
@@ -153,10 +156,7 @@
 
             <div class="p-4">
               <!-- Módulo 1: Activo -->
-              <div
-                v-if="currentStep === 0"
-                class="grid grid-cols-1 gap-3 sm:grid-cols-2"
-              >
+              <div v-if="currentStep === 0" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label class="flex flex-col gap-1">
                   <span class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
                     Nombre interno *
@@ -198,10 +198,7 @@
               </div>
 
               <!-- Módulo 2: Dispositivo -->
-              <div
-                v-else-if="currentStep === 1"
-                class="grid grid-cols-1 gap-3 sm:grid-cols-2"
-              >
+              <div v-else-if="currentStep === 1" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label class="flex flex-col gap-1 sm:col-span-2">
                   <span class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
                     Modelo GPS *
@@ -211,9 +208,7 @@
                     v-model="form.trackerModel"
                     class="h-10 cursor-pointer rounded-lg border border-[#cbd5e1] bg-white px-3 text-[12px] font-black text-[#172033] outline-none transition focus:border-[#FF6600] focus:ring-2 focus:ring-[#FF6600]/10"
                   >
-                    <option value="">
-                      Seleccionar modelo GPS
-                    </option>
+                    <option value="">Seleccionar modelo GPS</option>
 
                     <option
                       v-for="option in trackerModelOptions"
@@ -225,7 +220,10 @@
                   </select>
 
                   <span class="text-[10px] font-semibold text-slate-400">
-                    {{ selectedTrackerModel?.description || "Selecciona el modelo para habilitar el IMEI." }}
+                    {{
+                      selectedTrackerModel?.description ||
+                      "Selecciona el modelo para habilitar el IMEI."
+                    }}
                   </span>
                 </label>
 
@@ -240,7 +238,9 @@
                     inputmode="numeric"
                     :disabled="!form.trackerModel && !isEditMode"
                     class="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-[12px] font-semibold text-[#172033] outline-none transition placeholder:text-slate-400 focus:border-[#FF6600] focus:ring-2 focus:ring-[#FF6600]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                    :placeholder="form.trackerModel || isEditMode ? '867123456789012' : 'Selecciona un modelo'"
+                    :placeholder="
+                      form.trackerModel || isEditMode ? '867123456789012' : 'Selecciona un modelo'
+                    "
                   />
                 </label>
 
@@ -259,11 +259,11 @@
 
                 <div class="rounded-xl border border-[#d8dee8] bg-[#f8fafc] p-3 sm:col-span-2">
                   <div class="flex items-center justify-between gap-3">
-                    <p class="text-[11px] font-black text-[#102372]">
-                      Comunicación
-                    </p>
+                    <p class="text-[11px] font-black text-[#102372]">Comunicación</p>
 
-                    <span class="rounded-full bg-[#102372] px-2.5 py-1 text-[10px] font-black text-white">
+                    <span
+                      class="rounded-full bg-[#102372] px-2.5 py-1 text-[10px] font-black text-white"
+                    >
                       {{ form.protocol?.toUpperCase() || "TCP" }}
                     </span>
                   </div>
@@ -271,10 +271,7 @@
               </div>
 
               <!-- Módulo 3: Fechas -->
-              <div
-                v-else-if="currentStep === 2"
-                class="grid grid-cols-1 gap-3 sm:grid-cols-3"
-              >
+              <div v-else-if="currentStep === 2" class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <label class="flex flex-col gap-1">
                   <span class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
                     Ingreso
@@ -313,10 +310,7 @@
               </div>
 
               <!-- Módulo 4: Métricas -->
-              <div
-                v-else
-                class="grid grid-cols-1 gap-3 sm:grid-cols-3"
-              >
+              <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <label class="flex flex-col gap-1">
                   <span class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
                     Horómetro diario
@@ -363,9 +357,7 @@
                 </label>
 
                 <div class="rounded-xl border border-[#d8dee8] bg-[#f8fafc] p-3 sm:col-span-3">
-                  <p class="text-[11px] font-black text-[#102372]">
-                    Resumen
-                  </p>
+                  <p class="text-[11px] font-black text-[#102372]">Resumen</p>
 
                   <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
                     <div
@@ -392,7 +384,11 @@
       <footer class="shrink-0 border-t border-[#d8dee8] bg-[#f8fafc] px-4 py-3">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p class="text-[10px] font-semibold text-slate-500">
-            {{ isEditMode ? "Edita los datos necesarios y guarda los cambios." : "Obligatorios: activo y dispositivo." }}
+            {{
+              isEditMode
+                ? "Edita los datos necesarios y guarda los cambios."
+                : "Obligatorios: activo y dispositivo."
+            }}
           </p>
 
           <div class="flex flex-col-reverse gap-2 sm:flex-row">
@@ -447,11 +443,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits([
-  "update:modelValue",
-  "add-activo",
-  "update-activo",
-])
+const emit = defineEmits(["update:modelValue", "add-activo", "update-activo"])
 
 const steps = [
   {
@@ -657,7 +649,8 @@ const fillFormFromActivo = (activo) => {
   form.value = {
     trackerModel: findTrackerModel(activo),
     imei: activo.imei && activo.imei !== "-" ? String(activo.imei) : "",
-    protocol: activo.protocol && activo.protocol !== "-" ? String(activo.protocol).toLowerCase() : "tcp",
+    protocol:
+      activo.protocol && activo.protocol !== "-" ? String(activo.protocol).toLowerCase() : "tcp",
 
     name:
       activo.name && activo.name !== "-"
@@ -714,8 +707,10 @@ watch(
 const isStepCompleted = (index) => {
   if (index === 0) return isAssetStepValid.value
   if (index === 1) return isDeviceStepValid.value
-  if (index === 2) return Boolean(form.value.entryDate || form.value.deactivationDate || form.value.suspensionDate)
-  if (index === 3) return Boolean(form.value.dailyHourmeter || form.value.totalHourmeter || form.value.odometer)
+  if (index === 2)
+    return Boolean(form.value.entryDate || form.value.deactivationDate || form.value.suspensionDate)
+  if (index === 3)
+    return Boolean(form.value.dailyHourmeter || form.value.totalHourmeter || form.value.odometer)
 
   return false
 }
@@ -748,7 +743,8 @@ const buildPayload = () => {
   return {
     trackerModel: form.value.trackerModel,
     trackerModelLabel: selectedTrackerModelLabel.value || props.activo?.trackerModelLabel || "",
-    trackerManufacturer: selectedTrackerModel.value?.manufacturer || props.activo?.trackerManufacturer || "",
+    trackerManufacturer:
+      selectedTrackerModel.value?.manufacturer || props.activo?.trackerManufacturer || "",
     imei: form.value.imei.trim(),
     protocol: form.value.protocol || "tcp",
     name: form.value.name.trim(),

@@ -105,9 +105,7 @@ const getGeofenceTypeText = (type) => {
 
 const getGeofenceSeed = (geofence) => {
   const rawId = String(geofence?.id || geofence?.name || "1")
-  const seed = rawId
-    .split("")
-    .reduce((total, character) => total + character.charCodeAt(0), 0)
+  const seed = rawId.split("").reduce((total, character) => total + character.charCodeAt(0), 0)
 
   return seed || 1
 }

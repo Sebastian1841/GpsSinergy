@@ -9,11 +9,7 @@
     stroke="currentColor"
     stroke-width="2"
   >
-    <path
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-    />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
     <path
       stroke-linecap="round"
       stroke-linejoin="round"
@@ -143,11 +139,7 @@
       stroke-linejoin="round"
       d="M8 16H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"
     />
-    <path
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      d="M8 8h8v8a2 2 0 0 1-2 2H8V8z"
-    />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M8 8h8v8a2 2 0 0 1-2 2H8V8z" />
   </svg>
 
   <!-- Arrow Left / Retroceder -->
@@ -199,11 +191,7 @@
     stroke="currentColor"
     stroke-width="2"
   >
-    <path
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      d="M17 8l4 4m0 0l-4 4m4-4H3"
-    />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
   </svg>
 
   <!-- Close -->
@@ -215,11 +203,7 @@
     stroke="currentColor"
     stroke-width="2"
   >
-    <path
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      d="M6 18L18 6M6 6l12 12"
-    />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
   </svg>
 
   <!-- Plus / Agregar -->
@@ -373,16 +357,8 @@
     stroke="currentColor"
     stroke-width="2"
   >
-    <path
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      d="M4 6h16M4 12h16M4 18h16"
-    />
-    <path
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      d="M8 6v12l4-4 4 4V6"
-    />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M8 6v12l4-4 4 4V6" />
   </svg>
 
   <!-- Fuentes de Datos -->
@@ -395,14 +371,7 @@
     stroke="currentColor"
     stroke-width="2"
   >
-    <ellipse
-      cx="12"
-      cy="5"
-      rx="8"
-      ry="3"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    />
+    <ellipse cx="12" cy="5" rx="8" ry="3" stroke-linecap="round" stroke-linejoin="round" />
     <path
       stroke-linecap="round"
       stroke-linejoin="round"
@@ -425,13 +394,7 @@
     stroke="currentColor"
     stroke-width="2"
   >
-    <circle
-      cx="12"
-      cy="8"
-      r="4"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    />
+    <circle cx="12" cy="8" r="4" stroke-linecap="round" stroke-linejoin="round" />
     <path
       stroke-linecap="round"
       stroke-linejoin="round"
@@ -455,11 +418,7 @@
       d="M6 2h12a2 2 0 012 2v16a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2z"
     />
     <path stroke-linecap="round" stroke-linejoin="round" d="M14 2v6h6" />
-    <path
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      d="M8 12h8M8 16h8M8 20h4"
-    />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h8M8 16h8M8 20h4" />
   </svg>
 
   <!-- Mantenciones -->
@@ -489,13 +448,7 @@
     stroke="currentColor"
     stroke-width="2"
   >
-    <circle
-      cx="12"
-      cy="12"
-      r="3"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    />
+    <circle cx="12" cy="12" r="3" stroke-linecap="round" stroke-linejoin="round" />
     <path
       stroke-linecap="round"
       stroke-linejoin="round"
@@ -576,16 +529,8 @@
       stroke-linejoin="round"
     />
     <path d="M3 20h14" stroke-linecap="round" stroke-linejoin="round" />
-    <path
-      d="M14 9c2 0 3 .7 3 2.5v6.5"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    />
-    <path
-      d="M17 9l2-1 1 1.5-2 1"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    />
+    <path d="M14 9c2 0 3 .7 3 2.5v6.5" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M17 9l2-1 1 1.5-2 1" stroke-linecap="round" stroke-linejoin="round" />
   </svg>
   <!-- Gasto -->
   <svg
@@ -619,16 +564,8 @@
     stroke="currentColor"
     stroke-width="2"
   >
-    <polyline
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      points="4 14 10 10 14 12 20 6"
-    />
-    <polyline
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      points="20 10 20 6 16 6"
-    />
+    <polyline stroke-linecap="round" stroke-linejoin="round" points="4 14 10 10 14 12 20 6" />
+    <polyline stroke-linecap="round" stroke-linejoin="round" points="20 10 20 6 16 6" />
   </svg>
   <!-- Eventos -->
   <svg
@@ -680,11 +617,7 @@
     stroke="currentColor"
     stroke-width="2"
   >
-    <path
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      d="M9 20l3-6-3-6m6 12l3-6-3-6"
-    />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M9 20l3-6-3-6m6 12l3-6-3-6" />
   </svg>
 
   <!-- Upload -->
@@ -742,14 +675,7 @@
       stroke-linejoin="round"
       d="M14 14.76V5a2 2 0 10-4 0v9.76a4 4 0 104 0z"
     />
-    <line
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      x1="12"
-      y1="9"
-      x2="12"
-      y2="14"
-    />
+    <line stroke-linecap="round" stroke-linejoin="round" x1="12" y1="9" x2="12" y2="14" />
   </svg>
 
   <svg
@@ -794,19 +720,13 @@
     -1070 0 0 -270z m1920 -110 l0 -160 -850 0 -850 0 0 153 c0 85 3 157 7 160 3
     4 386 7 850 7 l843 0 0 -160z"
       />
-      <path
-        d="M1492 3633 l3 -108 373 -3 372 -2 0 110 0 110 -375 0 -376 0 3 -107z"
-      />
-      <path
-        d="M2670 3630 l0 -110 375 0 375 0 0 110 0 110 -375 0 -375 0 0 -110z"
-      />
+      <path d="M1492 3633 l3 -108 373 -3 372 -2 0 110 0 110 -375 0 -376 0 3 -107z" />
+      <path d="M2670 3630 l0 -110 375 0 375 0 0 110 0 110 -375 0 -375 0 0 -110z" />
       <path
         d="M1494 2977 c-3 -8 -3 -56 -2 -108 l3 -94 373 -3 372 -2 0 110 0 110
     -370 0 c-299 0 -372 -3 -376 -13z"
       />
-      <path
-        d="M2670 2880 l0 -110 375 0 375 0 0 110 0 110 -375 0 -375 0 0 -110z"
-      />
+      <path d="M2670 2880 l0 -110 375 0 375 0 0 110 0 110 -375 0 -375 0 0 -110z" />
       <path
         d="M3490 2545 c-230 -51 -431 -249 -485 -477 -50 -215 15 -438 175 -598
     198 -198 472 -243 730 -119 118 56 231 170 288 290 50 106 66 171 66 279 0
@@ -815,12 +735,8 @@
     0 -110 -1 -118 -33 -182 -128 -261 -467 -326 -676 -128 -247 234 -134 651 197
     725 75 17 171 11 243 -16z"
       />
-      <path
-        d="M1490 2135 l0 -105 375 0 375 0 0 105 0 105 -375 0 -375 0 0 -105z"
-      />
-      <path
-        d="M1490 1385 l0 -105 375 0 375 0 0 105 0 105 -375 0 -375 0 0 -105z"
-      />
+      <path d="M1490 2135 l0 -105 375 0 375 0 0 105 0 105 -375 0 -375 0 0 -105z" />
+      <path d="M1490 1385 l0 -105 375 0 375 0 0 105 0 105 -375 0 -375 0 0 -105z" />
       <path
         d="M3115 1060 c-211 -32 -391 -160 -484 -344 -57 -113 -71 -195 -71
     -418 l0 -198 105 0 105 0 0 169 c0 92 5 192 10 222 22 117 101 236 197 297 98
@@ -909,11 +825,7 @@
       stroke-linejoin="round"
       d="M4.75 6.75 9 5.25l6 2.5 4.25-1.5v11L15 18.75l-6-2.5-4.25 1.5v-11Z"
     />
-    <path
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      d="M9 5.25v11M15 7.75v11"
-    />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5.25v11M15 7.75v11" />
   </svg>
 
   <!-- Satelital -->
@@ -931,22 +843,10 @@
       stroke-linejoin="round"
       d="M8.25 15.75 6.25 17.75M15.75 8.25l2-2"
     />
-    <path
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      d="M8.25 6.75 17.25 15.75"
-    />
-    <path
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      d="M6.75 10.5 13.5 17.25"
-    />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75 17.25 15.75" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 10.5 13.5 17.25" />
     <path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25 15.75 15" />
-    <path
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      d="M5 20c2.25-2.25 5.75-2.25 8 0"
-    />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M5 20c2.25-2.25 5.75-2.25 8 0" />
   </svg>
 
   <!-- Claro -->
@@ -982,16 +882,8 @@
     stroke="currentColor"
     stroke-width="2"
   >
-    <path
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      d="M5.75 19.25V8.75h5v10.5"
-    />
-    <path
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      d="M13.25 19.25V5.75h5v13.5"
-    />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M5.75 19.25V8.75h5v10.5" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M13.25 19.25V5.75h5v13.5" />
     <path stroke-linecap="round" stroke-linejoin="round" d="M4.75 19.25h14.5" />
     <path
       stroke-linecap="round"
@@ -1028,5 +920,5 @@ export default {
       required: true,
     },
   },
-};
+}
 </script>

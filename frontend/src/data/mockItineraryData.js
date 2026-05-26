@@ -176,64 +176,64 @@ const itineraryAssetProfiles = {
 
 const routeTemplates = {
   "asset-001": [
-    [0.0000, 0.0000],
-    [0.0065, 0.0100],
-    [0.0010, 0.0215],
-    [-0.0060, 0.0180],
-    [-0.0115, 0.0270],
+    [0.0, 0.0],
+    [0.0065, 0.01],
+    [0.001, 0.0215],
+    [-0.006, 0.018],
+    [-0.0115, 0.027],
     [-0.0045, 0.0365],
-    [0.0040, 0.0310],
-    [0.0110, 0.0430],
+    [0.004, 0.031],
+    [0.011, 0.043],
   ],
   "asset-002": [
-    [0.0000, 0.0000],
-    [-0.0090, 0.0080],
-    [-0.0170, 0.0030],
-    [-0.0220, 0.0150],
-    [-0.0140, 0.0260],
-    [-0.0265, 0.0360],
-    [-0.0180, 0.0470],
-    [-0.0060, 0.0410],
+    [0.0, 0.0],
+    [-0.009, 0.008],
+    [-0.017, 0.003],
+    [-0.022, 0.015],
+    [-0.014, 0.026],
+    [-0.0265, 0.036],
+    [-0.018, 0.047],
+    [-0.006, 0.041],
   ],
   "asset-003": [
-    [0.0000, 0.0000],
-    [-0.0060, -0.0120],
-    [0.0040, -0.0210],
-    [0.0140, -0.0160],
-    [0.0200, -0.0300],
-    [0.0100, -0.0410],
-    [-0.0020, -0.0340],
-    [-0.0110, -0.0460],
+    [0.0, 0.0],
+    [-0.006, -0.012],
+    [0.004, -0.021],
+    [0.014, -0.016],
+    [0.02, -0.03],
+    [0.01, -0.041],
+    [-0.002, -0.034],
+    [-0.011, -0.046],
   ],
   "asset-004": [
-    [0.0000, 0.0000],
-    [0.0080, -0.0070],
-    [0.0180, -0.0010],
-    [0.0220, -0.0130],
-    [0.0130, -0.0240],
-    [0.0250, -0.0350],
-    [0.0340, -0.0260],
-    [0.0290, -0.0110],
+    [0.0, 0.0],
+    [0.008, -0.007],
+    [0.018, -0.001],
+    [0.022, -0.013],
+    [0.013, -0.024],
+    [0.025, -0.035],
+    [0.034, -0.026],
+    [0.029, -0.011],
   ],
   "asset-005": [
-    [0.0000, 0.0000],
-    [-0.0100, 0.0040],
-    [-0.0160, -0.0080],
-    [-0.0070, -0.0180],
-    [-0.0190, -0.0290],
-    [-0.0310, -0.0210],
-    [-0.0260, -0.0060],
-    [-0.0380, 0.0040],
+    [0.0, 0.0],
+    [-0.01, 0.004],
+    [-0.016, -0.008],
+    [-0.007, -0.018],
+    [-0.019, -0.029],
+    [-0.031, -0.021],
+    [-0.026, -0.006],
+    [-0.038, 0.004],
   ],
   "asset-006": [
-    [0.0000, 0.0000],
-    [0.0120, 0.0060],
-    [0.0200, -0.0070],
-    [0.0320, -0.0020],
-    [0.0380, 0.0140],
-    [0.0280, 0.0270],
-    [0.0150, 0.0200],
-    [0.0040, 0.0340],
+    [0.0, 0.0],
+    [0.012, 0.006],
+    [0.02, -0.007],
+    [0.032, -0.002],
+    [0.038, 0.014],
+    [0.028, 0.027],
+    [0.015, 0.02],
+    [0.004, 0.034],
   ],
 }
 
@@ -279,12 +279,7 @@ const createPoint = ({
   isCurrentLocation,
 })
 
-const getRoutePointOffset = ({
-  assetId,
-  pointIndex,
-  dayIndex,
-  assetIndex,
-}) => {
+const getRoutePointOffset = ({ assetId, pointIndex, dayIndex, assetIndex }) => {
   const template = routeTemplates[assetId] || routeTemplates["asset-001"]
   const [baseLatOffset, baseLngOffset] = template[pointIndex]
 
@@ -304,12 +299,7 @@ const getRoutePointOffset = ({
   }
 }
 
-const buildCurrentLocationPoint = ({
-  asset,
-  dateString,
-  pointIndex,
-  odometer,
-}) => {
+const buildCurrentLocationPoint = ({ asset, dateString, odometer }) => {
   return createPoint({
     id: `${asset.id}-${dateString}-current`,
     assetId: asset.id,
@@ -324,12 +314,7 @@ const buildCurrentLocationPoint = ({
   })
 }
 
-const generateDailyPointsForAsset = ({
-  asset,
-  dateString,
-  dayIndex,
-  assetIndex,
-}) => {
+const generateDailyPointsForAsset = ({ asset, dateString, dayIndex, assetIndex }) => {
   const profile = itineraryAssetProfiles[asset.id]
   const template = routeTemplates[asset.id]
 
@@ -379,8 +364,7 @@ const generateDailyPointsForAsset = ({
     })
 
     const odometerIncrement =
-      dayIndex * (45 + assetIndex * 5) +
-      index * (isStop ? 3 : 9 + assetIndex)
+      dayIndex * (45 + assetIndex * 5) + index * (isStop ? 3 : 9 + assetIndex)
 
     const event = isFirst
       ? "Inicio detenido"
@@ -413,7 +397,6 @@ const generateDailyPointsForAsset = ({
       buildCurrentLocationPoint({
         asset,
         dateString,
-        pointIndex: points.length,
         odometer: lastHistoricalPoint?.odometer || profile.odometerStart,
       }),
     ]
@@ -445,9 +428,7 @@ const generateMonthlyItineraryPoints = () => {
 export const mockItineraryPoints = generateMonthlyItineraryPoints()
 
 export const getLatestItineraryDate = () => {
-  const dates = mockItineraryPoints
-    .map((point) => point.timestamp.slice(0, 10))
-    .sort()
+  const dates = mockItineraryPoints.map((point) => point.timestamp.slice(0, 10)).sort()
 
   return dates[dates.length - 1] || new Date().toISOString().slice(0, 10)
 }
@@ -508,19 +489,14 @@ export const haversineDistanceKm = (pointA, pointB) => {
 
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1) * Math.cos(lat2) *
-      Math.sin(dLng / 2) * Math.sin(dLng / 2)
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2)
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 
   return earthRadiusKm * c
 }
 
-export const filterItineraryPoints = ({
-  assetId,
-  fromDate,
-  toDate,
-}) => {
+export const filterItineraryPoints = ({ assetId, fromDate, toDate }) => {
   return mockItineraryPoints
     .filter((point) => {
       const date = point.timestamp.slice(0, 10)
@@ -530,13 +506,8 @@ export const filterItineraryPoints = ({
     .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
 }
 
-export const buildItineraryResult = ({
-  asset,
-  points,
-}) => {
-  const sortedPoints = [...points].sort(
-    (a, b) => new Date(a.timestamp) - new Date(b.timestamp),
-  )
+export const buildItineraryResult = ({ asset, points }) => {
+  const sortedPoints = [...points].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
 
   let accumulatedDistanceKm = 0
   let movingMinutes = 0

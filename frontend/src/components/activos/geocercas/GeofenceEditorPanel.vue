@@ -1,5 +1,7 @@
 <template>
-  <div class="absolute left-[68px] top-3 z-[500] max-w-[360px] rounded-xl border border-[#d8dee8] bg-white px-3 py-2 shadow-lg">
+  <div
+    class="absolute left-[68px] top-3 z-[500] max-w-[360px] rounded-xl border border-[#d8dee8] bg-white px-3 py-2 shadow-lg"
+  >
     <p class="text-[11px] font-black text-[#102372]">
       {{ helperTitle }}
     </p>
@@ -8,10 +10,7 @@
       {{ helperText }}
     </p>
 
-    <div
-      v-if="drawMode && !editingDraft"
-      class="mt-3 grid gap-2 border-t border-[#edf0f5] pt-3"
-    >
+    <div v-if="drawMode && !editingDraft" class="mt-3 grid gap-2 border-t border-[#edf0f5] pt-3">
       <label class="block">
         <span class="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
           Nombre
@@ -28,7 +27,9 @@
 
       <div class="grid grid-cols-2 gap-2">
         <label class="block">
-          <span class="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+          <span
+            class="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400"
+          >
             Borde
           </span>
 
@@ -40,11 +41,10 @@
           />
         </label>
 
-        <label
-          v-if="drawMode !== 'route'"
-          class="block"
-        >
-          <span class="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+        <label v-if="drawMode !== 'route'" class="block">
+          <span
+            class="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400"
+          >
             Relleno
           </span>
 
@@ -56,17 +56,12 @@
           />
         </label>
 
-        <div
-          v-else
-          class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
-        >
+        <div v-else class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
           <span class="block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
             Tipo
           </span>
 
-          <p class="mt-1 text-[11px] font-black text-[#102372]">
-            Ruta
-          </p>
+          <p class="mt-1 text-[11px] font-black text-[#102372]">Ruta</p>
         </div>
       </div>
 
@@ -98,10 +93,7 @@
       </div>
     </div>
 
-    <div
-      v-if="editingDraft"
-      class="mt-3 grid gap-2 border-t border-[#edf0f5] pt-3"
-    >
+    <div v-if="editingDraft" class="mt-3 grid gap-2 border-t border-[#edf0f5] pt-3">
       <label class="block">
         <span class="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
           Nombre
@@ -119,7 +111,9 @@
 
       <div class="grid grid-cols-2 gap-2">
         <label class="block">
-          <span class="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+          <span
+            class="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400"
+          >
             Borde
           </span>
 
@@ -131,11 +125,10 @@
           />
         </label>
 
-        <label
-          v-if="editingDraft.type !== 'route'"
-          class="block"
-        >
-          <span class="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+        <label v-if="editingDraft.type !== 'route'" class="block">
+          <span
+            class="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400"
+          >
             Relleno
           </span>
 
@@ -147,17 +140,12 @@
           />
         </label>
 
-        <div
-          v-else
-          class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
-        >
+        <div v-else class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
           <span class="block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
             Tipo
           </span>
 
-          <p class="mt-1 text-[11px] font-black text-[#102372]">
-            Ruta
-          </p>
+          <p class="mt-1 text-[11px] font-black text-[#102372]">Ruta</p>
         </div>
       </div>
 
@@ -221,10 +209,7 @@
       </button>
     </div>
 
-    <div
-      v-if="editingDraft?.type === 'circle'"
-      class="mt-2 flex gap-2"
-    >
+    <div v-if="editingDraft?.type === 'circle'" class="mt-2 flex gap-2">
       <button
         type="button"
         class="cursor-pointer rounded-md bg-[#102372] px-2 py-1 text-[10px] font-black text-white transition hover:bg-[#0c1b59]"

@@ -32,7 +32,9 @@
                 {{ modalTitle }}
               </h2>
 
-              <p class="mt-1 max-w-[720px] text-[11px] font-semibold leading-relaxed text-slate-500">
+              <p
+                class="mt-1 max-w-[720px] text-[11px] font-semibold leading-relaxed text-slate-500"
+              >
                 {{ modalDescription }}
               </p>
             </div>
@@ -125,7 +127,9 @@
             v-if="!sortedRows.length"
             class="flex min-h-[230px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center"
           >
-            <div class="mb-3 grid h-10 w-10 place-items-center rounded-lg bg-[#102372] text-[17px] font-black text-white">
+            <div
+              class="mb-3 grid h-10 w-10 place-items-center rounded-lg bg-[#102372] text-[17px] font-black text-white"
+            >
               G
             </div>
 
@@ -148,11 +152,10 @@
             </button>
           </div>
 
-          <div
-            v-else
-            class="overflow-hidden rounded-xl border border-slate-200"
-          >
-            <div class="hidden grid-cols-[1.2fr_0.8fr_0.8fr_0.55fr_0.55fr] gap-3 border-b border-slate-200 bg-[#102372] px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.12em] text-white/70 md:grid">
+          <div v-else class="overflow-hidden rounded-xl border border-slate-200">
+            <div
+              class="hidden grid-cols-[1.2fr_0.8fr_0.8fr_0.55fr_0.55fr] gap-3 border-b border-slate-200 bg-[#102372] px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.12em] text-white/70 md:grid"
+            >
               <button
                 type="button"
                 class="flex cursor-pointer items-center gap-1 text-left transition hover:text-white"
@@ -227,9 +230,7 @@
                 {{ row.displayDate }}
               </p>
 
-              <p class="text-[11px] font-bold text-slate-600">
-                {{ row.event.speed ?? "-" }} km/h
-              </p>
+              <p class="text-[11px] font-bold text-slate-600">{{ row.event.speed ?? "-" }} km/h</p>
 
               <p class="text-[11px] font-bold text-slate-600">
                 {{ row.event.duration || "-" }}
@@ -238,7 +239,9 @@
           </div>
         </div>
 
-        <footer class="flex shrink-0 items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3 sm:px-5">
+        <footer
+          class="flex shrink-0 items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3 sm:px-5"
+        >
           <p class="hidden text-[10px] font-bold text-slate-400 sm:block">
             Doble clic en el encabezado para restaurar el tamaño.
           </p>
@@ -292,7 +295,9 @@
           class="absolute bottom-0 right-0 z-40 h-7 w-7 touch-none cursor-nwse-resize"
           @pointerdown.stop="startResize($event, 'se')"
         >
-          <div class="absolute bottom-2 right-2 h-3 w-3 rounded-sm border-b-2 border-r-2 border-slate-400"></div>
+          <div
+            class="absolute bottom-2 right-2 h-3 w-3 rounded-sm border-b-2 border-r-2 border-slate-400"
+          ></div>
         </div>
       </section>
     </div>
@@ -410,9 +415,7 @@ const parseEventDate = (value) => {
   }
 
   const normalized = String(value).trim()
-  const match = normalized.match(
-    /^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?/,
-  )
+  const match = normalized.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?/)
 
   if (!match) return null
 
@@ -456,16 +459,18 @@ const normalizedRows = computed(() => {
     const eventLabel = getEventLabel(event.eventType)
     const displayDate = formatEventDate(rawDate, time)
 
-    const searchText = normalizeText([
-      event.patent,
-      event.vehicle,
-      event.driver,
-      event.eventLabel,
-      eventLabel,
-      displayDate,
-      event.speed,
-      event.duration,
-    ].join(" "))
+    const searchText = normalizeText(
+      [
+        event.patent,
+        event.vehicle,
+        event.driver,
+        event.eventLabel,
+        eventLabel,
+        displayDate,
+        event.speed,
+        event.duration,
+      ].join(" "),
+    )
 
     return {
       key: event.id || `${event.patent || event.vehicle || "event"}-${rawDate || index}`,
@@ -665,9 +670,7 @@ const getSortIcon = (key) => {
 
 const uniqueVehicles = computed(() => {
   return new Set(
-    filteredRows.value
-      .map((row) => row.event.patent || row.event.vehicle)
-      .filter(Boolean),
+    filteredRows.value.map((row) => row.event.patent || row.event.vehicle).filter(Boolean),
   ).size
 })
 

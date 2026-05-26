@@ -49,9 +49,7 @@ const getBearing = (fromPoint, toPoint) => {
   const deltaLng = toRad(Number(toPoint.lng) - Number(fromPoint.lng))
 
   const y = Math.sin(deltaLng) * Math.cos(lat2)
-  const x =
-    Math.cos(lat1) * Math.sin(lat2) -
-    Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLng)
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLng)
 
   return (toDeg(Math.atan2(y, x)) + 360) % 360
 }
@@ -60,15 +58,7 @@ const getItineraryRoutePalette = (index = 0) => {
   return itineraryRoutePalette[index % itineraryRoutePalette.length]
 }
 
-const getItineraryRouteColor = (index = 0) => {
-  return getItineraryRoutePalette(index).main
-}
-
-const createItineraryIcon = ({
-  type = "point",
-  label = "",
-  selected = false,
-} = {}) => {
+const createItineraryIcon = ({ type = "point", label = "", selected = false } = {}) => {
   const styles = {
     start: {
       bg: "#16a34a",
@@ -167,12 +157,7 @@ const buildItineraryTooltip = (point, label = "Punto") => {
   `
 }
 
-export function createItineraryMapController({
-  props,
-  getMap,
-  getRenderer,
-  layers,
-}) {
+export function createItineraryMapController({ props, getMap, getRenderer, layers }) {
   const createItineraryRouteStyles = (index = 0) => {
     const palette = getItineraryRoutePalette(index)
     const renderer = getRenderer()
@@ -288,9 +273,7 @@ export function createItineraryMapController({
 
     if (!route) return []
 
-    const sourceRoutes = Array.isArray(route.routes) && route.routes.length
-      ? route.routes
-      : [route]
+    const sourceRoutes = Array.isArray(route.routes) && route.routes.length ? route.routes : [route]
 
     return sourceRoutes
       .map((item, index) => {

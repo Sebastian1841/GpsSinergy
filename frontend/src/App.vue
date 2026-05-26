@@ -3,7 +3,7 @@
     <AppHeader @toggle-sidebar="toggleSidebar" />
 
     <div class="relative flex min-h-0 flex-1 overflow-hidden">
-      <AppSidebar v-model:isOpen="showSidebar" />
+      <AppSidebar v-model:is-open="showSidebar" />
 
       <main class="min-h-0 flex-1 overflow-hidden bg-[#f3f3f3]">
         <router-view />

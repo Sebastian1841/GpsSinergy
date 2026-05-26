@@ -43,11 +43,7 @@
               stroke="currentColor"
               stroke-width="2"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M15 19l-7-7 7-7"
-              />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
 
@@ -55,9 +51,7 @@
             <p class="text-[10px] font-black uppercase tracking-[0.22em] text-white/45">
               Plataforma
             </p>
-            <h2 class="mt-1 truncate text-sm font-bold text-white">
-              Sistema
-            </h2>
+            <h2 class="mt-1 truncate text-sm font-bold text-white">Sistema</h2>
           </div>
 
           <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#ff6600]">
@@ -80,7 +74,9 @@
               active-class="sidebar-link-active"
               @click="$emit('update:isOpen', false)"
             >
-              <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/70 transition-colors duration-100 group-hover:bg-[#ff6600] group-hover:text-white">
+              <div
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/70 transition-colors duration-100 group-hover:bg-[#ff6600] group-hover:text-white"
+              >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   class="h-5 w-5"
@@ -97,11 +93,11 @@
                 </svg>
               </div>
 
-              <span class="min-w-0 flex-1 truncate">
-                Activos
-              </span>
+              <span class="min-w-0 flex-1 truncate"> Activos </span>
 
-              <span class="h-2 w-2 rounded-full bg-transparent transition-colors duration-100 group-hover:bg-[#ff6600]"></span>
+              <span
+                class="h-2 w-2 rounded-full bg-transparent transition-colors duration-100 group-hover:bg-[#ff6600]"
+              ></span>
             </RouterLink>
           </li>
         </ul>
@@ -111,12 +107,8 @@
       <footer class="relative z-10 border-t border-white/10 px-4 py-3">
         <div class="flex items-center justify-between rounded-2xl bg-black/10 px-3 py-2">
           <div>
-            <p class="text-[10px] font-black uppercase tracking-[0.16em] text-white/35">
-              Sinergy
-            </p>
-            <p class="text-xs text-white/60">
-              Sistema corporativo
-            </p>
+            <p class="text-[10px] font-black uppercase tracking-[0.16em] text-white/35">Sinergy</p>
+            <p class="text-xs text-white/60">Sistema corporativo</p>
           </div>
 
           <div class="h-2.5 w-2.5 rounded-full bg-[#ff6600]"></div>

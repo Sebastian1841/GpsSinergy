@@ -32,7 +32,9 @@
                 Seleccionar geocerca
               </h2>
 
-              <p class="mt-1 max-w-[720px] text-[11px] font-semibold leading-relaxed text-slate-500">
+              <p
+                class="mt-1 max-w-[720px] text-[11px] font-semibold leading-relaxed text-slate-500"
+              >
                 Edita una geocerca o revisa el historial de vehículos asociados.
               </p>
             </div>
@@ -53,9 +55,7 @@
             v-if="!geofenceItems.length"
             class="flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-5 text-center"
           >
-            <p class="text-[13px] font-black text-[#172033]">
-              No hay geocercas creadas
-            </p>
+            <p class="text-[13px] font-black text-[#172033]">No hay geocercas creadas</p>
 
             <p class="mt-1 max-w-[320px] text-[11px] font-semibold text-slate-500">
               Crea una geocerca desde el menú Geocerca usando la opción circular, poligonal o ruta.
@@ -71,17 +71,16 @@
             </button>
           </div>
 
-          <div
-            v-else
-            class="grid grid-cols-1 gap-3 sm:grid-cols-2"
-          >
+          <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <article
               v-for="geofence in geofenceItems"
               :key="geofence.id"
               class="flex min-h-0 flex-col justify-between rounded-xl border border-[#d8dee8] bg-white p-3 shadow-sm transition hover:border-[#FF6600] sm:p-4"
-              :class="selectedGeofenceId === geofence.id || editingDraft?.id === geofence.id
-                ? 'border-[#FF6600] bg-[#fff7ed]'
-                : ''"
+              :class="
+                selectedGeofenceId === geofence.id || editingDraft?.id === geofence.id
+                  ? 'border-[#FF6600] bg-[#fff7ed]'
+                  : ''
+              "
             >
               <div class="min-w-0">
                 <div class="flex items-start justify-between gap-3">
@@ -149,7 +148,9 @@
           </div>
         </div>
 
-        <footer class="flex shrink-0 items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3 sm:px-5">
+        <footer
+          class="flex shrink-0 items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3 sm:px-5"
+        >
           <p class="hidden text-[10px] font-bold text-slate-400 sm:block">
             Puedes mover y redimensionar este modal. Doble clic en el encabezado para restaurar.
           </p>
@@ -203,7 +204,9 @@
           class="absolute bottom-0 right-0 z-40 h-7 w-7 touch-none cursor-nwse-resize"
           @pointerdown.stop="startResize($event, 'se')"
         >
-          <div class="absolute bottom-2 right-2 h-3 w-3 rounded-sm border-b-2 border-r-2 border-slate-400"></div>
+          <div
+            class="absolute bottom-2 right-2 h-3 w-3 rounded-sm border-b-2 border-r-2 border-slate-400"
+          ></div>
         </div>
       </section>
     </div>
@@ -241,12 +244,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits([
-  "update:modelValue",
-  "select-edit",
-  "open-history",
-  "delete-geofence",
-])
+const emit = defineEmits(["update:modelValue", "select-edit", "open-history", "delete-geofence"])
 
 const {
   modalRef,

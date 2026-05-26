@@ -10,16 +10,10 @@
           {{ item.label }}
         </p>
 
-        <span
-          class="h-2.5 w-2.5 rounded-full"
-          :class="item.dot"
-        ></span>
+        <span class="h-2.5 w-2.5 rounded-full" :class="item.dot"></span>
       </div>
 
-      <p
-        class="mt-2 truncate text-[20px] font-black leading-none"
-        :class="item.valueClass"
-      >
+      <p class="mt-2 truncate text-[20px] font-black leading-none" :class="item.valueClass">
         {{ item.value }}
       </p>
 

@@ -7,18 +7,22 @@
         <button
           type="button"
           class="flex h-8 min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-md px-2 text-[10px] font-black transition"
-          :class="activePanelView === 'itinerarios'
-            ? 'bg-[#102372] text-white shadow-sm'
-            : 'text-[#102372] hover:bg-white hover:text-[#FF6600]'"
+          :class="
+            activePanelView === 'itinerarios'
+              ? 'bg-[#102372] text-white shadow-sm'
+              : 'text-[#102372] hover:bg-white hover:text-[#FF6600]'
+          "
           @click="activePanelView = 'itinerarios'"
         >
           <span class="truncate">Itinerarios</span>
 
           <span
             class="rounded px-1.5 py-0.5 text-[9px] font-black"
-            :class="activePanelView === 'itinerarios'
-              ? 'bg-white/15 text-white'
-              : 'bg-[#102372]/10 text-[#102372]'"
+            :class="
+              activePanelView === 'itinerarios'
+                ? 'bg-white/15 text-white'
+                : 'bg-[#102372]/10 text-[#102372]'
+            "
           >
             {{ filteredAssets.length }}
           </span>
@@ -26,9 +30,11 @@
           <span
             v-if="selectedAssetIds.length"
             class="rounded px-1.5 py-0.5 text-[9px] font-black"
-            :class="activePanelView === 'itinerarios'
-              ? 'bg-[#FF6600] text-white'
-              : 'bg-[#FF6600]/10 text-[#FF6600]'"
+            :class="
+              activePanelView === 'itinerarios'
+                ? 'bg-[#FF6600] text-white'
+                : 'bg-[#FF6600]/10 text-[#FF6600]'
+            "
           >
             {{ selectedAssetIds.length }} sel.
           </span>
@@ -37,9 +43,11 @@
         <button
           type="button"
           class="flex h-8 min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-md px-2 text-[10px] font-black transition"
-          :class="activePanelView === 'resumen-dia'
-            ? 'bg-[#102372] text-white shadow-sm'
-            : 'text-[#102372] hover:bg-white hover:text-[#FF6600]'"
+          :class="
+            activePanelView === 'resumen-dia'
+              ? 'bg-[#102372] text-white shadow-sm'
+              : 'text-[#102372] hover:bg-white hover:text-[#FF6600]'
+          "
           @click="activePanelView = 'resumen-dia'"
         >
           <span class="truncate">Resumen del día</span>
@@ -47,9 +55,11 @@
           <span
             v-if="routeResult?.rows?.length"
             class="rounded px-1.5 py-0.5 text-[9px] font-black"
-            :class="activePanelView === 'resumen-dia'
-              ? 'bg-white/15 text-white'
-              : 'bg-[#102372]/10 text-[#102372]'"
+            :class="
+              activePanelView === 'resumen-dia'
+                ? 'bg-white/15 text-white'
+                : 'bg-[#102372]/10 text-[#102372]'
+            "
           >
             {{ routeResult.rows.length }}
           </span>
@@ -60,9 +70,13 @@
         <!-- Buscador + selector de dispositivos + acciones -->
         <section class="relative">
           <div class="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1.5">
-            <div class="flex h-8 min-w-0 overflow-hidden rounded-lg border border-[#d8dee8] bg-white transition focus-within:border-[#FF6600] focus-within:ring-2 focus-within:ring-[#FF6600]/15">
+            <div
+              class="flex h-8 min-w-0 overflow-hidden rounded-lg border border-[#d8dee8] bg-white transition focus-within:border-[#FF6600] focus-within:ring-2 focus-within:ring-[#FF6600]/15"
+            >
               <div class="relative min-w-0 flex-1">
-                <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-slate-400">
+                <span
+                  class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-slate-400"
+                >
                   ⌕
                 </span>
 
@@ -94,7 +108,9 @@
                 :title="selectedAssetsSummary"
                 @click="showDeviceList = !showDeviceList"
               >
-                <span class="min-w-0 truncate text-[9.5px] font-black uppercase tracking-[0.06em] text-slate-500">
+                <span
+                  class="min-w-0 truncate text-[9.5px] font-black uppercase tracking-[0.06em] text-slate-500"
+                >
                   {{ selectedAssetsSummary }}
                 </span>
 
@@ -128,7 +144,9 @@
             v-if="showDeviceList"
             class="absolute left-0 right-0 top-[36px] z-30 overflow-hidden rounded-lg border border-[#d8dee8] bg-white shadow-xl"
           >
-            <div class="flex items-center justify-between gap-2 border-b border-[#edf1f5] bg-[#f8fafc] px-2 py-1.5">
+            <div
+              class="flex items-center justify-between gap-2 border-b border-[#edf1f5] bg-[#f8fafc] px-2 py-1.5"
+            >
               <p class="truncate text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
                 Selección de dispositivos
               </p>
@@ -163,9 +181,11 @@
               >
                 <span
                   class="flex h-4 w-4 items-center justify-center rounded border text-[10px] font-black transition"
-                  :class="isAssetSelected(asset.id)
-                    ? 'border-[#FF6600] bg-[#FF6600] text-white'
-                    : 'border-[#cbd5e1] bg-white text-transparent'"
+                  :class="
+                    isAssetSelected(asset.id)
+                      ? 'border-[#FF6600] bg-[#FF6600] text-white'
+                      : 'border-[#cbd5e1] bg-white text-transparent'
+                  "
                 >
                   ✓
                 </span>
@@ -183,7 +203,7 @@
                   </span>
 
                   <span class="block truncate text-[10px] font-semibold text-slate-500">
-                    {{ asset.deviceId }} · {{ asset.conductor || 'Sin conductor' }}
+                    {{ asset.deviceId }} · {{ asset.conductor || "Sin conductor" }}
                   </span>
                 </span>
 
@@ -195,17 +215,10 @@
                 </span>
               </button>
 
-              <div
-                v-if="!filteredAssets.length"
-                class="px-3 py-4 text-center"
-              >
-                <p class="text-[11px] font-black text-[#102372]">
-                  Sin dispositivos
-                </p>
+              <div v-if="!filteredAssets.length" class="px-3 py-4 text-center">
+                <p class="text-[11px] font-black text-[#102372]">Sin dispositivos</p>
 
-                <p class="mt-1 text-[10px] font-semibold text-slate-500">
-                  No hay coincidencias.
-                </p>
+                <p class="mt-1 text-[10px] font-semibold text-slate-500">No hay coincidencias.</p>
               </div>
             </div>
           </div>
@@ -218,19 +231,18 @@
             :key="option.value"
             type="button"
             class="cursor-pointer rounded-md px-2 py-1.5 text-[10px] font-black transition"
-            :class="dateRange === option.value
-              ? 'bg-[#102372] text-white shadow-sm'
-              : 'text-[#102372] hover:bg-white hover:text-[#FF6600]'"
+            :class="
+              dateRange === option.value
+                ? 'bg-[#102372] text-white shadow-sm'
+                : 'text-[#102372] hover:bg-white hover:text-[#FF6600]'
+            "
             @click="setDateRange(option.value)"
           >
             {{ option.label }}
           </button>
         </div>
 
-        <div
-          v-if="dateRange === 'custom'"
-          class="grid grid-cols-2 gap-2"
-        >
+        <div v-if="dateRange === 'custom'" class="grid grid-cols-2 gap-2">
           <input
             v-model="fromDate"
             type="date"
@@ -255,19 +267,14 @@
 
     <!-- Contenido variable -->
     <main class="min-h-0 flex-1 overflow-auto p-2">
-      <div
-        v-if="routeResult && activePanelView === 'itinerarios'"
-        class="space-y-2"
-      >
+      <div v-if="routeResult && activePanelView === 'itinerarios'" class="space-y-2">
         <ItinerarySummary :summary="routeResult.summary" />
 
         <div
           v-if="!routeResult.rows.length"
           class="rounded-lg border border-dashed border-[#cbd5e1] bg-white px-3 py-4 text-center"
         >
-          <p class="text-[11px] font-black text-[#102372]">
-            Sin puntos GPS para este rango
-          </p>
+          <p class="text-[11px] font-black text-[#102372]">Sin puntos GPS para este rango</p>
 
           <p class="mt-1 text-[10px] font-semibold text-slate-500">
             Cambia la fecha o selecciona otro dispositivo.
@@ -296,7 +303,7 @@
         class="flex min-h-[180px] flex-col items-center justify-center rounded-lg border border-dashed border-[#cbd5e1] bg-white p-4 text-center"
       >
         <h3 class="text-[12px] font-black text-[#102372]">
-          {{ activePanelView === 'resumen-dia' ? 'Sin resumen cargado' : 'Sin recorrido cargado' }}
+          {{ activePanelView === "resumen-dia" ? "Sin resumen cargado" : "Sin recorrido cargado" }}
         </h3>
 
         <p class="mt-1 max-w-[230px] text-[10px] font-semibold leading-relaxed text-slate-500">
@@ -308,7 +315,7 @@
           class="mt-3 h-8 cursor-pointer rounded-lg bg-[#102372] px-4 text-[10px] font-black text-white transition hover:bg-[#0c1b59]"
           @click="searchItinerary"
         >
-          {{ activePanelView === 'resumen-dia' ? 'Buscar resumen' : 'Buscar recorrido' }}
+          {{ activePanelView === "resumen-dia" ? "Buscar resumen" : "Buscar recorrido" }}
         </button>
       </div>
     </main>
@@ -337,11 +344,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits([
-  "route-selected",
-  "point-selected",
-  "clear-route",
-])
+const emit = defineEmits(["route-selected", "point-selected", "clear-route"])
 
 const latestDate = getLatestItineraryDate()
 
@@ -421,11 +424,9 @@ const normalizedAssets = computed(() => {
 
   return mockItineraryAssets.map((itineraryAsset) => {
     const matchingCurrentAsset = fromProps.find((activo) => {
-      const samePatente =
-        normalizeText(activo.patente) === normalizeText(itineraryAsset.patente)
+      const samePatente = normalizeText(activo.patente) === normalizeText(itineraryAsset.patente)
 
-      const sameDevice =
-        normalizeText(activo.deviceId) === normalizeText(itineraryAsset.deviceId)
+      const sameDevice = normalizeText(activo.deviceId) === normalizeText(itineraryAsset.deviceId)
 
       return samePatente || sameDevice
     })
@@ -497,9 +498,7 @@ const selectedAssetsSummary = computed(() => {
 
   const remaining = selectedAssets.value.length - 2
 
-  return remaining > 0
-    ? `${labels} +${remaining} más`
-    : labels
+  return remaining > 0 ? `${labels} +${remaining} más` : labels
 })
 
 const primarySelectedAsset = computed(() => {
@@ -880,19 +879,23 @@ watch(dateRange, () => {
   applyDateRange()
 })
 
-watch(filteredAssets, (assets) => {
-  if (!assets.length) {
-    selectedAssetIds.value = []
-    return
-  }
+watch(
+  filteredAssets,
+  (assets) => {
+    if (!assets.length) {
+      selectedAssetIds.value = []
+      return
+    }
 
-  const availableIds = new Set(normalizedAssets.value.map((asset) => asset.id))
-  selectedAssetIds.value = selectedAssetIds.value.filter((id) => availableIds.has(id))
+    const availableIds = new Set(normalizedAssets.value.map((asset) => asset.id))
+    selectedAssetIds.value = selectedAssetIds.value.filter((id) => availableIds.has(id))
 
-  if (!selectedAssetIds.value.length) {
-    selectedAssetIds.value = [assets[0].id]
-  }
-}, { immediate: true })
+    if (!selectedAssetIds.value.length) {
+      selectedAssetIds.value = [assets[0].id]
+    }
+  },
+  { immediate: true },
+)
 
 onMounted(() => {
   applyDateRange()

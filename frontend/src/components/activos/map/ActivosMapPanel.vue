@@ -1,11 +1,10 @@
 <template>
-  <section class="relative min-h-0 overflow-hidden rounded-xl border border-[#d8dee8] bg-[#dbe3ee] shadow-sm">
+  <section
+    class="relative min-h-0 overflow-hidden rounded-xl border border-[#d8dee8] bg-[#dbe3ee] shadow-sm"
+  >
     <div ref="mapRef" class="absolute inset-0"></div>
 
-    <div
-      v-if="showKpis"
-      class="pointer-events-none absolute bottom-3 left-3 z-[520]"
-    >
+    <div v-if="showKpis" class="pointer-events-none absolute bottom-3 left-3 z-[520]">
       <TopStatsBar
         :activos="mapStatsActivos"
         :active-filter="activeFilter"
@@ -40,7 +39,9 @@
     />
 
     <div class="pointer-events-none absolute right-3 top-3 z-[520]">
-      <div class="flex items-center gap-1.5 rounded-xl border border-white/70 bg-white/90 px-2.5 py-1.5 text-[10px] font-black text-[#102372] shadow-lg backdrop-blur-md">
+      <div
+        class="flex items-center gap-1.5 rounded-xl border border-white/70 bg-white/90 px-2.5 py-1.5 text-[10px] font-black text-[#102372] shadow-lg backdrop-blur-md"
+      >
         <span class="h-1.5 w-1.5 rounded-full bg-[#FF6600]"></span>
         <span>{{ currentMapTypeOption.label }}</span>
       </div>

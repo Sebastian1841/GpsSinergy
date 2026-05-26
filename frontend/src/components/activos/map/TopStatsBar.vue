@@ -6,9 +6,11 @@
       type="button"
       :title="`${item.label}: ${item.value}`"
       class="group relative flex h-[48px] w-[48px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border-2 bg-white text-center shadow-[0_12px_28px_rgba(15,23,42,0.34)] transition hover:-translate-y-[1px] hover:scale-[1.03] hover:bg-white hover:shadow-[0_16px_36px_rgba(15,23,42,0.42)]"
-      :class="activeFilter === item.filter
-        ? 'border-[#FF6600] ring-4 ring-[#FF6600]/25 shadow-[0_0_0_1px_rgba(255,102,0,0.35),0_16px_36px_rgba(15,23,42,0.42)]'
-        : 'border-white ring-2 ring-slate-900/20'"
+      :class="
+        activeFilter === item.filter
+          ? 'border-[#FF6600] ring-4 ring-[#FF6600]/25 shadow-[0_0_0_1px_rgba(255,102,0,0.35),0_16px_36px_rgba(15,23,42,0.42)]'
+          : 'border-white ring-2 ring-slate-900/20'
+      "
       @click="$emit('select-filter', item.filter)"
     >
       <span
@@ -23,7 +25,9 @@
         {{ item.value }}
       </strong>
 
-      <span class="mt-1 max-w-[42px] truncate text-[7.5px] font-black uppercase leading-none tracking-[0.05em] text-slate-800">
+      <span
+        class="mt-1 max-w-[42px] truncate text-[7.5px] font-black uppercase leading-none tracking-[0.05em] text-slate-800"
+      >
         {{ item.shortLabel }}
       </span>
     </button>

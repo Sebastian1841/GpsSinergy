@@ -17,13 +17,10 @@
           @dblclick="resetFrame"
         >
           <div class="flex min-w-0 items-center gap-3">
-            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-[#FF6600] ring-1 ring-white/10">
-              <svg
-                viewBox="0 0 24 24"
-                class="h-5 w-5"
-                fill="none"
-                aria-hidden="true"
-              >
+            <div
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-[#FF6600] ring-1 ring-white/10"
+            >
+              <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" aria-hidden="true">
                 <path
                   d="m8 9 3 3-3 3M13.5 15h3"
                   stroke="currentColor"
@@ -46,20 +43,18 @@
               </p>
 
               <p class="mt-0.5 truncate text-[11px] font-semibold text-white/60">
-                {{ deviceName }} · {{ activo.protocol || "TCP" }} · {{ terminalLogs.length }} registros
+                {{ deviceName }} · {{ activo.protocol || "TCP" }} ·
+                {{ terminalLogs.length }} registros
               </p>
             </div>
           </div>
 
-          <div
-            class="flex shrink-0 items-center gap-2"
-            data-no-drag
-          >
+          <div class="flex shrink-0 items-center gap-2" data-no-drag>
             <span
               class="hidden rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] sm:inline-flex"
-              :class="isSending
-                ? 'bg-[#FF6600]/15 text-[#FFB077]'
-                : 'bg-emerald-400/15 text-emerald-300'"
+              :class="
+                isSending ? 'bg-[#FF6600]/15 text-[#FFB077]' : 'bg-emerald-400/15 text-emerald-300'
+              "
             >
               {{ isSending ? "Enviando" : "Online" }}
             </span>
@@ -76,8 +71,12 @@
         </header>
 
         <main class="flex min-h-0 flex-1 flex-col bg-[#e9eef6] p-2.5">
-          <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#cbd5e1] bg-white shadow-sm">
-            <div class="flex h-10 shrink-0 items-center justify-between border-b border-[#d8dee8] bg-[#f8fafc] px-3">
+          <div
+            class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#cbd5e1] bg-white shadow-sm"
+          >
+            <div
+              class="flex h-10 shrink-0 items-center justify-between border-b border-[#d8dee8] bg-[#f8fafc] px-3"
+            >
               <div class="flex min-w-0 items-center gap-2">
                 <span class="h-2.5 w-2.5 rounded-full bg-red-400"></span>
                 <span class="h-2.5 w-2.5 rounded-full bg-amber-400"></span>
@@ -89,11 +88,15 @@
               </div>
 
               <div class="flex shrink-0 items-center gap-2">
-                <span class="rounded-full bg-[#eef3ff] px-2.5 py-1 font-mono text-[10px] font-black text-[#102372]">
+                <span
+                  class="rounded-full bg-[#eef3ff] px-2.5 py-1 font-mono text-[10px] font-black text-[#102372]"
+                >
                   TCP
                 </span>
 
-                <span class="rounded-full bg-[#fff7ed] px-2.5 py-1 font-mono text-[10px] font-black text-[#FF6600]">
+                <span
+                  class="rounded-full bg-[#fff7ed] px-2.5 py-1 font-mono text-[10px] font-black text-[#FF6600]"
+                >
                   {{ terminalLogs.length }} logs
                 </span>
               </div>
@@ -191,10 +194,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits([
-  "update:modelValue",
-  "send-command",
-])
+const emit = defineEmits(["update:modelValue", "send-command"])
 
 const terminalHistoryRef = ref(null)
 const terminalCommand = ref("")
@@ -235,19 +235,15 @@ const focusInput = async () => {
 const setInitialHistory = async () => {
   const logs = props.history.map(normalizeHistoryLog)
 
-  terminalLogs.value = logs.length || !props.simulateHistory
-    ? logs
-    : createSimulatedHistory(props.activo)
+  terminalLogs.value =
+    logs.length || !props.simulateHistory ? logs : createSimulatedHistory(props.activo)
 
   await scrollToBottom()
   await focusInput()
 }
 
 const addLog = async (payload) => {
-  terminalLogs.value = [
-    ...terminalLogs.value,
-    createLog(payload),
-  ]
+  terminalLogs.value = [...terminalLogs.value, createLog(payload)]
 
   await scrollToBottom()
 }
@@ -270,21 +266,17 @@ const closeModal = () => {
   emit("update:modelValue", false)
 }
 
-const finishCommand = async ({
-  pendingId,
-  ok = true,
-  message = "",
-} = {}) => {
+const finishCommand = async ({ pendingId, ok = true, message = "" } = {}) => {
   isSending.value = false
 
   await updateLog(pendingId, {
     type: ok ? "report" : "error",
     source: ok ? "Report" : "Error",
-    message: message || (
-      ok
+    message:
+      message ||
+      (ok
         ? "(CommandResult=OK) (Message=Command sent successfully)"
-        : "(CommandResult=FAILED) (Message=Command could not be sent)"
-    ),
+        : "(CommandResult=FAILED) (Message=Command could not be sent)"),
   })
 
   await focusInput()

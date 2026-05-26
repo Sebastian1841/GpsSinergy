@@ -1,5 +1,7 @@
 <template>
-  <aside class="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[#d8dee8] bg-white shadow-sm">
+  <aside
+    class="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[#d8dee8] bg-white shadow-sm"
+  >
     <template v-if="activo">
       <div class="shrink-0 border-b border-[#d8dee8] bg-[#102372] px-4 py-3 text-white">
         <div class="flex items-start justify-between gap-3">
@@ -43,9 +45,7 @@
 
       <div class="min-h-0 flex-1 overflow-auto bg-white">
         <section class="border-b border-[#edf0f5] px-4 py-3">
-          <h3 class="text-[11px] font-black text-[#172033]">
-            Estado del vehículo
-          </h3>
+          <h3 class="text-[11px] font-black text-[#172033]">Estado del vehículo</h3>
 
           <div class="mt-3 space-y-3">
             <DetailRow label="Velocidad" :value="activo.velocidad || '-'" />
@@ -63,11 +63,11 @@
 
         <section class="border-b border-[#edf0f5] px-4 py-3">
           <div class="flex items-center justify-between">
-            <h3 class="text-[11px] font-black text-[#172033]">
-              Ruta actual
-            </h3>
+            <h3 class="text-[11px] font-black text-[#172033]">Ruta actual</h3>
 
-            <span class="rounded-full bg-[#fff3eb] px-2 py-0.5 text-[10px] font-black text-[#FF6600]">
+            <span
+              class="rounded-full bg-[#fff3eb] px-2 py-0.5 text-[10px] font-black text-[#FF6600]"
+            >
               62%
             </span>
           </div>
@@ -99,9 +99,7 @@
 
         <section class="px-4 py-3">
           <div class="flex items-center justify-between">
-            <h3 class="text-[11px] font-black text-[#172033]">
-              Alertas recientes
-            </h3>
+            <h3 class="text-[11px] font-black text-[#172033]">Alertas recientes</h3>
 
             <button
               type="button"
@@ -158,8 +156,7 @@ const DetailRow = defineComponent({
             ? h(
                 "span",
                 {
-                  class:
-                    "block truncate text-[10px] font-semibold text-[#102372]",
+                  class: "block truncate text-[10px] font-semibold text-[#102372]",
                 },
                 props.subvalue,
               )
@@ -188,16 +185,8 @@ const AlertItem = defineComponent({
             class: `h-2.5 w-2.5 shrink-0 rounded-full ${props.color}`,
           }),
           h("div", { class: "min-w-0 flex-1" }, [
-            h(
-              "p",
-              { class: "truncate text-[11px] font-bold text-[#172033]" },
-              props.title,
-            ),
-            h(
-              "p",
-              { class: "text-[10px] font-semibold text-slate-500" },
-              props.time,
-            ),
+            h("p", { class: "truncate text-[11px] font-bold text-[#172033]" }, props.title),
+            h("p", { class: "text-[10px] font-semibold text-slate-500" }, props.time),
           ]),
         ],
       )

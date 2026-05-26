@@ -4,14 +4,9 @@
     class="min-h-0 flex-1 overflow-auto bg-[#fbfcfe] font-mono text-[11px]"
     @click="$emit('focus-input')"
   >
-    <div
-      v-if="!logs.length"
-      class="flex h-full min-h-[280px] items-center justify-center"
-    >
+    <div v-if="!logs.length" class="flex h-full min-h-[280px] items-center justify-center">
       <div class="rounded-xl border border-dashed border-[#cbd5e1] bg-white px-6 py-6 text-center">
-        <p class="text-sm font-black text-[#102372]">
-          Consola sin actividad
-        </p>
+        <p class="text-sm font-black text-[#102372]">Consola sin actividad</p>
 
         <p class="mt-1 text-xs font-semibold text-slate-500">
           Escribe un comando para iniciar la comunicación con el rastreador.
@@ -19,11 +14,10 @@
       </div>
     </div>
 
-    <div
-      v-else
-      class="min-w-[900px]"
-    >
-      <div class="sticky top-0 z-10 grid grid-cols-[72px_76px_70px_minmax(0,1fr)] border-b border-[#d8dee8] bg-[#eef3ff] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.08em] text-[#102372]">
+    <div v-else class="min-w-[900px]">
+      <div
+        class="sticky top-0 z-10 grid grid-cols-[72px_76px_70px_minmax(0,1fr)] border-b border-[#d8dee8] bg-[#eef3ff] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.08em] text-[#102372]"
+      >
         <span>Hora</span>
         <span>Fecha</span>
         <span>Tipo</span>
@@ -66,14 +60,8 @@
           </template>
 
           <template v-else>
-            <span
-              class="whitespace-pre-wrap break-words font-semibold"
-              :class="log.textClass"
-            >
-              <span
-                v-if="log.type === 'client'"
-                class="mr-1 font-black text-[#FF6600]"
-              >
+            <span class="whitespace-pre-wrap break-words font-semibold" :class="log.textClass">
+              <span v-if="log.type === 'client'" class="mr-1 font-black text-[#FF6600]">
                 &gt;
               </span>
 
@@ -96,9 +84,7 @@ defineProps({
   },
 })
 
-defineEmits([
-  "focus-input",
-])
+defineEmits(["focus-input"])
 
 const bodyRef = ref(null)
 

@@ -8,17 +8,14 @@
           :key="section.key"
           type="button"
           class="group flex min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[10px] font-black transition"
-          :class="localActiveSection === section.key
-            ? 'bg-[#102372] text-white shadow-sm'
-            : 'text-[#102372] hover:bg-white hover:text-[#FF6600]'"
+          :class="
+            localActiveSection === section.key
+              ? 'bg-[#102372] text-white shadow-sm'
+              : 'text-[#102372] hover:bg-white hover:text-[#FF6600]'
+          "
           @click="setSection(section.key)"
         >
-          <svg
-            viewBox="0 0 24 24"
-            class="h-3.5 w-3.5 shrink-0"
-            fill="none"
-            aria-hidden="true"
-          >
+          <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 shrink-0" fill="none" aria-hidden="true">
             <path
               v-if="section.key === 'activos'"
               d="M4.75 16.5h14.5M6.75 16.5l1.15-5.75A2.25 2.25 0 0 1 10.1 9h3.8a2.25 2.25 0 0 1 2.2 1.75l1.15 5.75M7.25 16.5v1.25M16.75 16.5v1.25M9 12.25h6"
@@ -54,9 +51,11 @@
           <span
             v-if="section.count !== null"
             class="rounded-md px-1.5 py-0.5 text-[9px] font-black"
-            :class="localActiveSection === section.key
-              ? 'bg-white/15 text-white'
-              : 'bg-[#102372]/10 text-[#102372] group-hover:bg-[#FF6600]/10 group-hover:text-[#FF6600]'"
+            :class="
+              localActiveSection === section.key
+                ? 'bg-white/15 text-white'
+                : 'bg-[#102372]/10 text-[#102372] group-hover:bg-[#FF6600]/10 group-hover:text-[#FF6600]'
+            "
           >
             {{ section.count }}
           </span>
@@ -64,18 +63,10 @@
       </div>
 
       <!-- Buscador + acciones -->
-      <div
-        v-if="localActiveSection !== 'itinerarios'"
-        class="mt-3 flex items-center gap-2"
-      >
+      <div v-if="localActiveSection !== 'itinerarios'" class="mt-3 flex items-center gap-2">
         <div class="relative min-w-0 flex-1">
           <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-            <svg
-              viewBox="0 0 24 24"
-              class="h-4 w-4"
-              fill="none"
-              aria-hidden="true"
-            >
+            <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" aria-hidden="true">
               <path
                 d="m20 20-4.35-4.35M18 10.5a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z"
                 stroke="currentColor"
@@ -120,12 +111,7 @@
           title="Agregar activo"
           @click="$emit('open-add-activo')"
         >
-          <svg
-            viewBox="0 0 24 24"
-            class="h-4 w-4 shrink-0"
-            fill="none"
-            aria-hidden="true"
-          >
+          <svg viewBox="0 0 24 24" class="h-4 w-4 shrink-0" fill="none" aria-hidden="true">
             <path
               d="M12 5v14M5 12h14"
               stroke="currentColor"
@@ -134,31 +120,21 @@
             />
           </svg>
 
-          <span class="whitespace-nowrap">
-            Agregar activo
-          </span>
+          <span class="whitespace-nowrap"> Agregar activo </span>
         </button>
 
         <!-- Dropdown de columnas -->
-        <div
-          v-if="localActiveSection === 'activos'"
-          class="relative shrink-0"
-        >
+        <div v-if="localActiveSection === 'activos'" class="relative shrink-0">
           <button
             type="button"
             class="flex h-[36px] w-[36px] cursor-pointer items-center justify-center rounded-lg border bg-[#f8fafc] text-[#102372] transition hover:bg-white hover:text-[#FF6600]"
-            :class="showColumns
-              ? 'border-[#FF6600] bg-[#fff7ed] text-[#FF6600]'
-              : 'border-[#d8dee8]'"
+            :class="
+              showColumns ? 'border-[#FF6600] bg-[#fff7ed] text-[#FF6600]' : 'border-[#d8dee8]'
+            "
             title="Filtrar columnas visibles"
             @click.stop="toggleColumnsDropdown"
           >
-            <svg
-              viewBox="0 0 24 24"
-              class="h-4 w-4"
-              fill="none"
-              aria-hidden="true"
-            >
+            <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" aria-hidden="true">
               <path
                 d="M4.75 6.75h14.5L14 12.5v4.75l-4 1.75v-6.5L4.75 6.75Z"
                 stroke="currentColor"
@@ -177,7 +153,9 @@
             <div class="border-b border-[#edf1f5] bg-[#f8fafc] px-3 py-2">
               <div class="flex items-center justify-between gap-2">
                 <div class="min-w-0">
-                  <p class="truncate text-[10px] font-black uppercase tracking-[0.12em] text-[#102372]">
+                  <p
+                    class="truncate text-[10px] font-black uppercase tracking-[0.12em] text-[#102372]"
+                  >
                     Columnas visibles
                   </p>
 
@@ -196,13 +174,10 @@
               </div>
 
               <div class="relative mt-2">
-                <span class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400">
-                  <svg
-                    viewBox="0 0 24 24"
-                    class="h-3.5 w-3.5"
-                    fill="none"
-                    aria-hidden="true"
-                  >
+                <span
+                  class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+                >
+                  <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" aria-hidden="true">
                     <path
                       d="m20 20-4.35-4.35M18 10.5a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z"
                       stroke="currentColor"
@@ -257,13 +232,8 @@
                 </span>
               </label>
 
-              <div
-                v-if="!filteredConfigurableColumns.length"
-                class="px-2 py-5 text-center"
-              >
-                <p class="text-[11px] font-black text-[#102372]">
-                  Sin columnas encontradas
-                </p>
+              <div v-if="!filteredConfigurableColumns.length" class="px-2 py-5 text-center">
+                <p class="text-[11px] font-black text-[#102372]">Sin columnas encontradas</p>
 
                 <p class="mt-1 text-[10px] font-semibold text-slate-500">
                   Prueba buscando por nombre de variable.
@@ -302,10 +272,7 @@
       />
     </div>
 
-    <div
-      v-else
-      class="min-h-0 flex-1 overflow-auto bg-[#f8fafc] p-3"
-    >
+    <div v-else class="min-h-0 flex-1 overflow-auto bg-[#f8fafc] p-3">
       <div class="flex min-h-full flex-col rounded-2xl border border-[#d8dee8] bg-white p-4">
         <div class="mb-4 flex items-start justify-between gap-3">
           <div class="min-w-0">
@@ -313,22 +280,17 @@
               Control territorial
             </p>
 
-            <h3 class="mt-1 truncate text-[14px] font-black text-[#102372]">
-              Geocercas
-            </h3>
+            <h3 class="mt-1 truncate text-[14px] font-black text-[#102372]">Geocercas</h3>
 
             <p class="mt-1 text-[11px] font-semibold leading-relaxed text-slate-500">
               Zonas y rutas creadas en el mapa. Puedes revisarlas y eliminarlas desde este panel.
             </p>
           </div>
 
-          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#102372]/10 text-[#102372]">
-            <svg
-              viewBox="0 0 24 24"
-              class="h-5 w-5"
-              fill="none"
-              aria-hidden="true"
-            >
+          <div
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#102372]/10 text-[#102372]"
+          >
+            <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" aria-hidden="true">
               <path
                 d="M12 21s7-4.6 7-11.25A7 7 0 0 0 5 9.75C5 16.4 12 21 12 21ZM12 12.25a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"
                 stroke="currentColor"
@@ -344,9 +306,7 @@
           v-if="!geofenceItems.length"
           class="flex min-h-[180px] flex-col items-center justify-center rounded-xl border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-4 text-center"
         >
-          <p class="text-[12px] font-black text-[#102372]">
-            No hay geocercas creadas
-          </p>
+          <p class="text-[12px] font-black text-[#102372]">No hay geocercas creadas</p>
 
           <p class="mt-1 max-w-[280px] text-[11px] font-semibold leading-relaxed text-slate-500">
             Crea una geocerca desde las herramientas del mapa para verla en esta sección.
@@ -357,26 +317,23 @@
           v-else-if="!filteredGeofenceItems.length"
           class="flex min-h-[160px] flex-col items-center justify-center rounded-xl border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-4 text-center"
         >
-          <p class="text-[12px] font-black text-[#102372]">
-            Sin resultados
-          </p>
+          <p class="text-[12px] font-black text-[#102372]">Sin resultados</p>
 
           <p class="mt-1 max-w-[280px] text-[11px] font-semibold leading-relaxed text-slate-500">
             No encontramos geocercas con ese criterio de búsqueda.
           </p>
         </div>
 
-        <div
-          v-else
-          class="grid gap-2"
-        >
+        <div v-else class="grid gap-2">
           <article
             v-for="geofence in filteredGeofenceItems"
             :key="geofence.id"
             class="group rounded-xl border bg-white p-3 shadow-sm transition hover:border-[#FF6600] hover:bg-[#fff7ed]"
-            :class="normalizeId(selectedGeofenceId) === normalizeId(geofence.id)
-              ? 'border-[#FF6600] bg-[#fff7ed]'
-              : 'border-[#d8dee8]'"
+            :class="
+              normalizeId(selectedGeofenceId) === normalizeId(geofence.id)
+                ? 'border-[#FF6600] bg-[#fff7ed]'
+                : 'border-[#d8dee8]'
+            "
           >
             <button
               type="button"
@@ -410,7 +367,9 @@
               </span>
             </button>
 
-            <div class="mt-3 flex items-center justify-between gap-2 rounded-lg bg-[#f8fafc] px-3 py-2">
+            <div
+              class="mt-3 flex items-center justify-between gap-2 rounded-lg bg-[#f8fafc] px-3 py-2"
+            >
               <p class="min-w-0 truncate text-[10px] font-bold text-slate-500">
                 {{ getGeofenceDescription(geofence) }}
               </p>
@@ -584,13 +543,7 @@ const {
   normalizeText,
 })
 
-const {
-  sortColumnKey,
-  sortedActivos,
-  toggleSort,
-  clearSort,
-  getSortIcon,
-} = useFleetSorting({
+const { sortColumnKey, sortedActivos, toggleSort, clearSort, getSortIcon } = useFleetSorting({
   activos: computed(() => props.activos),
   columns: computed(() => props.columns),
   getCellValue,

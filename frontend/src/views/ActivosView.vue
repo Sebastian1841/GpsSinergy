@@ -44,9 +44,7 @@
           <div
             class="absolute left-1/2 top-1/2 flex h-12 w-3 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-[#cbd5e1] bg-white shadow-sm"
           >
-            <span
-              class="h-7 w-[2px] rounded-full bg-[#102372] group-hover:bg-[#FF6600]"
-            ></span>
+            <span class="h-7 w-[2px] rounded-full bg-[#102372] group-hover:bg-[#FF6600]"></span>
           </div>
         </div>
       </div>
@@ -114,12 +112,7 @@ const sectionSearch = ref({
   geocercas: "",
 })
 
-const {
-  geofences,
-  createGeofence,
-  updateGeofence,
-  deleteGeofence,
-} = useGeofences()
+const { geofences, createGeofence, updateGeofence, deleteGeofence } = useGeofences()
 
 const customActivos = ref([])
 const deletedActivoIds = ref([])
@@ -177,7 +170,9 @@ const formatKm = (value) => {
 }
 
 const normalizeText = (value) => {
-  return String(value || "").trim().toLowerCase()
+  return String(value || "")
+    .trim()
+    .toLowerCase()
 }
 
 const sidebarSearch = computed(() => {
@@ -212,19 +207,11 @@ const normalizedActivos = computed(() => {
       ...activo,
 
       vehiculo:
-        activo.vehiculo ||
-        activo.nombrePantalla ||
-        activo.displayName ||
-        activo.name ||
-        "-",
+        activo.vehiculo || activo.nombrePantalla || activo.displayName || activo.name || "-",
 
       name: activo.name || activo.vehiculo || "-",
 
-      nombrePantalla:
-        activo.nombrePantalla ||
-        activo.displayName ||
-        activo.vehiculo ||
-        "-",
+      nombrePantalla: activo.nombrePantalla || activo.displayName || activo.vehiculo || "-",
 
       conductor: isCustomAsset
         ? emptyValue(activo.conductor)
@@ -250,14 +237,10 @@ const normalizedActivos = computed(() => {
         activo.odometer ||
         (isCustomAsset ? "-" : `${(125430 + index * 1820).toLocaleString("es-CL")} km`),
 
-      direccion:
-        activo.direccion ||
-        activo.ubicacion ||
-        "Última ubicación registrada",
+      direccion: activo.direccion || activo.ubicacion || "Última ubicación registrada",
 
       ignicion:
-        activo.ignicion ||
-        (estado === "moving" || estado === "idle" ? "Encendida" : "Apagada"),
+        activo.ignicion || (estado === "moving" || estado === "idle" ? "Encendida" : "Apagada"),
 
       ibutton: isCustomAsset
         ? emptyValue(activo.ibutton)
@@ -345,10 +328,7 @@ const buildActivoDataFromForm = (form = {}, fallbackActivo = {}) => {
     fallbackActivo.name ||
     "Activo sin nombre"
 
-  const name =
-    form.name ||
-    fallbackActivo.name ||
-    displayName
+  const name = form.name || fallbackActivo.name || displayName
 
   const odometerFromForm = form.odometer ?? form.odometro
 
@@ -358,59 +338,31 @@ const buildActivoDataFromForm = (form = {}, fallbackActivo = {}) => {
     vehiculo: displayName,
     name,
     nombrePantalla:
-      form.displayName ||
-      form.nombrePantalla ||
-      fallbackActivo.nombrePantalla ||
-      displayName,
+      form.displayName || form.nombrePantalla || fallbackActivo.nombrePantalla || displayName,
 
     trackerModel: form.trackerModel || fallbackActivo.trackerModel || "-",
     trackerModelLabel:
-      form.trackerModelLabel ||
-      fallbackActivo.trackerModelLabel ||
-      form.trackerModel ||
-      "-",
-    trackerManufacturer:
-      form.trackerManufacturer ||
-      fallbackActivo.trackerManufacturer ||
-      "-",
+      form.trackerModelLabel || fallbackActivo.trackerModelLabel || form.trackerModel || "-",
+    trackerManufacturer: form.trackerManufacturer || fallbackActivo.trackerManufacturer || "-",
 
     imei: form.imei || fallbackActivo.imei || "-",
     protocol: form.protocol || fallbackActivo.protocol || "tcp",
 
-    descripcion:
-      form.description ||
-      form.descripcion ||
-      fallbackActivo.descripcion ||
-      "-",
+    descripcion: form.description || form.descripcion || fallbackActivo.descripcion || "-",
 
-    fechaIngreso:
-      form.entryDate ||
-      form.fechaIngreso ||
-      fallbackActivo.fechaIngreso ||
-      "-",
+    fechaIngreso: form.entryDate || form.fechaIngreso || fallbackActivo.fechaIngreso || "-",
 
-    fechaBaja:
-      form.deactivationDate ||
-      form.fechaBaja ||
-      fallbackActivo.fechaBaja ||
-      "-",
+    fechaBaja: form.deactivationDate || form.fechaBaja || fallbackActivo.fechaBaja || "-",
 
     fechaSuspension:
-      form.suspensionDate ||
-      form.fechaSuspension ||
-      fallbackActivo.fechaSuspension ||
-      "-",
+      form.suspensionDate || form.fechaSuspension || fallbackActivo.fechaSuspension || "-",
 
     horometroDiario: emptyValue(
-      form.dailyHourmeter ??
-      form.horometroDiario ??
-      fallbackActivo.horometroDiario,
+      form.dailyHourmeter ?? form.horometroDiario ?? fallbackActivo.horometroDiario,
     ),
 
     horometroTotal: emptyValue(
-      form.totalHourmeter ??
-      form.horometroTotal ??
-      fallbackActivo.horometroTotal,
+      form.totalHourmeter ?? form.horometroTotal ?? fallbackActivo.horometroTotal,
     ),
 
     odometro:
@@ -419,10 +371,7 @@ const buildActivoDataFromForm = (form = {}, fallbackActivo = {}) => {
         : emptyValue(odometerFromForm ?? fallbackActivo.odometro),
 
     direccion:
-      form.direccion ||
-      form.ubicacion ||
-      fallbackActivo.direccion ||
-      "Última ubicación registrada",
+      form.direccion || form.ubicacion || fallbackActivo.direccion || "Última ubicación registrada",
   }
 }
 
@@ -493,9 +442,12 @@ const handleUpdateActivo = async (payload) => {
 
   if (id === null || id === undefined) return
 
-  const baseActivo = normalizedActivos.value.find((activo) => {
-    return String(activo.id) === String(id)
-  }) || editingActivo.value || {}
+  const baseActivo =
+    normalizedActivos.value.find((activo) => {
+      return String(activo.id) === String(id)
+    }) ||
+    editingActivo.value ||
+    {}
 
   const form = payload?.data || payload?.form || payload || {}
 
@@ -522,7 +474,9 @@ const openTerminalModal = (activo) => {
 }
 
 const deleteActivo = async (activo) => {
-  const confirmed = window.confirm(`¿Eliminar el activo "${activo.vehiculo || activo.name || activo.id}"?`)
+  const confirmed = window.confirm(
+    `¿Eliminar el activo "${activo.vehiculo || activo.name || activo.id}"?`,
+  )
 
   if (!confirmed) return
 
@@ -534,10 +488,7 @@ const deleteActivo = async (activo) => {
     deletedActivoIds.value = [...deletedActivoIds.value, activo.id]
   }
 
-  const {
-    [String(activo.id)]: _removedEditedActivo,
-    ...nextEditedActivos
-  } = editedActivos.value
+  const { [String(activo.id)]: _removedEditedActivo, ...nextEditedActivos } = editedActivos.value
 
   editedActivos.value = nextEditedActivos
 

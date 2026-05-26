@@ -2,9 +2,7 @@
   <section class="min-h-0 overflow-hidden rounded-xl border border-[#d8dee8] bg-white shadow-sm">
     <div class="flex items-center justify-between border-b border-[#edf0f5] px-3 py-3">
       <div>
-        <p class="text-[11px] font-black text-[#102372]">
-          Eventos del recorrido
-        </p>
+        <p class="text-[11px] font-black text-[#102372]">Eventos del recorrido</p>
 
         <p class="text-[10px] font-semibold text-slate-500">
           {{ rows.length }} registros GPS encontrados
@@ -20,21 +18,18 @@
       v-if="!rows.length"
       class="flex min-h-[220px] flex-col items-center justify-center p-6 text-center"
     >
-      <p class="text-[13px] font-black text-[#172033]">
-        Sin registros para mostrar
-      </p>
+      <p class="text-[13px] font-black text-[#172033]">Sin registros para mostrar</p>
 
       <p class="mt-1 max-w-[320px] text-[11px] font-semibold text-slate-500">
         Busca una patente o dispositivo y selecciona un rango de fechas.
       </p>
     </div>
 
-    <div
-      v-else
-      class="max-h-[420px] overflow-auto"
-    >
+    <div v-else class="max-h-[420px] overflow-auto">
       <table class="min-w-full border-collapse text-left text-[11px]">
-        <thead class="sticky top-0 z-10 bg-[#f8fafc] text-[10px] uppercase tracking-[0.08em] text-slate-500">
+        <thead
+          class="sticky top-0 z-10 bg-[#f8fafc] text-[10px] uppercase tracking-[0.08em] text-slate-500"
+        >
           <tr>
             <th class="border-b border-[#edf0f5] px-3 py-2 font-black">Hora</th>
             <th class="border-b border-[#edf0f5] px-3 py-2 font-black">Estado</th>
@@ -59,11 +54,13 @@
             <td class="whitespace-nowrap px-3 py-2">
               <span
                 class="rounded-full px-2 py-0.5 text-[10px] font-black"
-                :class="row.status === 'moving'
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : 'bg-[#fff3eb] text-[#FF6600]'"
+                :class="
+                  row.status === 'moving'
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : 'bg-[#fff3eb] text-[#FF6600]'
+                "
               >
-                {{ row.status === 'moving' ? 'Movimiento' : 'Detenido' }}
+                {{ row.status === "moving" ? "Movimiento" : "Detenido" }}
               </span>
             </td>
 

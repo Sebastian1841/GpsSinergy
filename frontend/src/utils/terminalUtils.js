@@ -72,9 +72,7 @@ const cleanValue = (value) => {
 }
 
 const formatValue = (value, fallback = "-") => {
-  return value === null || value === undefined || value === ""
-    ? fallback
-    : value
+  return value === null || value === undefined || value === "" ? fallback : value
 }
 
 const parseGpsGateMessage = (message = "") => {
@@ -103,12 +101,7 @@ const getVariableTone = (key, value) => {
   if (key === "GpsValid") return value === "True" ? "green" : "red"
   if (key === "Status") return "green"
 
-  if (
-    key === "Ignition" ||
-    key === "Fuel" ||
-    key === "BatteryVoltage" ||
-    key === "InputVoltage"
-  ) {
+  if (key === "Ignition" || key === "Fuel" || key === "BatteryVoltage" || key === "InputVoltage") {
     return "orange"
   }
 
@@ -175,23 +168,14 @@ export const normalizeHistoryLog = (log = {}) => {
     type,
     source:
       log.source ||
-      (
-        type === "client"
-          ? "Client"
-          : type === "server"
-            ? "Server"
-            : type === "error"
-              ? "Error"
-              : "Report"
-      ),
-    message: String(
-      log.message ??
-      log.raw ??
-      log.response ??
-      log.report ??
-      log.data ??
-      "",
-    ),
+      (type === "client"
+        ? "Client"
+        : type === "server"
+          ? "Server"
+          : type === "error"
+            ? "Error"
+            : "Report"),
+    message: String(log.message ?? log.raw ?? log.response ?? log.report ?? log.data ?? ""),
     time: log.time || getTime(),
     date: log.date || getDate(),
   })

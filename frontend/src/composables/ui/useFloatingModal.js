@@ -140,9 +140,7 @@ export function useFloatingModal({
     modalRef.value.style.transition = "none"
     modalRef.value.style.backfaceVisibility = "hidden"
     modalRef.value.style.transformOrigin = "top left"
-    modalRef.value.style.willChange = type === "drag"
-      ? "transform"
-      : "left, top, width, height"
+    modalRef.value.style.willChange = type === "drag" ? "transform" : "left, top, width, height"
 
     if (type === "drag") {
       modalRef.value.style.boxShadow = "0 14px 36px rgba(2,6,23,0.34)"
@@ -246,29 +244,17 @@ export function useFloatingModal({
     let height = start.height
 
     if (session.direction.includes("e")) {
-      width = clamp(
-        start.width + deltaX,
-        minWidth,
-        session.viewport.width - start.left - margin,
-      )
+      width = clamp(start.width + deltaX, minWidth, session.viewport.width - start.left - margin)
     }
 
     if (session.direction.includes("s")) {
-      height = clamp(
-        start.height + deltaY,
-        minHeight,
-        session.viewport.height - start.top - margin,
-      )
+      height = clamp(start.height + deltaY, minHeight, session.viewport.height - start.top - margin)
     }
 
     if (session.direction.includes("w")) {
       const right = start.left + start.width
 
-      left = clamp(
-        start.left + deltaX,
-        margin,
-        right - minWidth,
-      )
+      left = clamp(start.left + deltaX, margin, right - minWidth)
 
       width = right - left
     }
@@ -276,21 +262,20 @@ export function useFloatingModal({
     if (session.direction.includes("n")) {
       const bottom = start.top + start.height
 
-      top = clamp(
-        start.top + deltaY,
-        margin,
-        bottom - minHeight,
-      )
+      top = clamp(start.top + deltaY, margin, bottom - minHeight)
 
       height = bottom - top
     }
 
-    return constrainFrame({
-      left,
-      top,
-      width,
-      height,
-    }, session.viewport)
+    return constrainFrame(
+      {
+        left,
+        top,
+        width,
+        height,
+      },
+      session.viewport,
+    )
   }
 
   const updateInteraction = () => {

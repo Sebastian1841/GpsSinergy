@@ -35,9 +35,11 @@
 
                 <span
                   class="flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[9px] font-black"
-                  :class="sortColumnKey === column.key
-                    ? 'border-[#FF6600] bg-[#FF6600] text-white'
-                    : 'border-white/30 bg-white/10 text-white/70'"
+                  :class="
+                    sortColumnKey === column.key
+                      ? 'border-[#FF6600] bg-[#FF6600] text-white'
+                      : 'border-white/30 bg-white/10 text-white/70'
+                  "
                 >
                   {{ getSortIcon(column.key) }}
                 </span>
@@ -103,12 +105,16 @@
               </template>
 
               <template v-else-if="column.key === 'protocol'">
-                <span class="inline-flex rounded-md bg-[#eef3ff] px-1.5 py-0.5 text-[10px] font-black uppercase text-[#102372]">
+                <span
+                  class="inline-flex rounded-md bg-[#eef3ff] px-1.5 py-0.5 text-[10px] font-black uppercase text-[#102372]"
+                >
                   {{ resolveCellValue(activo, column) }}
                 </span>
               </template>
 
-              <template v-else-if="['horometroDiario', 'horometroTotal', 'odometro'].includes(column.key)">
+              <template
+                v-else-if="['horometroDiario', 'horometroTotal', 'odometro'].includes(column.key)"
+              >
                 <span class="font-bold text-slate-700">
                   {{ resolveCellValue(activo, column) }}
                 </span>
@@ -168,11 +174,7 @@ const props = defineProps({
   },
 })
 
-defineEmits([
-  "select",
-  "toggle-sort",
-  "open-context-menu",
-])
+defineEmits(["select", "toggle-sort", "open-context-menu"])
 
 const isSelected = (activo) => {
   if (props.selectedId === null || props.selectedId === undefined) return false

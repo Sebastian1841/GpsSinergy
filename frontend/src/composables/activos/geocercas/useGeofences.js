@@ -3,11 +3,7 @@ import { ref, watch } from "vue"
 const STORAGE_KEY = "sinergy-activos-geofences"
 const STORAGE_VERSION = 1
 
-const VALID_GEOFENCE_TYPES = new Set([
-  "circle",
-  "polygon",
-  "route",
-])
+const VALID_GEOFENCE_TYPES = new Set(["circle", "polygon", "route"])
 
 const DEFAULT_STROKE_COLOR = "#FF6600"
 const DEFAULT_FILL_COLOR = "#FF6600"
@@ -48,9 +44,7 @@ const normalizePoint = (point) => {
 const normalizeCoordinates = (coordinates) => {
   if (!Array.isArray(coordinates)) return []
 
-  return coordinates
-    .map((point) => normalizePoint(point))
-    .filter(Boolean)
+  return coordinates.map((point) => normalizePoint(point)).filter(Boolean)
 }
 
 const normalizeColor = (value, fallback) => {
@@ -70,10 +64,7 @@ const normalizeGeofence = (geofence) => {
   if (!id) return null
   if (!VALID_GEOFENCE_TYPES.has(type)) return null
 
-  const strokeColor = normalizeColor(
-    geofence.strokeColor || geofence.color,
-    DEFAULT_STROKE_COLOR,
-  )
+  const strokeColor = normalizeColor(geofence.strokeColor || geofence.color, DEFAULT_STROKE_COLOR)
 
   const baseGeofence = {
     ...geofence,
@@ -130,9 +121,7 @@ const normalizeGeofence = (geofence) => {
 const normalizeGeofences = (geofences) => {
   if (!Array.isArray(geofences)) return []
 
-  return geofences
-    .map((geofence) => normalizeGeofence(geofence))
-    .filter(Boolean)
+  return geofences.map((geofence) => normalizeGeofence(geofence)).filter(Boolean)
 }
 
 const readStoredPayload = () => {
@@ -223,10 +212,7 @@ export function useGeofences() {
       return
     }
 
-    geofences.value = [
-      ...geofences.value,
-      normalizedGeofence,
-    ]
+    geofences.value = [...geofences.value, normalizedGeofence]
   }
 
   const deleteGeofence = (geofenceId) => {

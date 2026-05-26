@@ -5,8 +5,12 @@
       class="fixed inset-0 z-[2147483646] flex items-center justify-center bg-slate-950/45 p-4"
       @click.self="closeModal"
     >
-      <div class="w-full max-w-2xl overflow-hidden rounded-2xl border border-[#d8dee8] bg-white shadow-2xl">
-        <div class="flex items-start justify-between gap-4 border-b border-[#edf1f5] bg-[#f8fafc] px-5 py-4">
+      <div
+        class="w-full max-w-2xl overflow-hidden rounded-2xl border border-[#d8dee8] bg-white shadow-2xl"
+      >
+        <div
+          class="flex items-start justify-between gap-4 border-b border-[#edf1f5] bg-[#f8fafc] px-5 py-4"
+        >
           <div class="min-w-0">
             <p class="text-[10px] font-black uppercase tracking-[0.16em] text-[#FF6600]">
               Editar activo
@@ -16,9 +20,7 @@
               {{ form.vehiculo || "Activo sin nombre" }}
             </h3>
 
-            <p class="mt-1 text-xs font-semibold text-slate-500">
-              IMEI: {{ form.imei || "-" }}
-            </p>
+            <p class="mt-1 text-xs font-semibold text-slate-500">IMEI: {{ form.imei || "-" }}</p>
           </div>
 
           <button
@@ -170,10 +172,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits([
-  "update:modelValue",
-  "save",
-])
+const emit = defineEmits(["update:modelValue", "save"])
 
 const form = reactive({
   estado: "offline",

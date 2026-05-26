@@ -156,8 +156,7 @@ const getCircleEdgeLatLng = (center, radiusMeters) => {
   const distance = radiusMeters / earthRadius
 
   const lat2 = Math.asin(
-    Math.sin(lat1) * Math.cos(distance) +
-      Math.cos(lat1) * Math.sin(distance) * Math.cos(bearing),
+    Math.sin(lat1) * Math.cos(distance) + Math.cos(lat1) * Math.sin(distance) * Math.cos(bearing),
   )
 
   const lng2 =
@@ -179,13 +178,7 @@ const createVertexIcon = (active = false) => {
   })
 }
 
-export function createGeofenceMapController({
-  props,
-  emit,
-  getMap,
-  layers,
-  state,
-}) {
+export function createGeofenceMapController({ props, emit, getMap, layers, state }) {
   const {
     drawMode,
     draftPolygonPoints,
@@ -288,7 +281,6 @@ export function createGeofenceMapController({
     if (!map || !layers.geofenceLayer) return
 
     layers.geofenceLayer.clearLayers()
-
     ;(props.geofences || []).forEach((geofence) => {
       if (editingDraft.value?.id === geofence.id) return
 
@@ -560,9 +552,7 @@ export function createGeofenceMapController({
     }
 
     if (geofence.type === "polygon" || geofence.type === "route") {
-      const bounds = L.latLngBounds(
-        geofence.coordinates.map((point) => [point.lat, point.lng]),
-      )
+      const bounds = L.latLngBounds(geofence.coordinates.map((point) => [point.lat, point.lng]))
 
       if (bounds.isValid()) {
         map?.fitBounds(bounds, {
@@ -693,10 +683,7 @@ export function createGeofenceMapController({
 
     radiusMarker.on("drag", (event) => {
       const nextEdge = event.target.getLatLng()
-      const currentCenter = L.latLng(
-        editingDraft.value.center.lat,
-        editingDraft.value.center.lng,
-      )
+      const currentCenter = L.latLng(editingDraft.value.center.lat, editingDraft.value.center.lng)
 
       const nextRadius = Math.max(10, Math.round(currentCenter.distanceTo(nextEdge)))
 
@@ -728,9 +715,7 @@ export function createGeofenceMapController({
 
         editingDraft.value.coordinates[index] = normalizePoint(next)
 
-        polygon.setLatLngs(
-          editingDraft.value.coordinates.map((item) => [item.lat, item.lng]),
-        )
+        polygon.setLatLngs(editingDraft.value.coordinates.map((item) => [item.lat, item.lng]))
       })
 
       marker.on("dragend", () => {
@@ -761,9 +746,7 @@ export function createGeofenceMapController({
 
         editingDraft.value.coordinates[index] = normalizePoint(next)
 
-        route.setLatLngs(
-          editingDraft.value.coordinates.map((item) => [item.lat, item.lng]),
-        )
+        route.setLatLngs(editingDraft.value.coordinates.map((item) => [item.lat, item.lng]))
       })
 
       marker.on("dragend", () => {
