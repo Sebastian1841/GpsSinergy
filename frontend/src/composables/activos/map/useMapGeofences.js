@@ -9,6 +9,12 @@ const geofenceStyle = {
   fillOpacity: 0.12,
 }
 
+const routeStyle = {
+  color: "#FF6600",
+  weight: 5,
+  opacity: 0.95,
+}
+
 const draftStyle = {
   color: "#102372",
   weight: 2,
@@ -18,12 +24,25 @@ const draftStyle = {
   dashArray: "6 5",
 }
 
+const draftRouteStyle = {
+  color: "#102372",
+  weight: 4,
+  opacity: 0.95,
+  dashArray: "6 5",
+}
+
 const editStyle = {
   color: "#102372",
   weight: 3,
   opacity: 0.95,
   fillColor: "#FF6600",
   fillOpacity: 0.14,
+}
+
+const editRouteStyle = {
+  color: "#102372",
+  weight: 5,
+  opacity: 0.95,
 }
 
 const normalizePoint = (point) => ({
@@ -42,6 +61,91 @@ const makeGeofenceId = () => {
     `geofence-${Date.now()}-${Math.random().toString(16).slice(2)}`
   )
 }
+
+const getNumber = (value, fallback) => {
+  const number = Number(value)
+
+  return Number.isFinite(number) ? number : fallback
+}
+
+const getFallbackGeofenceName = (props, type) => {
+  const nextNumber = (props.geofences || []).length + 1
+
+  if (type === "route") return `Ruta ${nextNumber}`
+
+  return `Geocerca ${nextNumber}`
+}
+
+const getDraftGeofenceOptions = (props, type) => {
+  const options = props.draftGeofenceOptions || {}
+  const fallbackName = getFallbackGeofenceName(props, type)
+
+  const strokeColor = options.strokeColor || options.color || geofenceStyle.color
+  const fillColor = options.fillColor || strokeColor || geofenceStyle.fillColor
+
+  return {
+    name: String(options.name || fallbackName).trim() || fallbackName,
+    strokeColor,
+    fillColor,
+    fillOpacity: getNumber(options.fillOpacity, geofenceStyle.fillOpacity),
+  }
+}
+
+const getShapeStyle = (geofence = {}) => {
+  const strokeColor = geofence.strokeColor || geofence.color || geofenceStyle.color
+  const fillColor = geofence.fillColor || strokeColor || geofenceStyle.fillColor
+
+  return {
+    ...geofenceStyle,
+    color: strokeColor,
+    fillColor,
+    fillOpacity: getNumber(geofence.fillOpacity, geofenceStyle.fillOpacity),
+  }
+}
+
+const getRouteStyle = (geofence = {}) => ({
+  ...routeStyle,
+  color: geofence.strokeColor || geofence.color || routeStyle.color,
+})
+
+const getDraftShapeStyle = (props) => {
+  const options = props.draftGeofenceOptions || {}
+  const strokeColor = options.strokeColor || draftStyle.color
+  const fillColor = options.fillColor || strokeColor || draftStyle.fillColor
+
+  return {
+    ...draftStyle,
+    color: strokeColor,
+    fillColor,
+    fillOpacity: getNumber(options.fillOpacity, draftStyle.fillOpacity),
+  }
+}
+
+const getDraftRouteStyle = (props) => {
+  const options = props.draftGeofenceOptions || {}
+
+  return {
+    ...draftRouteStyle,
+    color: options.strokeColor || options.color || draftRouteStyle.color,
+  }
+}
+
+const getEditShapeStyle = (geofence = {}) => {
+  const strokeColor = geofence.strokeColor || geofence.color || editStyle.color
+  const fillColor = geofence.fillColor || strokeColor || editStyle.fillColor
+
+  return {
+    ...editStyle,
+    color: strokeColor,
+    fillColor,
+    fillOpacity: getNumber(geofence.fillOpacity, editStyle.fillOpacity),
+  }
+}
+
+const getEditRouteStyle = (geofence = {}) => ({
+  ...editRouteStyle,
+  color: geofence.strokeColor || geofence.color || editRouteStyle.color,
+})
 
 const getCircleEdgeLatLng = (center, radiusMeters) => {
   const earthRadius = 6378137
@@ -85,6 +189,7 @@ export function createGeofenceMapController({
   const {
     drawMode,
     draftPolygonPoints,
+    draftRoutePoints,
     draftCircleCenter,
     editingDraft,
     editAddPoint,
@@ -96,10 +201,15 @@ export function createGeofenceMapController({
     return draftPolygonPoints.value.length >= 3
   })
 
+  const canSaveRoute = computed(() => {
+    return draftRoutePoints.value.length >= 2
+  })
+
   const helperTitle = computed(() => {
     if (editingDraft.value) return `Editando ${editingDraft.value.name}`
     if (drawMode.value === "circle") return "Nueva geocerca por radio"
     if (drawMode.value === "polygon") return "Nueva geocerca poligonal"
+    if (drawMode.value === "route") return "Nueva geocerca de ruta"
     return ""
   })
 
@@ -111,6 +221,11 @@ export function createGeofenceMapController({
     if (editingDraft.value?.type === "polygon") {
       if (editAddPoint.value) return "Haz clic en el mapa para agregar un nuevo punto."
       return "Arrastra los puntos para ajustar la forma. También puedes agregar o quitar puntos."
+    }
+
+    if (editingDraft.value?.type === "route") {
+      if (editAddPoint.value) return "Haz clic en el mapa para agregar un nuevo punto a la ruta."
+      return "Arrastra los puntos para ajustar el recorrido. También puedes agregar o quitar puntos."
     }
 
     if (drawMode.value === "circle") {
@@ -127,6 +242,14 @@ export function createGeofenceMapController({
       return "Haz clic en el primer punto para cerrar, doble clic o presiona ✓ para guardar."
     }
 
+    if (drawMode.value === "route") {
+      const points = draftRoutePoints.value.length
+
+      if (points === 0) return "Haz clic en el mapa para marcar el inicio de la ruta."
+      if (points < 2) return `Marca mínimo 2 puntos. Actual: ${points}.`
+      return "Sigue marcando el recorrido o presiona ✓ para guardar la ruta."
+    }
+
     return ""
   })
 
@@ -140,6 +263,7 @@ export function createGeofenceMapController({
 
   const resetDraftState = () => {
     draftPolygonPoints.value = []
+    draftRoutePoints.value = []
     draftCircleCenter.value = null
     clearDraftLayers()
   }
@@ -172,7 +296,7 @@ export function createGeofenceMapController({
 
       if (geofence.type === "circle") {
         layer = L.circle([geofence.center.lat, geofence.center.lng], {
-          ...geofenceStyle,
+          ...getShapeStyle(geofence),
           radius: geofence.radius,
         })
       }
@@ -180,7 +304,14 @@ export function createGeofenceMapController({
       if (geofence.type === "polygon") {
         layer = L.polygon(
           geofence.coordinates.map((point) => [point.lat, point.lng]),
-          geofenceStyle,
+          getShapeStyle(geofence),
+        )
+      }
+
+      if (geofence.type === "route") {
+        layer = L.polyline(
+          geofence.coordinates.map((point) => [point.lat, point.lng]),
+          getRouteStyle(geofence),
         )
       }
 
@@ -215,6 +346,13 @@ export function createGeofenceMapController({
     activateDrawCursor()
   }
 
+  const startRouteDraw = () => {
+    stopEditing()
+    resetDraftState()
+    drawMode.value = "route"
+    activateDrawCursor()
+  }
+
   const startCircleDraw = () => {
     stopEditing()
     resetDraftState()
@@ -238,14 +376,44 @@ export function createGeofenceMapController({
     redrawDraftPolygon()
   }
 
+  const undoRoutePoint = () => {
+    draftRoutePoints.value.pop()
+    redrawDraftRoute()
+  }
+
   const finishPolygon = () => {
     if (draftPolygonPoints.value.length < 3) return
 
+    const options = getDraftGeofenceOptions(props, "polygon")
+
     emit("geofence-created", {
       id: makeGeofenceId(),
-      name: `Geocerca ${(props.geofences || []).length + 1}`,
+      name: options.name,
       type: "polygon",
+      strokeColor: options.strokeColor,
+      fillColor: options.fillColor,
+      fillOpacity: options.fillOpacity,
+      color: options.strokeColor,
       coordinates: draftPolygonPoints.value.map((point) => normalizePoint(point)),
+      createdAt: new Date().toISOString(),
+    })
+
+    cancelDraw()
+  }
+
+  const finishRoute = () => {
+    if (draftRoutePoints.value.length < 2) return
+
+    const options = getDraftGeofenceOptions(props, "route")
+
+    emit("geofence-created", {
+      id: makeGeofenceId(),
+      name: options.name,
+      type: "route",
+      strokeColor: options.strokeColor,
+      color: options.strokeColor,
+      toleranceMeters: 100,
+      coordinates: draftRoutePoints.value.map((point) => normalizePoint(point)),
       createdAt: new Date().toISOString(),
     })
 
@@ -257,10 +425,16 @@ export function createGeofenceMapController({
 
     if (radius < 10) return
 
+    const options = getDraftGeofenceOptions(props, "circle")
+
     emit("geofence-created", {
       id: makeGeofenceId(),
-      name: `Geocerca ${(props.geofences || []).length + 1}`,
+      name: options.name,
       type: "circle",
+      strokeColor: options.strokeColor,
+      fillColor: options.fillColor,
+      fillOpacity: options.fillOpacity,
+      color: options.strokeColor,
       center: normalizePoint(center),
       radius,
       createdAt: new Date().toISOString(),
@@ -274,12 +448,14 @@ export function createGeofenceMapController({
 
     layers.draftLayer.clearLayers()
 
+    const currentDraftStyle = getDraftShapeStyle(props)
+
     if (draftPolygonPoints.value.length >= 2) {
-      L.polyline(draftPolygonPoints.value, draftStyle).addTo(layers.draftLayer)
+      L.polyline(draftPolygonPoints.value, currentDraftStyle).addTo(layers.draftLayer)
     }
 
     if (draftPolygonPoints.value.length >= 3) {
-      L.polygon(draftPolygonPoints.value, draftStyle).addTo(layers.draftLayer)
+      L.polygon(draftPolygonPoints.value, currentDraftStyle).addTo(layers.draftLayer)
     }
 
     draftPolygonPoints.value.forEach((point, index) => {
@@ -310,6 +486,35 @@ export function createGeofenceMapController({
     })
   }
 
+  const redrawDraftRoute = () => {
+    if (!layers.draftLayer) return
+
+    layers.draftLayer.clearLayers()
+
+    if (draftRoutePoints.value.length >= 2) {
+      L.polyline(draftRoutePoints.value, getDraftRouteStyle(props)).addTo(layers.draftLayer)
+    }
+
+    draftRoutePoints.value.forEach((point, index) => {
+      const marker = L.marker(point, {
+        draggable: true,
+        icon: createVertexIcon(index === 0),
+      })
+
+      marker.on("dragend", (event) => {
+        draftRoutePoints.value[index] = event.target.getLatLng()
+        redrawDraftRoute()
+      })
+
+      marker
+        .bindTooltip(index === 0 ? "Inicio de ruta" : `Punto ${index + 1}`, {
+          direction: "top",
+          className: "sinergy-geofence-tooltip",
+        })
+        .addTo(layers.draftLayer)
+    })
+  }
+
   const redrawDraftCircle = (edge = null) => {
     if (!layers.draftLayer || !draftCircleCenter.value) return
 
@@ -319,7 +524,7 @@ export function createGeofenceMapController({
     const radius = edge ? center.distanceTo(edge) : 1
 
     L.circle(center, {
-      ...draftStyle,
+      ...getDraftShapeStyle(props),
       radius,
     }).addTo(layers.draftLayer)
 
@@ -354,7 +559,7 @@ export function createGeofenceMapController({
       })
     }
 
-    if (geofence.type === "polygon") {
+    if (geofence.type === "polygon" || geofence.type === "route") {
       const bounds = L.latLngBounds(
         geofence.coordinates.map((point) => [point.lat, point.lng]),
       )
@@ -373,9 +578,55 @@ export function createGeofenceMapController({
     emit("geofence-updated", cloneGeofence(editingDraft.value))
   }
 
+  const updateEditingGeofenceMeta = (updates = {}) => {
+    if (!editingDraft.value) return
+
+    const currentType = editingDraft.value.type
+    const fallbackName = getFallbackGeofenceName(props, currentType)
+
+    const nextStrokeColor =
+      updates.strokeColor ||
+      updates.color ||
+      editingDraft.value.strokeColor ||
+      editingDraft.value.color ||
+      geofenceStyle.color
+
+    const nextFillColor =
+      updates.fillColor ||
+      editingDraft.value.fillColor ||
+      nextStrokeColor ||
+      geofenceStyle.fillColor
+
+    editingDraft.value = {
+      ...editingDraft.value,
+      ...updates,
+      name:
+        updates.name !== undefined
+          ? String(updates.name).trim() || fallbackName
+          : editingDraft.value.name,
+      strokeColor: nextStrokeColor,
+      color: nextStrokeColor,
+      fillColor: currentType === "route" ? undefined : nextFillColor,
+      fillOpacity: getNumber(
+        updates.fillOpacity,
+        getNumber(editingDraft.value.fillOpacity, geofenceStyle.fillOpacity),
+      ),
+    }
+
+    emitUpdatedGeofence()
+    redrawEditLayer()
+  }
+
   const removeLastEditPoint = () => {
-    if (!editingDraft.value || editingDraft.value.type !== "polygon") return
-    if (editingDraft.value.coordinates.length <= 3) return
+    if (!editingDraft.value) return
+
+    if (editingDraft.value.type === "polygon") {
+      if (editingDraft.value.coordinates.length <= 3) return
+    } else if (editingDraft.value.type === "route") {
+      if (editingDraft.value.coordinates.length <= 2) return
+    } else {
+      return
+    }
 
     editingDraft.value.coordinates.pop()
     emitUpdatedGeofence()
@@ -394,6 +645,10 @@ export function createGeofenceMapController({
     if (editingDraft.value.type === "polygon") {
       redrawEditPolygon()
     }
+
+    if (editingDraft.value.type === "route") {
+      redrawEditRoute()
+    }
   }
 
   const redrawEditCircle = () => {
@@ -402,7 +657,7 @@ export function createGeofenceMapController({
     const edgeLatLng = getCircleEdgeLatLng(center, radius)
 
     const circle = L.circle(center, {
-      ...editStyle,
+      ...getEditShapeStyle(editingDraft.value),
       radius,
     }).addTo(layers.editLayer)
 
@@ -460,7 +715,7 @@ export function createGeofenceMapController({
 
   const redrawEditPolygon = () => {
     const points = editingDraft.value.coordinates.map((point) => [point.lat, point.lng])
-    const polygon = L.polygon(points, editStyle).addTo(layers.editLayer)
+    const polygon = L.polygon(points, getEditShapeStyle(editingDraft.value)).addTo(layers.editLayer)
 
     editingDraft.value.coordinates.forEach((point, index) => {
       const marker = L.marker([point.lat, point.lng], {
@@ -491,13 +746,49 @@ export function createGeofenceMapController({
     })
   }
 
+  const redrawEditRoute = () => {
+    const points = editingDraft.value.coordinates.map((point) => [point.lat, point.lng])
+    const route = L.polyline(points, getEditRouteStyle(editingDraft.value)).addTo(layers.editLayer)
+
+    editingDraft.value.coordinates.forEach((point, index) => {
+      const marker = L.marker([point.lat, point.lng], {
+        draggable: true,
+        icon: createVertexIcon(index === 0),
+      })
+
+      marker.on("drag", (event) => {
+        const next = event.target.getLatLng()
+
+        editingDraft.value.coordinates[index] = normalizePoint(next)
+
+        route.setLatLngs(
+          editingDraft.value.coordinates.map((item) => [item.lat, item.lng]),
+        )
+      })
+
+      marker.on("dragend", () => {
+        emitUpdatedGeofence()
+      })
+
+      marker
+        .bindTooltip(index === 0 ? "Mover inicio" : `Mover punto ${index + 1}`, {
+          direction: "top",
+          className: "sinergy-geofence-tooltip",
+        })
+        .addTo(layers.editLayer)
+    })
+  }
+
   const deleteGeofence = (id) => {
     if (editingDraft.value?.id === id) stopEditing()
     emit("geofence-deleted", id)
   }
 
   const handleMapClick = (event) => {
-    if (editingDraft.value?.type === "polygon" && editAddPoint.value) {
+    if (
+      (editingDraft.value?.type === "polygon" || editingDraft.value?.type === "route") &&
+      editAddPoint.value
+    ) {
       editingDraft.value.coordinates.push(normalizePoint(event.latlng))
 
       editAddPoint.value = false
@@ -511,6 +802,12 @@ export function createGeofenceMapController({
     if (drawMode.value === "polygon") {
       draftPolygonPoints.value.push(event.latlng)
       redrawDraftPolygon()
+      return
+    }
+
+    if (drawMode.value === "route") {
+      draftRoutePoints.value.push(event.latlng)
+      redrawDraftRoute()
       return
     }
 
@@ -534,6 +831,10 @@ export function createGeofenceMapController({
     if (drawMode.value === "polygon" && draftPolygonPoints.value.length >= 3) {
       finishPolygon()
     }
+
+    if (drawMode.value === "route" && draftRoutePoints.value.length >= 2) {
+      finishRoute()
+    }
   }
 
   const syncAndRenderGeofences = () => {
@@ -552,13 +853,19 @@ export function createGeofenceMapController({
   return {
     geofences,
     canSavePolygon,
+    canSaveRoute,
     helperTitle,
     helperText,
 
     startCircleDraw,
     startPolygonDraw,
+    startRouteDraw,
+
     finishPolygon,
+    finishRoute,
+
     undoPolygonPoint,
+    undoRoutePoint,
     cancelAll,
 
     renderGeofences,
@@ -568,6 +875,7 @@ export function createGeofenceMapController({
     stopEditing,
     removeLastEditPoint,
     deleteGeofence,
+    updateEditingGeofenceMeta,
 
     handleMapClick,
     handleMapMouseMove,

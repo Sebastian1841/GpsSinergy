@@ -45,6 +45,7 @@ const MAP_TILE_LAYERS = {
 export function useActivosMap({ props, emit, mapRef }) {
   const drawMode = ref(null)
   const draftPolygonPoints = ref([])
+  const draftRoutePoints = ref([])
   const draftCircleCenter = ref(null)
   const editingDraft = ref(null)
   const editAddPoint = ref(false)
@@ -141,6 +142,7 @@ export function useActivosMap({ props, emit, mapRef }) {
     state: {
       drawMode,
       draftPolygonPoints,
+      draftRoutePoints,
       draftCircleCenter,
       editingDraft,
       editAddPoint,
@@ -343,21 +345,32 @@ export function useActivosMap({ props, emit, mapRef }) {
     geofences: geofenceMap.geofences,
     drawMode,
     draftPolygonPoints,
+    draftRoutePoints,
     editingDraft,
     editAddPoint,
+
     canSavePolygon: geofenceMap.canSavePolygon,
+    canSaveRoute: geofenceMap.canSaveRoute,
+
     helperTitle: geofenceMap.helperTitle,
     helperText: geofenceMap.helperText,
 
     startCircleDraw: geofenceMap.startCircleDraw,
     startPolygonDraw: geofenceMap.startPolygonDraw,
+    startRouteDraw: geofenceMap.startRouteDraw,
+
     finishPolygon: geofenceMap.finishPolygon,
+    finishRoute: geofenceMap.finishRoute,
+
     undoPolygonPoint: geofenceMap.undoPolygonPoint,
+    undoRoutePoint: geofenceMap.undoRoutePoint,
+
     cancelAll: geofenceMap.cancelAll,
 
     startEditGeofence: geofenceMap.startEditGeofence,
     stopEditing: geofenceMap.stopEditing,
     removeLastEditPoint: geofenceMap.removeLastEditPoint,
     deleteGeofence: geofenceMap.deleteGeofence,
+    updateEditingGeofenceMeta: geofenceMap.updateEditingGeofenceMeta,
   }
 }
