@@ -50,6 +50,44 @@ const normalizePoint = (point) => ({
   lng: Number(point.lng.toFixed(7)),
 })
 
+const normalizeId = (value) => {
+  return String(value ?? "")
+}
+
+const normalizeSignatureValue = (value) => {
+  if (value === null || value === undefined) return ""
+
+  return String(value)
+}
+
+const buildCoordinatesSignature = (coordinates = []) => {
+  if (!Array.isArray(coordinates)) return ""
+
+  return coordinates
+    .map((point) => {
+      return [point?.lat, point?.lng].map(normalizeSignatureValue).join(":")
+    })
+    .join("|")
+}
+
+const buildGeofenceSignature = (geofence = {}) => {
+  return [
+    geofence.id,
+    geofence.type,
+    geofence.name,
+    geofence.strokeColor || geofence.color,
+    geofence.fillColor,
+    geofence.fillOpacity,
+    geofence.radius,
+    geofence.center?.lat,
+    geofence.center?.lng,
+    geofence.toleranceMeters,
+    buildCoordinatesSignature(geofence.coordinates),
+  ]
+    .map(normalizeSignatureValue)
+    .join(":")
+}
+
 const toRad = (value) => (value * Math.PI) / 180
 const toDeg = (value) => (value * 180) / Math.PI
 
@@ -178,6 +216,20 @@ const createVertexIcon = (active = false) => {
   })
 }
 
+const isValidLatLngValue = (lat, lng) => {
+  return Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))
+}
+
+const getCoordinateLatLngs = (coordinates = []) => {
+  if (!Array.isArray(coordinates)) return []
+
+  return coordinates
+    .filter((point) => {
+      return isValidLatLngValue(point?.lat, point?.lng)
+    })
+    .map((point) => [Number(point.lat), Number(point.lng)])
+}
+
 export function createGeofenceMapController({ props, emit, getMap, layers, state }) {
   const {
     drawMode,
@@ -187,6 +239,8 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
     editingDraft,
     editAddPoint,
   } = state
+
+  const geofenceLayerCache = new Map()
 
   const geofences = computed(() => props.geofences || [])
 
@@ -275,52 +329,109 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
     map?.doubleClickZoom?.enable()
   }
 
+  const removeCachedGeofenceLayer = (geofenceId) => {
+    const cachedLayer = geofenceLayerCache.get(geofenceId)
+
+    if (!cachedLayer) return
+
+    layers.geofenceLayer?.removeLayer(cachedLayer.layer)
+    geofenceLayerCache.delete(geofenceId)
+  }
+
+  const createGeofenceLayer = (geofence) => {
+    let layer = null
+
+    if (geofence.type === "circle") {
+      if (!isValidLatLngValue(geofence.center?.lat, geofence.center?.lng)) return null
+
+      layer = L.circle([Number(geofence.center.lat), Number(geofence.center.lng)], {
+        ...getShapeStyle(geofence),
+        radius: getNumber(geofence.radius, 10),
+      })
+    }
+
+    if (geofence.type === "polygon") {
+      const latLngs = getCoordinateLatLngs(geofence.coordinates)
+
+      if (latLngs.length < 3) return null
+
+      layer = L.polygon(latLngs, getShapeStyle(geofence))
+    }
+
+    if (geofence.type === "route") {
+      const latLngs = getCoordinateLatLngs(geofence.coordinates)
+
+      if (latLngs.length < 2) return null
+
+      layer = L.polyline(latLngs, getRouteStyle(geofence))
+    }
+
+    if (!layer) return null
+
+    layer.bindTooltip(`${geofence.name} · clic para editar`, {
+      direction: "top",
+      sticky: true,
+      className: "sinergy-geofence-tooltip",
+    })
+
+    layer.on("click", () => {
+      if (drawMode.value) return
+      startEditGeofence(geofence.id)
+    })
+
+    return layer
+  }
+
   const renderGeofences = () => {
     const map = getMap()
 
     if (!map || !layers.geofenceLayer) return
 
-    layers.geofenceLayer.clearLayers()
+    const nextGeofenceIds = new Set()
+
     ;(props.geofences || []).forEach((geofence) => {
-      if (editingDraft.value?.id === geofence.id) return
+      const geofenceId = normalizeId(geofence.id)
 
-      let layer = null
+      if (!geofenceId) return
 
-      if (geofence.type === "circle") {
-        layer = L.circle([geofence.center.lat, geofence.center.lng], {
-          ...getShapeStyle(geofence),
-          radius: geofence.radius,
-        })
+      if (normalizeId(editingDraft.value?.id) === geofenceId) {
+        removeCachedGeofenceLayer(geofenceId)
+        return
       }
 
-      if (geofence.type === "polygon") {
-        layer = L.polygon(
-          geofence.coordinates.map((point) => [point.lat, point.lng]),
-          getShapeStyle(geofence),
-        )
+      nextGeofenceIds.add(geofenceId)
+
+      const signature = buildGeofenceSignature(geofence)
+      const cachedLayer = geofenceLayerCache.get(geofenceId)
+
+      if (cachedLayer?.signature === signature) {
+        return
       }
 
-      if (geofence.type === "route") {
-        layer = L.polyline(
-          geofence.coordinates.map((point) => [point.lat, point.lng]),
-          getRouteStyle(geofence),
-        )
-      }
+      removeCachedGeofenceLayer(geofenceId)
+
+      const layer = createGeofenceLayer(geofence)
 
       if (!layer) return
 
-      layer.bindTooltip(`${geofence.name} · clic para editar`, {
-        direction: "top",
-        sticky: true,
-        className: "sinergy-geofence-tooltip",
-      })
-
-      layer.on("click", () => {
-        if (drawMode.value) return
-        startEditGeofence(geofence.id)
-      })
-
       layer.addTo(layers.geofenceLayer)
+
+      geofenceLayerCache.set(geofenceId, {
+        layer,
+        signature,
+      })
+    })
+
+    const staleGeofenceIds = []
+
+    geofenceLayerCache.forEach((_cachedLayer, geofenceId) => {
+      if (!nextGeofenceIds.has(geofenceId)) {
+        staleGeofenceIds.push(geofenceId)
+      }
+    })
+
+    staleGeofenceIds.forEach((geofenceId) => {
+      removeCachedGeofenceLayer(geofenceId)
     })
   }
 
@@ -536,7 +647,10 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
 
     cancelDraw()
 
-    const geofence = (props.geofences || []).find((item) => item.id === geofenceId)
+    const geofence = (props.geofences || []).find((item) => {
+      return normalizeId(item.id) === normalizeId(geofenceId)
+    })
+
     if (!geofence) return
 
     editingDraft.value = cloneGeofence(geofence)
@@ -763,7 +877,8 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
   }
 
   const deleteGeofence = (id) => {
-    if (editingDraft.value?.id === id) stopEditing()
+    if (normalizeId(editingDraft.value?.id) === normalizeId(id)) stopEditing()
+    removeCachedGeofenceLayer(normalizeId(id))
     emit("geofence-deleted", id)
   }
 
@@ -822,7 +937,9 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
 
   const syncAndRenderGeofences = () => {
     if (editingDraft.value) {
-      const updated = (props.geofences || []).find((item) => item.id === editingDraft.value.id)
+      const updated = (props.geofences || []).find((item) => {
+        return normalizeId(item.id) === normalizeId(editingDraft.value.id)
+      })
 
       if (updated) {
         editingDraft.value = cloneGeofence(updated)

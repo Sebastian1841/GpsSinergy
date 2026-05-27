@@ -210,13 +210,27 @@
         </div>
       </section>
     </div>
+
+    <ConfirmDialog
+      v-model="confirmDialog.isOpen"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      :detail="confirmDialog.detail"
+      :confirm-label="confirmDialog.confirmLabel"
+      :cancel-label="confirmDialog.cancelLabel"
+      :variant="confirmDialog.variant"
+      @confirm="confirmAction"
+      @cancel="cancelAction"
+    />
   </Teleport>
 </template>
 
 <script setup>
 import { nextTick, onBeforeUnmount, watch } from "vue"
 
+import ConfirmDialog from "../../ui/ConfirmDialog.vue"
 import { useFloatingModal } from "../../../composables/ui/useFloatingModal.js"
+import { useConfirmDialog } from "../../../composables/ui/useConfirmDialog.js"
 import {
   getGeofenceBadgeClass,
   getGeofenceBadgeLabel,
@@ -246,6 +260,8 @@ const props = defineProps({
 
 const emit = defineEmits(["update:modelValue", "select-edit", "open-history", "delete-geofence"])
 
+const { confirmDialog, openConfirmDialog, confirmAction, cancelAction } = useConfirmDialog()
+
 const {
   modalRef,
   modalFrameStyle,
@@ -268,11 +284,19 @@ const closeModal = () => {
   emit("update:modelValue", false)
 }
 
-const confirmDeleteGeofence = (geofence) => {
+const confirmDeleteGeofence = async (geofence) => {
   if (!geofence?.id) return
 
   const geofenceName = geofence.name || "esta geocerca"
-  const confirmed = window.confirm(`¿Eliminar la geocerca "${geofenceName}"?`)
+
+  const confirmed = await openConfirmDialog({
+    title: "Eliminar geocerca",
+    message: `¿Seguro que deseas eliminar "${geofenceName}"?`,
+    detail: "Esta acción quitará la geocerca del mapa y de la lista lateral.",
+    confirmLabel: "Eliminar",
+    cancelLabel: "Cancelar",
+    variant: "danger",
+  })
 
   if (!confirmed) return
 
@@ -280,6 +304,8 @@ const confirmDeleteGeofence = (geofence) => {
 }
 
 const handleKeydown = (event) => {
+  if (confirmDialog.isOpen) return
+
   if (event.key === "Escape" && props.modelValue) {
     closeModal()
   }

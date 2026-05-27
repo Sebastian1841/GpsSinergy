@@ -1,6 +1,6 @@
 <template>
-  <div class="min-h-0 min-w-0 flex-1 overflow-hidden bg-white">
-    <div class="h-full min-w-0 overflow-auto">
+  <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white">
+    <div class="min-h-0 min-w-0 flex-1 overflow-auto">
       <table class="w-max min-w-full border-collapse text-[11px] text-[#172033]">
         <colgroup>
           <col
@@ -50,7 +50,7 @@
 
         <tbody>
           <tr
-            v-for="activo in activos"
+            v-for="activo in paginatedActivos"
             :key="activo.id"
             :data-activo-id="String(activo.id)"
             class="h-[32px] cursor-context-menu border-b border-[#edf1f5] transition hover:bg-[#f6f8fb]"
@@ -139,10 +139,68 @@
         </tbody>
       </table>
     </div>
+
+    <footer
+      v-if="activos.length"
+      class="flex shrink-0 flex-col gap-2 border-t border-[#d8dee8] bg-[#f8fafc] px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div class="flex min-w-0 items-center gap-2">
+        <span class="text-[10px] font-black uppercase tracking-[0.12em] text-[#102372]">
+          Tabla
+        </span>
+
+        <span class="truncate text-[11px] font-bold text-slate-500">
+          {{ paginationStart }}-{{ paginationEnd }} de {{ totalItems }} activos
+        </span>
+      </div>
+
+      <div class="flex items-center justify-between gap-2 sm:justify-end">
+        <label class="flex items-center gap-2 text-[11px] font-bold text-slate-500">
+          <span class="hidden sm:inline">Filas</span>
+
+          <select
+            v-model.number="pageSize"
+            class="h-8 cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-2 text-[11px] font-black text-[#102372] outline-none transition focus:border-[#FF6600] focus:ring-2 focus:ring-[#FF6600]/10"
+          >
+            <option v-for="option in pageSizeOptions" :key="option" :value="option">
+              {{ option }}
+            </option>
+          </select>
+        </label>
+
+        <div class="flex items-center gap-1">
+          <button
+            type="button"
+            class="h-8 cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-3 text-[11px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[#d8dee8] disabled:hover:text-[#102372]"
+            :disabled="currentPage <= 1"
+            @click="goToPreviousPage"
+          >
+            Anterior
+          </button>
+
+          <span
+            class="flex h-8 min-w-[74px] items-center justify-center rounded-lg border border-[#d8dee8] bg-white px-3 text-[11px] font-black text-[#102372]"
+          >
+            {{ currentPage }} / {{ totalPages }}
+          </span>
+
+          <button
+            type="button"
+            class="h-8 cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-3 text-[11px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[#d8dee8] disabled:hover:text-[#102372]"
+            :disabled="currentPage >= totalPages"
+            @click="goToNextPage"
+          >
+            Siguiente
+          </button>
+        </div>
+      </div>
+    </footer>
   </div>
 </template>
 
 <script setup>
+import { computed, ref, watch } from "vue"
+
 const props = defineProps({
   activos: {
     type: Array,
@@ -175,6 +233,73 @@ const props = defineProps({
 })
 
 defineEmits(["select", "toggle-sort", "open-context-menu"])
+
+const pageSizeOptions = [25, 50, 100, 200]
+const currentPage = ref(1)
+const pageSize = ref(50)
+
+const totalItems = computed(() => {
+  return props.activos.length
+})
+
+const totalPages = computed(() => {
+  return Math.max(1, Math.ceil(totalItems.value / pageSize.value))
+})
+
+const paginationStart = computed(() => {
+  if (!totalItems.value) return 0
+
+  return (currentPage.value - 1) * pageSize.value + 1
+})
+
+const paginationEnd = computed(() => {
+  return Math.min(currentPage.value * pageSize.value, totalItems.value)
+})
+
+const paginatedActivos = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+
+  return props.activos.slice(start, end)
+})
+
+const activosOrderSignature = computed(() => {
+  return props.activos
+    .map((activo) => {
+      return String(activo?.id ?? "")
+    })
+    .join("|")
+})
+
+const clampCurrentPage = () => {
+  if (currentPage.value > totalPages.value) {
+    currentPage.value = totalPages.value
+  }
+
+  if (currentPage.value < 1) {
+    currentPage.value = 1
+  }
+}
+
+const goToPreviousPage = () => {
+  currentPage.value = Math.max(1, currentPage.value - 1)
+}
+
+const goToNextPage = () => {
+  currentPage.value = Math.min(totalPages.value, currentPage.value + 1)
+}
+
+const goToSelectedActivoPage = () => {
+  if (props.selectedId === null || props.selectedId === undefined) return
+
+  const selectedIndex = props.activos.findIndex((activo) => {
+    return String(activo.id) === String(props.selectedId)
+  })
+
+  if (selectedIndex < 0) return
+
+  currentPage.value = Math.floor(selectedIndex / pageSize.value) + 1
+}
 
 const isSelected = (activo) => {
   if (props.selectedId === null || props.selectedId === undefined) return false
@@ -218,4 +343,15 @@ const statusChipClass = (estado) => {
 
   return classes[estado] || "bg-slate-100 text-slate-500"
 }
+
+watch(
+  [activosOrderSignature, pageSize, () => props.selectedId],
+  () => {
+    clampCurrentPage()
+    goToSelectedActivoPage()
+  },
+  {
+    immediate: true,
+  },
+)
 </script>

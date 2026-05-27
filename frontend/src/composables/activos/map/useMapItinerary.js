@@ -158,6 +158,9 @@ const buildItineraryTooltip = (point, label = "Punto") => {
 }
 
 export function createItineraryMapController({ props, getMap, getRenderer, layers }) {
+  const routeLayers = []
+  let selectedItineraryPointLayer = null
+
   const createItineraryRouteStyles = (index = 0) => {
     const palette = getItineraryRoutePalette(index)
     const renderer = getRenderer()
@@ -290,8 +293,41 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
       .filter((item) => item.points.length)
   }
 
+  const addRouteLayer = (layer) => {
+    if (!layer || !layers.itineraryLayer) return layer
+
+    routeLayers.push(layer)
+    layer.addTo(layers.itineraryLayer)
+
+    return layer
+  }
+
+  const clearItineraryRouteLayers = () => {
+    if (!layers.itineraryLayer) {
+      routeLayers.length = 0
+      return
+    }
+
+    routeLayers.forEach((layer) => {
+      layers.itineraryLayer.removeLayer(layer)
+    })
+
+    routeLayers.length = 0
+  }
+
+  const clearSelectedItineraryPoint = () => {
+    if (!layers.itineraryLayer || !selectedItineraryPointLayer) {
+      selectedItineraryPointLayer = null
+      return
+    }
+
+    layers.itineraryLayer.removeLayer(selectedItineraryPointLayer)
+    selectedItineraryPointLayer = null
+  }
+
   const clearItineraryRoute = () => {
-    layers.itineraryLayer?.clearLayers()
+    clearItineraryRouteLayers()
+    clearSelectedItineraryPoint()
   }
 
   const renderRouteDirectionArrows = ({ points, routeColor }) => {
@@ -309,12 +345,38 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
 
       const angle = getBearing(previousPoint, currentPoint)
 
-      L.marker(toLatLng(currentPoint), {
-        icon: createRouteArrowIcon(routeColor, angle),
-        interactive: false,
-        zIndexOffset: 760,
-      }).addTo(layers.itineraryLayer)
+      addRouteLayer(
+        L.marker(toLatLng(currentPoint), {
+          icon: createRouteArrowIcon(routeColor, angle),
+          interactive: false,
+          zIndexOffset: 760,
+        }),
+      )
     }
+  }
+
+  const renderSelectedItineraryPoint = () => {
+    if (!layers.itineraryLayer) return
+
+    clearSelectedItineraryPoint()
+
+    const selectedPoint = props.selectedItineraryPoint
+
+    if (!isValidLatLng(selectedPoint)) return
+
+    selectedItineraryPointLayer = L.marker(toLatLng(selectedPoint), {
+      icon: createItineraryIcon({
+        type: "selected",
+        label: selectedPoint.index ?? "•",
+        selected: true,
+      }),
+      zIndexOffset: 1200,
+    }).bindTooltip(buildItineraryTooltip(selectedPoint, "Punto seleccionado"), {
+      direction: "top",
+      className: "sinergy-geofence-tooltip",
+    })
+
+    selectedItineraryPointLayer.addTo(layers.itineraryLayer)
   }
 
   const renderItineraryRoute = ({ fit = false } = {}) => {
@@ -322,12 +384,15 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
 
     if (!map || !layers.itineraryLayer) return
 
-    layers.itineraryLayer.clearLayers()
+    clearItineraryRouteLayers()
 
     const route = props.itineraryRoute
     const routes = getItineraryRoutes()
 
-    if (!route || !routes.length) return
+    if (!route || !routes.length) {
+      clearSelectedItineraryPoint()
+      return
+    }
 
     const allLatLngs = []
 
@@ -343,10 +408,10 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
       if (latLngs.length >= 2) {
         const styles = createItineraryRouteStyles(routeIndex)
 
-        L.polyline(latLngs, styles.halo).addTo(layers.itineraryLayer)
-        L.polyline(latLngs, styles.base).addTo(layers.itineraryLayer)
-        L.polyline(latLngs, styles.main).addTo(layers.itineraryLayer)
-        L.polyline(latLngs, styles.flow).addTo(layers.itineraryLayer)
+        addRouteLayer(L.polyline(latLngs, styles.halo))
+        addRouteLayer(L.polyline(latLngs, styles.base))
+        addRouteLayer(L.polyline(latLngs, styles.main))
+        addRouteLayer(L.polyline(latLngs, styles.flow))
 
         renderRouteDirectionArrows({
           points,
@@ -360,16 +425,18 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
 
             if (!isIntermediate || !isMoving) return
 
-            L.circleMarker(toLatLng(point), {
-              radius: 2.6,
-              color: "#ffffff",
-              weight: 1.2,
-              fillColor: routeColor,
-              fillOpacity: 0.78,
-              opacity: 1,
-              interactive: false,
-              renderer: getRenderer(),
-            }).addTo(layers.itineraryLayer)
+            addRouteLayer(
+              L.circleMarker(toLatLng(point), {
+                radius: 2.6,
+                color: "#ffffff",
+                weight: 1.2,
+                fillColor: routeColor,
+                fillOpacity: 0.78,
+                opacity: 1,
+                interactive: false,
+                renderer: getRenderer(),
+              }),
+            )
           })
         }
       }
@@ -378,33 +445,33 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
       const lastPoint = points[points.length - 1]
 
       if (firstPoint) {
-        L.marker(toLatLng(firstPoint), {
-          icon: createItineraryIcon({
-            type: "start",
-            label: "I",
-          }),
-          zIndexOffset: 900,
-        })
-          .bindTooltip(buildItineraryTooltip(firstPoint, "Inicio"), {
+        addRouteLayer(
+          L.marker(toLatLng(firstPoint), {
+            icon: createItineraryIcon({
+              type: "start",
+              label: "I",
+            }),
+            zIndexOffset: 900,
+          }).bindTooltip(buildItineraryTooltip(firstPoint, "Inicio"), {
             direction: "top",
             className: "sinergy-geofence-tooltip",
-          })
-          .addTo(layers.itineraryLayer)
+          }),
+        )
       }
 
       if (lastPoint && lastPoint.id !== firstPoint?.id) {
-        L.marker(toLatLng(lastPoint), {
-          icon: createItineraryIcon({
-            type: "end",
-            label: "F",
-          }),
-          zIndexOffset: 900,
-        })
-          .bindTooltip(buildItineraryTooltip(lastPoint, "Fin"), {
+        addRouteLayer(
+          L.marker(toLatLng(lastPoint), {
+            icon: createItineraryIcon({
+              type: "end",
+              label: "F",
+            }),
+            zIndexOffset: 900,
+          }).bindTooltip(buildItineraryTooltip(lastPoint, "Fin"), {
             direction: "top",
             className: "sinergy-geofence-tooltip",
-          })
-          .addTo(layers.itineraryLayer)
+          }),
+        )
       }
 
       points.forEach((point) => {
@@ -414,38 +481,22 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
 
         if (!isStop || isFirst || isLast) return
 
-        L.marker(toLatLng(point), {
-          icon: createItineraryIcon({
-            type: "stop",
-            label: "",
-          }),
-          zIndexOffset: 850,
-        })
-          .bindTooltip(buildItineraryTooltip(point, "Parada"), {
+        addRouteLayer(
+          L.marker(toLatLng(point), {
+            icon: createItineraryIcon({
+              type: "stop",
+              label: "",
+            }),
+            zIndexOffset: 850,
+          }).bindTooltip(buildItineraryTooltip(point, "Parada"), {
             direction: "top",
             className: "sinergy-geofence-tooltip",
-          })
-          .addTo(layers.itineraryLayer)
+          }),
+        )
       })
     })
 
-    const selectedPoint = props.selectedItineraryPoint
-
-    if (isValidLatLng(selectedPoint)) {
-      L.marker(toLatLng(selectedPoint), {
-        icon: createItineraryIcon({
-          type: "selected",
-          label: selectedPoint.index || "•",
-          selected: true,
-        }),
-        zIndexOffset: 1200,
-      })
-        .bindTooltip(buildItineraryTooltip(selectedPoint, "Punto seleccionado"), {
-          direction: "top",
-          className: "sinergy-geofence-tooltip",
-        })
-        .addTo(layers.itineraryLayer)
-    }
+    renderSelectedItineraryPoint()
 
     if (fit && allLatLngs.length) {
       if (allLatLngs.length === 1) {
@@ -482,6 +533,7 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
     ensureItineraryMapStyles,
     clearItineraryRoute,
     renderItineraryRoute,
+    renderSelectedItineraryPoint,
     centerItineraryPoint,
   }
 }

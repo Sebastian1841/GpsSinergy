@@ -524,7 +524,7 @@ export function useActivosMap({ props, emit, mapRef }) {
   watch(
     () => buildSelectedItineraryPointSignature(props.selectedItineraryPoint),
     () => {
-      itineraryMap.renderItineraryRoute()
+      itineraryMap.renderSelectedItineraryPoint()
       itineraryMap.centerItineraryPoint()
     },
   )

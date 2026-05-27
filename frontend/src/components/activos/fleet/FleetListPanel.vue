@@ -400,6 +400,18 @@
       </button>
     </div>
 
+    <ConfirmDialog
+      v-model="confirmDialog.isOpen"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      :detail="confirmDialog.detail"
+      :confirm-label="confirmDialog.confirmLabel"
+      :cancel-label="confirmDialog.cancelLabel"
+      :variant="confirmDialog.variant"
+      @confirm="confirmAction"
+      @cancel="cancelAction"
+    />
+
     <FleetContextMenu
       :is-open="deviceContextMenu.isOpen"
       :x="deviceContextMenu.x"
@@ -413,11 +425,13 @@
 
 <script setup>
 import { computed, ref, watch } from "vue"
+import ConfirmDialog from "../../ui/ConfirmDialog.vue"
 import ItineraryPanel from "../itinerarios/ItineraryPanel.vue"
 import FleetTable from "./FleetTable.vue"
 import FleetContextMenu from "./FleetContextMenu.vue"
 import { useFleetColumns } from "../../../composables/activos/fleet/useFleetColumns"
 import { useFleetSorting } from "../../../composables/activos/fleet/useFleetSorting"
+import { useConfirmDialog } from "../../../composables/ui/useConfirmDialog.js"
 import {
   getGeofenceBadgeClass,
   getGeofenceBadgeLabel,
@@ -493,6 +507,8 @@ const emit = defineEmits([
 
 const showColumns = ref(false)
 const localActiveSection = ref(props.activeSection || "activos")
+
+const { confirmDialog, openConfirmDialog, confirmAction, cancelAction } = useConfirmDialog()
 
 const deviceContextMenu = ref({
   isOpen: false,
@@ -600,11 +616,19 @@ const searchPlaceholder = computed(() => {
   return placeholders[localActiveSection.value] || placeholders.activos
 })
 
-const confirmDeleteGeofence = (geofence) => {
+const confirmDeleteGeofence = async (geofence) => {
   if (!geofence?.id) return
 
   const geofenceName = geofence.name || "esta geocerca"
-  const confirmed = window.confirm(`¿Eliminar la geocerca "${geofenceName}"?`)
+
+  const confirmed = await openConfirmDialog({
+    title: "Eliminar geocerca",
+    message: `¿Seguro que deseas eliminar "${geofenceName}"?`,
+    detail: "Esta acción quitará la geocerca del mapa y de la lista lateral.",
+    confirmLabel: "Eliminar",
+    cancelLabel: "Cancelar",
+    variant: "danger",
+  })
 
   if (!confirmed) return
 

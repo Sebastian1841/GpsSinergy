@@ -86,20 +86,35 @@
       :history="terminalHistory"
       @send-command="handleTerminalCommand"
     />
+
+    <ConfirmDialog
+      v-model="confirmDialog.isOpen"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      :detail="confirmDialog.detail"
+      :confirm-label="confirmDialog.confirmLabel"
+      :cancel-label="confirmDialog.cancelLabel"
+      :variant="confirmDialog.variant"
+      @confirm="confirmAction"
+      @cancel="cancelAction"
+    />
   </section>
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, ref } from "vue"
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
 import { mockActivos } from "../data/mockActivos"
 
 import FleetListPanel from "../components/activos/fleet/FleetListPanel.vue"
 import ActivosMapPanel from "../components/activos/map/ActivosMapPanel.vue"
 import AddActivoModal from "../components/activos/fleet/AddActivoModal.vue"
 import FleetTerminalModal from "../components/activos/fleet/FleetTerminalModal.vue"
+import ConfirmDialog from "../components/ui/ConfirmDialog.vue"
 
 import { useFleetTerminal } from "../composables/activos/fleet/useFleetTerminal"
 import { useGeofences } from "../composables/activos/geocercas/useGeofences.js"
+import { useConfirmDialog } from "../composables/ui/useConfirmDialog.js"
+import { usePersistedFleetState } from "../composables/activos/fleet/usePersistedFleetState.js"
 
 const selectedId = ref(mockActivos[0]?.id || null)
 const selectedGeofenceId = ref(null)
@@ -114,9 +129,9 @@ const sectionSearch = ref({
 
 const { geofences, createGeofence, updateGeofence, deleteGeofence } = useGeofences()
 
-const customActivos = ref([])
-const deletedActivoIds = ref([])
-const editedActivos = ref({})
+const { confirmDialog, openConfirmDialog, confirmAction, cancelAction } = useConfirmDialog()
+
+const { customActivos, deletedActivoIds, editedActivos, leftPanelWidth } = usePersistedFleetState()
 
 const showActivoModal = ref(false)
 const activoModalMode = ref("create")
@@ -134,8 +149,6 @@ const {
 
 const selectedItineraryRoute = ref(null)
 const selectedItineraryPoint = ref(null)
-
-const leftPanelWidth = ref(380)
 
 const layoutRef = ref(null)
 
@@ -299,6 +312,21 @@ const filteredActivos = computed(() => {
     return matchesText && matchesStatusFilter(activo)
   })
 })
+
+const ensureSelectedActivo = () => {
+  if (!filteredActivos.value.length) {
+    selectedId.value = null
+    return
+  }
+
+  const selectedExists = filteredActivos.value.some((activo) => {
+    return String(activo.id) === String(selectedId.value)
+  })
+
+  if (selectedExists) return
+
+  selectedId.value = filteredActivos.value[0]?.id || null
+}
 
 const createActivoId = () => {
   const ids = [...customActivos.value, ...mockActivos]
@@ -474,9 +502,18 @@ const openTerminalModal = (activo) => {
 }
 
 const deleteActivo = async (activo) => {
-  const confirmed = window.confirm(
-    `¿Eliminar el activo "${activo.vehiculo || activo.name || activo.id}"?`,
-  )
+  if (!activo?.id) return
+
+  const activoName = activo.vehiculo || activo.name || activo.id
+
+  const confirmed = await openConfirmDialog({
+    title: "Eliminar activo",
+    message: `¿Seguro que deseas eliminar "${activoName}"?`,
+    detail: "El activo se quitará de la lista y del mapa en esta sesión.",
+    confirmLabel: "Eliminar",
+    cancelLabel: "Cancelar",
+    variant: "danger",
+  })
 
   if (!confirmed) return
 
@@ -728,6 +765,16 @@ const setStatusFilter = async (filter) => {
 
   await refreshMapLayout(true)
 }
+
+watch(
+  filteredActivos,
+  () => {
+    ensureSelectedActivo()
+  },
+  {
+    immediate: true,
+  },
+)
 
 onBeforeUnmount(() => {
   window.removeEventListener("pointermove", scheduleDragResize)
