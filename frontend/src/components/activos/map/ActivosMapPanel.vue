@@ -227,7 +227,7 @@ const visibleGeofences = computed(() => {
 })
 
 const getGeofenceById = (geofenceId) => {
-  return geofenceItems.value.find((geofence) => {
+  return (props.geofences || []).find((geofence) => {
     return normalizeId(geofence.id) === normalizeId(geofenceId)
   })
 }

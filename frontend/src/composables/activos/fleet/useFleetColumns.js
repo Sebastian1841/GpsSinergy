@@ -7,6 +7,25 @@ const defaultNormalizeText = (value) => {
     .replace(/\s+/g, " ")
 }
 
+const buildColumnsSignature = (columns = []) => {
+  if (!Array.isArray(columns)) return ""
+
+  return columns
+    .map((column) => {
+      return [
+        column.key,
+        column.label,
+        column.width,
+        column.align,
+        column.locked,
+        column.defaultVisible,
+      ]
+        .map((value) => String(value ?? ""))
+        .join(":")
+    })
+    .join("|")
+}
+
 export function useFleetColumns({ columns, normalizeText = defaultNormalizeText } = {}) {
   const columnSearch = ref("")
   const visibleColumnKeys = ref([])
@@ -15,6 +34,10 @@ export function useFleetColumns({ columns, normalizeText = defaultNormalizeText 
     const value = unref(columns)
 
     return Array.isArray(value) ? value : []
+  })
+
+  const columnsSignature = computed(() => {
+    return buildColumnsSignature(safeColumns.value)
   })
 
   const defaultColumnKeys = computed(() => {
@@ -53,12 +76,11 @@ export function useFleetColumns({ columns, normalizeText = defaultNormalizeText 
   }
 
   watch(
-    safeColumns,
+    columnsSignature,
     () => {
       resetColumns()
     },
     {
-      deep: true,
       immediate: true,
     },
   )

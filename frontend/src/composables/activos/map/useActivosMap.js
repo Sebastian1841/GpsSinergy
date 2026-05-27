@@ -42,6 +42,121 @@ const MAP_TILE_LAYERS = {
   },
 }
 
+const normalizeSignatureValue = (value) => {
+  if (value === null || value === undefined) return ""
+
+  return String(value)
+}
+
+const normalizeId = (value) => {
+  return String(value ?? "")
+}
+
+const buildPointSignature = (point) => {
+  if (!point) return ""
+
+  return [
+    point.id,
+    point.lat,
+    point.lng,
+    point.speed,
+    point.index,
+    point.timeLabel,
+    point.speedLabel,
+    point.address,
+    point.event,
+    point.isCurrentLocation,
+  ]
+    .map(normalizeSignatureValue)
+    .join(":")
+}
+
+const buildPointsSignature = (points = []) => {
+  if (!Array.isArray(points)) return ""
+
+  return points.map(buildPointSignature).join("|")
+}
+
+const buildActivosSignature = (activos = []) => {
+  if (!Array.isArray(activos)) return ""
+
+  return activos
+    .map((activo) => {
+      return [
+        activo.id,
+        activo.lat,
+        activo.lng,
+        activo.estado,
+        activo.vehiculo,
+        activo.patente,
+        activo.name,
+      ]
+        .map(normalizeSignatureValue)
+        .join(":")
+    })
+    .join("|")
+}
+
+const buildGeofenceCoordinatesSignature = (coordinates = []) => {
+  if (!Array.isArray(coordinates)) return ""
+
+  return coordinates
+    .map((point) => {
+      return [point?.lat, point?.lng].map(normalizeSignatureValue).join(":")
+    })
+    .join("|")
+}
+
+const buildGeofencesSignature = (geofences = []) => {
+  if (!Array.isArray(geofences)) return ""
+
+  return geofences
+    .map((geofence) => {
+      return [
+        geofence.id,
+        geofence.type,
+        geofence.name,
+        geofence.strokeColor || geofence.color,
+        geofence.fillColor,
+        geofence.fillOpacity,
+        geofence.radius,
+        geofence.center?.lat,
+        geofence.center?.lng,
+        geofence.toleranceMeters,
+        buildGeofenceCoordinatesSignature(geofence.coordinates),
+      ]
+        .map(normalizeSignatureValue)
+        .join(":")
+    })
+    .join("|")
+}
+
+const buildItineraryRouteSignature = (route) => {
+  if (!route) return ""
+
+  const sourceRoutes = Array.isArray(route.routes) && route.routes.length ? route.routes : [route]
+
+  return sourceRoutes
+    .map((item, index) => {
+      const points = item.points || item.rows || []
+
+      return [
+        index,
+        item.id,
+        item.asset?.id || route.asset?.id,
+        item.asset?.activoId || route.asset?.activoId,
+        buildPointsSignature(points),
+      ]
+        .map(normalizeSignatureValue)
+        .join(":")
+    })
+    .join("|")
+}
+
+const buildSelectedItineraryPointSignature = (point) => {
+  return buildPointSignature(point)
+}
+
 export function useActivosMap({ props, emit, mapRef }) {
   const drawMode = ref(null)
   const draftPolygonPoints = ref([])
@@ -53,6 +168,8 @@ export function useActivosMap({ props, emit, mapRef }) {
   let map = null
   let currentTileLayer = null
   let itineraryRenderer = null
+
+  const markerCache = new Map()
 
   const layers = {
     markerLayer: null,
@@ -134,6 +251,61 @@ export function useActivosMap({ props, emit, mapRef }) {
     })
   }
 
+  const buildMarkerSignature = (activo) => {
+    const activoLatLng = getActivoLatLng(activo)
+    const isSelected = normalizeId(activo.id) === normalizeId(props.selectedId)
+
+    return [
+      activo.id,
+      activoLatLng?.[0],
+      activoLatLng?.[1],
+      activo.estado,
+      activo.vehiculo,
+      activo.patente,
+      activo.name,
+      isSelected,
+    ]
+      .map(normalizeSignatureValue)
+      .join(":")
+  }
+
+  const createActivoMarker = (activo, activoLatLng) => {
+    const marker = L.marker(activoLatLng, {
+      icon: createMarkerIcon(activo),
+    })
+
+    marker.on("click", () => {
+      if (drawMode.value || editingDraft.value) return
+      emit("select", activo.id)
+    })
+
+    marker.bindTooltip(activo.vehiculo || activo.patente || activo.name || "Activo", {
+      permanent: activo.id === props.selectedId,
+      direction: "top",
+      offset: [0, -12],
+      className: "sinergy-tooltip",
+    })
+
+    return marker
+  }
+
+  const removeMarkerFromCache = (markerId) => {
+    const cachedMarker = markerCache.get(markerId)
+
+    if (!cachedMarker) return
+
+    layers.markerLayer?.removeLayer(cachedMarker.marker)
+    markerCache.delete(markerId)
+  }
+
+  const clearMarkerCache = () => {
+    markerCache.forEach((cachedMarker) => {
+      layers.markerLayer?.removeLayer(cachedMarker.marker)
+    })
+
+    markerCache.clear()
+  }
+
   const geofenceMap = createGeofenceMapController({
     props,
     emit,
@@ -159,33 +331,50 @@ export function useActivosMap({ props, emit, mapRef }) {
   const renderMarkers = () => {
     if (!map || !layers.markerLayer) return
 
-    layers.markerLayer.clearLayers()
-
     const bounds = []
+    const nextMarkerIds = new Set()
 
     ;(props.activos || []).forEach((activo) => {
       const activoLatLng = getActivoLatLng(activo)
 
       if (!activoLatLng) return
 
-      const marker = L.marker(activoLatLng, {
-        icon: createMarkerIcon(activo),
-      })
+      const markerId = normalizeId(activo.id)
 
-      marker.on("click", () => {
-        if (drawMode.value || editingDraft.value) return
-        emit("select", activo.id)
-      })
+      if (!markerId) return
 
-      marker.bindTooltip(activo.vehiculo || activo.patente || activo.name || "Activo", {
-        permanent: activo.id === props.selectedId,
-        direction: "top",
-        offset: [0, -12],
-        className: "sinergy-tooltip",
-      })
+      const markerSignature = buildMarkerSignature(activo)
+      const cachedMarker = markerCache.get(markerId)
+
+      nextMarkerIds.add(markerId)
+      bounds.push(activoLatLng)
+
+      if (cachedMarker?.signature === markerSignature) {
+        return
+      }
+
+      removeMarkerFromCache(markerId)
+
+      const marker = createActivoMarker(activo, activoLatLng)
 
       marker.addTo(layers.markerLayer)
-      bounds.push(activoLatLng)
+
+      markerCache.set(markerId, {
+        marker,
+        signature: markerSignature,
+      })
+    })
+
+    const staleMarkerIds = []
+
+    markerCache.forEach((_cachedMarker, markerId) => {
+      if (!nextMarkerIds.has(markerId)) {
+        staleMarkerIds.push(markerId)
+      }
+    })
+
+    staleMarkerIds.forEach((markerId) => {
+      removeMarkerFromCache(markerId)
     })
 
     if (bounds.length && !props.selectedId && !props.itineraryRoute) {
@@ -273,6 +462,7 @@ export function useActivosMap({ props, emit, mapRef }) {
       map.off("dblclick", geofenceMap.handleMapDoubleClick)
     }
 
+    clearMarkerCache()
     geofenceMap.cancelAll()
     itineraryMap.clearItineraryRoute()
 
@@ -297,7 +487,7 @@ export function useActivosMap({ props, emit, mapRef }) {
   )
 
   watch(
-    () => props.activos,
+    () => buildActivosSignature(props.activos),
     () => {
       renderMarkers()
 
@@ -305,7 +495,6 @@ export function useActivosMap({ props, emit, mapRef }) {
         centerSelected()
       }
     },
-    { deep: true },
   )
 
   watch(
@@ -317,30 +506,27 @@ export function useActivosMap({ props, emit, mapRef }) {
   )
 
   watch(
-    () => props.geofences,
+    () => buildGeofencesSignature(props.geofences),
     () => {
       geofenceMap.syncAndRenderGeofences()
     },
-    { deep: true },
   )
 
   watch(
-    () => props.itineraryRoute,
+    () => buildItineraryRouteSignature(props.itineraryRoute),
     () => {
       itineraryMap.renderItineraryRoute({
         fit: Boolean(props.itineraryRoute),
       })
     },
-    { deep: true },
   )
 
   watch(
-    () => props.selectedItineraryPoint,
+    () => buildSelectedItineraryPointSignature(props.selectedItineraryPoint),
     () => {
       itineraryMap.renderItineraryRoute()
       itineraryMap.centerItineraryPoint()
     },
-    { deep: true },
   )
 
   return {
