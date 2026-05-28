@@ -47,6 +47,33 @@
       </div>
     </div>
 
+    <div class="pointer-events-none absolute right-3 top-12 z-[520]">
+      <div
+        class="pointer-events-auto flex items-center gap-1 rounded-xl border border-white/70 bg-white/90 p-1 shadow-lg backdrop-blur-md"
+      >
+        <button
+          type="button"
+          class="rounded-lg px-2.5 py-1.5 text-[10px] font-black transition"
+          :class="
+            showMovementTrails
+              ? 'bg-[#102372] text-white shadow-sm'
+              : 'bg-white text-[#102372] hover:bg-[#f3f5fa]'
+          "
+          @click="toggleMovementTrails"
+        >
+          Estela
+        </button>
+
+        <button
+          type="button"
+          class="rounded-lg bg-white px-2.5 py-1.5 text-[10px] font-black text-[#FF6600] transition hover:bg-[#fff3eb]"
+          @click="clearMovementTrails"
+        >
+          Limpiar
+        </button>
+      </div>
+    </div>
+
     <GeofenceEditorPanel
       v-if="drawMode || editingDraft"
       :draw-mode="drawMode"
@@ -136,6 +163,10 @@ const props = defineProps({
   selectedItineraryPoint: {
     type: Object,
     default: null,
+  },
+  telemetryBatch: {
+    type: Array,
+    default: () => [],
   },
 })
 
@@ -227,7 +258,7 @@ const visibleGeofences = computed(() => {
 })
 
 const getGeofenceById = (geofenceId) => {
-  return (props.geofences || []).find((geofence) => {
+  return geofenceItems.value.find((geofence) => {
     return normalizeId(geofence.id) === normalizeId(geofenceId)
   })
 }
@@ -313,6 +344,12 @@ const {
   removeLastEditPoint,
   deleteGeofence,
   updateEditingGeofenceMeta,
+
+  applyActivoTelemetryBatch,
+
+  showMovementTrails,
+  toggleMovementTrails,
+  clearMovementTrails,
 } = useActivosMap({
   props: mapProps,
   emit,
@@ -522,6 +559,22 @@ const handleDeleteGeofence = (geofenceId) => {
 
   deleteGeofence(geofenceId)
 }
+
+const handleTelemetryBatch = (batch = []) => {
+  if (!Array.isArray(batch) || !batch.length) return []
+
+  return applyActivoTelemetryBatch(batch)
+}
+
+watch(
+  () => props.telemetryBatch,
+  (batch) => {
+    handleTelemetryBatch(batch)
+  },
+  {
+    deep: false,
+  },
+)
 
 watch(
   () => props.selectedGeofenceId,

@@ -108,12 +108,27 @@ export function usePersistedFleetState({ storageKey = DEFAULT_STORAGE_KEY } = {}
   const editedActivos = ref(persistedState.editedActivos)
   const leftPanelWidth = ref(persistedState.leftPanelWidth)
 
-  const persistFleetState = () => {
-    writePersistedFleetState(storageKey, {
+  const buildCurrentState = (overrides = {}) => {
+    return {
       customActivos: customActivos.value,
       deletedActivoIds: deletedActivoIds.value,
       editedActivos: editedActivos.value,
       leftPanelWidth: leftPanelWidth.value,
+      ...overrides,
+    }
+  }
+
+  const persistFleetState = (overrides = {}) => {
+    return writePersistedFleetState(storageKey, buildCurrentState(overrides))
+  }
+
+  const persistPanelWidth = (width = leftPanelWidth.value) => {
+    const normalizedWidth = normalizePanelWidth(width)
+
+    leftPanelWidth.value = normalizedWidth
+
+    return persistFleetState({
+      leftPanelWidth: normalizedWidth,
     })
   }
 
@@ -126,13 +141,18 @@ export function usePersistedFleetState({ storageKey = DEFAULT_STORAGE_KEY } = {}
     removeStorageItem(storageKey)
   }
 
-  watch([customActivos, deletedActivoIds, editedActivos, leftPanelWidth], persistFleetState)
+  watch([customActivos, deletedActivoIds, editedActivos], () => {
+    persistFleetState()
+  })
 
   return {
     customActivos,
     deletedActivoIds,
     editedActivos,
     leftPanelWidth,
+
+    persistFleetState,
+    persistPanelWidth,
     resetPersistedFleetState,
   }
 }

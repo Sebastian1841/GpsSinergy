@@ -10,7 +10,7 @@
       <div class="relative flex min-h-0 flex-col overflow-hidden bg-white">
         <FleetListPanel
           :activos="filteredActivos"
-          :all-activos="normalizedActivos"
+          :all-activos="tableActivos"
           :geofences="geofences"
           :selected-geofence-id="selectedGeofenceId"
           :selected-id="selectedId"
@@ -52,8 +52,9 @@
       <div class="flex min-h-0 flex-col overflow-hidden bg-[#eef2f7]">
         <div class="relative grid min-h-0 flex-1 overflow-hidden p-3">
           <ActivosMapPanel
-            :activos="filteredActivos"
-            :all-activos="normalizedActivos"
+            :activos="mapActivos"
+            :all-activos="tableActivos"
+            :telemetry-batch="latestTelemetryBatch"
             :selected-id="selectedId"
             :selected-geofence-id="selectedGeofenceId"
             :geofences="geofences"
@@ -74,9 +75,12 @@
 
     <AddActivoModal
       v-model="showActivoModal"
-      :mode="activoModalMode"
-      :activo="editingActivo"
       @add-activo="handleAddActivo"
+    />
+
+    <FleetEditModal
+      v-model="showEditActivoModal"
+      :activo="editingActivo"
       @update-activo="handleUpdateActivo"
     />
 
@@ -104,19 +108,39 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
 import { mockActivos } from "../data/mockActivos"
+import { createMockFleetSnapshot } from "../data/mockTelemetryStream.js"
 
 import FleetListPanel from "../components/activos/fleet/FleetListPanel.vue"
 import ActivosMapPanel from "../components/activos/map/ActivosMapPanel.vue"
 import AddActivoModal from "../components/activos/fleet/AddActivoModal.vue"
+import FleetEditModal from "../components/activos/fleet/FleetEditModal.vue"
 import FleetTerminalModal from "../components/activos/fleet/FleetTerminalModal.vue"
 import ConfirmDialog from "../components/ui/ConfirmDialog.vue"
 
 import { useFleetTerminal } from "../composables/activos/fleet/useFleetTerminal"
+import { useFleetTelemetry } from "../composables/activos/fleet/useFleetTelemetry.js"
 import { useGeofences } from "../composables/activos/geocercas/useGeofences.js"
 import { useConfirmDialog } from "../composables/ui/useConfirmDialog.js"
 import { usePersistedFleetState } from "../composables/activos/fleet/usePersistedFleetState.js"
 
-const selectedId = ref(mockActivos[0]?.id || null)
+const STRESS_FLEET_COUNT = Number(import.meta.env.VITE_FLEET_STRESS_COUNT || 0)
+const STRESS_BATCH_SIZE = Number(import.meta.env.VITE_FLEET_STRESS_BATCH_SIZE || 250)
+
+const MOCK_TELEMETRY_ENABLED =
+  import.meta.env.DEV && import.meta.env.VITE_MOCK_TELEMETRY !== "false"
+
+const MOCK_TELEMETRY_INTERVAL_MS = 1000
+const MOCK_TELEMETRY_BATCH_SIZE = STRESS_FLEET_COUNT > 0 ? STRESS_BATCH_SIZE : 18
+const TABLE_SYNC_INTERVAL_MS = 1000
+
+const baseMockActivos =
+  import.meta.env.DEV && STRESS_FLEET_COUNT > 0
+    ? createMockFleetSnapshot({
+        count: STRESS_FLEET_COUNT,
+      })
+    : mockActivos
+
+const selectedId = ref(baseMockActivos[0]?.id || null)
 const selectedGeofenceId = ref(null)
 const statusFilter = ref("all")
 const activeSidebarSection = ref("activos")
@@ -131,10 +155,21 @@ const { geofences, createGeofence, updateGeofence, deleteGeofence } = useGeofenc
 
 const { confirmDialog, openConfirmDialog, confirmAction, cancelAction } = useConfirmDialog()
 
-const { customActivos, deletedActivoIds, editedActivos, leftPanelWidth } = usePersistedFleetState()
+const { customActivos, deletedActivoIds, editedActivos, leftPanelWidth, persistPanelWidth } =
+  usePersistedFleetState()
+
+const {
+  activos: telemetryActivos,
+  replaceFleetSnapshot,
+  startMockTelemetry,
+  stopMockTelemetry,
+} = useFleetTelemetry([], {
+  intervalMs: MOCK_TELEMETRY_INTERVAL_MS,
+  batchSize: MOCK_TELEMETRY_BATCH_SIZE,
+})
 
 const showActivoModal = ref(false)
-const activoModalMode = ref("create")
+const showEditActivoModal = ref(false)
 const editingActivo = ref(null)
 
 const {
@@ -145,16 +180,22 @@ const {
   closeTerminalModal,
   handleTerminalCommand,
   removeTerminalHistory,
+  appendTelemetryPulses,
 } = useFleetTerminal()
 
 const selectedItineraryRoute = ref(null)
 const selectedItineraryPoint = ref(null)
+
+const tableActivos = ref([])
+const mapSnapshotActivos = ref([])
+const latestTelemetryBatch = ref([])
 
 const layoutRef = ref(null)
 
 let resizeMode = null
 let animationFrame = null
 let resizeFrame = null
+let tableSyncTimer = null
 let lastPointerEvent = null
 
 const fallbackDrivers = [
@@ -188,6 +229,14 @@ const normalizeText = (value) => {
     .toLowerCase()
 }
 
+const cloneFleetSnapshot = (snapshot = []) => {
+  return snapshot.map((activo) => {
+    return {
+      ...activo,
+    }
+  })
+}
+
 const sidebarSearch = computed(() => {
   return sectionSearch.value[activeSidebarSection.value] || ""
 })
@@ -195,7 +244,7 @@ const sidebarSearch = computed(() => {
 const rawActivos = computed(() => {
   const deletedIds = new Set(deletedActivoIds.value.map((id) => String(id)))
 
-  return [...customActivos.value, ...mockActivos]
+  return [...customActivos.value, ...baseMockActivos]
     .filter((activo) => {
       return !deletedIds.has(String(activo.id))
     })
@@ -211,7 +260,7 @@ const rawActivos = computed(() => {
     })
 })
 
-const normalizedActivos = computed(() => {
+const baseNormalizedActivos = computed(() => {
   return rawActivos.value.map((activo, index) => {
     const estado = activo.estado || "offline"
     const isCustomAsset = activo.source === "custom"
@@ -283,6 +332,10 @@ const normalizedActivos = computed(() => {
   })
 })
 
+const normalizedActivos = computed(() => {
+  return telemetryActivos.value
+})
+
 const matchesStatusFilter = (activo) => {
   if (statusFilter.value === "all") return true
   if (statusFilter.value === "online") return activo.estado !== "offline"
@@ -291,10 +344,10 @@ const matchesStatusFilter = (activo) => {
   return activo.estado === statusFilter.value
 }
 
-const filteredActivos = computed(() => {
+const filterActivosByCurrentState = (activos = []) => {
   const term = normalizeText(sectionSearch.value.activos)
 
-  return normalizedActivos.value.filter((activo) => {
+  return activos.filter((activo) => {
     const matchesText =
       !term ||
       normalizeText(activo.vehiculo).includes(term) ||
@@ -311,25 +364,60 @@ const filteredActivos = computed(() => {
 
     return matchesText && matchesStatusFilter(activo)
   })
+}
+
+const mapActivos = computed(() => {
+  return filterActivosByCurrentState(mapSnapshotActivos.value)
 })
 
+const filteredActivos = computed(() => {
+  return filterActivosByCurrentState(tableActivos.value)
+})
+
+const syncTableActivos = () => {
+  tableActivos.value = cloneFleetSnapshot(normalizedActivos.value)
+}
+
+const syncMapSnapshotActivos = (snapshot = normalizedActivos.value) => {
+  mapSnapshotActivos.value = cloneFleetSnapshot(snapshot)
+}
+
+const scheduleTableActivosSync = ({ immediate = false } = {}) => {
+  if (immediate) {
+    if (tableSyncTimer) {
+      window.clearTimeout(tableSyncTimer)
+      tableSyncTimer = null
+    }
+
+    syncTableActivos()
+    return
+  }
+
+  if (tableSyncTimer) return
+
+  tableSyncTimer = window.setTimeout(() => {
+    tableSyncTimer = null
+    syncTableActivos()
+  }, TABLE_SYNC_INTERVAL_MS)
+}
+
 const ensureSelectedActivo = () => {
-  if (!filteredActivos.value.length) {
+  if (!mapActivos.value.length) {
     selectedId.value = null
     return
   }
 
-  const selectedExists = filteredActivos.value.some((activo) => {
+  const selectedExists = mapActivos.value.some((activo) => {
     return String(activo.id) === String(selectedId.value)
   })
 
   if (selectedExists) return
 
-  selectedId.value = filteredActivos.value[0]?.id || null
+  selectedId.value = mapActivos.value[0]?.id || null
 }
 
 const createActivoId = () => {
-  const ids = [...customActivos.value, ...mockActivos]
+  const ids = [...customActivos.value, ...baseMockActivos]
     .map((activo) => Number(activo.id))
     .filter((id) => Number.isFinite(id))
 
@@ -405,7 +493,7 @@ const buildActivoDataFromForm = (form = {}, fallbackActivo = {}) => {
 
 const openAddActivoModal = () => {
   activeSidebarSection.value = "activos"
-  activoModalMode.value = "create"
+  showEditActivoModal.value = false
   editingActivo.value = null
   showActivoModal.value = true
 }
@@ -450,7 +538,6 @@ const handleAddActivo = async (form) => {
   selectedId.value = newActivo.id
 
   showActivoModal.value = false
-  activoModalMode.value = "create"
   editingActivo.value = null
 
   await refreshMapLayout(true)
@@ -460,9 +547,9 @@ const openEditActivoModal = (activo) => {
   if (!activo) return
 
   selectedId.value = activo.id
-  activoModalMode.value = "edit"
+  showActivoModal.value = false
   editingActivo.value = activo
-  showActivoModal.value = true
+  showEditActivoModal.value = true
 }
 
 const handleUpdateActivo = async (payload) => {
@@ -487,8 +574,7 @@ const handleUpdateActivo = async (payload) => {
   }
 
   selectedId.value = id
-  showActivoModal.value = false
-  activoModalMode.value = "create"
+  showEditActivoModal.value = false
   editingActivo.value = null
 
   await refreshMapLayout(true)
@@ -532,7 +618,7 @@ const deleteActivo = async (activo) => {
   removeTerminalHistory(activo)
 
   if (String(selectedId.value) === String(activo.id)) {
-    const nextActivo = filteredActivos.value.find((item) => {
+    const nextActivo = mapActivos.value.find((item) => {
       return String(item.id) !== String(activo.id)
     })
 
@@ -540,8 +626,7 @@ const deleteActivo = async (activo) => {
   }
 
   if (String(editingActivo.value?.id) === String(activo.id)) {
-    showActivoModal.value = false
-    activoModalMode.value = "create"
+    showEditActivoModal.value = false
     editingActivo.value = null
   }
 
@@ -746,6 +831,8 @@ const stopResize = async () => {
     resizeFrame = null
   }
 
+  persistPanelWidth(leftPanelWidth.value)
+
   await refreshMapLayout()
 }
 
@@ -758,16 +845,42 @@ const setStatusFilter = async (filter) => {
   activeSidebarSection.value = "activos"
   clearSelectedItinerary()
 
+  syncMapSnapshotActivos()
+
   statusFilter.value = filter
 
-  const nextActivo = filteredActivos.value[0]
+  const nextActivo = mapActivos.value[0]
   selectedId.value = nextActivo?.id || null
 
   await refreshMapLayout(true)
 }
 
 watch(
-  filteredActivos,
+  baseNormalizedActivos,
+  (snapshot) => {
+    latestTelemetryBatch.value = []
+    replaceFleetSnapshot(snapshot)
+    syncMapSnapshotActivos(snapshot)
+    scheduleTableActivosSync({ immediate: true })
+  },
+  {
+    immediate: true,
+  },
+)
+
+watch(normalizedActivos, () => {
+  scheduleTableActivosSync()
+})
+
+watch(
+  () => [statusFilter.value, sectionSearch.value.activos],
+  () => {
+    syncMapSnapshotActivos()
+  },
+)
+
+watch(
+  mapActivos,
   () => {
     ensureSelectedActivo()
   },
@@ -776,7 +889,22 @@ watch(
   },
 )
 
+if (MOCK_TELEMETRY_ENABLED) {
+  startMockTelemetry({
+    intervalMs: MOCK_TELEMETRY_INTERVAL_MS,
+    batchSize: MOCK_TELEMETRY_BATCH_SIZE,
+    onBatch: (batch = []) => {
+      latestTelemetryBatch.value = batch
+      appendTelemetryPulses(batch)
+      refreshMapLayout()
+      scheduleTableActivosSync()
+    },
+  })
+}
+
 onBeforeUnmount(() => {
+  stopMockTelemetry()
+
   window.removeEventListener("pointermove", scheduleDragResize)
   window.removeEventListener("pointerup", stopResize)
 
@@ -786,6 +914,10 @@ onBeforeUnmount(() => {
 
   if (resizeFrame) {
     cancelAnimationFrame(resizeFrame)
+  }
+
+  if (tableSyncTimer) {
+    window.clearTimeout(tableSyncTimer)
   }
 
   document.body.style.cursor = ""

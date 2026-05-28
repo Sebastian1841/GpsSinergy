@@ -1,5 +1,7 @@
 import { computed, ref } from "vue"
 
+const MAX_TERMINAL_HISTORY_PER_ACTIVO = 200
+
 export function useFleetTerminal() {
   const showTerminalModal = ref(false)
   const terminalActivo = ref(null)
@@ -34,6 +36,10 @@ export function useFleetTerminal() {
     return String(activo?.id || activo?.imei || "unknown")
   }
 
+  const getTelemetryPulseKey = (pulse) => {
+    return String(pulse?.id || pulse?.activoId || pulse?.imei || "unknown")
+  }
+
   const terminalHistory = computed(() => {
     if (!terminalActivo.value) return []
 
@@ -48,6 +54,7 @@ export function useFleetTerminal() {
     message = "",
     time = getCurrentTimeLabel(),
     date = getCurrentDateLabel(),
+    payload = null,
   } = {}) => {
     return {
       id: createLocalId(),
@@ -56,6 +63,7 @@ export function useFleetTerminal() {
       message,
       time,
       date,
+      payload,
     }
   }
 
@@ -77,6 +85,7 @@ export function useFleetTerminal() {
       message: String(log.message ?? log.response ?? log.result ?? log.data ?? ""),
       time: log.time || getCurrentTimeLabel(),
       date: log.date || getCurrentDateLabel(),
+      payload: log.payload || null,
     }
   }
 
@@ -85,10 +94,13 @@ export function useFleetTerminal() {
 
     const key = getTerminalHistoryKey(activo)
     const currentHistory = terminalHistoryByActivo.value[key] || []
+    const nextHistory = [...currentHistory, ...logs.map(normalizeTerminalHistoryLog)].slice(
+      -MAX_TERMINAL_HISTORY_PER_ACTIVO,
+    )
 
     terminalHistoryByActivo.value = {
       ...terminalHistoryByActivo.value,
-      [key]: [...currentHistory, ...logs.map(normalizeTerminalHistoryLog)],
+      [key]: nextHistory,
     }
   }
 
@@ -100,6 +112,78 @@ export function useFleetTerminal() {
     const { [key]: _removedTerminalHistory, ...nextTerminalHistory } = terminalHistoryByActivo.value
 
     terminalHistoryByActivo.value = nextTerminalHistory
+  }
+
+  const formatPulseSpeed = (pulse) => {
+    const speed = pulse?.velocidad ?? pulse?.speed
+
+    if (speed === null || speed === undefined || speed === "") return "-"
+
+    const numberSpeed = Number(speed)
+
+    if (!Number.isFinite(numberSpeed)) return String(speed)
+
+    return `${numberSpeed.toFixed(1)} km/h`
+  }
+
+  const formatPulseCoordinate = (value) => {
+    const numberValue = Number(value)
+
+    if (!Number.isFinite(numberValue)) return "-"
+
+    return numberValue.toFixed(6)
+  }
+
+  const createTelemetryPulseLog = (pulse = {}) => {
+    const timestamp = pulse.timestamp || pulse.updatedAt || new Date().toISOString()
+    const date = new Date(timestamp)
+    const time = Number.isNaN(date.getTime())
+      ? getCurrentTimeLabel()
+      : date.toLocaleTimeString("es-CL", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        })
+
+    const dateLabel = Number.isNaN(date.getTime())
+      ? getCurrentDateLabel()
+      : date.toLocaleDateString("es-CL", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        })
+
+    const estado = pulse.estado || pulse.status || "sin estado"
+    const velocidad = formatPulseSpeed(pulse)
+    const lat = formatPulseCoordinate(pulse.lat)
+    const lng = formatPulseCoordinate(pulse.lng)
+
+    return createTerminalHistoryLog({
+      type: "report",
+      source: "RX Pulse",
+      time,
+      date: dateLabel,
+      message: `PULSE ${estado} · ${velocidad} · ${lat}, ${lng}`,
+      payload: pulse,
+    })
+  }
+
+  const appendTelemetryPulses = (batch = []) => {
+    if (!showTerminalModal.value || !terminalActivo.value) return
+    if (!Array.isArray(batch) || !batch.length) return
+
+    const activeTerminalKey = getTerminalHistoryKey(terminalActivo.value)
+
+    const pulseLogs = batch
+      .filter((pulse) => {
+        return getTelemetryPulseKey(pulse) === activeTerminalKey
+      })
+      .map(createTelemetryPulseLog)
+
+    if (!pulseLogs.length) return
+
+    appendTerminalHistory(terminalActivo.value, pulseLogs)
   }
 
   const openTerminalModal = (activo) => {
@@ -220,5 +304,6 @@ export function useFleetTerminal() {
     closeTerminalModal,
     handleTerminalCommand,
     removeTerminalHistory,
+    appendTelemetryPulses,
   }
 }

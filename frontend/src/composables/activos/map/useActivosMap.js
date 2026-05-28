@@ -1,8 +1,16 @@
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import L from "leaflet"
 
-import { createGeofenceMapController } from "./useMapGeofences.js"
+import { createGeofenceMapController } from "./geofences/useMapGeofences.js"
 import { createItineraryMapController } from "./useMapItinerary.js"
+import { createMovementTrailController } from "./useMapMovementTrails.js"
+import { createAssetMarkerController } from "./useMapAssetMarkers.js"
+
+import {
+  buildGeofencesSignature,
+  buildItineraryRouteSignature,
+  buildSelectedItineraryPointSignature,
+} from "./mapSignatures.js"
 
 const MAP_TILE_LAYERS = {
   standard: {
@@ -42,119 +50,8 @@ const MAP_TILE_LAYERS = {
   },
 }
 
-const normalizeSignatureValue = (value) => {
-  if (value === null || value === undefined) return ""
-
-  return String(value)
-}
-
 const normalizeId = (value) => {
   return String(value ?? "")
-}
-
-const buildPointSignature = (point) => {
-  if (!point) return ""
-
-  return [
-    point.id,
-    point.lat,
-    point.lng,
-    point.speed,
-    point.index,
-    point.timeLabel,
-    point.speedLabel,
-    point.address,
-    point.event,
-    point.isCurrentLocation,
-  ]
-    .map(normalizeSignatureValue)
-    .join(":")
-}
-
-const buildPointsSignature = (points = []) => {
-  if (!Array.isArray(points)) return ""
-
-  return points.map(buildPointSignature).join("|")
-}
-
-const buildActivosSignature = (activos = []) => {
-  if (!Array.isArray(activos)) return ""
-
-  return activos
-    .map((activo) => {
-      return [
-        activo.id,
-        activo.lat,
-        activo.lng,
-        activo.estado,
-        activo.vehiculo,
-        activo.patente,
-        activo.name,
-      ]
-        .map(normalizeSignatureValue)
-        .join(":")
-    })
-    .join("|")
-}
-
-const buildGeofenceCoordinatesSignature = (coordinates = []) => {
-  if (!Array.isArray(coordinates)) return ""
-
-  return coordinates
-    .map((point) => {
-      return [point?.lat, point?.lng].map(normalizeSignatureValue).join(":")
-    })
-    .join("|")
-}
-
-const buildGeofencesSignature = (geofences = []) => {
-  if (!Array.isArray(geofences)) return ""
-
-  return geofences
-    .map((geofence) => {
-      return [
-        geofence.id,
-        geofence.type,
-        geofence.name,
-        geofence.strokeColor || geofence.color,
-        geofence.fillColor,
-        geofence.fillOpacity,
-        geofence.radius,
-        geofence.center?.lat,
-        geofence.center?.lng,
-        geofence.toleranceMeters,
-        buildGeofenceCoordinatesSignature(geofence.coordinates),
-      ]
-        .map(normalizeSignatureValue)
-        .join(":")
-    })
-    .join("|")
-}
-
-const buildItineraryRouteSignature = (route) => {
-  if (!route) return ""
-
-  const sourceRoutes = Array.isArray(route.routes) && route.routes.length ? route.routes : [route]
-
-  return sourceRoutes
-    .map((item, index) => {
-      const points = item.points || item.rows || []
-
-      return [
-        index,
-        item.id,
-        item.asset?.id || route.asset?.id,
-        item.asset?.activoId || route.asset?.activoId,
-        buildPointsSignature(points),
-      ]
-        .map(normalizeSignatureValue)
-        .join(":")
-    })
-    .join("|")
-}
-
-const buildSelectedItineraryPointSignature = (point) => {
-  return buildPointSignature(point)
 }
 
 export function useActivosMap({ props, emit, mapRef }) {
@@ -164,24 +61,20 @@ export function useActivosMap({ props, emit, mapRef }) {
   const draftCircleCenter = ref(null)
   const editingDraft = ref(null)
   const editAddPoint = ref(false)
+  const leafletMap = ref(null)
 
   let map = null
   let currentTileLayer = null
   let itineraryRenderer = null
 
-  const markerCache = new Map()
-
   const layers = {
     markerLayer: null,
+    movementTrailLayer: null,
     geofenceLayer: null,
     itineraryLayer: null,
     draftLayer: null,
     editLayer: null,
   }
-
-  const selectedActivo = computed(() => {
-    return (props.activos || []).find((activo) => activo.id === props.selectedId) || null
-  })
 
   const getActivoLatLng = (activo) => {
     if (!activo) return null
@@ -225,86 +118,33 @@ export function useActivosMap({ props, emit, mapRef }) {
     map.invalidateSize()
   }
 
-  const markerClass = (estado) => {
-    const classes = {
-      moving: "marker-moving",
-      idle: "marker-idle",
-      stopped: "marker-stopped",
-      offline: "marker-offline",
-    }
+  const handleResize = () => {
+    if (!map) return
 
-    return classes[estado] || "marker-offline"
+    map.invalidateSize()
   }
 
-  const createMarkerIcon = (activo) => {
-    const isSelected = activo.id === props.selectedId
+  const movementTrails = createMovementTrailController({
+    L,
+    getMap: () => map,
+    getMapType: () => props.mapType,
+    layers,
+    getActivoLatLng,
+    normalizeId,
+  })
 
-    return L.divIcon({
-      className: "",
-      html: `
-        <div class="sinergy-marker ${markerClass(activo.estado)} ${isSelected ? "selected" : ""}">
-          <span></span>
-        </div>
-      `,
-      iconSize: isSelected ? [30, 30] : [22, 22],
-      iconAnchor: isSelected ? [15, 15] : [11, 11],
-    })
-  }
-
-  const buildMarkerSignature = (activo) => {
-    const activoLatLng = getActivoLatLng(activo)
-    const isSelected = normalizeId(activo.id) === normalizeId(props.selectedId)
-
-    return [
-      activo.id,
-      activoLatLng?.[0],
-      activoLatLng?.[1],
-      activo.estado,
-      activo.vehiculo,
-      activo.patente,
-      activo.name,
-      isSelected,
-    ]
-      .map(normalizeSignatureValue)
-      .join(":")
-  }
-
-  const createActivoMarker = (activo, activoLatLng) => {
-    const marker = L.marker(activoLatLng, {
-      icon: createMarkerIcon(activo),
-    })
-
-    marker.on("click", () => {
-      if (drawMode.value || editingDraft.value) return
-      emit("select", activo.id)
-    })
-
-    marker.bindTooltip(activo.vehiculo || activo.patente || activo.name || "Activo", {
-      permanent: activo.id === props.selectedId,
-      direction: "top",
-      offset: [0, -12],
-      className: "sinergy-tooltip",
-    })
-
-    return marker
-  }
-
-  const removeMarkerFromCache = (markerId) => {
-    const cachedMarker = markerCache.get(markerId)
-
-    if (!cachedMarker) return
-
-    layers.markerLayer?.removeLayer(cachedMarker.marker)
-    markerCache.delete(markerId)
-  }
-
-  const clearMarkerCache = () => {
-    markerCache.forEach((cachedMarker) => {
-      layers.markerLayer?.removeLayer(cachedMarker.marker)
-    })
-
-    markerCache.clear()
-  }
+  const assetMarkers = createAssetMarkerController({
+    L,
+    props,
+    emit,
+    getMap: () => map,
+    layers,
+    getActivoLatLng,
+    normalizeId,
+    movementTrails,
+    drawMode,
+    editingDraft,
+  })
 
   const geofenceMap = createGeofenceMapController({
     props,
@@ -328,82 +168,6 @@ export function useActivosMap({ props, emit, mapRef }) {
     layers,
   })
 
-  const renderMarkers = () => {
-    if (!map || !layers.markerLayer) return
-
-    const bounds = []
-    const nextMarkerIds = new Set()
-
-    ;(props.activos || []).forEach((activo) => {
-      const activoLatLng = getActivoLatLng(activo)
-
-      if (!activoLatLng) return
-
-      const markerId = normalizeId(activo.id)
-
-      if (!markerId) return
-
-      const markerSignature = buildMarkerSignature(activo)
-      const cachedMarker = markerCache.get(markerId)
-
-      nextMarkerIds.add(markerId)
-      bounds.push(activoLatLng)
-
-      if (cachedMarker?.signature === markerSignature) {
-        return
-      }
-
-      removeMarkerFromCache(markerId)
-
-      const marker = createActivoMarker(activo, activoLatLng)
-
-      marker.addTo(layers.markerLayer)
-
-      markerCache.set(markerId, {
-        marker,
-        signature: markerSignature,
-      })
-    })
-
-    const staleMarkerIds = []
-
-    markerCache.forEach((_cachedMarker, markerId) => {
-      if (!nextMarkerIds.has(markerId)) {
-        staleMarkerIds.push(markerId)
-      }
-    })
-
-    staleMarkerIds.forEach((markerId) => {
-      removeMarkerFromCache(markerId)
-    })
-
-    if (bounds.length && !props.selectedId && !props.itineraryRoute) {
-      map.fitBounds(bounds, {
-        padding: [30, 30],
-        maxZoom: 14,
-      })
-    }
-  }
-
-  const centerSelected = () => {
-    if (!map || !selectedActivo.value) return
-
-    const activoLatLng = getActivoLatLng(selectedActivo.value)
-
-    if (!activoLatLng) return
-
-    map.invalidateSize()
-
-    map.flyTo(activoLatLng, 15, {
-      duration: 0.45,
-    })
-  }
-
-  const handleResize = () => {
-    if (!map) return
-    map.invalidateSize()
-  }
-
   onMounted(async () => {
     await nextTick()
 
@@ -415,6 +179,8 @@ export function useActivosMap({ props, emit, mapRef }) {
       preferCanvas: true,
     }).setView([-33.4489, -70.6693], 13)
 
+    leafletMap.value = map
+
     itineraryRenderer = L.svg({
       padding: 0.5,
     })
@@ -425,6 +191,9 @@ export function useActivosMap({ props, emit, mapRef }) {
       })
       .addTo(map)
 
+    movementTrails.ensureMovementTrailPane()
+
+    layers.movementTrailLayer = L.layerGroup().addTo(map)
     layers.markerLayer = L.layerGroup().addTo(map)
     layers.geofenceLayer = L.featureGroup().addTo(map)
     layers.itineraryLayer = L.featureGroup().addTo(map)
@@ -443,8 +212,11 @@ export function useActivosMap({ props, emit, mapRef }) {
       fit: Boolean(props.itineraryRoute),
     })
 
-    renderMarkers()
-    centerSelected()
+    assetMarkers.syncActivoMarkers(props.activos, {
+      fit: true,
+    })
+
+    assetMarkers.centerSelected()
 
     setTimeout(() => {
       map?.invalidateSize()
@@ -462,7 +234,7 @@ export function useActivosMap({ props, emit, mapRef }) {
       map.off("dblclick", geofenceMap.handleMapDoubleClick)
     }
 
-    clearMarkerCache()
+    assetMarkers.clearMarkerCache()
     geofenceMap.cancelAll()
     itineraryMap.clearItineraryRoute()
 
@@ -476,6 +248,7 @@ export function useActivosMap({ props, emit, mapRef }) {
       map = null
     }
 
+    leafletMap.value = null
     itineraryRenderer = null
   })
 
@@ -483,25 +256,25 @@ export function useActivosMap({ props, emit, mapRef }) {
     () => props.mapType,
     () => {
       applyTileLayer()
+      movementTrails.redrawAllMovementTrails()
     },
   )
 
   watch(
-    () => buildActivosSignature(props.activos),
-    () => {
-      renderMarkers()
-
-      if (props.selectedId) {
-        centerSelected()
-      }
+    () => props.activos,
+    (activos) => {
+      assetMarkers.syncActivoMarkers(activos)
+    },
+    {
+      deep: false,
     },
   )
 
   watch(
     () => props.selectedId,
     () => {
-      renderMarkers()
-      centerSelected()
+      assetMarkers.syncActivoMarkers(props.activos)
+      assetMarkers.centerSelected()
     },
   )
 
@@ -560,5 +333,17 @@ export function useActivosMap({ props, emit, mapRef }) {
     removeLastEditPoint: geofenceMap.removeLastEditPoint,
     deleteGeofence: geofenceMap.deleteGeofence,
     updateEditingGeofenceMeta: geofenceMap.updateEditingGeofenceMeta,
+
+    syncActivoMarkers: assetMarkers.syncActivoMarkers,
+    applyActivoTelemetryBatch: assetMarkers.applyActivoTelemetryBatch,
+    upsertActivoMarker: assetMarkers.upsertActivoMarker,
+    removeActivoMarker: assetMarkers.removeActivoMarker,
+
+    leafletMap,
+    mapInstance: leafletMap,
+
+    showMovementTrails: movementTrails.showMovementTrails,
+    toggleMovementTrails: movementTrails.toggleMovementTrails,
+    clearMovementTrails: movementTrails.clearMovementTrails,
   }
 }

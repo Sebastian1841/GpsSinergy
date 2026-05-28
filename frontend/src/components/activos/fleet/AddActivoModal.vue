@@ -7,22 +7,19 @@
     <section
       class="flex max-h-[calc(100%-16px)] w-full max-w-[920px] flex-col overflow-hidden rounded-t-2xl border border-[#d8dee8] bg-white shadow-2xl sm:max-h-[calc(100%-32px)] sm:rounded-2xl"
     >
-      <!-- Header corporativo -->
       <header class="shrink-0 bg-[#102372] px-4 py-3 sm:px-5">
         <div class="flex items-center justify-between gap-3">
           <div class="min-w-0">
             <p class="text-[10px] font-black uppercase tracking-[0.18em] text-[#FF6600]">
-              {{ isEditMode ? "Edición de activo" : "Alta de activo" }}
+              Alta de activo
             </p>
 
             <h2 class="mt-0.5 truncate text-[16px] font-black text-white">
-              {{ isEditMode ? "Modificar activo GPS" : "Registrar activo GPS" }}
+              Registrar activo GPS
             </h2>
 
-            <p v-if="isEditMode" class="mt-1 truncate text-[11px] font-semibold text-white/65">
-              {{ form.displayName || form.name || "Activo seleccionado" }}
-
-              <span v-if="form.imei"> · IMEI {{ form.imei }} </span>
+            <p class="mt-1 truncate text-[11px] font-semibold text-white/65">
+              Completa los datos principales para registrar un nuevo activo.
             </p>
           </div>
 
@@ -48,7 +45,6 @@
         @submit.prevent="submitForm"
       >
         <div class="grid grid-cols-1 gap-3 lg:grid-cols-[215px_minmax(0,1fr)]">
-          <!-- Navegación lateral -->
           <aside class="rounded-2xl border border-[#d8dee8] bg-white p-2 shadow-sm">
             <div class="rounded-xl bg-[#f8fafc] p-1">
               <button
@@ -117,22 +113,8 @@
                 </div>
               </div>
             </div>
-
-            <div
-              v-if="isEditMode"
-              class="mt-2 rounded-xl border border-[#FF6600]/20 bg-[#fff7ed] p-3"
-            >
-              <p class="text-[10px] font-black uppercase tracking-[0.12em] text-[#FF6600]">
-                Modo edición
-              </p>
-
-              <p class="mt-1 text-[10px] font-semibold leading-relaxed text-slate-600">
-                Los cambios se aplicarán sobre el activo seleccionado.
-              </p>
-            </div>
           </aside>
 
-          <!-- Contenido principal -->
           <section class="overflow-hidden rounded-2xl border border-[#d8dee8] bg-white shadow-sm">
             <div class="border-b border-[#edf1f5] bg-[#f8fafc] px-4 py-4">
               <div class="flex items-start justify-between gap-3">
@@ -155,7 +137,6 @@
             </div>
 
             <div class="p-4">
-              <!-- Módulo 1: Activo -->
               <div v-if="currentStep === 0" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label class="flex flex-col gap-1">
                   <span class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
@@ -197,7 +178,6 @@
                 </label>
               </div>
 
-              <!-- Módulo 2: Dispositivo -->
               <div v-else-if="currentStep === 1" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label class="flex flex-col gap-1 sm:col-span-2">
                   <span class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
@@ -236,11 +216,9 @@
                     v-model="form.imei"
                     type="text"
                     inputmode="numeric"
-                    :disabled="!form.trackerModel && !isEditMode"
+                    :disabled="!form.trackerModel"
                     class="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-[12px] font-semibold text-[#172033] outline-none transition placeholder:text-slate-400 focus:border-[#FF6600] focus:ring-2 focus:ring-[#FF6600]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                    :placeholder="
-                      form.trackerModel || isEditMode ? '867123456789012' : 'Selecciona un modelo'
-                    "
+                    :placeholder="form.trackerModel ? '867123456789012' : 'Selecciona un modelo'"
                   />
                 </label>
 
@@ -270,7 +248,6 @@
                 </div>
               </div>
 
-              <!-- Módulo 3: Fechas -->
               <div v-else-if="currentStep === 2" class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <label class="flex flex-col gap-1">
                   <span class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
@@ -309,7 +286,6 @@
                 </label>
               </div>
 
-              <!-- Módulo 4: Métricas -->
               <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <label class="flex flex-col gap-1">
                   <span class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
@@ -384,11 +360,7 @@
       <footer class="shrink-0 border-t border-[#d8dee8] bg-[#f8fafc] px-4 py-3">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p class="text-[10px] font-semibold text-slate-500">
-            {{
-              isEditMode
-                ? "Edita los datos necesarios y guarda los cambios."
-                : "Obligatorios: activo y dispositivo."
-            }}
+            Obligatorios: activo y dispositivo.
           </p>
 
           <div class="flex flex-col-reverse gap-2 sm:flex-row">
@@ -416,7 +388,7 @@
               :disabled="!canSaveActivo"
               @click="submitForm"
             >
-              {{ isEditMode ? "Guardar cambios" : "Crear activo" }}
+              Crear activo
             </button>
           </div>
         </div>
@@ -433,17 +405,9 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  mode: {
-    type: String,
-    default: "create",
-  },
-  activo: {
-    type: Object,
-    default: null,
-  },
 })
 
-const emit = defineEmits(["update:modelValue", "add-activo", "update-activo"])
+const emit = defineEmits(["update:modelValue", "add-activo"])
 
 const steps = [
   {
@@ -527,8 +491,6 @@ const createEmptyForm = () => ({
 const currentStep = ref(0)
 const form = ref(createEmptyForm())
 
-const isEditMode = computed(() => props.mode === "edit")
-
 const currentStepConfig = computed(() => steps[currentStep.value] || steps[0])
 
 const selectedTrackerModel = computed(() => {
@@ -546,10 +508,6 @@ const isAssetStepValid = computed(() => {
 })
 
 const isDeviceStepValid = computed(() => {
-  if (isEditMode.value) {
-    return Boolean(form.value.imei.trim())
-  }
-
   return Boolean(form.value.trackerModel && form.value.imei.trim())
 })
 
@@ -579,7 +537,7 @@ const summaryItems = computed(() => [
   },
   {
     label: "Modelo",
-    value: selectedTrackerModelLabel.value || props.activo?.trackerModelLabel,
+    value: selectedTrackerModelLabel.value,
   },
   {
     label: "IMEI",
@@ -599,92 +557,8 @@ const summaryItems = computed(() => [
   },
 ])
 
-const normalizeDate = (value) => {
-  if (!value || value === "-") return ""
-
-  const text = String(value)
-
-  if (/^\d{4}-\d{2}-\d{2}/.test(text)) {
-    return text.slice(0, 10)
-  }
-
-  return ""
-}
-
-const extractNumber = (value) => {
-  if (!value || value === "-") return ""
-
-  const match = String(value)
-    .replace(/\./g, "")
-    .replace(",", ".")
-    .match(/-?\d+(\.\d+)?/)
-
-  return match ? match[0] : ""
-}
-
-const findTrackerModel = (activo) => {
-  if (!activo) return ""
-
-  if (activo.trackerModel) {
-    const exists = trackerModelOptions.some((option) => {
-      return option.value === activo.trackerModel
-    })
-
-    if (exists) return activo.trackerModel
-  }
-
-  const label = String(activo.trackerModelLabel || "").toLowerCase()
-
-  const option = trackerModelOptions.find((item) => {
-    return (
-      item.label.toLowerCase() === label ||
-      `${item.manufacturer} ${item.label}`.toLowerCase() === label
-    )
-  })
-
-  return option?.value || ""
-}
-
-const fillFormFromActivo = (activo) => {
-  form.value = {
-    trackerModel: findTrackerModel(activo),
-    imei: activo.imei && activo.imei !== "-" ? String(activo.imei) : "",
-    protocol:
-      activo.protocol && activo.protocol !== "-" ? String(activo.protocol).toLowerCase() : "tcp",
-
-    name:
-      activo.name && activo.name !== "-"
-        ? String(activo.name)
-        : String(activo.vehiculo || activo.nombrePantalla || ""),
-
-    displayName:
-      activo.nombrePantalla && activo.nombrePantalla !== "-"
-        ? String(activo.nombrePantalla)
-        : String(activo.vehiculo || activo.displayName || activo.name || ""),
-
-    description:
-      activo.descripcion && activo.descripcion !== "-"
-        ? String(activo.descripcion)
-        : String(activo.description || ""),
-
-    entryDate: normalizeDate(activo.fechaIngreso || activo.entryDate),
-    deactivationDate: normalizeDate(activo.fechaBaja || activo.deactivationDate),
-    suspensionDate: normalizeDate(activo.fechaSuspension || activo.suspensionDate),
-
-    dailyHourmeter: extractNumber(activo.horometroDiario ?? activo.dailyHourmeter),
-    totalHourmeter: extractNumber(activo.horometroTotal ?? activo.totalHourmeter),
-    odometer: extractNumber(activo.odometro ?? activo.odometer),
-  }
-}
-
 const resetModal = () => {
   currentStep.value = 0
-
-  if (isEditMode.value && props.activo) {
-    fillFormFromActivo(props.activo)
-    return
-  }
-
   form.value = createEmptyForm()
 }
 
@@ -698,7 +572,7 @@ watch(
 watch(
   () => form.value.trackerModel,
   (trackerModel) => {
-    if (!trackerModel && !isEditMode.value) {
+    if (!trackerModel) {
       form.value.imei = ""
     }
   },
@@ -742,9 +616,8 @@ const toNumberOrEmpty = (value) => {
 const buildPayload = () => {
   return {
     trackerModel: form.value.trackerModel,
-    trackerModelLabel: selectedTrackerModelLabel.value || props.activo?.trackerModelLabel || "",
-    trackerManufacturer:
-      selectedTrackerModel.value?.manufacturer || props.activo?.trackerManufacturer || "",
+    trackerModelLabel: selectedTrackerModelLabel.value,
+    trackerManufacturer: selectedTrackerModel.value?.manufacturer || "",
     imei: form.value.imei.trim(),
     protocol: form.value.protocol || "tcp",
     name: form.value.name.trim(),
@@ -756,26 +629,14 @@ const buildPayload = () => {
     dailyHourmeter: toNumberOrEmpty(form.value.dailyHourmeter),
     totalHourmeter: toNumberOrEmpty(form.value.totalHourmeter),
     odometer: toNumberOrEmpty(form.value.odometer),
-    connectionStatus: isEditMode.value ? "updated" : "pending",
+    connectionStatus: "pending",
   }
 }
 
 const submitForm = () => {
   if (!canSaveActivo.value) return
 
-  const payload = buildPayload()
-
-  if (isEditMode.value) {
-    emit("update-activo", {
-      id: props.activo?.id,
-      data: payload,
-    })
-
-    closeModal()
-    return
-  }
-
-  emit("add-activo", payload)
+  emit("add-activo", buildPayload())
   closeModal()
 }
 </script>
