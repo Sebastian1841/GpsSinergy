@@ -7,39 +7,23 @@ import {
   normalizePoint,
 } from "../../../../utils/geofenceMapUtils.js"
 
+import { getFallbackGeofenceName } from "../../../../utils/geofenceUtils.js"
+import { normalizeId } from "../../../../utils/idUtils.js"
+
 import { createGeofenceDrawingController } from "./useGeofenceDrawing.js"
 import { createGeofenceEditingController } from "./useGeofenceEditing.js"
 import { createGeofenceRendererController } from "./useGeofenceRenderer.js"
 
-import {
-  geofenceStyle,
-  getNumber,
-} from "./geofenceMapStyles.js"
-
-const normalizeId = (value) => {
-  return String(value ?? "")
-}
-
-const getFallbackGeofenceName = (props, type) => {
-  const nextNumber = (props.geofences || []).length + 1
-
-  if (type === "route") return `Ruta ${nextNumber}`
-
-  return `Geocerca ${nextNumber}`
-}
+import { geofenceStyle, getGeofenceMapColor } from "./geofenceMapStyles.js"
 
 const getDraftGeofenceOptions = (props, type) => {
   const options = props.draftGeofenceOptions || {}
-  const fallbackName = getFallbackGeofenceName(props, type)
-
-  const strokeColor = options.strokeColor || options.color || geofenceStyle.color
-  const fillColor = options.fillColor || strokeColor || geofenceStyle.fillColor
+  const fallbackName = getFallbackGeofenceName(props.geofences || [], type)
+  const color = getGeofenceMapColor(options, geofenceStyle.color)
 
   return {
     name: String(options.name || fallbackName).trim() || fallbackName,
-    strokeColor,
-    fillColor,
-    fillOpacity: getNumber(options.fillOpacity, geofenceStyle.fillOpacity),
+    color,
   }
 }
 
@@ -220,10 +204,7 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
       id: makeGeofenceId(),
       name: options.name,
       type: "polygon",
-      strokeColor: options.strokeColor,
-      fillColor: options.fillColor,
-      fillOpacity: options.fillOpacity,
-      color: options.strokeColor,
+      color: options.color,
       coordinates: draftPolygonPoints.value.map((point) => normalizePoint(point)),
       createdAt: new Date().toISOString(),
     })
@@ -240,8 +221,7 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
       id: makeGeofenceId(),
       name: options.name,
       type: "route",
-      strokeColor: options.strokeColor,
-      color: options.strokeColor,
+      color: options.color,
       toleranceMeters: 100,
       coordinates: draftRoutePoints.value.map((point) => normalizePoint(point)),
       createdAt: new Date().toISOString(),
@@ -261,10 +241,7 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
       id: makeGeofenceId(),
       name: options.name,
       type: "circle",
-      strokeColor: options.strokeColor,
-      fillColor: options.fillColor,
-      fillOpacity: options.fillOpacity,
-      color: options.strokeColor,
+      color: options.color,
       center: normalizePoint(center),
       radius,
       createdAt: new Date().toISOString(),
@@ -402,6 +379,7 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
 
     renderGeofences: renderer.renderGeofences,
     syncAndRenderGeofences,
+    clearGeofenceCache: renderer.clearGeofenceCache,
 
     startEditGeofence,
     stopEditing,

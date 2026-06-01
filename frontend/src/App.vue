@@ -3,10 +3,10 @@
     <AppHeader @toggle-sidebar="toggleSidebar" />
 
     <div class="relative flex min-h-0 flex-1 overflow-hidden">
-      <AppSidebar v-model:is-open="showSidebar" />
+      <AppSidebar :is-open="showSidebar" @update:is-open="showSidebar = $event" />
 
       <main class="min-h-0 flex-1 overflow-hidden bg-[#f3f3f3]">
-        <router-view />
+        <router-view :app-sidebar-open="showSidebar" />
       </main>
     </div>
   </div>

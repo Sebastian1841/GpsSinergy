@@ -65,6 +65,24 @@
 
       <button
         type="button"
+        :title="isFullscreen ? 'Salir pantalla completa' : 'Pantalla completa'"
+        class="group relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-[15px] font-black transition"
+        :class="
+          isFullscreen ? 'bg-[#102372] text-white' : 'bg-white text-[#102372] hover:bg-[#eef3ff]'
+        "
+        @click.stop="$emit('toggle-fullscreen')"
+      >
+        {{ isFullscreen ? "⤢" : "⛶" }}
+
+        <span
+          class="pointer-events-none absolute left-[46px] top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-[#102372] px-2 py-1 text-[10px] font-black text-white shadow-lg group-hover:block"
+        >
+          {{ isFullscreen ? "Salir pantalla completa" : "Pantalla completa" }}
+        </span>
+      </button>
+
+      <button
+        type="button"
         title="Capas"
         class="group relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-[15px] font-black transition"
         :class="
@@ -80,36 +98,6 @@
           class="pointer-events-none absolute left-[46px] top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-[#102372] px-2 py-1 text-[10px] font-black text-white shadow-lg group-hover:block"
         >
           Capas
-        </span>
-      </button>
-
-      <button
-        type="button"
-        title="Rutas"
-        class="group relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl bg-white text-[15px] font-black text-[#102372] transition hover:bg-[#eef3ff]"
-        @click.stop
-      >
-        ⤴
-
-        <span
-          class="pointer-events-none absolute left-[46px] top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-[#102372] px-2 py-1 text-[10px] font-black text-white shadow-lg group-hover:block"
-        >
-          Rutas
-        </span>
-      </button>
-
-      <button
-        type="button"
-        title="Alertas"
-        class="group relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl bg-white text-[15px] font-black text-[#102372] transition hover:bg-[#eef3ff]"
-        @click.stop
-      >
-        !
-
-        <span
-          class="pointer-events-none absolute left-[46px] top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-[#102372] px-2 py-1 text-[10px] font-black text-white shadow-lg group-hover:block"
-        >
-          Alertas
         </span>
       </button>
 
@@ -279,7 +267,7 @@
     <!-- Dropdown compacto de tipos de mapa -->
     <div
       v-if="toolsMenuOpen && layersMenuOpen"
-      class="absolute left-[64px] top-[100px] z-[545] w-[205px] overflow-hidden rounded-2xl border border-[#d8dee8] bg-white shadow-2xl"
+      class="absolute left-[64px] top-[142px] z-[545] w-[205px] overflow-hidden rounded-2xl border border-[#d8dee8] bg-white shadow-2xl"
       @click.stop
     >
       <div class="border-b border-[#edf1f5] bg-[#f8fafc] px-3 py-2">
@@ -452,10 +440,15 @@ defineProps({
     type: Array,
     default: () => [],
   },
+  isFullscreen: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits([
   "toggle-kpis",
+  "toggle-fullscreen",
   "create-circle",
   "create-polygon",
   "create-route",

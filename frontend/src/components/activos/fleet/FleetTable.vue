@@ -263,14 +263,6 @@ const paginatedActivos = computed(() => {
   return props.activos.slice(start, end)
 })
 
-const activosOrderSignature = computed(() => {
-  return props.activos
-    .map((activo) => {
-      return String(activo?.id ?? "")
-    })
-    .join("|")
-})
-
 const clampCurrentPage = () => {
   if (currentPage.value > totalPages.value) {
     currentPage.value = totalPages.value
@@ -345,13 +337,19 @@ const statusChipClass = (estado) => {
 }
 
 watch(
-  [activosOrderSignature, pageSize, () => props.selectedId],
+  [pageSize, () => props.activos.length],
   () => {
     clampCurrentPage()
-    goToSelectedActivoPage()
   },
   {
     immediate: true,
+  },
+)
+
+watch(
+  () => props.selectedId,
+  () => {
+    goToSelectedActivoPage()
   },
 )
 </script>

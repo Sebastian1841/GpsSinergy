@@ -5,12 +5,16 @@ import {
   getCircleEdgePoint,
   normalizePoint,
 } from "../../../../utils/geofenceMapUtils.js"
+import {
+  getFallbackGeofenceName,
+  removeLegacyGeofenceColorFields,
+} from "../../../../utils/geofenceUtils.js"
 
 import {
   geofenceStyle,
   getEditRouteStyle,
   getEditShapeStyle,
-  getNumber,
+  getGeofenceMapColor,
 } from "./geofenceMapStyles.js"
 
 const getCircleEdgeLatLng = (center, radiusMeters) => {
@@ -19,12 +23,12 @@ const getCircleEdgeLatLng = (center, radiusMeters) => {
   return L.latLng(edgePoint.lat, edgePoint.lng)
 }
 
-const getFallbackGeofenceName = (props, type) => {
-  const nextNumber = (props.geofences || []).length + 1
-
-  if (type === "route") return `Ruta ${nextNumber}`
-
-  return `Geocerca ${nextNumber}`
+const hasColorUpdate = (updates = {}) => {
+  return (
+    updates.color !== undefined ||
+    updates.strokeColor !== undefined ||
+    updates.fillColor !== undefined
+  )
 }
 
 export function createGeofenceEditingController({
@@ -188,35 +192,21 @@ export function createGeofenceEditingController({
     if (!editingDraft.value) return
 
     const currentType = editingDraft.value.type
-    const fallbackName = getFallbackGeofenceName(props, currentType)
+    const fallbackName = getFallbackGeofenceName(props.geofences || [], currentType)
+    const cleanUpdates = removeLegacyGeofenceColorFields(updates)
 
-    const nextStrokeColor =
-      updates.strokeColor ||
-      updates.color ||
-      editingDraft.value.strokeColor ||
-      editingDraft.value.color ||
-      geofenceStyle.color
-
-    const nextFillColor =
-      updates.fillColor ||
-      editingDraft.value.fillColor ||
-      nextStrokeColor ||
-      geofenceStyle.fillColor
+    const nextColor = hasColorUpdate(updates)
+      ? getGeofenceMapColor(updates, geofenceStyle.color)
+      : getGeofenceMapColor(editingDraft.value, geofenceStyle.color)
 
     editingDraft.value = {
       ...editingDraft.value,
-      ...updates,
+      ...cleanUpdates,
       name:
         updates.name !== undefined
           ? String(updates.name).trim() || fallbackName
           : editingDraft.value.name,
-      strokeColor: nextStrokeColor,
-      color: nextStrokeColor,
-      fillColor: currentType === "route" ? undefined : nextFillColor,
-      fillOpacity: getNumber(
-        updates.fillOpacity,
-        getNumber(editingDraft.value.fillOpacity, geofenceStyle.fillOpacity),
-      ),
+      color: nextColor,
     }
 
     emitUpdatedGeofence()

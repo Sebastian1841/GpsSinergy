@@ -283,7 +283,11 @@
                         <p class="text-[11px] font-black text-[#102372]">Comunicación</p>
 
                         <p class="mt-1 text-[10px] font-semibold text-slate-500">
-                          {{ selectedTrackerModelLabel || form.trackerModelLabel || "Modelo no definido" }}
+                          {{
+                            selectedTrackerModelLabel ||
+                            form.trackerModelLabel ||
+                            "Modelo no definido"
+                          }}
                         </p>
                       </div>
 
@@ -449,6 +453,8 @@
 <script setup>
 import { computed, ref, watch } from "vue"
 
+import { useFleetFormWizard } from "../../../composables/activos/fleet/useFleetFormWizard.js"
+
 const props = defineProps({
   modelValue: {
     type: Boolean,
@@ -492,6 +498,16 @@ const steps = [
     title: "Métricas del activo",
   },
 ]
+
+const {
+  currentStep,
+  currentStepConfig,
+  progressWidth,
+  goToStep,
+  nextStep,
+  previousStep,
+  resetWizard,
+} = useFleetFormWizard(steps)
 
 const trackerModelOptions = [
   {
@@ -545,10 +561,7 @@ const createEmptyForm = () => ({
   odometer: "",
 })
 
-const currentStep = ref(0)
 const form = ref(createEmptyForm())
-
-const currentStepConfig = computed(() => steps[currentStep.value] || steps[0])
 
 const selectedTrackerModel = computed(() => {
   return trackerModelOptions.find((option) => option.value === form.value.trackerModel) || null
@@ -572,10 +585,6 @@ const isDeviceStepValid = computed(() => {
 
 const canSaveActivo = computed(() => {
   return Boolean(isAssetStepValid.value && isDeviceStepValid.value)
-})
-
-const progressWidth = computed(() => {
-  return `${((currentStep.value + 1) / steps.length) * 100}%`
 })
 
 const requiredStatus = computed(() => [
@@ -711,7 +720,7 @@ const fillFormFromActivo = (activo = {}) => {
 }
 
 const resetModal = () => {
-  currentStep.value = 0
+  resetWizard()
 
   if (props.activo) {
     fillFormFromActivo(props.activo)
@@ -744,18 +753,6 @@ const isStepCompleted = (index) => {
   return false
 }
 
-const goToStep = (index) => {
-  currentStep.value = Math.min(Math.max(Number(index), 0), steps.length - 1)
-}
-
-const nextStep = () => {
-  currentStep.value = Math.min(currentStep.value + 1, steps.length - 1)
-}
-
-const previousStep = () => {
-  currentStep.value = Math.max(currentStep.value - 1, 0)
-}
-
 const closeModal = () => {
   emit("update:modelValue", false)
 }
@@ -782,7 +779,10 @@ const buildPayload = () => {
 
     trackerModel: form.value.trackerModel || props.activo?.trackerModel || "-",
     trackerModelLabel:
-      selectedTrackerModelLabel.value || form.value.trackerModelLabel || props.activo?.trackerModelLabel || "-",
+      selectedTrackerModelLabel.value ||
+      form.value.trackerModelLabel ||
+      props.activo?.trackerModelLabel ||
+      "-",
     trackerManufacturer:
       selectedTrackerModel.value?.manufacturer ||
       form.value.trackerManufacturer ||

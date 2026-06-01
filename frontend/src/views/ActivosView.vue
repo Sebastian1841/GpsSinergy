@@ -61,6 +61,7 @@
             :itinerary-route="selectedItineraryRoute"
             :selected-itinerary-point="selectedItineraryPoint"
             :active-filter="statusFilter"
+            :app-sidebar-open="props.appSidebarOpen"
             class="min-h-0"
             @select="selectActivo"
             @select-filter="setStatusFilter"
@@ -73,10 +74,7 @@
       </div>
     </div>
 
-    <AddActivoModal
-      v-model="showActivoModal"
-      @add-activo="handleAddActivo"
-    />
+    <AddActivoModal v-model="showActivoModal" @add-activo="handleAddActivo" />
 
     <FleetEditModal
       v-model="showEditActivoModal"
@@ -106,9 +104,11 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
+import { onBeforeUnmount } from "vue"
+
 import { mockActivos } from "../data/mockActivos"
 import { createMockFleetSnapshot } from "../data/mockTelemetryStream.js"
+import { normalizeId } from "../utils/idUtils.js"
 
 import FleetListPanel from "../components/activos/fleet/FleetListPanel.vue"
 import ActivosMapPanel from "../components/activos/map/ActivosMapPanel.vue"
@@ -123,6 +123,19 @@ import { useGeofences } from "../composables/activos/geocercas/useGeofences.js"
 import { useConfirmDialog } from "../composables/ui/useConfirmDialog.js"
 import { usePersistedFleetState } from "../composables/activos/fleet/usePersistedFleetState.js"
 
+import { useActivosCrud } from "../composables/activos/view/useActivosCrud.js"
+import { useActivosFilters } from "../composables/activos/view/useActivosFilters.js"
+import { useActivosLayout } from "../composables/activos/view/useActivosLayout.js"
+import { useActivosSelection } from "../composables/activos/view/useActivosSelection.js"
+import { useActivosTelemetrySync } from "../composables/activos/view/useActivosTelemetrySync.js"
+
+const props = defineProps({
+  appSidebarOpen: {
+    type: Boolean,
+    default: false,
+  },
+})
+
 const STRESS_FLEET_COUNT = Number(import.meta.env.VITE_FLEET_STRESS_COUNT || 0)
 const STRESS_BATCH_SIZE = Number(import.meta.env.VITE_FLEET_STRESS_BATCH_SIZE || 250)
 
@@ -131,7 +144,7 @@ const MOCK_TELEMETRY_ENABLED =
 
 const MOCK_TELEMETRY_INTERVAL_MS = 1000
 const MOCK_TELEMETRY_BATCH_SIZE = STRESS_FLEET_COUNT > 0 ? STRESS_BATCH_SIZE : 18
-const TABLE_SYNC_INTERVAL_MS = 1000
+const TABLE_SYNC_INTERVAL_MS = 2500
 
 const baseMockActivos =
   import.meta.env.DEV && STRESS_FLEET_COUNT > 0
@@ -139,17 +152,6 @@ const baseMockActivos =
         count: STRESS_FLEET_COUNT,
       })
     : mockActivos
-
-const selectedId = ref(baseMockActivos[0]?.id || null)
-const selectedGeofenceId = ref(null)
-const statusFilter = ref("all")
-const activeSidebarSection = ref("activos")
-
-const sectionSearch = ref({
-  activos: "",
-  itinerarios: "",
-  geocercas: "",
-})
 
 const { geofences, createGeofence, updateGeofence, deleteGeofence } = useGeofences()
 
@@ -168,10 +170,6 @@ const {
   batchSize: MOCK_TELEMETRY_BATCH_SIZE,
 })
 
-const showActivoModal = ref(false)
-const showEditActivoModal = ref(false)
-const editingActivo = ref(null)
-
 const {
   showTerminalModal,
   terminalActivo,
@@ -183,506 +181,114 @@ const {
   appendTelemetryPulses,
 } = useFleetTerminal()
 
-const selectedItineraryRoute = ref(null)
-const selectedItineraryPoint = ref(null)
+const { layoutRef, refreshMapLayout, startFleetResize, cleanupLayout } = useActivosLayout({
+  leftPanelWidth,
+  persistPanelWidth,
+})
 
-const tableActivos = ref([])
-const mapSnapshotActivos = ref([])
-const latestTelemetryBatch = ref([])
+let telemetrySync = null
+let selection = null
 
-const layoutRef = ref(null)
+const filters = useActivosFilters({
+  refreshMapLayout,
 
-let resizeMode = null
-let animationFrame = null
-let resizeFrame = null
-let tableSyncTimer = null
-let lastPointerEvent = null
+  onLeaveItinerarios: () => {
+    selection?.clearSelectedItinerary()
+  },
 
-const fallbackDrivers = [
-  "Carlos Ramírez",
-  "María Gómez",
-  "Juan Pérez",
-  "Ana Torres",
-  "Luis Hidalgo",
-  "Felipe Soto",
-]
+  onFilterChanged: async () => {
+    telemetrySync?.syncMapSnapshotActivos()
 
-const emptyValue = (value) => {
-  if (value === "" || value === null || value === undefined) return "-"
+    const nextActivo = telemetrySync?.mapActivos.value?.[0]
 
-  return value
-}
-
-const formatKm = (value) => {
-  if (value === "" || value === null || value === undefined) return "-"
-
-  const numberValue = Number(value)
-
-  if (!Number.isFinite(numberValue)) return String(value)
-
-  return `${numberValue.toLocaleString("es-CL")} km`
-}
-
-const normalizeText = (value) => {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-}
-
-const cloneFleetSnapshot = (snapshot = []) => {
-  return snapshot.map((activo) => {
-    return {
-      ...activo,
+    if (selection) {
+      selection.selectedId.value = nextActivo?.id || null
     }
-  })
-}
-
-const sidebarSearch = computed(() => {
-  return sectionSearch.value[activeSidebarSection.value] || ""
+  },
 })
 
-const rawActivos = computed(() => {
-  const deletedIds = new Set(deletedActivoIds.value.map((id) => String(id)))
+const {
+  statusFilter,
+  activeSidebarSection,
+  sectionSearch,
+  sidebarSearch,
+  filterActivosByCurrentState,
+  setSidebarSearch,
+  setSidebarSection,
+  setStatusFilter,
+} = filters
 
-  return [...customActivos.value, ...baseMockActivos]
-    .filter((activo) => {
-      return !deletedIds.has(String(activo.id))
-    })
-    .map((activo) => {
-      const editedActivo = editedActivos.value[String(activo.id)]
-
-      return editedActivo
-        ? {
-            ...activo,
-            ...editedActivo,
-          }
-        : activo
-    })
+selection = useActivosSelection({
+  baseSelectedId: baseMockActivos[0]?.id || null,
+  getMapActivos: () => telemetrySync?.mapActivos.value || [],
+  activeSidebarSection,
+  refreshMapLayout,
 })
 
-const baseNormalizedActivos = computed(() => {
-  return rawActivos.value.map((activo, index) => {
-    const estado = activo.estado || "offline"
-    const isCustomAsset = activo.source === "custom"
+const {
+  selectedId,
+  selectedGeofenceId,
+  selectedItineraryRoute,
+  selectedItineraryPoint,
+  ensureSelectedActivo,
+  selectActivo,
+  handleClearGeofenceSelection,
+  handleSidebarGeofenceSelected,
+  handleItineraryRouteSelected,
+  handleItineraryPointSelected,
+  handleClearItineraryRoute,
+} = selection
 
-    return {
-      ...activo,
+const {
+  baseNormalizedActivos,
+  showActivoModal,
+  showEditActivoModal,
+  editingActivo,
+  openAddActivoModal,
+  handleAddActivo,
+  handleUpdateActivo,
+  handleDeviceAction,
+} = useActivosCrud({
+  baseMockActivos,
+  customActivos,
+  deletedActivoIds,
+  editedActivos,
 
-      vehiculo:
-        activo.vehiculo || activo.nombrePantalla || activo.displayName || activo.name || "-",
+  getNormalizedActivos: () => telemetrySync?.normalizedActivos.value || [],
+  getMapActivos: () => telemetrySync?.mapActivos.value || [],
 
-      name: activo.name || activo.vehiculo || "-",
+  selectedId,
+  statusFilter,
+  activeSidebarSection,
+  sectionSearch,
 
-      nombrePantalla: activo.nombrePantalla || activo.displayName || activo.vehiculo || "-",
-
-      conductor: isCustomAsset
-        ? emptyValue(activo.conductor)
-        : activo.conductor || fallbackDrivers[index % fallbackDrivers.length],
-
-      velocidad:
-        activo.velocidad ||
-        (isCustomAsset
-          ? "-"
-          : estado === "moving"
-            ? "62 km/h"
-            : estado === "idle"
-              ? "0 km/h"
-              : "-"),
-
-      combustible:
-        activo.combustible ||
-        activo.fuel ||
-        (isCustomAsset ? "-" : estado === "offline" ? "-" : `${68 - index * 2}%`),
-
-      odometro:
-        activo.odometro ||
-        activo.odometer ||
-        (isCustomAsset ? "-" : `${(125430 + index * 1820).toLocaleString("es-CL")} km`),
-
-      direccion: activo.direccion || activo.ubicacion || "Última ubicación registrada",
-
-      ignicion:
-        activo.ignicion || (estado === "moving" || estado === "idle" ? "Encendida" : "Apagada"),
-
-      ibutton: isCustomAsset
-        ? emptyValue(activo.ibutton)
-        : activo.ibutton || `iButton # ${String(index + 1).padStart(3, "0")}`,
-
-      imei:
-        activo.imei ||
-        activo.deviceId ||
-        activo.identificador ||
-        `86812345${String(index + 1).padStart(4, "0")}`,
-
-      protocol: activo.protocol || "-",
-
-      trackerModel: activo.trackerModel || "-",
-      trackerModelLabel: activo.trackerModelLabel || "-",
-      trackerManufacturer: activo.trackerManufacturer || "-",
-
-      descripcion: activo.descripcion || activo.description || "-",
-
-      fechaIngreso: activo.fechaIngreso || activo.entryDate || "-",
-      fechaBaja: activo.fechaBaja || activo.deactivationDate || "-",
-      fechaSuspension: activo.fechaSuspension || activo.suspensionDate || "-",
-
-      horometroDiario: emptyValue(activo.horometroDiario ?? activo.dailyHourmeter),
-      horometroTotal: emptyValue(activo.horometroTotal ?? activo.totalHourmeter),
-    }
-  })
+  openConfirmDialog,
+  removeTerminalHistory,
+  terminalActivo,
+  closeTerminalModal,
+  openFleetTerminalModal,
+  refreshMapLayout,
 })
 
-const normalizedActivos = computed(() => {
-  return telemetryActivos.value
+telemetrySync = useActivosTelemetrySync({
+  telemetryActivos,
+  baseNormalizedActivos,
+  filterActivosByCurrentState,
+  statusFilter,
+  sectionSearch,
+  replaceFleetSnapshot,
+  startMockTelemetry,
+  stopMockTelemetry,
+  appendTelemetryPulses,
+  ensureSelectedActivo,
+  mockTelemetryEnabled: MOCK_TELEMETRY_ENABLED,
+  mockTelemetryIntervalMs: MOCK_TELEMETRY_INTERVAL_MS,
+  mockTelemetryBatchSize: MOCK_TELEMETRY_BATCH_SIZE,
+  tableSyncIntervalMs: TABLE_SYNC_INTERVAL_MS,
 })
 
-const matchesStatusFilter = (activo) => {
-  if (statusFilter.value === "all") return true
-  if (statusFilter.value === "online") return activo.estado !== "offline"
-  if (statusFilter.value === "alerts") return activo.estado === "stopped"
-
-  return activo.estado === statusFilter.value
-}
-
-const filterActivosByCurrentState = (activos = []) => {
-  const term = normalizeText(sectionSearch.value.activos)
-
-  return activos.filter((activo) => {
-    const matchesText =
-      !term ||
-      normalizeText(activo.vehiculo).includes(term) ||
-      normalizeText(activo.name).includes(term) ||
-      normalizeText(activo.nombrePantalla).includes(term) ||
-      normalizeText(activo.trackerModelLabel).includes(term) ||
-      normalizeText(activo.trackerManufacturer).includes(term) ||
-      normalizeText(activo.protocol).includes(term) ||
-      normalizeText(activo.imei).includes(term) ||
-      normalizeText(activo.estado).includes(term) ||
-      normalizeText(activo.datosUlt).includes(term) ||
-      normalizeText(activo.fechaIngreso).includes(term) ||
-      normalizeText(activo.descripcion).includes(term)
-
-    return matchesText && matchesStatusFilter(activo)
-  })
-}
-
-const mapActivos = computed(() => {
-  return filterActivosByCurrentState(mapSnapshotActivos.value)
-})
-
-const filteredActivos = computed(() => {
-  return filterActivosByCurrentState(tableActivos.value)
-})
-
-const syncTableActivos = () => {
-  tableActivos.value = cloneFleetSnapshot(normalizedActivos.value)
-}
-
-const syncMapSnapshotActivos = (snapshot = normalizedActivos.value) => {
-  mapSnapshotActivos.value = cloneFleetSnapshot(snapshot)
-}
-
-const scheduleTableActivosSync = ({ immediate = false } = {}) => {
-  if (immediate) {
-    if (tableSyncTimer) {
-      window.clearTimeout(tableSyncTimer)
-      tableSyncTimer = null
-    }
-
-    syncTableActivos()
-    return
-  }
-
-  if (tableSyncTimer) return
-
-  tableSyncTimer = window.setTimeout(() => {
-    tableSyncTimer = null
-    syncTableActivos()
-  }, TABLE_SYNC_INTERVAL_MS)
-}
-
-const ensureSelectedActivo = () => {
-  if (!mapActivos.value.length) {
-    selectedId.value = null
-    return
-  }
-
-  const selectedExists = mapActivos.value.some((activo) => {
-    return String(activo.id) === String(selectedId.value)
-  })
-
-  if (selectedExists) return
-
-  selectedId.value = mapActivos.value[0]?.id || null
-}
-
-const createActivoId = () => {
-  const ids = [...customActivos.value, ...baseMockActivos]
-    .map((activo) => Number(activo.id))
-    .filter((id) => Number.isFinite(id))
-
-  return Math.max(0, ...ids) + 1
-}
-
-const getCurrentTimeLabel = () => {
-  return new Date().toLocaleTimeString("es-CL", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  })
-}
-
-const buildActivoDataFromForm = (form = {}, fallbackActivo = {}) => {
-  const displayName =
-    form.displayName ||
-    form.vehiculo ||
-    form.nombrePantalla ||
-    form.name ||
-    fallbackActivo.vehiculo ||
-    fallbackActivo.nombrePantalla ||
-    fallbackActivo.name ||
-    "Activo sin nombre"
-
-  const name = form.name || fallbackActivo.name || displayName
-
-  const odometerFromForm = form.odometer ?? form.odometro
-
-  return {
-    estado: form.estado || fallbackActivo.estado || "offline",
-
-    vehiculo: displayName,
-    name,
-    nombrePantalla:
-      form.displayName || form.nombrePantalla || fallbackActivo.nombrePantalla || displayName,
-
-    trackerModel: form.trackerModel || fallbackActivo.trackerModel || "-",
-    trackerModelLabel:
-      form.trackerModelLabel || fallbackActivo.trackerModelLabel || form.trackerModel || "-",
-    trackerManufacturer: form.trackerManufacturer || fallbackActivo.trackerManufacturer || "-",
-
-    imei: form.imei || fallbackActivo.imei || "-",
-    protocol: form.protocol || fallbackActivo.protocol || "tcp",
-
-    descripcion: form.description || form.descripcion || fallbackActivo.descripcion || "-",
-
-    fechaIngreso: form.entryDate || form.fechaIngreso || fallbackActivo.fechaIngreso || "-",
-
-    fechaBaja: form.deactivationDate || form.fechaBaja || fallbackActivo.fechaBaja || "-",
-
-    fechaSuspension:
-      form.suspensionDate || form.fechaSuspension || fallbackActivo.fechaSuspension || "-",
-
-    horometroDiario: emptyValue(
-      form.dailyHourmeter ?? form.horometroDiario ?? fallbackActivo.horometroDiario,
-    ),
-
-    horometroTotal: emptyValue(
-      form.totalHourmeter ?? form.horometroTotal ?? fallbackActivo.horometroTotal,
-    ),
-
-    odometro:
-      form.odometer !== undefined && form.odometer !== null && form.odometer !== ""
-        ? formatKm(form.odometer)
-        : emptyValue(odometerFromForm ?? fallbackActivo.odometro),
-
-    direccion:
-      form.direccion || form.ubicacion || fallbackActivo.direccion || "Última ubicación registrada",
-  }
-}
-
-const openAddActivoModal = () => {
-  activeSidebarSection.value = "activos"
-  showEditActivoModal.value = false
-  editingActivo.value = null
-  showActivoModal.value = true
-}
-
-const handleAddActivo = async (form) => {
-  const baseData = buildActivoDataFromForm(form, {
-    estado: "offline",
-    direccion: "Ubicación pendiente de reporte GPS",
-  })
-
-  const newActivo = {
-    id: createActivoId(),
-    source: "custom",
-
-    ...baseData,
-
-    datosUlt:
-      baseData.fechaIngreso && baseData.fechaIngreso !== "-"
-        ? baseData.fechaIngreso
-        : getCurrentTimeLabel(),
-
-    choque: "-",
-
-    conductor: "-",
-    velocidad: "-",
-    combustible: "-",
-    ibutton: "-",
-
-    lat: -33.4489 + customActivos.value.length * 0.002,
-    lng: -70.6693 + customActivos.value.length * 0.002,
-  }
-
-  customActivos.value = [newActivo, ...customActivos.value]
-
-  sectionSearch.value = {
-    ...sectionSearch.value,
-    activos: "",
-  }
-
-  statusFilter.value = "all"
-  activeSidebarSection.value = "activos"
-  selectedId.value = newActivo.id
-
-  showActivoModal.value = false
-  editingActivo.value = null
-
-  await refreshMapLayout(true)
-}
-
-const openEditActivoModal = (activo) => {
-  if (!activo) return
-
-  selectedId.value = activo.id
-  showActivoModal.value = false
-  editingActivo.value = activo
-  showEditActivoModal.value = true
-}
-
-const handleUpdateActivo = async (payload) => {
-  const id = payload?.id ?? editingActivo.value?.id
-
-  if (id === null || id === undefined) return
-
-  const baseActivo =
-    normalizedActivos.value.find((activo) => {
-      return String(activo.id) === String(id)
-    }) ||
-    editingActivo.value ||
-    {}
-
-  const form = payload?.data || payload?.form || payload || {}
-
-  const data = buildActivoDataFromForm(form, baseActivo)
-
-  editedActivos.value = {
-    ...editedActivos.value,
-    [String(id)]: data,
-  }
-
-  selectedId.value = id
-  showEditActivoModal.value = false
-  editingActivo.value = null
-
-  await refreshMapLayout(true)
-}
-
-const openTerminalModal = (activo) => {
-  if (!activo) return
-
-  selectedId.value = activo.id
-  openFleetTerminalModal(activo)
-}
-
-const deleteActivo = async (activo) => {
-  if (!activo?.id) return
-
-  const activoName = activo.vehiculo || activo.name || activo.id
-
-  const confirmed = await openConfirmDialog({
-    title: "Eliminar activo",
-    message: `¿Seguro que deseas eliminar "${activoName}"?`,
-    detail: "El activo se quitará de la lista y del mapa en esta sesión.",
-    confirmLabel: "Eliminar",
-    cancelLabel: "Cancelar",
-    variant: "danger",
-  })
-
-  if (!confirmed) return
-
-  customActivos.value = customActivos.value.filter((item) => {
-    return String(item.id) !== String(activo.id)
-  })
-
-  if (!deletedActivoIds.value.some((id) => String(id) === String(activo.id))) {
-    deletedActivoIds.value = [...deletedActivoIds.value, activo.id]
-  }
-
-  const { [String(activo.id)]: _removedEditedActivo, ...nextEditedActivos } = editedActivos.value
-
-  editedActivos.value = nextEditedActivos
-
-  removeTerminalHistory(activo)
-
-  if (String(selectedId.value) === String(activo.id)) {
-    const nextActivo = mapActivos.value.find((item) => {
-      return String(item.id) !== String(activo.id)
-    })
-
-    selectedId.value = nextActivo?.id || null
-  }
-
-  if (String(editingActivo.value?.id) === String(activo.id)) {
-    showEditActivoModal.value = false
-    editingActivo.value = null
-  }
-
-  if (String(terminalActivo.value?.id) === String(activo.id)) {
-    closeTerminalModal()
-  }
-
-  await refreshMapLayout(true)
-}
-
-const handleDeviceAction = async ({ action, activo }) => {
-  if (!activo) return
-
-  selectedId.value = activo.id
-
-  if (action === "edit-device") {
-    openEditActivoModal(activo)
-    return
-  }
-
-  if (action === "open-terminal") {
-    openTerminalModal(activo)
-    return
-  }
-
-  if (action === "delete-device") {
-    await deleteActivo(activo)
-  }
-}
-
-const clearSelectedItinerary = () => {
-  selectedItineraryRoute.value = null
-  selectedItineraryPoint.value = null
-}
-
-const setSidebarSearch = (value) => {
-  const section = activeSidebarSection.value || "activos"
-
-  sectionSearch.value = {
-    ...sectionSearch.value,
-    [section]: value,
-  }
-}
-
-const setSidebarSection = async (section) => {
-  const allowedSections = ["activos", "itinerarios", "geocercas"]
-  const nextSection = allowedSections.includes(section) ? section : "activos"
-
-  activeSidebarSection.value = nextSection
-
-  if (nextSection !== "itinerarios") {
-    clearSelectedItinerary()
-  }
-
-  await refreshMapLayout(true)
-}
+const { tableActivos, latestTelemetryBatch, mapActivos, filteredActivos, cleanupTelemetrySync } =
+  telemetrySync
 
 const handleGeofenceCreated = async (geofence) => {
   createGeofence(geofence)
@@ -699,228 +305,15 @@ const handleGeofenceUpdated = (updatedGeofence) => {
 const handleGeofenceDeleted = async (geofenceId) => {
   deleteGeofence(geofenceId)
 
-  if (String(selectedGeofenceId.value) === String(geofenceId)) {
+  if (normalizeId(selectedGeofenceId.value) === normalizeId(geofenceId)) {
     selectedGeofenceId.value = null
   }
 
   await refreshMapLayout(true)
 }
 
-const handleClearGeofenceSelection = () => {
-  selectedGeofenceId.value = null
-}
-
-const handleSidebarGeofenceSelected = async (geofence) => {
-  if (!geofence?.id) return
-
-  selectedGeofenceId.value = geofence.id
-  activeSidebarSection.value = "geocercas"
-
-  await refreshMapLayout(true)
-}
-
-const handleItineraryRouteSelected = async (route) => {
-  selectedItineraryRoute.value = route
-  selectedItineraryPoint.value = null
-  activeSidebarSection.value = "itinerarios"
-
-  const routeAssetId = route?.asset?.activoId || route?.asset?.id
-
-  if (routeAssetId) {
-    selectedId.value = routeAssetId
-  }
-
-  await refreshMapLayout(true)
-}
-
-const handleItineraryPointSelected = async (payload) => {
-  selectedItineraryPoint.value = payload?.point || payload || null
-  activeSidebarSection.value = "itinerarios"
-
-  await refreshMapLayout()
-}
-
-const handleClearItineraryRoute = async () => {
-  clearSelectedItinerary()
-
-  await refreshMapLayout(true)
-}
-
-const clamp = (value, min, max) => {
-  return Math.min(Math.max(value, min), max)
-}
-
-const refreshMapLayout = async (withTransition = false) => {
-  await nextTick()
-
-  if (animationFrame) {
-    cancelAnimationFrame(animationFrame)
-  }
-
-  animationFrame = requestAnimationFrame(() => {
-    window.dispatchEvent(new Event("resize"))
-  })
-
-  if (withTransition) {
-    setTimeout(() => {
-      window.dispatchEvent(new Event("resize"))
-    }, 160)
-
-    setTimeout(() => {
-      window.dispatchEvent(new Event("resize"))
-    }, 340)
-  }
-}
-
-const scheduleDragResize = (event) => {
-  lastPointerEvent = {
-    clientX: event.clientX,
-    clientY: event.clientY,
-  }
-
-  if (resizeFrame) return
-
-  resizeFrame = requestAnimationFrame(() => {
-    if (!lastPointerEvent) return
-
-    if (resizeMode === "fleet") {
-      resizeFleet(lastPointerEvent)
-    }
-
-    resizeFrame = null
-  })
-}
-
-const startFleetResize = (event) => {
-  resizeMode = "fleet"
-
-  document.body.style.cursor = "col-resize"
-  document.body.style.userSelect = "none"
-
-  event.preventDefault()
-  event.currentTarget.setPointerCapture?.(event.pointerId)
-
-  window.addEventListener("pointermove", scheduleDragResize)
-  window.addEventListener("pointerup", stopResize)
-}
-
-const resizeFleet = (event) => {
-  if (!layoutRef.value) return
-
-  const rect = layoutRef.value.getBoundingClientRect()
-  const rawWidth = event.clientX - rect.left
-
-  const minWidth = 300
-  const maxWidth = Math.max(minWidth, rect.width - 360)
-
-  leftPanelWidth.value = clamp(rawWidth, minWidth, maxWidth)
-}
-
-const stopResize = async () => {
-  resizeMode = null
-  lastPointerEvent = null
-
-  document.body.style.cursor = ""
-  document.body.style.userSelect = ""
-
-  window.removeEventListener("pointermove", scheduleDragResize)
-  window.removeEventListener("pointerup", stopResize)
-
-  if (resizeFrame) {
-    cancelAnimationFrame(resizeFrame)
-    resizeFrame = null
-  }
-
-  persistPanelWidth(leftPanelWidth.value)
-
-  await refreshMapLayout()
-}
-
-const selectActivo = async (id) => {
-  selectedId.value = id
-  await refreshMapLayout(true)
-}
-
-const setStatusFilter = async (filter) => {
-  activeSidebarSection.value = "activos"
-  clearSelectedItinerary()
-
-  syncMapSnapshotActivos()
-
-  statusFilter.value = filter
-
-  const nextActivo = mapActivos.value[0]
-  selectedId.value = nextActivo?.id || null
-
-  await refreshMapLayout(true)
-}
-
-watch(
-  baseNormalizedActivos,
-  (snapshot) => {
-    latestTelemetryBatch.value = []
-    replaceFleetSnapshot(snapshot)
-    syncMapSnapshotActivos(snapshot)
-    scheduleTableActivosSync({ immediate: true })
-  },
-  {
-    immediate: true,
-  },
-)
-
-watch(normalizedActivos, () => {
-  scheduleTableActivosSync()
-})
-
-watch(
-  () => [statusFilter.value, sectionSearch.value.activos],
-  () => {
-    syncMapSnapshotActivos()
-  },
-)
-
-watch(
-  mapActivos,
-  () => {
-    ensureSelectedActivo()
-  },
-  {
-    immediate: true,
-  },
-)
-
-if (MOCK_TELEMETRY_ENABLED) {
-  startMockTelemetry({
-    intervalMs: MOCK_TELEMETRY_INTERVAL_MS,
-    batchSize: MOCK_TELEMETRY_BATCH_SIZE,
-    onBatch: (batch = []) => {
-      latestTelemetryBatch.value = batch
-      appendTelemetryPulses(batch)
-      refreshMapLayout()
-      scheduleTableActivosSync()
-    },
-  })
-}
-
 onBeforeUnmount(() => {
-  stopMockTelemetry()
-
-  window.removeEventListener("pointermove", scheduleDragResize)
-  window.removeEventListener("pointerup", stopResize)
-
-  if (animationFrame) {
-    cancelAnimationFrame(animationFrame)
-  }
-
-  if (resizeFrame) {
-    cancelAnimationFrame(resizeFrame)
-  }
-
-  if (tableSyncTimer) {
-    window.clearTimeout(tableSyncTimer)
-  }
-
-  document.body.style.cursor = ""
-  document.body.style.userSelect = ""
+  cleanupTelemetrySync()
+  cleanupLayout()
 })
 </script>

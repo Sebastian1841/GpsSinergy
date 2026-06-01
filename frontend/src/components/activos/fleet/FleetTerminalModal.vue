@@ -17,7 +17,9 @@
           @dblclick="resetFrame"
         >
           <div class="flex min-w-0 items-center gap-3">
-            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-[#FF6600] ring-1 ring-white/15">
+            <div
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-[#FF6600] ring-1 ring-white/15"
+            >
               <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" aria-hidden="true">
                 <path
                   d="m8 9 3 3-3 3M13.5 15h3"
@@ -51,9 +53,7 @@
             <span
               class="hidden rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] sm:inline-flex"
               :class="
-                isSending
-                  ? 'bg-[#FF6600]/20 text-orange-100'
-                  : 'bg-emerald-400/20 text-emerald-100'
+                isSending ? 'bg-[#FF6600]/20 text-orange-100' : 'bg-emerald-400/20 text-emerald-100'
               "
             >
               {{ isSending ? "Enviando" : "Online" }}
@@ -92,9 +92,7 @@
                 </div>
 
                 <div class="min-w-0">
-                  <p class="truncate text-sm font-black text-[#102372]">
-                    Terminal del dispositivo
-                  </p>
+                  <p class="truncate text-sm font-black text-[#102372]">Terminal del dispositivo</p>
 
                   <p class="truncate text-[11px] font-semibold text-slate-500">
                     {{ deviceName }} · telemetría y comandos remotos
@@ -160,7 +158,9 @@
               class="min-h-0 flex-1 overflow-auto bg-white"
               @click="focusInput"
             >
-              <table class="min-w-full border-separate border-spacing-0 text-left font-mono text-[11px]">
+              <table
+                class="min-w-full border-separate border-spacing-0 text-left font-mono text-[11px]"
+              >
                 <thead
                   class="sticky top-0 z-10 bg-[#f8fafc] text-[10px] font-black uppercase tracking-[0.08em] text-slate-500 shadow-sm"
                 >
@@ -214,7 +214,9 @@
                       </span>
                     </td>
 
-                    <td class="border-b border-[#edf2f7] px-3 py-2 align-top font-black text-[#102372]">
+                    <td
+                      class="border-b border-[#edf2f7] px-3 py-2 align-top font-black text-[#102372]"
+                    >
                       {{ row.velocidad }}
                     </td>
 
@@ -247,9 +249,7 @@
                 class="flex h-full min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-5 text-center"
               >
                 <div>
-                  <p class="text-sm font-black text-[#102372]">
-                    Sin comandos enviados
-                  </p>
+                  <p class="text-sm font-black text-[#102372]">Sin comandos enviados</p>
 
                   <p class="mt-1 text-xs font-semibold text-slate-500">
                     Escribe un comando abajo y al enviarlo aparecerá la respuesta en este módulo.
@@ -286,7 +286,9 @@
                     </span>
                   </div>
 
-                  <p class="mt-2 break-words font-mono text-xs font-semibold leading-relaxed text-slate-700">
+                  <p
+                    class="mt-2 break-words font-mono text-xs font-semibold leading-relaxed text-slate-700"
+                  >
                     {{ row.message }}
                   </p>
                 </article>
@@ -484,7 +486,11 @@ const parsePulseMessage = (message = "") => {
 
 const getPayloadValue = (payload = {}, keys = []) => {
   const key = keys.find((currentKey) => {
-    return payload[currentKey] !== undefined && payload[currentKey] !== null && payload[currentKey] !== ""
+    return (
+      payload[currentKey] !== undefined &&
+      payload[currentKey] !== null &&
+      payload[currentKey] !== ""
+    )
   })
 
   return key ? payload[key] : ""
@@ -530,8 +536,12 @@ const buildTerminalRow = (log = {}) => {
 
   const isTelemetry =
     hasTelemetryPayload ||
-    String(log.source || "").toLowerCase().includes("rx") ||
-    String(message || "").toUpperCase().startsWith("PULSE")
+    String(log.source || "")
+      .toLowerCase()
+      .includes("rx") ||
+    String(message || "")
+      .toUpperCase()
+      .startsWith("PULSE")
 
   const estado =
     getPayloadValue(payload, ["estado", "status"]) ||
@@ -620,10 +630,7 @@ const setInitialHistory = async () => {
 }
 
 const addLog = async (payload) => {
-  terminalLogs.value = [
-    ...terminalLogs.value,
-    normalizeTerminalLog(createLog(payload)),
-  ]
+  terminalLogs.value = [...terminalLogs.value, normalizeTerminalLog(createLog(payload))]
 
   await refreshTerminalView()
 }

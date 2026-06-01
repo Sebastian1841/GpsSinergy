@@ -1,6 +1,8 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import L from "leaflet"
 
+import { normalizeId } from "../../../utils/idUtils.js"
+
 import { createGeofenceMapController } from "./geofences/useMapGeofences.js"
 import { createItineraryMapController } from "./useMapItinerary.js"
 import { createMovementTrailController } from "./useMapMovementTrails.js"
@@ -48,10 +50,6 @@ const MAP_TILE_LAYERS = {
       attribution: "&copy; OpenStreetMap contributors, Tiles style by HOT",
     },
   },
-}
-
-const normalizeId = (value) => {
-  return String(value ?? "")
 }
 
 export function useActivosMap({ props, emit, mapRef }) {
@@ -205,6 +203,7 @@ export function useActivosMap({ props, emit, mapRef }) {
     map.on("click", geofenceMap.handleMapClick)
     map.on("mousemove", geofenceMap.handleMapMouseMove)
     map.on("dblclick", geofenceMap.handleMapDoubleClick)
+    map.on("zoomend", assetMarkers.refreshActivoMarkers)
 
     geofenceMap.renderGeofences()
 
@@ -232,10 +231,12 @@ export function useActivosMap({ props, emit, mapRef }) {
       map.off("click", geofenceMap.handleMapClick)
       map.off("mousemove", geofenceMap.handleMapMouseMove)
       map.off("dblclick", geofenceMap.handleMapDoubleClick)
+      map.off("zoomend", assetMarkers.refreshActivoMarkers)
     }
 
     assetMarkers.clearMarkerCache()
     geofenceMap.cancelAll()
+    geofenceMap.clearGeofenceCache?.()
     itineraryMap.clearItineraryRoute()
 
     if (currentTileLayer) {

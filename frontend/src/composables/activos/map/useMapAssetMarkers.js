@@ -1,10 +1,11 @@
 import { computed } from "vue"
 
-const normalizeSignatureValue = (value) => {
-  if (value === null || value === undefined) return ""
-
-  return String(value)
-}
+import { normalizeSignatureValue } from "../../../utils/mapSignatureUtils.js"
+import {
+  createAssetMarkerClusterController,
+  shouldClusterAssetMarkers,
+} from "./assetMarkers/assetMarkerClusters.js"
+import { createClusterIcon, createMarkerIcon } from "./assetMarkers/assetMarkerIcons.js"
 
 const isValidNumber = (value) => {
   return Number.isFinite(Number(value))
@@ -31,6 +32,25 @@ const formatTelemetryTime = (timestamp) => {
   })
 }
 
+const requestClusterFrame = (callback) => {
+  if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+    return window.requestAnimationFrame(callback)
+  }
+
+  return setTimeout(callback, 16)
+}
+
+const cancelClusterFrame = (frameId) => {
+  if (frameId === null || frameId === undefined) return
+
+  if (typeof window !== "undefined" && typeof window.cancelAnimationFrame === "function") {
+    window.cancelAnimationFrame(frameId)
+    return
+  }
+
+  clearTimeout(frameId)
+}
+
 export function createAssetMarkerController({
   L,
   props,
@@ -46,42 +66,27 @@ export function createAssetMarkerController({
   const markerCache = new Map()
   const latestActivosById = new Map()
 
+  let visibleActivoIds = new Set()
+  let clusterRefreshFrame = null
+
   const selectedActivo = computed(() => {
+    const selectedId = normalizeId(props.selectedId)
+
+    if (selectedId) {
+      const latestActivo = latestActivosById.get(selectedId)
+
+      if (latestActivo) return latestActivo
+    }
+
     return (
       (props.activos || []).find((activo) => {
-        return normalizeId(activo.id) === normalizeId(props.selectedId)
+        return normalizeId(activo.id) === selectedId
       }) || null
     )
   })
 
-  const markerClass = (estado) => {
-    const classes = {
-      moving: "marker-moving",
-      idle: "marker-idle",
-      stopped: "marker-stopped",
-      offline: "marker-offline",
-    }
-
-    return classes[estado] || "marker-offline"
-  }
-
   const isActivoSelected = (activo) => {
     return normalizeId(activo?.id) === normalizeId(props.selectedId)
-  }
-
-  const createMarkerIcon = (activo) => {
-    const isSelected = isActivoSelected(activo)
-
-    return L.divIcon({
-      className: "",
-      html: `
-        <div class="sinergy-marker ${markerClass(activo.estado)} ${isSelected ? "selected" : ""}">
-          <span></span>
-        </div>
-      `,
-      iconSize: isSelected ? [30, 30] : [22, 22],
-      iconAnchor: isSelected ? [15, 15] : [11, 11],
-    })
   }
 
   const buildMarkerPositionSignature = (activoLatLng) => {
@@ -117,7 +122,11 @@ export function createAssetMarkerController({
 
   const createActivoMarker = (activo, activoLatLng) => {
     const marker = L.marker(activoLatLng, {
-      icon: createMarkerIcon(activo),
+      icon: createMarkerIcon({
+        L,
+        activo,
+        isSelected: isActivoSelected(activo),
+      }),
     })
 
     marker.on("click", () => {
@@ -130,11 +139,35 @@ export function createAssetMarkerController({
     return marker
   }
 
+  const addCachedMarkerToLayer = (cachedMarker) => {
+    if (!layers.markerLayer || !cachedMarker || cachedMarker.isVisible) return
+
+    cachedMarker.marker.addTo(layers.markerLayer)
+    cachedMarker.isVisible = true
+  }
+
+  const hideCachedMarker = (markerId) => {
+    const cachedMarker = markerCache.get(markerId)
+
+    if (!cachedMarker || !cachedMarker.isVisible) return
+
+    layers.markerLayer?.removeLayer(cachedMarker.marker)
+    cachedMarker.isVisible = false
+  }
+
+  const cancelClusterRefresh = () => {
+    if (clusterRefreshFrame === null || clusterRefreshFrame === undefined) return
+
+    cancelClusterFrame(clusterRefreshFrame)
+    clusterRefreshFrame = null
+  }
+
   const removeActivoMarker = (id) => {
     const markerId = normalizeId(id)
     const cachedMarker = markerCache.get(markerId)
 
     movementTrails.removeMovementTrail(markerId)
+    visibleActivoIds.delete(markerId)
 
     if (!cachedMarker) {
       latestActivosById.delete(markerId)
@@ -144,16 +177,6 @@ export function createAssetMarkerController({
     layers.markerLayer?.removeLayer(cachedMarker.marker)
     markerCache.delete(markerId)
     latestActivosById.delete(markerId)
-  }
-
-  const clearMarkerCache = () => {
-    markerCache.forEach((cachedMarker) => {
-      layers.markerLayer?.removeLayer(cachedMarker.marker)
-    })
-
-    markerCache.clear()
-    latestActivosById.clear()
-    movementTrails.clearMovementTrails()
   }
 
   const updateCachedMarker = ({ cachedMarker, activo, activoLatLng }) => {
@@ -167,7 +190,13 @@ export function createAssetMarkerController({
     }
 
     if (cachedMarker.iconSignature !== iconSignature) {
-      cachedMarker.marker.setIcon(createMarkerIcon(activo))
+      cachedMarker.marker.setIcon(
+        createMarkerIcon({
+          L,
+          activo,
+          isSelected: isActivoSelected(activo),
+        }),
+      )
       cachedMarker.iconSignature = iconSignature
     }
 
@@ -177,6 +206,110 @@ export function createAssetMarkerController({
     }
 
     cachedMarker.activo = activo
+  }
+
+  const upsertIndividualMarker = (activo, { trackTrail = true } = {}) => {
+    const map = getMap()
+
+    if (!map || !layers.markerLayer || !activo) return null
+
+    const markerId = normalizeId(activo.id)
+
+    if (!markerId) return null
+
+    const activoLatLng = getActivoLatLng(activo)
+
+    latestActivosById.set(markerId, activo)
+
+    if (!activoLatLng) {
+      removeActivoMarker(markerId)
+      return null
+    }
+
+    if (trackTrail) {
+      movementTrails.registerMovementTrailPoint(activo)
+    }
+
+    const cachedMarker = markerCache.get(markerId)
+
+    if (cachedMarker) {
+      updateCachedMarker({
+        cachedMarker,
+        activo,
+        activoLatLng,
+      })
+
+      addCachedMarkerToLayer(cachedMarker)
+
+      return cachedMarker.marker
+    }
+
+    const marker = createActivoMarker(activo, activoLatLng)
+
+    marker.addTo(layers.markerLayer)
+
+    markerCache.set(markerId, {
+      marker,
+      activo,
+      isVisible: true,
+      positionSignature: buildMarkerPositionSignature(activoLatLng),
+      iconSignature: buildMarkerIconSignature(activo),
+      tooltipSignature: buildMarkerTooltipSignature(activo),
+    })
+
+    return marker
+  }
+
+  const getVisibleActivos = () => {
+    const sourceIds = visibleActivoIds.size
+      ? Array.from(visibleActivoIds)
+      : Array.from(latestActivosById.keys())
+
+    return sourceIds
+      .map((activoId) => {
+        return latestActivosById.get(activoId)
+      })
+      .filter(Boolean)
+  }
+
+  const markerClusters = createAssetMarkerClusterController({
+    L,
+    getMap,
+    layers,
+    createClusterIcon,
+    getActivoLatLng,
+    isActivoSelected,
+    upsertIndividualMarker,
+    hideIndividualMarker: hideCachedMarker,
+    drawMode,
+    editingDraft,
+  })
+
+  const clearMarkerCache = () => {
+    cancelClusterRefresh()
+    markerClusters.clearClusterMarkers()
+
+    markerCache.forEach((cachedMarker) => {
+      layers.markerLayer?.removeLayer(cachedMarker.marker)
+    })
+
+    markerCache.clear()
+    latestActivosById.clear()
+    visibleActivoIds.clear()
+    movementTrails.clearMovementTrails()
+  }
+
+  const scheduleClusterRefresh = () => {
+    if (clusterRefreshFrame !== null && clusterRefreshFrame !== undefined) return
+
+    clusterRefreshFrame = requestClusterFrame(() => {
+      clusterRefreshFrame = null
+      markerClusters.renderMarkerClusters(getVisibleActivos())
+    })
+  }
+
+  const refreshActivoMarkers = () => {
+    markerClusters.renderMarkerClusters(getVisibleActivos())
   }
 
   const upsertActivoMarker = (activo) => {
@@ -197,33 +330,18 @@ export function createAssetMarkerController({
       return null
     }
 
-    movementTrails.registerMovementTrailPoint(activo)
-
-    const cachedMarker = markerCache.get(markerId)
-
-    if (cachedMarker) {
-      updateCachedMarker({
-        cachedMarker,
-        activo,
-        activoLatLng,
-      })
-
-      return cachedMarker.marker
+    if (shouldClusterAssetMarkers(map) && !isActivoSelected(activo)) {
+      movementTrails.registerMovementTrailPoint(activo)
+      hideCachedMarker(markerId)
+      scheduleClusterRefresh()
+      return null
     }
 
-    const marker = createActivoMarker(activo, activoLatLng)
+    if (!shouldClusterAssetMarkers(map)) {
+      markerClusters.clearClusterMarkers()
+    }
 
-    marker.addTo(layers.markerLayer)
-
-    markerCache.set(markerId, {
-      marker,
-      activo,
-      positionSignature: buildMarkerPositionSignature(activoLatLng),
-      iconSignature: buildMarkerIconSignature(activo),
-      tooltipSignature: buildMarkerTooltipSignature(activo),
-    })
-
-    return marker
+    return upsertIndividualMarker(activo)
   }
 
   const mergeTelemetryUpdateIntoActivo = (activo = {}, update = {}) => {
@@ -289,6 +407,7 @@ export function createAssetMarkerController({
 
     const bounds = []
     const nextMarkerIds = new Set()
+    const nextActivos = []
 
     ;(activos || []).forEach((activo) => {
       const markerId = normalizeId(activo?.id)
@@ -297,15 +416,20 @@ export function createAssetMarkerController({
 
       const activoLatLng = getActivoLatLng(activo)
 
-      latestActivosById.set(markerId, activo)
-      nextMarkerIds.add(markerId)
-
-      if (activoLatLng) {
-        bounds.push(activoLatLng)
+      if (!activoLatLng) {
+        removeActivoMarker(markerId)
+        return
       }
 
-      upsertActivoMarker(activo)
+      latestActivosById.set(markerId, activo)
+      nextMarkerIds.add(markerId)
+      nextActivos.push(activo)
+      bounds.push(activoLatLng)
+
+      movementTrails.registerMovementTrailPoint(activo)
     })
+
+    visibleActivoIds = nextMarkerIds
 
     const staleMarkerIds = []
 
@@ -318,6 +442,31 @@ export function createAssetMarkerController({
     staleMarkerIds.forEach((markerId) => {
       removeActivoMarker(markerId)
     })
+
+    const staleActivoIds = []
+
+    latestActivosById.forEach((_activo, activoId) => {
+      if (!nextMarkerIds.has(activoId)) {
+        staleActivoIds.push(activoId)
+      }
+    })
+
+    staleActivoIds.forEach((activoId) => {
+      latestActivosById.delete(activoId)
+      movementTrails.removeMovementTrail(activoId)
+    })
+
+    if (shouldClusterAssetMarkers(map)) {
+      markerClusters.renderMarkerClusters(getVisibleActivos())
+    } else {
+      markerClusters.clearClusterMarkers()
+
+      nextActivos.forEach((activo) => {
+        upsertIndividualMarker(activo, {
+          trackTrail: false,
+        })
+      })
+    }
 
     if (fit && bounds.length && !props.selectedId && !props.itineraryRoute) {
       map.fitBounds(bounds, {
@@ -350,6 +499,7 @@ export function createAssetMarkerController({
     upsertActivoMarker,
     removeActivoMarker,
     clearMarkerCache,
+    refreshActivoMarkers,
     centerSelected,
   }
 }

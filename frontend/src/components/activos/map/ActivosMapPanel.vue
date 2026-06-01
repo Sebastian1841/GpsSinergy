@@ -1,6 +1,12 @@
 <template>
   <section
-    class="relative min-h-0 overflow-hidden rounded-xl border border-[#d8dee8] bg-[#dbe3ee] shadow-sm"
+    ref="panelRef"
+    class="min-h-0 overflow-hidden bg-[#dbe3ee] shadow-sm"
+    :class="
+      isFullscreen
+        ? 'fixed inset-0 z-[2147483600] h-screen w-screen rounded-none border-0'
+        : 'relative h-full rounded-xl border border-[#d8dee8]'
+    "
   >
     <div ref="mapRef" class="absolute inset-0"></div>
 
@@ -23,7 +29,9 @@
       :draft-route-points="draftRoutePoints"
       :map-type="mapType"
       :map-type-options="mapTypeOptions"
+      :is-fullscreen="isFullscreen"
       @toggle-kpis="toggleKpis"
+      @toggle-fullscreen="toggleFullscreen"
       @create-circle="handleCreateCircle"
       @create-polygon="handleCreatePolygon"
       @create-route="handleCreateRoute"
@@ -83,8 +91,7 @@
       :draft-geofence-form="draftGeofenceForm"
       :draft-geofence-preview-name="draftGeofencePreviewName"
       :edit-add-point="editAddPoint"
-      :editing-stroke-color="editingStrokeColor"
-      :editing-fill-color="editingFillColor"
+      :editing-color="editingColor"
       :editing-preview-name="editingPreviewName"
       :can-remove-last-edit-point="canRemoveLastEditPoint"
       @update-draft-field="handleDraftGeofenceField"
@@ -113,7 +120,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import "leaflet/dist/leaflet.css"
 import "../../../assets/styles/activos-map.css"
 
@@ -124,12 +131,8 @@ import GeofenceSelectorModal from "../geocercas/GeofenceSelectorModal.vue"
 import GeofenceHistoryModal from "../geocercas/GeofenceHistoryModal.vue"
 import { buildMockGeofenceHistory } from "../../../data/mockGeofenceHistoryData.js"
 import { useActivosMap } from "../../../composables/activos/map/useActivosMap.js"
-
-const DEFAULT_GEOFENCE_FORM = {
-  strokeColor: "#FF6600",
-  fillColor: "#FF6600",
-  fillOpacity: 0.12,
-}
+import { DEFAULT_GEOFENCE_COLOR, normalizeGeofenceColor } from "../../../utils/geofenceUtils.js"
+import { normalizeId } from "../../../utils/idUtils.js"
 
 const props = defineProps({
   activos: {
@@ -168,6 +171,10 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  appSidebarOpen: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits([
@@ -179,6 +186,7 @@ const emit = defineEmits([
   "clear-geofence-selection",
 ])
 
+const panelRef = ref(null)
 const mapRef = ref(null)
 const showGeofenceModal = ref(false)
 const showGeofenceHistoryModal = ref(false)
@@ -189,12 +197,13 @@ const showGeofences = ref(true)
 const showKpis = ref(true)
 const mapType = ref("standard")
 const currentDraftType = ref("circle")
+const isFullscreen = ref(false)
+
+let pendingSidebarBatch = null
 
 const draftGeofenceForm = ref({
   name: "",
-  strokeColor: DEFAULT_GEOFENCE_FORM.strokeColor,
-  fillColor: DEFAULT_GEOFENCE_FORM.fillColor,
-  fillOpacity: DEFAULT_GEOFENCE_FORM.fillOpacity,
+  color: DEFAULT_GEOFENCE_COLOR,
 })
 
 const mapTypeOptions = [
@@ -225,8 +234,100 @@ const mapTypeOptions = [
   },
 ]
 
-const normalizeId = (value) => {
-  return String(value ?? "")
+const refreshFullscreenLayout = async () => {
+  await nextTick()
+
+  requestAnimationFrame(() => {
+    window.dispatchEvent(new Event("resize"))
+
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("resize"))
+    })
+  })
+
+  setTimeout(() => {
+    window.dispatchEvent(new Event("resize"))
+  }, 220)
+
+  setTimeout(() => {
+    window.dispatchEvent(new Event("resize"))
+  }, 420)
+}
+
+const requestNativeFullscreen = async () => {
+  if (!panelRef.value) return
+
+  if (panelRef.value.requestFullscreen) {
+    await panelRef.value.requestFullscreen({
+      navigationUI: "hide",
+    })
+    return
+  }
+
+  if (panelRef.value.webkitRequestFullscreen) {
+    panelRef.value.webkitRequestFullscreen()
+  }
+}
+
+const exitNativeFullscreen = async () => {
+  if (document.fullscreenElement && document.exitFullscreen) {
+    await document.exitFullscreen()
+    return
+  }
+
+  if (document.webkitFullscreenElement && document.webkitExitFullscreen) {
+    document.webkitExitFullscreen()
+  }
+}
+
+const enterFullscreen = async () => {
+  isFullscreen.value = true
+
+  try {
+    await requestNativeFullscreen()
+  } catch {
+    // Si el navegador bloquea fullscreen nativo, queda el modo visual fixed.
+  }
+
+  await refreshFullscreenLayout()
+}
+
+const exitFullscreen = async () => {
+  try {
+    await exitNativeFullscreen()
+  } catch {
+    // Si el navegador ya salió de fullscreen, solo se sincroniza el estado visual.
+  }
+
+  isFullscreen.value = false
+
+  await refreshFullscreenLayout()
+}
+
+const toggleFullscreen = async () => {
+  if (isFullscreen.value || document.fullscreenElement === panelRef.value) {
+    await exitFullscreen()
+    return
+  }
+
+  await enterFullscreen()
+}
+
+const handleFullscreenChange = async () => {
+  const panelIsFullscreen =
+    document.fullscreenElement === panelRef.value ||
+    document.webkitFullscreenElement === panelRef.value
+
+  isFullscreen.value = panelIsFullscreen
+
+  await refreshFullscreenLayout()
+}
+
+const handleFullscreenKeydown = async (event) => {
+  if (event.key !== "Escape") return
+  if (!isFullscreen.value) return
+
+  await exitFullscreen()
 }
 
 const currentMapTypeOption = computed(() => {
@@ -276,9 +377,7 @@ const resetDraftGeofenceForm = (type) => {
 
   draftGeofenceForm.value = {
     name: getNextGeofenceName(type),
-    strokeColor: DEFAULT_GEOFENCE_FORM.strokeColor,
-    fillColor: DEFAULT_GEOFENCE_FORM.fillColor,
-    fillOpacity: DEFAULT_GEOFENCE_FORM.fillOpacity,
+    color: DEFAULT_GEOFENCE_COLOR,
   }
 }
 
@@ -286,12 +385,12 @@ const draftGeofencePreviewName = computed(() => {
   return draftGeofenceForm.value.name.trim() || getNextGeofenceName(currentDraftType.value)
 })
 
-const draftGeofenceOptions = computed(() => ({
-  name: draftGeofencePreviewName.value,
-  strokeColor: draftGeofenceForm.value.strokeColor,
-  fillColor: draftGeofenceForm.value.fillColor,
-  fillOpacity: draftGeofenceForm.value.fillOpacity,
-}))
+const draftGeofenceOptions = computed(() => {
+  return {
+    name: draftGeofencePreviewName.value,
+    color: normalizeGeofenceColor(draftGeofenceForm.value.color),
+  }
+})
 
 const mapProps = {
   get activos() {
@@ -356,12 +455,8 @@ const {
   mapRef,
 })
 
-const editingStrokeColor = computed(() => {
-  return editingDraft.value?.strokeColor || editingDraft.value?.color || "#FF6600"
-})
-
-const editingFillColor = computed(() => {
-  return editingDraft.value?.fillColor || editingStrokeColor.value || "#FF6600"
+const editingColor = computed(() => {
+  return normalizeGeofenceColor(editingDraft.value?.color)
 })
 
 const editingPreviewName = computed(() => {
@@ -569,10 +664,25 @@ const handleTelemetryBatch = (batch = []) => {
 watch(
   () => props.telemetryBatch,
   (batch) => {
+    if (props.appSidebarOpen) {
+      pendingSidebarBatch = batch
+      return
+    }
+
     handleTelemetryBatch(batch)
   },
   {
     deep: false,
+  },
+)
+
+watch(
+  () => props.appSidebarOpen,
+  (isOpen) => {
+    if (isOpen || !pendingSidebarBatch) return
+
+    handleTelemetryBatch(pendingSidebarBatch)
+    pendingSidebarBatch = null
   },
 )
 
@@ -596,5 +706,23 @@ watch(
 onMounted(() => {
   showGeofenceModal.value = false
   resetHistoryState()
+
+  window.addEventListener("keydown", handleFullscreenKeydown)
+  document.addEventListener("fullscreenchange", handleFullscreenChange)
+  document.addEventListener("webkitfullscreenchange", handleFullscreenChange)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", handleFullscreenKeydown)
+  document.removeEventListener("fullscreenchange", handleFullscreenChange)
+  document.removeEventListener("webkitfullscreenchange", handleFullscreenChange)
+
+  if (document.fullscreenElement === panelRef.value) {
+    document.exitFullscreen()
+  }
+
+  if (document.webkitFullscreenElement === panelRef.value && document.webkitExitFullscreen) {
+    document.webkitExitFullscreen()
+  }
 })
 </script>

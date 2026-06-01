@@ -1,13 +1,11 @@
 import { ref, watch } from "vue"
 
+import { getGeofenceColor, removeLegacyGeofenceColorFields } from "../../../utils/geofenceUtils.js"
+
 const STORAGE_KEY = "sinergy-activos-geofences"
 const STORAGE_VERSION = 1
 
 const VALID_GEOFENCE_TYPES = new Set(["circle", "polygon", "route"])
-
-const DEFAULT_STROKE_COLOR = "#FF6600"
-const DEFAULT_FILL_COLOR = "#FF6600"
-const DEFAULT_FILL_OPACITY = 0.12
 
 const canUseLocalStorage = () => {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined"
@@ -47,14 +45,6 @@ const normalizeCoordinates = (coordinates) => {
   return coordinates.map((point) => normalizePoint(point)).filter(Boolean)
 }
 
-const normalizeColor = (value, fallback) => {
-  if (typeof value !== "string") return fallback
-
-  const color = value.trim()
-
-  return color || fallback
-}
-
 const normalizeGeofence = (geofence) => {
   if (!geofence || typeof geofence !== "object") return null
 
@@ -64,17 +54,15 @@ const normalizeGeofence = (geofence) => {
   if (!id) return null
   if (!VALID_GEOFENCE_TYPES.has(type)) return null
 
-  const strokeColor = normalizeColor(geofence.strokeColor || geofence.color, DEFAULT_STROKE_COLOR)
+  const color = getGeofenceColor(geofence)
+  const cleanGeofence = removeLegacyGeofenceColorFields(geofence)
 
   const baseGeofence = {
-    ...geofence,
+    ...cleanGeofence,
     id,
     type,
     name: String(geofence.name || "Geocerca sin nombre").trim() || "Geocerca sin nombre",
-    strokeColor,
-    color: strokeColor,
-    fillColor: normalizeColor(geofence.fillColor, strokeColor || DEFAULT_FILL_COLOR),
-    fillOpacity: normalizeNumber(geofence.fillOpacity, DEFAULT_FILL_OPACITY),
+    color,
   }
 
   if (type === "circle") {
@@ -109,7 +97,6 @@ const normalizeGeofence = (geofence) => {
 
     return {
       ...baseGeofence,
-      fillColor: undefined,
       coordinates,
       toleranceMeters: normalizeNumber(geofence.toleranceMeters, 100),
     }

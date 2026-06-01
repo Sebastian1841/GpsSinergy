@@ -1,29 +1,21 @@
 <template>
   <div>
     <!-- Overlay en todos los tamaños -->
-    <transition
-      enter-active-class="transition-opacity duration-150 ease-out"
-      enter-from-class="opacity-0"
-      enter-to-class="opacity-100"
-      leave-active-class="transition-opacity duration-100 ease-in"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div
-        v-if="isOpen"
-        class="fixed inset-0 z-40 bg-slate-950/50"
-        @click="$emit('update:isOpen', false)"
-      />
-    </transition>
+    <div
+      v-if="isOpen"
+      class="fixed inset-0 z-40 bg-slate-950/30 [contain:paint]"
+      @click="$emit('update:isOpen', false)"
+    />
 
     <aside
       :class="[
         'fixed left-0 top-0 z-50 h-full w-72',
         'flex flex-col overflow-hidden text-white',
         'bg-[#1c2634]',
-        'border-r border-white/10 shadow-xl',
-        'transform-gpu will-change-transform transition-transform duration-150 ease-out',
-        isOpen ? 'translate-x-0' : '-translate-x-full',
+        'border-r border-white/10 shadow-lg',
+        'transform-gpu transition-transform duration-150 ease-out',
+        '[contain:layout_paint] [backface-visibility:hidden]',
+        isOpen ? 'translate-x-0 will-change-transform' : '-translate-x-full',
       ]"
     >
       <!-- Header -->

@@ -1,8 +1,7 @@
-const normalizeSignatureValue = (value) => {
-  if (value === null || value === undefined) return ""
-
-  return String(value)
-}
+import {
+  buildCoordinatesSignature,
+  normalizeSignatureValue,
+} from "../../../utils/mapSignatureUtils.js"
 
 const buildPointSignature = (point) => {
   if (!point) return ""
@@ -29,16 +28,6 @@ const buildPointsSignature = (points = []) => {
   return points.map(buildPointSignature).join("|")
 }
 
-const buildGeofenceCoordinatesSignature = (coordinates = []) => {
-  if (!Array.isArray(coordinates)) return ""
-
-  return coordinates
-    .map((point) => {
-      return [point?.lat, point?.lng].map(normalizeSignatureValue).join(":")
-    })
-    .join("|")
-}
-
 const buildGeofencesSignature = (geofences = []) => {
   if (!Array.isArray(geofences)) return ""
 
@@ -48,14 +37,12 @@ const buildGeofencesSignature = (geofences = []) => {
         geofence.id,
         geofence.type,
         geofence.name,
-        geofence.strokeColor || geofence.color,
-        geofence.fillColor,
-        geofence.fillOpacity,
+        geofence.color,
         geofence.radius,
         geofence.center?.lat,
         geofence.center?.lng,
         geofence.toleranceMeters,
-        buildGeofenceCoordinatesSignature(geofence.coordinates),
+        buildCoordinatesSignature(geofence.coordinates),
       ]
         .map(normalizeSignatureValue)
         .join(":")

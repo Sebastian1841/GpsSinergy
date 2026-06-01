@@ -77,18 +77,18 @@
           </span>
 
           <input
-            :value="search"
+            :value="localSearch"
             type="text"
             :placeholder="searchPlaceholder"
             class="h-[36px] w-full rounded-lg border border-[#d8dee8] bg-white pl-9 pr-8 text-[12px] font-semibold text-[#172033] outline-none placeholder:text-slate-400 focus:border-[#FF6600] focus:ring-2 focus:ring-[#FF6600]/10"
-            @input="$emit('update:search', $event.target.value)"
+            @input="handleSearchInput"
           />
 
           <button
-            v-if="search"
+            v-if="localSearch"
             type="button"
             class="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-base leading-none text-slate-400 transition hover:text-[#FF6600]"
-            @click="$emit('update:search', '')"
+            @click="clearSearch"
           >
             ×
           </button>
@@ -400,18 +400,6 @@
       </button>
     </div>
 
-    <ConfirmDialog
-      v-model="confirmDialog.isOpen"
-      :title="confirmDialog.title"
-      :message="confirmDialog.message"
-      :detail="confirmDialog.detail"
-      :confirm-label="confirmDialog.confirmLabel"
-      :cancel-label="confirmDialog.cancelLabel"
-      :variant="confirmDialog.variant"
-      @confirm="confirmAction"
-      @cancel="cancelAction"
-    />
-
     <FleetContextMenu
       :is-open="deviceContextMenu.isOpen"
       :x="deviceContextMenu.x"
@@ -424,14 +412,12 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue"
-import ConfirmDialog from "../../ui/ConfirmDialog.vue"
+import { computed, onBeforeUnmount, ref, watch } from "vue"
 import ItineraryPanel from "../itinerarios/ItineraryPanel.vue"
 import FleetTable from "./FleetTable.vue"
 import FleetContextMenu from "./FleetContextMenu.vue"
 import { useFleetColumns } from "../../../composables/activos/fleet/useFleetColumns"
 import { useFleetSorting } from "../../../composables/activos/fleet/useFleetSorting"
-import { useConfirmDialog } from "../../../composables/ui/useConfirmDialog.js"
 import {
   getGeofenceBadgeClass,
   getGeofenceBadgeLabel,
@@ -439,6 +425,7 @@ import {
   getGeofenceDescription,
   getGeofenceMeta,
 } from "../../../utils/geofenceUtils.js"
+import { normalizeId } from "../../../utils/idUtils.js"
 
 const props = defineProps({
   activos: {
@@ -507,8 +494,11 @@ const emit = defineEmits([
 
 const showColumns = ref(false)
 const localActiveSection = ref(props.activeSection || "activos")
+const localSearch = ref(props.search || "")
 
-const { confirmDialog, openConfirmDialog, confirmAction, cancelAction } = useConfirmDialog()
+const SEARCH_EMIT_DELAY_MS = 220
+
+let searchEmitTimer = null
 
 const deviceContextMenu = ref({
   isOpen: false,
@@ -516,10 +506,6 @@ const deviceContextMenu = ref({
   y: 0,
   activo: null,
 })
-
-const normalizeId = (value) => {
-  return String(value ?? "")
-}
 
 const normalizeText = (value) => {
   return String(value || "")
@@ -616,19 +602,44 @@ const searchPlaceholder = computed(() => {
   return placeholders[localActiveSection.value] || placeholders.activos
 })
 
-const confirmDeleteGeofence = async (geofence) => {
+const clearSearchEmitTimer = () => {
+  if (!searchEmitTimer) return
+
+  window.clearTimeout(searchEmitTimer)
+  searchEmitTimer = null
+}
+
+const emitSearch = (value) => {
+  emit("update:search", value)
+}
+
+const scheduleSearchEmit = (value) => {
+  clearSearchEmitTimer()
+
+  searchEmitTimer = window.setTimeout(() => {
+    searchEmitTimer = null
+    emitSearch(value)
+  }, SEARCH_EMIT_DELAY_MS)
+}
+
+const handleSearchInput = (event) => {
+  const value = event.target.value
+
+  localSearch.value = value
+  scheduleSearchEmit(value)
+}
+
+const clearSearch = () => {
+  clearSearchEmitTimer()
+  localSearch.value = ""
+  emitSearch("")
+}
+
+const confirmDeleteGeofence = (geofence) => {
   if (!geofence?.id) return
 
   const geofenceName = geofence.name || "esta geocerca"
-
-  const confirmed = await openConfirmDialog({
-    title: "Eliminar geocerca",
-    message: `¿Seguro que deseas eliminar "${geofenceName}"?`,
-    detail: "Esta acción quitará la geocerca del mapa y de la lista lateral.",
-    confirmLabel: "Eliminar",
-    cancelLabel: "Cancelar",
-    variant: "danger",
-  })
+  const confirmed = window.confirm(`¿Eliminar la geocerca "${geofenceName}"?`)
 
   if (!confirmed) return
 
@@ -733,4 +744,19 @@ watch(
     }
   },
 )
+
+watch(
+  () => props.search,
+  (nextSearch) => {
+    const normalizedSearch = nextSearch || ""
+
+    if (normalizedSearch !== localSearch.value) {
+      localSearch.value = normalizedSearch
+    }
+  },
+)
+
+onBeforeUnmount(() => {
+  clearSearchEmitTimer()
+})
 </script>

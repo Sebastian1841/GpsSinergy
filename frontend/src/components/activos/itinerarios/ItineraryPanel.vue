@@ -323,11 +323,13 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from "vue"
-
 import ItineraryDaySummary from "./ItineraryDaySummary.vue"
 import ItinerarySummary from "./ItinerarySummary.vue"
 import ItineraryTable from "./ItineraryTable.vue"
+
+import { useItineraryAssets } from "../../../composables/activos/itinerarios/useItineraryAssets.js"
+import { useItineraryFilters } from "../../../composables/activos/itinerarios/useItineraryFilters.js"
+import { useItineraryRoute } from "../../../composables/activos/itinerarios/useItineraryRoute.js"
 
 import {
   addDays,
@@ -367,23 +369,6 @@ const rangeOptions = [
   },
 ]
 
-const activePanelView = ref("itinerarios")
-const searchTerm = ref("")
-const selectedAssetIds = ref([])
-const showDeviceList = ref(false)
-const dateRange = ref("today")
-const fromDate = ref(latestDate)
-const toDate = ref(latestDate)
-const routeResult = ref(null)
-const selectedPointId = ref(null)
-const formError = ref("")
-
-const getFirstDefined = (...values) => {
-  return values.find((value) => {
-    return value !== undefined && value !== null && value !== ""
-  })
-}
-
 const normalizeText = (value) => {
   return String(value || "")
     .trim()
@@ -391,456 +376,71 @@ const normalizeText = (value) => {
     .replace(/\s+/g, " ")
 }
 
-const activeRangeLabel = computed(() => {
-  if (dateRange.value === "custom") {
-    return `${fromDate.value || "-"} / ${toDate.value || "-"}`
-  }
+const {
+  activePanelView,
+  searchTerm,
+  showDeviceList,
+  dateRange,
+  fromDate,
+  toDate,
+  formError,
+  activeRangeLabel,
 
-  return rangeOptions.find((option) => option.value === dateRange.value)?.label || "Hoy"
+  setDateRange,
+  applyDateRange,
+  openDeviceDropdown,
+  clearSearchTerm,
+} = useItineraryFilters({
+  latestDate,
+  addDays,
+  rangeOptions,
 })
 
-const normalizedAssets = computed(() => {
-  const fromProps = props.activos.map((activo) => ({
-    id: activo.id,
-    patente: activo.vehiculo || activo.patente || activo.name || `Activo ${activo.id}`,
-    deviceId: activo.imei || activo.deviceId || activo.identificador || "Sin dispositivo",
-    conductor: activo.conductor || activo.ibutton_name || activo.ibuttonName || "Sin conductor",
-    estado: activo.estado || "offline",
+const {
+  selectedAssetIds,
+  filteredAssets,
+  selectedAssets,
+  selectedAssetsSummary,
+  primarySelectedAsset,
 
-    // Ubicación actual del dispositivo
-    lat: getFirstDefined(activo.lat, activo.latitude, activo.latitud),
-    lng: getFirstDefined(activo.lng, activo.lon, activo.longitude, activo.longitud),
-    speed: getFirstDefined(activo.speed, activo.velocidad, activo.velocidad_kmh, 0),
-    direccion: getFirstDefined(activo.direccion, activo.address, activo.direccion_actual),
-    lastReport: getFirstDefined(
-      activo.last_report,
-      activo.lastReport,
-      activo.timestamp,
-      activo.updated_at,
-      activo.datosUlt,
-    ),
-    odometer: getFirstDefined(activo.odometer, activo.odometro, activo.kilometraje),
-  }))
-
-  return mockItineraryAssets.map((itineraryAsset) => {
-    const matchingCurrentAsset = fromProps.find((activo) => {
-      const samePatente = normalizeText(activo.patente) === normalizeText(itineraryAsset.patente)
-
-      const sameDevice = normalizeText(activo.deviceId) === normalizeText(itineraryAsset.deviceId)
-
-      return samePatente || sameDevice
-    })
-
-    if (!matchingCurrentAsset) {
-      return itineraryAsset
-    }
-
-    return {
-      ...itineraryAsset,
-
-      // Mantiene el ID del itinerario para que filterItineraryPoints siga funcionando
-      id: itineraryAsset.id,
-
-      // Guarda el ID real del activo del mapa
-      activoId: matchingCurrentAsset.id,
-
-      // Mantiene datos descriptivos del itinerario
-      patente: itineraryAsset.patente,
-      deviceId: itineraryAsset.deviceId,
-      conductor: itineraryAsset.conductor,
-
-      // Toma estado y ubicación actual desde activos
-      estado: matchingCurrentAsset.estado || itineraryAsset.estado,
-      lat: matchingCurrentAsset.lat,
-      lng: matchingCurrentAsset.lng,
-      speed: matchingCurrentAsset.speed,
-      direccion: matchingCurrentAsset.direccion || itineraryAsset.direccion,
-      lastReport: matchingCurrentAsset.lastReport || itineraryAsset.last_report,
-      odometer: matchingCurrentAsset.odometer,
-    }
-  })
+  toggleAsset,
+  isAssetSelected,
+  selectAllVisibleAssets,
+  clearSelectedAssets,
+} = useItineraryAssets({
+  props,
+  searchTerm,
+  formError,
+  normalizeText,
+  mockItineraryAssets,
 })
 
-const filteredAssets = computed(() => {
-  const term = searchTerm.value.trim().toLowerCase()
+const {
+  routeResult,
+  selectedPointId,
 
-  if (!term) return normalizedAssets.value
-
-  return normalizedAssets.value.filter((asset) => {
-    return (
-      asset.patente?.toLowerCase().includes(term) ||
-      asset.deviceId?.toLowerCase().includes(term) ||
-      asset.conductor?.toLowerCase().includes(term)
-    )
-  })
+  handleGenerateRoute,
+  handleSelectPoint,
+  handleClearRoute,
+} = useItineraryRoute({
+  emit,
+  latestDate,
+  selectedAssetIds,
+  filteredAssets,
+  selectedAssets,
+  primarySelectedAsset,
+  showDeviceList,
+  fromDate,
+  toDate,
+  formError,
+  applyDateRange,
+  filterItineraryPoints,
+  buildItineraryResult,
 })
 
-const selectedAssets = computed(() => {
-  const selected = new Set(selectedAssetIds.value)
-
-  return normalizedAssets.value.filter((asset) => selected.has(asset.id))
-})
-
-const selectedAssetsSummary = computed(() => {
-  if (!selectedAssets.value.length) {
-    return "Seleccionar dispositivos"
-  }
-
-  if (selectedAssets.value.length === 1) {
-    const asset = selectedAssets.value[0]
-    return `${asset.patente} · ${asset.deviceId}`
-  }
-
-  const labels = selectedAssets.value
-    .slice(0, 2)
-    .map((asset) => asset.patente)
-    .join(", ")
-
-  const remaining = selectedAssets.value.length - 2
-
-  return remaining > 0 ? `${labels} +${remaining} más` : labels
-})
-
-const primarySelectedAsset = computed(() => {
-  return selectedAssets.value[0] || filteredAssets.value[0] || null
-})
-
-const isAssetSelected = (assetId) => {
-  return selectedAssetIds.value.includes(assetId)
-}
-
-const openDeviceDropdown = () => {
-  showDeviceList.value = true
-}
-
-const clearSearchTerm = () => {
-  searchTerm.value = ""
-  showDeviceList.value = true
-}
-
-const toggleAsset = (asset) => {
-  formError.value = ""
-
-  if (isAssetSelected(asset.id)) {
-    selectedAssetIds.value = selectedAssetIds.value.filter((id) => id !== asset.id)
-    return
-  }
-
-  selectedAssetIds.value = [...selectedAssetIds.value, asset.id]
-}
-
-const selectAllVisibleAssets = () => {
-  const ids = filteredAssets.value.map((asset) => asset.id)
-  selectedAssetIds.value = [...new Set([...selectedAssetIds.value, ...ids])]
-  formError.value = ""
-}
-
-const clearSelectedAssets = () => {
-  selectedAssetIds.value = []
-  formError.value = ""
-}
-
-const setDateRange = (range) => {
-  dateRange.value = range
-  applyDateRange()
-}
-
-const applyDateRange = () => {
-  if (dateRange.value === "custom") return
-
-  if (dateRange.value === "today") {
-    fromDate.value = latestDate
-    toDate.value = latestDate
-    return
-  }
-
-  if (dateRange.value === "yesterday") {
-    const yesterday = addDays(latestDate, -1)
-    fromDate.value = yesterday
-    toDate.value = yesterday
-    return
-  }
-
-  if (dateRange.value === "week") {
-    fromDate.value = addDays(latestDate, -6)
-    toDate.value = latestDate
-  }
-}
-
-const validateSearch = () => {
-  formError.value = ""
-
-  if (!selectedAssetIds.value.length && !filteredAssets.value.length) {
-    formError.value = "Selecciona al menos un dispositivo disponible."
-    return false
-  }
-
-  if (!fromDate.value || !toDate.value) {
-    formError.value = "Selecciona una fecha de inicio y término."
-    return false
-  }
-
-  if (fromDate.value > toDate.value) {
-    formError.value = "La fecha inicial no puede ser mayor que la fecha final."
-    return false
-  }
-
-  return true
-}
-
-const parseNumberFromLabel = (label) => {
-  if (!label) return 0
-
-  const value = String(label)
-    .replace(",", ".")
-    .match(/[\d.]+/)
-
-  return value ? Number(value[0]) || 0 : 0
-}
-
-const parseMinutesFromLabel = (label) => {
-  if (!label) return 0
-
-  const text = String(label).toLowerCase()
-  const hours = text.match(/(\d+(?:[.,]\d+)?)\s*h/)
-  const minutes = text.match(/(\d+(?:[.,]\d+)?)\s*min/)
-
-  const parsedHours = hours ? Number(hours[1].replace(",", ".")) || 0 : 0
-  const parsedMinutes = minutes ? Number(minutes[1].replace(",", ".")) || 0 : 0
-
-  if (!hours && !minutes) {
-    return parseNumberFromLabel(text)
-  }
-
-  return parsedHours * 60 + parsedMinutes
-}
-
-const formatDistance = (value) => {
-  return `${value.toFixed(1).replace(".", ",")} km`
-}
-
-const formatMinutes = (value) => {
-  const total = Math.round(value)
-  const hours = Math.floor(total / 60)
-  const minutes = total % 60
-
-  if (hours <= 0) return `${minutes} min`
-  if (minutes <= 0) return `${hours} h`
-
-  return `${hours} h ${minutes} min`
-}
-
-const getCurrentReferenceDate = () => {
-  return latestDate
-}
-
-const hasValidAssetLocation = (asset) => {
-  const lat = Number(asset?.lat)
-  const lng = Number(asset?.lng)
-
-  return Number.isFinite(lat) && Number.isFinite(lng)
-}
-
-const isCurrentDateInsideRange = () => {
-  const currentDate = getCurrentReferenceDate()
-
-  return fromDate.value <= currentDate && currentDate <= toDate.value
-}
-
-const shouldAppendCurrentLocation = (asset) => {
-  return isCurrentDateInsideRange() && hasValidAssetLocation(asset)
-}
-
-const getCurrentLocationTimestamp = (asset) => {
-  const currentDate = getCurrentReferenceDate()
-  const fallbackTimestamp = `${currentDate}T23:59:59`
-
-  if (!asset?.lastReport) return fallbackTimestamp
-
-  const lastReportDate = new Date(asset.lastReport)
-
-  if (Number.isNaN(lastReportDate.getTime())) {
-    return fallbackTimestamp
-  }
-
-  const assetReportDay = String(asset.lastReport).slice(0, 10)
-
-  if (assetReportDay < currentDate) {
-    return fallbackTimestamp
-  }
-
-  return asset.lastReport
-}
-
-const buildCurrentLocationPoint = (asset) => {
-  return {
-    id: `${asset.id}-current-location`,
-    assetId: asset.id,
-    timestamp: getCurrentLocationTimestamp(asset),
-    lat: Number(asset.lat),
-    lng: Number(asset.lng),
-    speed: Number(asset.speed) || 0,
-    address: asset.direccion || "Ubicación actual",
-    event: "Ubicación actual",
-    odometer: asset.odometer || null,
-    isCurrentLocation: true,
-  }
-}
-
-const areSameCoordinates = (pointA, pointB) => {
-  if (!pointA || !pointB) return false
-
-  const latA = Number(pointA.lat)
-  const lngA = Number(pointA.lng)
-  const latB = Number(pointB.lat)
-  const lngB = Number(pointB.lng)
-
-  if (![latA, lngA, latB, lngB].every(Number.isFinite)) return false
-
-  return Math.abs(latA - latB) < 0.000001 && Math.abs(lngA - lngB) < 0.000001
-}
-
-const appendCurrentLocationIfNeeded = ({ asset, points }) => {
-  if (!shouldAppendCurrentLocation(asset)) return points
-
-  const currentPoint = buildCurrentLocationPoint(asset)
-  const lastPoint = points[points.length - 1]
-
-  if (areSameCoordinates(lastPoint, currentPoint)) {
-    return [
-      ...points.slice(0, -1),
-      {
-        ...lastPoint,
-        ...currentPoint,
-      },
-    ]
-  }
-
-  return [...points, currentPoint]
-}
-
-const getRoutePointsForAsset = (asset) => {
-  const historicalPoints = filterItineraryPoints({
-    assetId: asset.id,
-    fromDate: fromDate.value,
-    toDate: toDate.value,
-  })
-
-  return appendCurrentLocationIfNeeded({
-    asset,
-    points: historicalPoints,
-  })
-}
-
-const buildMultipleRouteResult = (assets) => {
-  const routes = assets.map((asset) => {
-    const points = getRoutePointsForAsset(asset)
-
-    return buildItineraryResult({
-      asset,
-      points,
-    })
-  })
-
-  const rows = routes
-    .flatMap((route) => {
-      return route.rows.map((row) => ({
-        ...row,
-        id: `${route.asset.id}-${row.id}`,
-        assetId: route.asset.id,
-        assetPatente: route.asset.patente,
-        assetDeviceId: route.asset.deviceId,
-      }))
-    })
-    .sort((a, b) => {
-      const dateA = new Date(a.timestamp || a.date || a.fecha || 0).getTime()
-      const dateB = new Date(b.timestamp || b.date || b.fecha || 0).getTime()
-
-      return dateA - dateB
-    })
-
-  const totalDistance = routes.reduce((total, route) => {
-    return total + parseNumberFromLabel(route.summary?.distanceLabel)
-  }, 0)
-
-  const totalMovingMinutes = routes.reduce((total, route) => {
-    return total + parseMinutesFromLabel(route.summary?.movingLabel)
-  }, 0)
-
-  const primaryAsset = assets[0]
-
-  if (assets.length === 1) {
-    return routes[0]
-  }
-
-  return {
-    id: `multi-${assets.map((asset) => asset.id).join("-")}`,
-    asset: {
-      ...primaryAsset,
-      id: primaryAsset.id,
-      patente: `${assets.length} dispositivos`,
-      deviceId: "Selección múltiple",
-      conductor: `${assets.length} rutas combinadas`,
-      estado: "moving",
-    },
-    assets,
-    routes,
-    rows,
-    summary: {
-      ...(routes[0]?.summary || {}),
-      distanceLabel: formatDistance(totalDistance),
-      movingLabel: formatMinutes(totalMovingMinutes),
-      pointsCount: rows.length,
-      assetsCount: assets.length,
-    },
-  }
-}
-
-const searchItinerary = () => {
-  applyDateRange()
-
-  if (!selectedAssetIds.value.length && filteredAssets.value.length) {
-    selectedAssetIds.value = [filteredAssets.value[0].id]
-  }
-
-  if (!validateSearch()) {
-    routeResult.value = null
-    selectedPointId.value = null
-    emit("clear-route")
-    return
-  }
-
-  const assets = selectedAssets.value.length
-    ? selectedAssets.value
-    : [primarySelectedAsset.value].filter(Boolean)
-
-  routeResult.value = buildMultipleRouteResult(assets)
-  selectedPointId.value = null
-  showDeviceList.value = false
-  emitRouteToMap()
-}
-
-const emitRouteToMap = () => {
-  if (!routeResult.value) return
-
-  emit("route-selected", routeResult.value)
-}
-
-const selectPoint = (point) => {
-  selectedPointId.value = point.id
-
-  emit("point-selected", {
-    point,
-    route: routeResult.value,
-  })
-}
-
-const clearResult = () => {
-  routeResult.value = null
-  selectedPointId.value = null
-  formError.value = ""
-  emit("clear-route")
-}
+const searchItinerary = handleGenerateRoute
+const selectPoint = handleSelectPoint
+const clearResult = handleClearRoute
 
 const statusLabel = (estado) => {
   const labels = {
@@ -874,30 +474,4 @@ const statusChipClass = (estado) => {
 
   return classes[estado] || "bg-slate-100 text-slate-500 ring-slate-200"
 }
-
-watch(dateRange, () => {
-  applyDateRange()
-})
-
-watch(
-  filteredAssets,
-  (assets) => {
-    if (!assets.length) {
-      selectedAssetIds.value = []
-      return
-    }
-
-    const availableIds = new Set(normalizedAssets.value.map((asset) => asset.id))
-    selectedAssetIds.value = selectedAssetIds.value.filter((id) => availableIds.has(id))
-
-    if (!selectedAssetIds.value.length) {
-      selectedAssetIds.value = [assets[0].id]
-    }
-  },
-  { immediate: true },
-)
-
-onMounted(() => {
-  applyDateRange()
-})
 </script>

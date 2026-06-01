@@ -23,6 +23,28 @@ export function createMovementTrailController({
 }) {
   const showMovementTrails = ref(true)
   const movementTrailCache = new Map()
+  const pendingTrailIds = new Set()
+
+  let pendingTrailFrame = null
+  let cachedStartIcon = null
+  let cachedStartIconSignature = ""
+
+  const requestTrailFrame = (callback) => {
+    if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+      return window.requestAnimationFrame(callback)
+    }
+
+    return setTimeout(callback, 16)
+  }
+
+  const cancelTrailFrame = (frameId) => {
+    if (typeof window !== "undefined" && typeof window.cancelAnimationFrame === "function") {
+      window.cancelAnimationFrame(frameId)
+      return
+    }
+
+    clearTimeout(frameId)
+  }
 
   const ensureMovementTrailPane = () => {
     const map = getMap()
@@ -85,12 +107,36 @@ export function createMovementTrailController({
     }
   }
 
-  const createTrailStartIcon = () => {
-    const trailStyle = getMovementTrailStyle()
+  const getTrailStyleSignature = (trailStyle) => {
+    return [
+      trailStyle.haloColor,
+      trailStyle.haloWeight,
+      trailStyle.haloOpacity,
+      trailStyle.coreColor,
+      trailStyle.coreWeight,
+      trailStyle.coreOpacity,
+      trailStyle.startBorderColor,
+      trailStyle.startBackground,
+      trailStyle.startShadow,
+      getMapType(),
+    ].join(":")
+  }
+
+  const getLatLngSignature = (latLng) => {
+    if (!latLng) return ""
+
+    return `${latLng.lat}:${latLng.lng}`
+  }
+
+  const getTrailStartIcon = (trailStyle, styleSignature) => {
+    if (cachedStartIcon && cachedStartIconSignature === styleSignature) {
+      return cachedStartIcon
+    }
+
     const size = getMapType() === "satellite" ? 12 : 10
     const half = size / 2
 
-    return L.divIcon({
+    cachedStartIcon = L.divIcon({
       className: "",
       html: `
         <div
@@ -107,6 +153,10 @@ export function createMovementTrailController({
       iconSize: [size, size],
       iconAnchor: [half, half],
     })
+
+    cachedStartIconSignature = styleSignature
+
+    return cachedStartIcon
   }
 
   const toLeafletLatLng = (activoLatLng) => {
@@ -134,6 +184,9 @@ export function createMovementTrailController({
       layer.removeLayer(trail.startMarker)
       trail.startMarker = null
     }
+
+    trail.styleSignature = ""
+    trail.startSignature = ""
   }
 
   const clearRenderedMovementTrailSegments = () => {
@@ -142,7 +195,7 @@ export function createMovementTrailController({
     })
   }
 
-  const updateMovementTrailLayer = (activoId) => {
+  const updateMovementTrailLayer = (activoId, { forceStyle = false } = {}) => {
     const layer = ensureMovementTrailLayer()
     const normalizedActivoId = normalizeId(activoId)
     const trail = movementTrailCache.get(normalizedActivoId)
@@ -155,6 +208,8 @@ export function createMovementTrailController({
     }
 
     const trailStyle = getMovementTrailStyle()
+    const styleSignature = getTrailStyleSignature(trailStyle)
+    const shouldUpdateStyle = forceStyle || trail.styleSignature !== styleSignature
     const path = trail.points
 
     if (!trail.haloLine) {
@@ -172,11 +227,14 @@ export function createMovementTrailController({
       trail.haloLine.addTo(layer)
     } else {
       trail.haloLine.setLatLngs(path)
-      trail.haloLine.setStyle({
-        color: trailStyle.haloColor,
-        weight: trailStyle.haloWeight,
-        opacity: trailStyle.haloOpacity,
-      })
+
+      if (shouldUpdateStyle) {
+        trail.haloLine.setStyle({
+          color: trailStyle.haloColor,
+          weight: trailStyle.haloWeight,
+          opacity: trailStyle.haloOpacity,
+        })
+      }
     }
 
     if (!trail.coreLine) {
@@ -194,32 +252,81 @@ export function createMovementTrailController({
       trail.coreLine.addTo(layer)
     } else {
       trail.coreLine.setLatLngs(path)
-      trail.coreLine.setStyle({
-        color: trailStyle.coreColor,
-        weight: trailStyle.coreWeight,
-        opacity: trailStyle.coreOpacity,
-      })
+
+      if (shouldUpdateStyle) {
+        trail.coreLine.setStyle({
+          color: trailStyle.coreColor,
+          weight: trailStyle.coreWeight,
+          opacity: trailStyle.coreOpacity,
+        })
+      }
     }
 
     const firstPoint = path[0]
+    const startSignature = getLatLngSignature(firstPoint)
 
     if (!trail.startMarker) {
       trail.startMarker = L.marker(firstPoint, {
         pane: MOVEMENT_TRAIL_PANE,
-        icon: createTrailStartIcon(),
+        icon: getTrailStartIcon(trailStyle, styleSignature),
         interactive: false,
       })
 
       trail.startMarker.addTo(layer)
     } else {
-      trail.startMarker.setLatLng(firstPoint)
-      trail.startMarker.setIcon(createTrailStartIcon())
+      if (trail.startSignature !== startSignature) {
+        trail.startMarker.setLatLng(firstPoint)
+      }
+
+      if (shouldUpdateStyle) {
+        trail.startMarker.setIcon(getTrailStartIcon(trailStyle, styleSignature))
+      }
     }
+
+    trail.styleSignature = styleSignature
+    trail.startSignature = startSignature
+  }
+
+  const clearPendingMovementTrailUpdates = () => {
+    pendingTrailIds.clear()
+
+    if (pendingTrailFrame === null) return
+
+    cancelTrailFrame(pendingTrailFrame)
+    pendingTrailFrame = null
+  }
+
+  const flushPendingMovementTrailUpdates = () => {
+    pendingTrailFrame = null
+
+    const trailIds = Array.from(pendingTrailIds)
+
+    pendingTrailIds.clear()
+
+    trailIds.forEach((activoId) => {
+      updateMovementTrailLayer(activoId)
+    })
+  }
+
+  const scheduleMovementTrailUpdate = (activoId) => {
+    const normalizedActivoId = normalizeId(activoId)
+
+    if (!normalizedActivoId) return
+
+    pendingTrailIds.add(normalizedActivoId)
+
+    if (pendingTrailFrame !== null) return
+
+    pendingTrailFrame = requestTrailFrame(flushPendingMovementTrailUpdates)
   }
 
   const redrawAllMovementTrails = () => {
+    clearPendingMovementTrailUpdates()
+
     movementTrailCache.forEach((_trail, activoId) => {
-      updateMovementTrailLayer(activoId)
+      updateMovementTrailLayer(activoId, {
+        forceStyle: true,
+      })
     })
   }
 
@@ -240,6 +347,8 @@ export function createMovementTrailController({
         haloLine: null,
         coreLine: null,
         startMarker: null,
+        styleSignature: "",
+        startSignature: "",
       }
 
       movementTrailCache.set(activoId, trail)
@@ -267,7 +376,7 @@ export function createMovementTrailController({
       trail.points.shift()
     }
 
-    updateMovementTrailLayer(activoId)
+    scheduleMovementTrailUpdate(activoId)
   }
 
   const removeMovementTrail = (id) => {
@@ -276,11 +385,13 @@ export function createMovementTrailController({
 
     if (!trail) return
 
+    pendingTrailIds.delete(activoId)
     removeMovementTrailLayers(trail)
     movementTrailCache.delete(activoId)
   }
 
   const clearMovementTrails = () => {
+    clearPendingMovementTrailUpdates()
     clearRenderedMovementTrailSegments()
     movementTrailCache.clear()
   }
@@ -289,6 +400,7 @@ export function createMovementTrailController({
     showMovementTrails.value = !showMovementTrails.value
 
     if (!showMovementTrails.value) {
+      clearPendingMovementTrailUpdates()
       clearRenderedMovementTrailSegments()
       return
     }

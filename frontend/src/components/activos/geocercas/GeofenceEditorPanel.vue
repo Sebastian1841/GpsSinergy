@@ -30,38 +30,25 @@
           <span
             class="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400"
           >
-            Borde
+            Color
           </span>
 
           <input
-            :value="draftGeofenceForm.strokeColor"
+            :value="draftColor"
             type="color"
             class="h-9 w-full cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
-            @input="$emit('update-draft-field', 'strokeColor', $event.target.value)"
+            @input="$emit('update-draft-field', 'color', $event.target.value)"
           />
         </label>
 
-        <label v-if="drawMode !== 'route'" class="block">
-          <span
-            class="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400"
-          >
-            Relleno
-          </span>
-
-          <input
-            :value="draftGeofenceForm.fillColor"
-            type="color"
-            class="h-9 w-full cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
-            @input="$emit('update-draft-field', 'fillColor', $event.target.value)"
-          />
-        </label>
-
-        <div v-else class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+        <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
           <span class="block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
             Tipo
           </span>
 
-          <p class="mt-1 text-[11px] font-black text-[#102372]">Ruta</p>
+          <p class="mt-1 text-[11px] font-black text-[#102372]">
+            {{ drawModeLabel }}
+          </p>
         </div>
       </div>
 
@@ -79,15 +66,8 @@
         <div class="flex shrink-0 items-center gap-1.5">
           <span
             class="h-5 w-5 rounded-full border border-slate-200"
-            :style="{ backgroundColor: draftGeofenceForm.strokeColor }"
-            title="Color de borde"
-          ></span>
-
-          <span
-            v-if="drawMode !== 'route'"
-            class="h-5 w-5 rounded-full border border-slate-200"
-            :style="{ backgroundColor: draftGeofenceForm.fillColor }"
-            title="Color de relleno"
+            :style="{ backgroundColor: draftColor }"
+            title="Color"
           ></span>
         </div>
       </div>
@@ -114,38 +94,25 @@
           <span
             class="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400"
           >
-            Borde
+            Color
           </span>
 
           <input
-            :value="editingStrokeColor"
+            :value="currentEditingColor"
             type="color"
             class="h-9 w-full cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
-            @change="$emit('update-editing-meta', 'strokeColor', $event.target.value)"
+            @change="$emit('update-editing-meta', 'color', $event.target.value)"
           />
         </label>
 
-        <label v-if="editingDraft.type !== 'route'" class="block">
-          <span
-            class="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400"
-          >
-            Relleno
-          </span>
-
-          <input
-            :value="editingFillColor"
-            type="color"
-            class="h-9 w-full cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
-            @change="$emit('update-editing-meta', 'fillColor', $event.target.value)"
-          />
-        </label>
-
-        <div v-else class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+        <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
           <span class="block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
             Tipo
           </span>
 
-          <p class="mt-1 text-[11px] font-black text-[#102372]">Ruta</p>
+          <p class="mt-1 text-[11px] font-black text-[#102372]">
+            {{ editingTypeLabel }}
+          </p>
         </div>
       </div>
 
@@ -163,15 +130,8 @@
         <div class="flex shrink-0 items-center gap-1.5">
           <span
             class="h-5 w-5 rounded-full border border-slate-200"
-            :style="{ backgroundColor: editingStrokeColor }"
-            title="Color de borde"
-          ></span>
-
-          <span
-            v-if="editingDraft.type !== 'route'"
-            class="h-5 w-5 rounded-full border border-slate-200"
-            :style="{ backgroundColor: editingFillColor }"
-            title="Color de relleno"
+            :style="{ backgroundColor: currentEditingColor }"
+            title="Color"
           ></span>
         </div>
       </div>
@@ -222,7 +182,11 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed } from "vue"
+
+import { DEFAULT_GEOFENCE_COLOR, normalizeGeofenceColor } from "../../../utils/geofenceUtils.js"
+
+const props = defineProps({
   drawMode: {
     type: String,
     default: null,
@@ -251,13 +215,9 @@ defineProps({
     type: Boolean,
     default: false,
   },
-  editingStrokeColor: {
+  editingColor: {
     type: String,
-    default: "#FF6600",
-  },
-  editingFillColor: {
-    type: String,
-    default: "#FF6600",
+    default: DEFAULT_GEOFENCE_COLOR,
   },
   editingPreviewName: {
     type: String,
@@ -276,4 +236,32 @@ defineEmits([
   "remove-last-edit-point",
   "stop-editing",
 ])
+
+const draftColor = computed(() => {
+  return normalizeGeofenceColor(props.draftGeofenceForm.color)
+})
+
+const currentEditingColor = computed(() => {
+  return normalizeGeofenceColor(props.editingColor)
+})
+
+const drawModeLabel = computed(() => {
+  const labels = {
+    circle: "Circular",
+    polygon: "Polígono",
+    route: "Ruta",
+  }
+
+  return labels[props.drawMode] || "Geocerca"
+})
+
+const editingTypeLabel = computed(() => {
+  const labels = {
+    circle: "Circular",
+    polygon: "Polígono",
+    route: "Ruta",
+  }
+
+  return labels[props.editingDraft?.type] || "Geocerca"
+})
 </script>

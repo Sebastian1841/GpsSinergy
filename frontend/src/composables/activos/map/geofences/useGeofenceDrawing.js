@@ -1,9 +1,6 @@
 import L from "leaflet"
 
-import {
-  getDraftRouteStyle,
-  getDraftShapeStyle,
-} from "./geofenceMapStyles.js"
+import { getDraftRouteStyle, getDraftShapeStyle } from "./geofenceMapStyles.js"
 
 const createVertexIcon = (active = false) => {
   return L.divIcon({
@@ -14,17 +11,8 @@ const createVertexIcon = (active = false) => {
   })
 }
 
-export function createGeofenceDrawingController({
-  props,
-  layers,
-  state,
-  onFinishPolygon,
-}) {
-  const {
-    draftPolygonPoints,
-    draftRoutePoints,
-    draftCircleCenter,
-  } = state
+export function createGeofenceDrawingController({ props, layers, state, onFinishPolygon }) {
+  const { draftPolygonPoints, draftRoutePoints, draftCircleCenter } = state
 
   const clearDraftLayers = () => {
     layers.draftLayer?.clearLayers()

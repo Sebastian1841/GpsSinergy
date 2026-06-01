@@ -25,8 +25,7 @@ export const getCircleEdgePoint = (center, radiusMeters) => {
   const distance = radiusMeters / earthRadius
 
   const lat2 = Math.asin(
-    Math.sin(lat1) * Math.cos(distance) +
-      Math.cos(lat1) * Math.sin(distance) * Math.cos(bearing),
+    Math.sin(lat1) * Math.cos(distance) + Math.cos(lat1) * Math.sin(distance) * Math.cos(bearing),
   )
 
   const lng2 =

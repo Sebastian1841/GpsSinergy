@@ -14,9 +14,7 @@
               Alta de activo
             </p>
 
-            <h2 class="mt-0.5 truncate text-[16px] font-black text-white">
-              Registrar activo GPS
-            </h2>
+            <h2 class="mt-0.5 truncate text-[16px] font-black text-white">Registrar activo GPS</h2>
 
             <p class="mt-1 truncate text-[11px] font-semibold text-white/65">
               Completa los datos principales para registrar un nuevo activo.
@@ -400,6 +398,8 @@
 <script setup>
 import { computed, ref, watch } from "vue"
 
+import { useFleetFormWizard } from "../../../composables/activos/fleet/useFleetFormWizard.js"
+
 const props = defineProps({
   modelValue: {
     type: Boolean,
@@ -439,6 +439,16 @@ const steps = [
     title: "Métricas iniciales",
   },
 ]
+
+const {
+  currentStep,
+  currentStepConfig,
+  progressWidth,
+  goToStep,
+  nextStep,
+  previousStep,
+  resetWizard,
+} = useFleetFormWizard(steps)
 
 const trackerModelOptions = [
   {
@@ -488,10 +498,7 @@ const createEmptyForm = () => ({
   odometer: "",
 })
 
-const currentStep = ref(0)
 const form = ref(createEmptyForm())
-
-const currentStepConfig = computed(() => steps[currentStep.value] || steps[0])
 
 const selectedTrackerModel = computed(() => {
   return trackerModelOptions.find((option) => option.value === form.value.trackerModel) || null
@@ -513,10 +520,6 @@ const isDeviceStepValid = computed(() => {
 
 const canSaveActivo = computed(() => {
   return Boolean(isAssetStepValid.value && isDeviceStepValid.value)
-})
-
-const progressWidth = computed(() => {
-  return `${((currentStep.value + 1) / steps.length) * 100}%`
 })
 
 const requiredStatus = computed(() => [
@@ -558,7 +561,7 @@ const summaryItems = computed(() => [
 ])
 
 const resetModal = () => {
-  currentStep.value = 0
+  resetWizard()
   form.value = createEmptyForm()
 }
 
@@ -587,18 +590,6 @@ const isStepCompleted = (index) => {
     return Boolean(form.value.dailyHourmeter || form.value.totalHourmeter || form.value.odometer)
 
   return false
-}
-
-const goToStep = (index) => {
-  currentStep.value = Math.min(Math.max(Number(index), 0), steps.length - 1)
-}
-
-const nextStep = () => {
-  currentStep.value = Math.min(currentStep.value + 1, steps.length - 1)
-}
-
-const previousStep = () => {
-  currentStep.value = Math.max(currentStep.value - 1, 0)
 }
 
 const closeModal = () => {

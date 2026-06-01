@@ -1,34 +1,18 @@
 import L from "leaflet"
 
 import {
-  getRouteStyle,
-  getShapeStyle,
-} from "./geofenceMapStyles.js"
+  buildCoordinatesSignature,
+  normalizeSignatureValue,
+} from "../../../../utils/mapSignatureUtils.js"
 
-const normalizeSignatureValue = (value) => {
-  if (value === null || value === undefined) return ""
-
-  return String(value)
-}
-
-const buildCoordinatesSignature = (coordinates = []) => {
-  if (!Array.isArray(coordinates)) return ""
-
-  return coordinates
-    .map((point) => {
-      return [point?.lat, point?.lng].map(normalizeSignatureValue).join(":")
-    })
-    .join("|")
-}
+import { getRouteStyle, getShapeStyle } from "./geofenceMapStyles.js"
 
 const buildGeofenceSignature = (geofence = {}) => {
   return [
     geofence.id,
     geofence.type,
     geofence.name,
-    geofence.strokeColor || geofence.color,
-    geofence.fillColor,
-    geofence.fillOpacity,
+    geofence.color,
     geofence.radius,
     geofence.center?.lat,
     geofence.center?.lng,
@@ -111,6 +95,7 @@ export function createGeofenceRendererController({
 
     layer.on("click", () => {
       if (drawMode.value) return
+
       onStartEditGeofence(geofence.id)
     })
 

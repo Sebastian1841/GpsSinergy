@@ -60,6 +60,30 @@
     0 14px 28px rgba(15, 23, 42, 0.45);
 }
 
+.sinergy-marker-cluster {
+  display: grid;
+  place-items: center;
+  border: 3px solid #ffffff;
+  border-radius: 999px;
+  background: #102372;
+  color: #ffffff;
+  box-shadow:
+    0 0 0 4px rgba(16, 35, 114, 0.18),
+    0 12px 24px rgba(15, 23, 42, 0.28);
+}
+
+.sinergy-marker-cluster__count {
+  display: grid;
+  min-width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1;
+}
+
 .marker-moving {
   background: #10b981;
 }

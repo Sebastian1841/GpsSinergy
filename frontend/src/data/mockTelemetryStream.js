@@ -366,8 +366,7 @@ export const createMockFleetSnapshot = ({
       lat: roundCoordinate(lat),
       lng: roundCoordinate(lng),
 
-      velocidad:
-        estado === TELEMETRY_STATUS.MOVING ? `${randomInteger(20, 90)} km/h` : "0 km/h",
+      velocidad: estado === TELEMETRY_STATUS.MOVING ? `${randomInteger(20, 90)} km/h` : "0 km/h",
 
       combustible: `${randomInteger(25, 95)}%`,
       odometro: `${randomInteger(5000, 250000).toLocaleString("es-CL")} km`,
