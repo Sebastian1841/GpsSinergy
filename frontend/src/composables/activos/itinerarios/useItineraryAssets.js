@@ -18,7 +18,8 @@ export function useItineraryAssets({
   const normalizedAssets = computed(() => {
     const fromProps = (props.activos || []).map((activo) => ({
       id: activo.id,
-      patente: activo.vehiculo || activo.patente || activo.name || `Activo ${activo.id}`,
+      patente:
+        activo.patente || activo.patent || activo.vehiculo || activo.name || `Activo ${activo.id}`,
       deviceId: activo.imei || activo.deviceId || activo.identificador || "Sin dispositivo",
       conductor: activo.conductor || activo.ibutton_name || activo.ibuttonName || "Sin conductor",
       estado: activo.estado || "offline",
@@ -37,35 +38,31 @@ export function useItineraryAssets({
       odometer: getFirstDefined(activo.odometer, activo.odometro, activo.kilometraje),
     }))
 
-    return mockItineraryAssets.map((itineraryAsset) => {
-      const matchingCurrentAsset = fromProps.find((activo) => {
-        const samePatente = normalizeText(activo.patente) === normalizeText(itineraryAsset.patente)
-        const sameDevice = normalizeText(activo.deviceId) === normalizeText(itineraryAsset.deviceId)
+    const sourceAssets = fromProps
 
-        return samePatente || sameDevice
+    return sourceAssets.map((currentAsset) => {
+      const itineraryAsset = mockItineraryAssets.find((asset) => {
+        const sameId = String(asset.id) === String(currentAsset.id)
+        const samePatente = normalizeText(asset.patente) === normalizeText(currentAsset.patente)
+        const sameDevice = normalizeText(asset.deviceId) === normalizeText(currentAsset.deviceId)
+
+        return sameId || samePatente || sameDevice
       })
-
-      if (!matchingCurrentAsset) {
-        return itineraryAsset
-      }
 
       return {
         ...itineraryAsset,
-
-        id: itineraryAsset.id,
-        activoId: matchingCurrentAsset.id,
-
-        patente: itineraryAsset.patente,
-        deviceId: itineraryAsset.deviceId,
-        conductor: itineraryAsset.conductor,
-
-        estado: matchingCurrentAsset.estado || itineraryAsset.estado,
-        lat: matchingCurrentAsset.lat,
-        lng: matchingCurrentAsset.lng,
-        speed: matchingCurrentAsset.speed,
-        direccion: matchingCurrentAsset.direccion || itineraryAsset.direccion,
-        lastReport: matchingCurrentAsset.lastReport || itineraryAsset.last_report,
-        odometer: matchingCurrentAsset.odometer,
+        id: itineraryAsset?.id || String(currentAsset.id),
+        activoId: currentAsset.id,
+        patente: currentAsset.patente || itineraryAsset?.patente,
+        deviceId: currentAsset.deviceId || itineraryAsset?.deviceId,
+        conductor: currentAsset.conductor || itineraryAsset?.conductor,
+        estado: currentAsset.estado || itineraryAsset?.estado,
+        lat: currentAsset.lat ?? itineraryAsset?.lat,
+        lng: currentAsset.lng ?? itineraryAsset?.lng,
+        speed: currentAsset.speed ?? itineraryAsset?.speed ?? 0,
+        direccion: currentAsset.direccion || itineraryAsset?.direccion,
+        lastReport: currentAsset.lastReport || itineraryAsset?.last_report,
+        odometer: currentAsset.odometer ?? itineraryAsset?.odometer,
       }
     })
   })

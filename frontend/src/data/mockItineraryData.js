@@ -1,83 +1,18 @@
-export const mockItineraryAssets = [
-  {
-    id: "asset-001",
-    activoId: 1,
-    patente: "MAESOL",
-    deviceId: "868123450001",
-    conductor: "Carlos Ramírez",
-    estado: "idle",
-    lat: -33.4489,
-    lng: -70.6693,
-    speed: 0,
-    direccion: "Ubicación actual MAESOL",
-    last_report: "2026-05-14T23:59:59",
-  },
-  {
-    id: "asset-002",
-    activoId: 2,
-    patente: "CAMIONETA JAC",
-    deviceId: "868123450002",
-    conductor: "Ana Torres",
-    estado: "idle",
-    lat: -33.4521,
-    lng: -70.6625,
-    speed: 0,
-    direccion: "Ubicación actual CAMIONETA JAC",
-    last_report: "2026-05-14T23:59:59",
-  },
-  {
-    id: "asset-003",
-    activoId: 3,
-    patente: "TWDR56 PESO",
-    deviceId: "868123450003",
-    conductor: "Juan Pérez",
-    estado: "idle",
-    lat: -33.4448,
-    lng: -70.6755,
-    speed: 0,
-    direccion: "Ubicación actual TWDR56 PESO",
-    last_report: "2026-05-14T23:59:59",
-  },
-  {
-    id: "asset-004",
-    activoId: 4,
-    patente: "CAMIONETA SSANGYONG",
-    deviceId: "868123450004",
-    conductor: "María González",
-    estado: "moving",
-    lat: -33.4568,
-    lng: -70.6712,
-    speed: 38,
-    direccion: "Ubicación actual CAMIONETA SSANGYONG",
-    last_report: "2026-05-14T23:59:59",
-  },
-  {
-    id: "asset-005",
-    activoId: 5,
-    patente: "VIEJITO HACKER",
-    deviceId: "868123450005",
-    conductor: "Felipe Soto",
-    estado: "stopped",
-    lat: -33.461,
-    lng: -70.658,
-    speed: 0,
-    direccion: "Ubicación actual VIEJITO HACKER",
-    last_report: "2026-05-14T23:59:59",
-  },
-  {
-    id: "asset-006",
-    activoId: 6,
-    patente: "MAXUS T 60",
-    deviceId: "868123450006",
-    conductor: "Luis Hidalgo",
-    estado: "offline",
-    lat: -33.4412,
-    lng: -70.6552,
-    speed: 0,
-    direccion: "Ubicación actual MAXUS T 60",
-    last_report: "2026-05-14T23:59:59",
-  },
-]
+import { mockAssets } from "./mockDatabase.js"
+
+export const mockItineraryAssets = mockAssets.map((asset) => ({
+  id: asset.id,
+  activoId: asset.id,
+  patente: asset.patente,
+  deviceId: asset.imei,
+  conductor: asset.conductor,
+  estado: asset.estado,
+  lat: asset.lat,
+  lng: asset.lng,
+  speed: Number(asset.speed) || 0,
+  direccion: asset.direccion,
+  last_report: "2026-05-14T23:59:59",
+}))
 
 const CURRENT_MOCK_DATE = "2026-05-14"
 
@@ -314,11 +249,28 @@ const buildCurrentLocationPoint = ({ asset, dateString, odometer }) => {
   })
 }
 
-const generateDailyPointsForAsset = ({ asset, dateString, dayIndex, assetIndex }) => {
-  const profile = itineraryAssetProfiles[asset.id]
-  const template = routeTemplates[asset.id]
+const getItineraryProfile = (asset, assetIndex) => {
+  return (
+    itineraryAssetProfiles[asset.id] || {
+      baseLat: Number(asset.lat),
+      baseLng: Number(asset.lng),
+      odometerStart: 50000 + assetIndex * 12000,
+      addresses: [
+        `Base operacional ${asset.patente}`,
+        "Inicio de recorrido",
+        "Tramo operativo",
+        "Punto de control",
+        "Destino intermedio",
+        "Parada programada",
+        "Ruta de retorno",
+        `Fin de recorrido ${asset.patente}`,
+      ],
+    }
+  )
+}
 
-  if (!profile || !template) return []
+const generateDailyPointsForAsset = ({ asset, dateString, dayIndex, assetIndex }) => {
+  const profile = getItineraryProfile(asset, assetIndex)
 
   const weekday = new Date(`${dateString}T00:00:00`).getDay()
   const isSunday = weekday === 0

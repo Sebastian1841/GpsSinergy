@@ -59,9 +59,9 @@
         </div>
 
         <ul class="space-y-1.5">
-          <li>
+          <li v-for="item in assetNavigationItems" :key="item.to">
             <RouterLink
-              to="/activos"
+              :to="item.to"
               class="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-white/75 transition-colors duration-100 hover:bg-white/[0.08] hover:text-white"
               active-class="sidebar-link-active"
               @click="$emit('update:isOpen', false)"
@@ -85,7 +85,9 @@
                 </svg>
               </div>
 
-              <span class="min-w-0 flex-1 truncate"> Activos </span>
+              <span class="min-w-0 flex-1 truncate">
+                {{ item.label }}
+              </span>
 
               <span
                 class="h-2 w-2 rounded-full bg-transparent transition-colors duration-100 group-hover:bg-[#ff6600]"
@@ -93,7 +95,7 @@
             </RouterLink>
           </li>
 
-          <li>
+          <li v-if="isPlatformAdmin">
             <RouterLink
               to="/empresas"
               class="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-white/75 transition-colors duration-100 hover:bg-white/[0.08] hover:text-white"
@@ -127,7 +129,7 @@
             </RouterLink>
           </li>
 
-          <li>
+          <li v-if="isPlatformAdmin">
             <RouterLink
               to="/usuarios"
               class="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-white/75 transition-colors duration-100 hover:bg-white/[0.08] hover:text-white"
@@ -179,6 +181,28 @@
 </template>
 
 <script setup>
+import { computed } from "vue"
+
+import { useAccessControl } from "../../composables/auth/useAccessControl.js"
+
+const { isPlatformAdmin, accessibleCompanies } = useAccessControl()
+
+const assetNavigationItems = computed(() => {
+  if (isPlatformAdmin.value) {
+    return [
+      {
+        to: "/activos",
+        label: "Activos",
+      },
+    ]
+  }
+
+  return accessibleCompanies.value.map((company) => ({
+    to: `/app/${company.id}/activos`,
+    label: company.name,
+  }))
+})
+
 defineProps({
   isOpen: { type: Boolean, default: false },
 })

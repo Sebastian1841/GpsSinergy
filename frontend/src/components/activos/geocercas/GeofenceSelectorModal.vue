@@ -35,7 +35,11 @@
               <p
                 class="mt-1 max-w-[720px] text-[11px] font-semibold leading-relaxed text-slate-500"
               >
-                Edita una geocerca o revisa el historial de vehículos asociados.
+                {{
+                  canEdit
+                    ? "Edita una geocerca o revisa el historial de vehículos asociados."
+                    : "Revisa el historial de vehículos asociados."
+                }}
               </p>
             </div>
 
@@ -116,8 +120,12 @@
                 </div>
               </div>
 
-              <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <div
+                class="mt-3 grid grid-cols-1 gap-2"
+                :class="canEdit ? 'sm:grid-cols-3' : 'sm:grid-cols-1'"
+              >
                 <button
+                  v-if="canEdit"
                   type="button"
                   class="cursor-pointer rounded-lg bg-[#102372] px-3 py-2 text-[11px] font-black text-white transition hover:bg-[#0c1b59]"
                   @pointerdown.stop
@@ -136,6 +144,7 @@
                 </button>
 
                 <button
+                  v-if="canEdit"
                   type="button"
                   class="cursor-pointer rounded-lg bg-red-50 px-3 py-2 text-[11px] font-black text-red-600 transition hover:bg-red-100"
                   @pointerdown.stop
@@ -255,6 +264,10 @@ const props = defineProps({
   editingDraft: {
     type: Object,
     default: null,
+  },
+  canEdit: {
+    type: Boolean,
+    default: false,
   },
 })
 

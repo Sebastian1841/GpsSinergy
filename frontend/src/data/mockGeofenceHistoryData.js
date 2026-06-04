@@ -1,40 +1,12 @@
-const mockVehiclePool = [
-  {
-    patent: "ABCD-12",
-    vehicle: "Camión 1",
-    driver: "Sin conductor",
-  },
-  {
-    patent: "EFGH-34",
-    vehicle: "Camioneta 3",
-    driver: "Juan Pérez",
-  },
-  {
-    patent: "IJKL-56",
-    vehicle: "Furgón técnico",
-    driver: "Carlos Muñoz",
-  },
-  {
-    patent: "MNOP-78",
-    vehicle: "Camión reparto",
-    driver: "Felipe Andrade",
-  },
-  {
-    patent: "QRST-90",
-    vehicle: "Unidad soporte",
-    driver: "Marcelo Soto",
-  },
-  {
-    patent: "UVWX-22",
-    vehicle: "Camioneta norte",
-    driver: "Daniel Rojas",
-  },
-  {
-    patent: "YZAB-45",
-    vehicle: "Móvil técnico",
-    driver: "Andrea Molina",
-  },
-]
+import { mockAssets } from "./mockDatabase.js"
+
+const buildVehiclePool = (activos = []) => {
+  return activos.map((activo) => ({
+    patent: activo.patente || activo.patent || "Sin patente",
+    vehicle: activo.vehiculo || activo.name || "Activo",
+    driver: activo.conductor || "Sin conductor",
+  }))
+}
 
 const baseEvents = [
   {
@@ -110,16 +82,20 @@ const getGeofenceSeed = (geofence) => {
   return seed || 1
 }
 
-export const buildMockGeofenceHistory = (geofence) => {
+export const buildMockGeofenceHistory = (geofence, activos = mockAssets) => {
   if (!geofence) return []
+
+  const vehiclePool = buildVehiclePool(activos)
+
+  if (!vehiclePool.length) return []
 
   const seed = getGeofenceSeed(geofence)
   const typeText = getGeofenceTypeText(geofence.type)
   const geofenceName = geofence.name || "Geocerca"
 
   return baseEvents.map((event, index) => {
-    const vehicleIndex = (seed + index) % mockVehiclePool.length
-    const vehicle = mockVehiclePool[vehicleIndex]
+    const vehicleIndex = (seed + index) % vehiclePool.length
+    const vehicle = vehiclePool[vehicleIndex]
     const speedVariation = seed % 7
 
     return {

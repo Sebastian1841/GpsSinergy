@@ -80,9 +80,11 @@
           :access="access"
           :scopes="scopes"
           :assets="assets"
+          :sucursales="getApplication(access.applicationId)?.sucursales || []"
           @update-operational-scope="handleUpdateOperationalScope"
           @toggle-scope-option="handleToggleScopeOption"
           @toggle-scope-asset="handleToggleScopeAsset"
+          @toggle-scope-sucursal="handleToggleScopeSucursal"
         />
       </div>
     </article>
@@ -152,6 +154,7 @@ const emit = defineEmits([
   "update-operational-scope",
   "toggle-scope-option",
   "toggle-scope-asset",
+  "toggle-scope-sucursal",
 ])
 
 const getApplication = (applicationId) => {
@@ -175,6 +178,10 @@ const handleToggleScopeOption = (accessId, optionKey) => {
 
 const handleToggleScopeAsset = (accessId, assetId) => {
   emit("toggle-scope-asset", accessId, assetId)
+}
+
+const handleToggleScopeSucursal = (accessId, sucursalId) => {
+  emit("toggle-scope-sucursal", accessId, sucursalId)
 }
 
 const handleToggleModuleAccess = (accessId, moduleId) => {

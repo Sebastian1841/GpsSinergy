@@ -24,6 +24,7 @@
       @click.stop
     >
       <button
+        v-if="canViewGeofences"
         type="button"
         title="Geocerca"
         class="group relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-[16px] font-black transition"
@@ -124,7 +125,7 @@
       @click.stop
     >
       <!-- Crear -->
-      <div class="relative">
+      <div v-if="canEditGeofences" class="relative">
         <button
           type="button"
           title="Crear geocerca"
@@ -214,6 +215,7 @@
       </div>
 
       <button
+        v-if="canEditGeofences"
         type="button"
         title="Editar geocercas"
         class="group relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl bg-white text-[15px] font-black text-[#102372] transition hover:bg-[#eef3ff]"
@@ -441,6 +443,14 @@ defineProps({
     default: () => [],
   },
   isFullscreen: {
+    type: Boolean,
+    default: false,
+  },
+  canViewGeofences: {
+    type: Boolean,
+    default: false,
+  },
+  canEditGeofences: {
     type: Boolean,
     default: false,
   },

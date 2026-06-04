@@ -30,6 +30,8 @@
       :map-type="mapType"
       :map-type-options="mapTypeOptions"
       :is-fullscreen="isFullscreen"
+      :can-view-geofences="canViewGeofences"
+      :can-edit-geofences="canEditGeofences"
       @toggle-kpis="toggleKpis"
       @toggle-fullscreen="toggleFullscreen"
       @create-circle="handleCreateCircle"
@@ -106,6 +108,7 @@
       :geofence-items="geofenceItems"
       :selected-geofence-id="activeGeofenceId"
       :editing-draft="editingDraft"
+      :can-edit="canEditGeofences"
       @select-edit="selectGeofenceToEdit"
       @open-history="openGeofenceHistory"
       @delete-geofence="handleDeleteGeofence"
@@ -172,6 +175,14 @@ const props = defineProps({
     default: () => [],
   },
   appSidebarOpen: {
+    type: Boolean,
+    default: false,
+  },
+  canViewGeofences: {
+    type: Boolean,
+    default: false,
+  },
+  canEditGeofences: {
     type: Boolean,
     default: false,
   },
@@ -339,10 +350,12 @@ const mapStatsActivos = computed(() => {
 })
 
 const geofenceItems = computed(() => {
-  return props.geofences || []
+  return props.canViewGeofences ? props.geofences || [] : []
 })
 
 const visibleGeofences = computed(() => {
+  if (!props.canViewGeofences) return []
+
   const allGeofences = props.geofences || []
 
   if (showGeofences.value) {
@@ -413,6 +426,9 @@ const mapProps = {
   },
   get draftGeofenceOptions() {
     return draftGeofenceOptions.value
+  },
+  get canEditGeofences() {
+    return props.canEditGeofences
   },
 }
 
@@ -540,6 +556,8 @@ const handleToggleGeofenceVisibility = () => {
 }
 
 const handleCreateCircle = () => {
+  if (!props.canEditGeofences) return
+
   showGeofences.value = true
   showGeofenceModal.value = false
   clearActiveGeofenceSelection()
@@ -549,6 +567,8 @@ const handleCreateCircle = () => {
 }
 
 const handleCreatePolygon = () => {
+  if (!props.canEditGeofences) return
+
   showGeofences.value = true
   showGeofenceModal.value = false
   clearActiveGeofenceSelection()
@@ -558,6 +578,8 @@ const handleCreatePolygon = () => {
 }
 
 const handleCreateRoute = () => {
+  if (!props.canEditGeofences) return
+
   showGeofences.value = true
   showGeofenceModal.value = false
   clearActiveGeofenceSelection()
@@ -567,11 +589,15 @@ const handleCreateRoute = () => {
 }
 
 const openEditGeofenceModal = () => {
+  if (!props.canEditGeofences) return
+
   resetHistoryState()
   showGeofenceModal.value = true
 }
 
 const openGeofenceHistorySelector = () => {
+  if (!props.canViewGeofences) return
+
   resetHistoryState()
   showGeofenceModal.value = false
 
@@ -589,13 +615,15 @@ const openGeofenceHistory = (geofence) => {
   if (!geofence) return
 
   selectedHistoryGeofence.value = geofence
-  selectedHistoryEvents.value = buildMockGeofenceHistory(geofence)
+  selectedHistoryEvents.value = buildMockGeofenceHistory(geofence, props.allActivos)
 
   showGeofenceModal.value = false
   showGeofenceHistoryModal.value = true
 }
 
 const selectGeofenceToEdit = (geofenceId) => {
+  if (!props.canEditGeofences) return
+
   resetHistoryState()
   activeGeofenceId.value = geofenceId
   showGeofenceModal.value = false
@@ -604,6 +632,8 @@ const selectGeofenceToEdit = (geofenceId) => {
 }
 
 const handleExternalGeofenceSelection = (geofenceId) => {
+  if (!props.canEditGeofences) return
+
   if (!geofenceId) {
     clearActiveGeofenceSelection(false)
     return
@@ -644,6 +674,8 @@ const handleCancel = () => {
 }
 
 const handleDeleteGeofence = (geofenceId) => {
+  if (!props.canEditGeofences) return
+
   if (normalizeId(activeGeofenceId.value) === normalizeId(geofenceId)) {
     clearActiveGeofenceSelection()
   }

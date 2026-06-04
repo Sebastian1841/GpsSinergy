@@ -154,6 +154,8 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
   }
 
   const startPolygonDraw = () => {
+    if (props.canEditGeofences === false) return
+
     stopEditing()
     resetDraftState()
     drawMode.value = "polygon"
@@ -161,6 +163,8 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
   }
 
   const startRouteDraw = () => {
+    if (props.canEditGeofences === false) return
+
     stopEditing()
     resetDraftState()
     drawMode.value = "route"
@@ -168,6 +172,8 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
   }
 
   const startCircleDraw = () => {
+    if (props.canEditGeofences === false) return
+
     stopEditing()
     resetDraftState()
     drawMode.value = "circle"
@@ -251,6 +257,8 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
   }
 
   const startEditGeofence = (geofenceId) => {
+    if (props.canEditGeofences === false) return
+
     const map = getMap()
 
     cancelDraw()
@@ -286,6 +294,8 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
   }
 
   const deleteGeofence = (id) => {
+    if (props.canEditGeofences === false) return
+
     if (normalizeId(editingDraft.value?.id) === normalizeId(id)) {
       stopEditing()
     }
@@ -295,6 +305,8 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
   }
 
   const handleMapClick = (event) => {
+    if (props.canEditGeofences === false) return
+
     if (
       (editingDraft.value?.type === "polygon" || editingDraft.value?.type === "route") &&
       editAddPoint.value

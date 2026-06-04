@@ -117,7 +117,7 @@
         </button>
 
         <button
-          v-if="localActiveSection === 'activos'"
+          v-if="localActiveSection === 'activos' && canCreateAssets"
           type="button"
           class="flex h-[36px] shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#102372]/20 bg-[#102372] px-3 text-[10px] font-black text-white shadow-sm transition hover:border-[#FF6600] hover:bg-[#0c1b59]"
           title="Agregar activo"
@@ -258,7 +258,7 @@
     </div>
 
     <FleetTable
-      v-if="localActiveSection === 'activos'"
+      v-if="localActiveSection === 'activos' && allowedSections.includes('activos')"
       :activos="sortedActivos"
       :visible-columns="visibleColumns"
       :selected-id="selectedId"
@@ -390,6 +390,7 @@
               </p>
 
               <button
+                v-if="canEditGeofences"
                 type="button"
                 class="shrink-0 cursor-pointer rounded-md bg-red-50 px-2 py-1 text-[10px] font-black text-red-600 transition hover:bg-red-100"
                 @click.stop="confirmDeleteGeofence(geofence)"
@@ -402,9 +403,16 @@
       </div>
     </div>
 
-    <div v-else class="min-h-0 flex-1 overflow-auto bg-[#eef2f7] p-3">
+    <div
+      v-else-if="localActiveSection === 'sucursales' && allowedSections.includes('sucursales')"
+      class="min-h-0 flex-1 overflow-auto bg-[#eef2f7] p-3"
+    >
       <GestionSucursalesPanel
         :company="empresaSucursales"
+        :companies="sucursalCompanies"
+        :selected-company-id="selectedSucursalCompanyId"
+        :show-company-selector="showSucursalCompanySelector"
+        @select-company="$emit('select-sucursal-company', $event)"
         @alternar-sucursales-habilitadas="$emit('alternar-sucursales-habilitadas')"
         @agregar-sucursal="$emit('agregar-sucursal', $event)"
         @actualizar-nombre-sucursal="handleActualizarNombreSucursal"
@@ -415,7 +423,14 @@
     </div>
 
     <div
-      v-if="localActiveSection === 'activos'"
+      v-else
+      class="flex min-h-0 flex-1 items-center justify-center bg-[#eef2f7] p-4 text-center"
+    >
+      <p class="text-[11px] font-black text-[#102372]">Sin funciones habilitadas</p>
+    </div>
+
+    <div
+      v-if="localActiveSection === 'activos' && allowedSections.includes('activos')"
       class="shrink-0 border-t border-[#d8dee8] bg-[#f8fafc] px-3 py-2"
     >
       <button
@@ -428,6 +443,7 @@
     </div>
 
     <FleetContextMenu
+      v-if="canManageAssets"
       :is-open="deviceContextMenu.isOpen"
       :x="deviceContextMenu.x"
       :y="deviceContextMenu.y"
@@ -497,6 +513,34 @@ const props = defineProps({
       assetsCount: 0,
     }),
   },
+  sucursalCompanies: {
+    type: Array,
+    default: () => [],
+  },
+  selectedSucursalCompanyId: {
+    type: [String, Number],
+    default: "",
+  },
+  showSucursalCompanySelector: {
+    type: Boolean,
+    default: false,
+  },
+  allowedSections: {
+    type: Array,
+    default: () => ["activos", "itinerarios", "geocercas", "sucursales"],
+  },
+  canManageAssets: {
+    type: Boolean,
+    default: false,
+  },
+  canCreateAssets: {
+    type: Boolean,
+    default: false,
+  },
+  canEditGeofences: {
+    type: Boolean,
+    default: false,
+  },
   columns: {
     type: Array,
     default: () => [
@@ -527,6 +571,7 @@ const emit = defineEmits([
   "device-action",
   "geofence-selected",
   "geofence-delete",
+  "select-sucursal-company",
   "alternar-sucursales-habilitadas",
   "agregar-sucursal",
   "actualizar-nombre-sucursal",
@@ -595,28 +640,32 @@ const { sortColumnKey, sortedActivos, toggleSort, clearSort, getSortIcon } = use
   normalizeText,
 })
 
-const menuSections = computed(() => [
-  {
-    key: "activos",
-    label: "Activos",
-    count: props.allActivos.length || props.activos.length,
-  },
-  {
-    key: "itinerarios",
-    label: "Itinerarios",
-    count: null,
-  },
-  {
-    key: "geocercas",
-    label: "Geocercas",
-    count: props.geofences.length,
-  },
-  {
-    key: "sucursales",
-    label: "Sucursales",
-    count: props.empresaSucursales.sucursales?.length || 0,
-  },
-])
+const menuSections = computed(() => {
+  const allowedSections = new Set(props.allowedSections)
+
+  return [
+    {
+      key: "activos",
+      label: "Activos",
+      count: props.allActivos.length || props.activos.length,
+    },
+    {
+      key: "itinerarios",
+      label: "Itinerarios",
+      count: null,
+    },
+    {
+      key: "geocercas",
+      label: "Geocercas",
+      count: props.geofences.length,
+    },
+    {
+      key: "sucursales",
+      label: "Sucursales",
+      count: props.empresaSucursales.sucursales?.length || 0,
+    },
+  ].filter((section) => allowedSections.has(section.key))
+})
 
 const itineraryActivos = computed(() => {
   return props.allActivos.length ? props.allActivos : props.activos
@@ -695,7 +744,7 @@ const confirmDeleteGeofence = (geofence) => {
 }
 
 const handleGeofenceSelect = (geofence) => {
-  if (!geofence?.id) return
+  if (!geofence?.id || !props.canEditGeofences) return
 
   emit("geofence-selected", geofence)
 }
@@ -743,7 +792,7 @@ const handleToggleSort = (columnKey) => {
 }
 
 const openDeviceContextMenu = (event, activo) => {
-  if (!activo) return
+  if (!activo || !props.canManageAssets) return
 
   event.preventDefault?.()
   event.stopPropagation?.()
@@ -783,6 +832,21 @@ const handleDeviceAction = ({ action, activo }) => {
 
   closeDeviceContextMenu()
 }
+
+watch(
+  [menuSections, () => props.activeSection],
+  ([sections, requestedSection]) => {
+    const availableSection = sections.find((section) => section.key === requestedSection)
+    const nextSection = availableSection?.key || sections[0]?.key || "activos"
+
+    if (localActiveSection.value !== nextSection) {
+      localActiveSection.value = nextSection
+      emit("update:active-section", nextSection)
+      emit("select-section", nextSection)
+    }
+  },
+  { immediate: true },
+)
 
 watch(
   () => props.activeSection,

@@ -24,6 +24,21 @@
           ></span>
         </button>
       </div>
+
+      <label v-if="showCompanySelector" class="mt-3 block">
+        <span class="mb-1 block text-[9px] font-black uppercase text-white/60">
+          Empresa administrada
+        </span>
+        <select
+          :value="selectedCompanyId"
+          class="h-9 w-full cursor-pointer rounded-lg border border-white/25 bg-white px-2 text-[11px] font-black text-[#102372] outline-none focus:border-[#FF6600]"
+          @change="$emit('select-company', $event.target.value)"
+        >
+          <option v-for="item in companies" :key="item.id" :value="item.id">
+            {{ item.name }}
+          </option>
+        </select>
+      </label>
     </header>
 
     <div class="grid gap-3 p-3">
@@ -310,16 +325,29 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue"
+import { computed, ref, watch } from "vue"
 
 const props = defineProps({
   company: {
     type: Object,
     required: true,
   },
+  companies: {
+    type: Array,
+    default: () => [],
+  },
+  selectedCompanyId: {
+    type: [String, Number],
+    default: "",
+  },
+  showCompanySelector: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits([
+  "select-company",
   "alternar-sucursales-habilitadas",
   "agregar-sucursal",
   "actualizar-nombre-sucursal",
@@ -336,6 +364,17 @@ const activeManager = ref(null)
 
 const sucursales = computed(() => props.company.sucursales || [])
 const assets = computed(() => props.company.assets || [])
+
+watch(
+  () => props.company.id,
+  () => {
+    nombreSucursal.value = ""
+    busquedaSucursal.value = ""
+    assetSearch.value = ""
+    filtroSucursalActivo.value = "all"
+    activeManager.value = null
+  },
+)
 
 const sucursalesFiltradas = computed(() => {
   const term = busquedaSucursal.value.trim().toLowerCase()

@@ -1,11 +1,7 @@
 import { computed, ref, watch } from "vue"
 
+import { useMockDatabase } from "../mock/useMockDatabase.js"
 import { useDebouncedValue } from "../ui/useDebouncedValue.js"
-
-import {
-  mockCompanyRecords,
-  mockCompanyReportTypes,
-} from "../../data/companies/mockCompanyManagementData.js"
 
 import {
   cloneCompanyData,
@@ -34,7 +30,7 @@ const createEmptyDraftCompany = () => ({
 const createCompanyReports = (reportTypes = []) => {
   return reportTypes.map((reportType) => ({
     reportId: reportType.id,
-    enabled: reportType.id === "mileage" || reportType.id === "route-history",
+    enabled: false,
   }))
 }
 
@@ -42,127 +38,21 @@ const buildCompanyId = (companiesCount) => {
   return `company-${String(companiesCount + 1).padStart(3, "0")}`
 }
 
-const getSucursalFlotaStorageKey = (companyId) => {
-  return `sinergy-sucursales-flota-${companyId || "general"}`
-}
-
-const getLegacySucursalFlotaStorageKey = (companyId) => {
-  return `sinergy-fleet-branches-${companyId || "general"}`
-}
-
-const readSucursalFlotaState = (companyId) => {
-  if (typeof window === "undefined") return null
-
-  try {
-    const serializedState =
-      window.localStorage.getItem(getSucursalFlotaStorageKey(companyId)) ||
-      window.localStorage.getItem(getLegacySucursalFlotaStorageKey(companyId))
-    const parsedState = JSON.parse(serializedState || "null")
-
-    if (!parsedState || typeof parsedState !== "object") return null
-
-    const storedSucursales = parsedState.sucursales || parsedState.branches
-    const storedAssets = Array.isArray(parsedState.assets) ? parsedState.assets : []
-
-    return {
-      sucursalesHabilitadas:
-        parsedState.sucursalesHabilitadas ?? parsedState.branchesEnabled ?? true,
-      sucursales: Array.isArray(storedSucursales) ? storedSucursales : [],
-      assets: storedAssets.map((asset) => ({
-        ...asset,
-        sucursalId: asset.sucursalId ?? asset.branchId ?? null,
-      })),
-      asignacionesActivos: parsedState.asignacionesActivos || parsedState.assetAssignments || {},
-    }
-  } catch {
-    return null
-  }
-}
-
-const persistirSucursalesEmpresa = (company) => {
-  if (typeof window === "undefined" || !company?.id) return
-
-  try {
-    window.localStorage.setItem(
-      getSucursalFlotaStorageKey(company.id),
-      JSON.stringify({
-        sucursalesHabilitadas: company.sucursalesHabilitadas !== false,
-        sucursales: company.sucursales || [],
-        assets: company.assets || [],
-        asignacionesActivos: Object.fromEntries(
-          (company.assets || []).map((asset) => [String(asset.id), asset.sucursalId || null]),
-        ),
-        updatedAt: new Date().toISOString(),
-      }),
-    )
-  } catch {
-    // Local storage is optional for the frontend-only prototype.
-  }
-}
-
-const PATENT_LETTERS = "BCDFGHJKLMPRSTVWXYZ"
-
-const buildMockPatent = (companyId, assetIndex) => {
-  const companySeed = String(companyId || "")
-    .split("")
-    .reduce((total, character) => total + character.charCodeAt(0), 0)
-
-  let letterSeed = companySeed * 131 + assetIndex
-  const letters = Array.from({ length: 4 }, () => {
-    const letter = PATENT_LETTERS[letterSeed % PATENT_LETTERS.length]
-
-    letterSeed = Math.floor(letterSeed / PATENT_LETTERS.length)
-    return letter
-  })
-
-  const digits = String(((companySeed + assetIndex) % 90) + 10)
-
-  return `${letters[0]}${letters[1]}-${letters[2]}${letters[3]}-${digits}`
-}
-
-const buildCompanyAssets = (company, sucursales) => {
-  if (Array.isArray(company.assets)) {
-    return company.assets.map((asset) => ({
-      ...asset,
-      sucursalId: asset.sucursalId || null,
-    }))
-  }
-
-  const totalAssets = Number(company.assetsCount) || 0
-  const assignedAssets = Math.floor(totalAssets * 0.85)
-
-  return Array.from({ length: totalAssets }, (_, index) => ({
-    id: `asset-${company.id}-${String(index + 1).padStart(3, "0")}`,
-    patent: buildMockPatent(company.id, index),
-    sucursalId:
-      index < assignedAssets && sucursales.length ? sucursales[index % sucursales.length].id : null,
-  }))
-}
-
-const normalizarSucursalesEmpresa = (company) => {
-  const storedState = readSucursalFlotaState(company.id)
-  const sucursales = Array.isArray(storedState?.sucursales)
-    ? storedState.sucursales
-    : company.sucursales || []
-  const normalizedSucursales = sucursales.map((sucursal) => ({
-    ...sucursal,
-    active: sucursal.active ?? true,
-  }))
-
-  return {
-    ...company,
-    sucursalesHabilitadas:
-      storedState?.sucursalesHabilitadas ?? company.sucursalesHabilitadas ?? true,
-    sucursales: normalizedSucursales,
-    assets: Array.isArray(storedState?.assets)
-      ? storedState.assets
-      : buildCompanyAssets(company, normalizedSucursales),
-  }
+const buildApplicationId = (companiesCount) => {
+  return `app-${String(companiesCount + 1).padStart(3, "0")}`
 }
 
 export function useCompanyManagement() {
-  const companies = ref(cloneCompanyData(mockCompanyRecords).map(normalizarSucursalesEmpresa))
-  const reportTypes = ref(cloneCompanyData(mockCompanyReportTypes))
+  const {
+    companyRecords: companies,
+    reportTypes,
+    createCompany: createDatabaseCompany,
+    updateCompany: updateDatabaseCompany,
+    updateAsset,
+    addSucursal: addDatabaseSucursal,
+    updateSucursal,
+    deleteSucursal: deleteDatabaseSucursal,
+  } = useMockDatabase()
 
   const searchTerm = ref("")
   const selectedStatus = ref("all")
@@ -174,14 +64,6 @@ export function useCompanyManagement() {
   const draftCompany = ref(createEmptyDraftCompany())
 
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 180)
-
-  watch(
-    companies,
-    (companyRecords) => {
-      companyRecords.forEach(persistirSucursalesEmpresa)
-    },
-    { deep: true },
-  )
 
   const filteredCompanies = computed(() => {
     return companies.value.filter((company) => {
@@ -230,31 +112,11 @@ export function useCompanyManagement() {
     }, 0)
 
     return [
-      {
-        key: "all",
-        label: "Empresas",
-        value: companies.value.length,
-      },
-      {
-        key: "active",
-        label: "Activas",
-        value: activeCompanies.length,
-      },
-      {
-        key: "assets",
-        label: "Activos",
-        value: totalAssets,
-      },
-      {
-        key: "online",
-        label: "En linea",
-        value: activeAssets,
-      },
-      {
-        key: "alerts",
-        label: "Alertas",
-        value: totalAlerts,
-      },
+      { key: "all", label: "Empresas", value: companies.value.length },
+      { key: "active", label: "Activas", value: activeCompanies.length },
+      { key: "assets", label: "Activos", value: totalAssets },
+      { key: "online", label: "En linea", value: activeAssets },
+      { key: "alerts", label: "Alertas", value: totalAlerts },
     ]
   })
 
@@ -301,29 +163,26 @@ export function useCompanyManagement() {
     if (!name || !rut) return
 
     const companyId = buildCompanyId(companies.value.length)
+    const applicationId = buildApplicationId(companies.value.length)
 
-    companies.value.unshift({
+    createDatabaseCompany({
       ...draftCompany.value,
       id: companyId,
+      applicationId,
       name,
       rut,
+      shortName: name
+        .split(" ")
+        .filter(Boolean)
+        .slice(0, 3)
+        .map((part) => part[0])
+        .join("")
+        .toUpperCase(),
       createdAt: new Date().toISOString().slice(0, 10),
-      assetsCount: 0,
-      activeAssetsCount: 0,
-      movingAssetsCount: 0,
-      alertsCount: 0,
-      usersCount: 0,
       lastTelemetryAt: "Sin telemetria",
       workspacePath: `/app/${companyId}/activos`,
       sucursalesHabilitadas: true,
-      sucursales: [
-        {
-          id: `sucursal-${companyId}-001`,
-          name: "Casa matriz",
-          active: true,
-        },
-      ],
-      assets: [],
+      sucursales: [],
       reports: createCompanyReports(reportTypes.value),
     })
 
@@ -334,12 +193,18 @@ export function useCompanyManagement() {
   const updateCompany = () => {
     if (!draftCompany.value.id) return
 
-    const company = companies.value.find((item) => item.id === draftCompany.value.id)
+    const {
+      assets: _assets,
+      assetsCount: _assetsCount,
+      activeAssetsCount: _activeAssetsCount,
+      movingAssetsCount: _movingAssetsCount,
+      alertsCount: _alertsCount,
+      usersCount: _usersCount,
+      ...companyChanges
+    } = draftCompany.value
 
-    if (!company) return
-
-    Object.assign(company, {
-      ...draftCompany.value,
+    updateDatabaseCompany(draftCompany.value.id, {
+      ...companyChanges,
       name: draftCompany.value.name.trim(),
       rut: draftCompany.value.rut.trim(),
       workspacePath: getCompanyWorkspacePath(draftCompany.value),
@@ -360,21 +225,29 @@ export function useCompanyManagement() {
   const toggleSelectedCompanyStatus = () => {
     if (!selectedCompany.value) return
 
-    selectedCompany.value.status = selectedCompany.value.status === "active" ? "inactive" : "active"
+    updateDatabaseCompany(selectedCompany.value.id, {
+      status: selectedCompany.value.status === "active" ? "inactive" : "active",
+    })
   }
 
   const toggleCompanyReport = (reportId) => {
     const reportAccess = selectedCompany.value?.reports?.find((item) => item.reportId === reportId)
 
-    if (!reportAccess) return
+    if (!reportAccess || !selectedCompany.value) return
 
-    reportAccess.enabled = !reportAccess.enabled
+    updateDatabaseCompany(selectedCompany.value.id, {
+      reports: selectedCompany.value.reports.map((item) => {
+        return item.reportId === reportId ? { ...item, enabled: !item.enabled } : item
+      }),
+    })
   }
 
   const alternarSucursalesHabilitadas = () => {
     if (!selectedCompany.value) return
 
-    selectedCompany.value.sucursalesHabilitadas = !selectedCompany.value.sucursalesHabilitadas
+    updateDatabaseCompany(selectedCompany.value.id, {
+      sucursalesHabilitadas: !selectedCompany.value.sucursalesHabilitadas,
+    })
   }
 
   const agregarSucursal = (name) => {
@@ -382,22 +255,15 @@ export function useCompanyManagement() {
 
     if (!selectedCompany.value || !nombreSucursal) return
 
-    selectedCompany.value.sucursales = [
-      ...(selectedCompany.value.sucursales || []),
-      {
-        id: `sucursal-${selectedCompany.value.id}-${Date.now()}`,
-        name: nombreSucursal,
-        active: true,
-      },
-    ]
+    addDatabaseSucursal(selectedCompany.value.id, {
+      id: `sucursal-${selectedCompany.value.id}-${Date.now()}`,
+      name: nombreSucursal,
+      active: true,
+    })
   }
 
   const actualizarNombreSucursal = (sucursalId, name) => {
-    const sucursal = selectedCompany.value?.sucursales?.find((item) => item.id === sucursalId)
-
-    if (!sucursal) return
-
-    sucursal.name = name
+    updateSucursal(sucursalId, { name })
   }
 
   const alternarEstadoSucursal = (sucursalId) => {
@@ -405,43 +271,27 @@ export function useCompanyManagement() {
 
     if (!sucursal) return
 
-    sucursal.active = !sucursal.active
+    updateSucursal(sucursalId, { active: !sucursal.active })
   }
 
   const eliminarSucursal = (sucursalId) => {
-    if (!selectedCompany.value) return
-
-    selectedCompany.value.assets = (selectedCompany.value.assets || []).map((asset) => {
-      if (asset.sucursalId !== sucursalId) return asset
-
-      return {
-        ...asset,
-        sucursalId: null,
-      }
-    })
-
-    selectedCompany.value.sucursales = (selectedCompany.value.sucursales || []).filter(
-      (sucursal) => {
-        return sucursal.id !== sucursalId
-      },
-    )
+    deleteDatabaseSucursal(sucursalId)
   }
 
   const actualizarSucursalActivo = ({ assetId, sucursalId }) => {
     if (!selectedCompany.value) return
 
+    const assetBelongsToCompany = selectedCompany.value.assets?.some((asset) => {
+      return String(asset.id) === String(assetId)
+    })
     const siguienteSucursalId = sucursalId || null
     const sucursalExiste =
       !siguienteSucursalId ||
       selectedCompany.value.sucursales?.some((sucursal) => sucursal.id === siguienteSucursalId)
 
-    if (!sucursalExiste) return
+    if (!assetBelongsToCompany || !sucursalExiste) return
 
-    const asset = selectedCompany.value.assets?.find((item) => item.id === assetId)
-
-    if (!asset) return
-
-    asset.sucursalId = siguienteSucursalId
+    updateAsset(assetId, { sucursalId: siguienteSucursalId })
   }
 
   const getCompanyHealth = (company) => {

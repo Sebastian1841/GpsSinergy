@@ -26,6 +26,16 @@
 
         <div class="flex flex-wrap gap-2">
           <button
+            v-if="canImpersonate"
+            type="button"
+            class="h-9 rounded-lg bg-[#102372] px-3 text-[10px] font-black text-white transition hover:bg-[#0c1b59]"
+            @click="$emit('impersonate-user')"
+          >
+            Ver como usuario
+          </button>
+
+          <button
+            v-if="!user.isPlatformAdmin"
             type="button"
             class="h-9 rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#102372]/40"
             @click="$emit('edit-user')"
@@ -34,6 +44,7 @@
           </button>
 
           <button
+            v-if="!user.isPlatformAdmin"
             type="button"
             class="h-9 rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#ff6600] transition hover:border-[#ff6600]/50"
             @click="$emit('toggle-user-status')"
@@ -95,6 +106,7 @@
           @update-operational-scope="handleUpdateOperationalScope"
           @toggle-scope-option="handleToggleScopeOption"
           @toggle-scope-asset="handleToggleScopeAsset"
+          @toggle-scope-sucursal="handleToggleScopeSucursal"
         />
       </div>
     </template>
@@ -164,9 +176,14 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  canImpersonate: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits([
+  "impersonate-user",
   "edit-user",
   "toggle-user-status",
   "add-application-access",
@@ -179,6 +196,7 @@ const emit = defineEmits([
   "update-operational-scope",
   "toggle-scope-option",
   "toggle-scope-asset",
+  "toggle-scope-sucursal",
 ])
 
 const applicationToAddId = ref("")
@@ -241,5 +259,9 @@ const handleToggleScopeOption = (accessId, optionKey) => {
 
 const handleToggleScopeAsset = (accessId, assetId) => {
   emit("toggle-scope-asset", accessId, assetId)
+}
+
+const handleToggleScopeSucursal = (accessId, sucursalId) => {
+  emit("toggle-scope-sucursal", accessId, sucursalId)
 }
 </script>

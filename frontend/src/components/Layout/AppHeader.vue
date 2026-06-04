@@ -1,7 +1,8 @@
 <template>
   <header
     ref="headerRef"
-    class="relative z-30 border-b border-white/10 bg-gradient-to-r from-[#182230] via-[#1f2937] to-[#182230] shadow-[0_8px_30px_rgba(0,0,0,0.18)]"
+    class="relative border-b border-white/10 bg-gradient-to-r from-[#182230] via-[#1f2937] to-[#182230] shadow-[0_8px_30px_rgba(0,0,0,0.18)]"
+    :class="showDropdown ? 'z-[700]' : 'z-30'"
   >
     <div
       class="absolute inset-x-0 bottom-0 h-[2px] bg-gradient-to-r from-transparent via-[#ff6600]/70 to-transparent"
@@ -34,7 +35,7 @@
         </div>
       </div>
 
-      <div v-if="user.username" class="relative z-40 shrink-0">
+      <div v-if="currentUser" class="relative z-40 shrink-0">
         <button
           class="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-white backdrop-blur-sm transition-all duration-200 hover:border-white/20 hover:bg-white/[0.08]"
           aria-label="Abrir menú de usuario"
@@ -128,53 +129,18 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 import { useRouter } from "vue-router"
+import { useAuthSession } from "../../composables/auth/useAuthSession.js"
 import SvgIcon from "../icons/SvgIcon.vue"
 
 const emit = defineEmits(["toggle-sidebar"])
 
 const router = useRouter()
+const { currentUser, currentRole, logout: logoutSession } = useAuthSession()
 
-const user = ref({})
 const showDropdown = ref(false)
 const headerRef = ref(null)
 
-const safeParseUser = () => {
-  try {
-    const storedUser = localStorage.getItem("user")
-    return storedUser ? JSON.parse(storedUser) : {}
-  } catch {
-    return {}
-  }
-}
-
-const normalizeLocalUser = (rawUser = {}) => {
-  const raw = rawUser?.user || rawUser || {}
-
-  return {
-    username:
-      raw.username ||
-      raw.name ||
-      raw.nombre ||
-      raw.full_name ||
-      raw.user_metadata?.name ||
-      raw.user_metadata?.full_name ||
-      raw.email ||
-      "",
-    email: raw.email || raw.correo || raw.user_metadata?.email || "",
-    avatar:
-      raw.avatar ||
-      raw.avatar_url ||
-      raw.foto ||
-      raw.photoURL ||
-      raw.user_metadata?.avatar_url ||
-      null,
-    role: raw.role || raw.rol || raw.user_metadata?.role || null,
-  }
-}
-
 onMounted(() => {
-  user.value = normalizeLocalUser(safeParseUser())
-
   document.addEventListener("click", handleClickOutside)
   document.addEventListener("keydown", handleKeydown)
 })
@@ -184,28 +150,16 @@ onBeforeUnmount(() => {
   document.removeEventListener("keydown", handleKeydown)
 })
 
-const userName = computed(() => user.value.username || "Invitado")
+const userName = computed(() => {
+  return currentUser.value?.name || currentUser.value?.username || "Invitado"
+})
 
 const userInitial = computed(() => {
-  const name = user.value.username || "I"
-  return name.charAt(0).toUpperCase()
+  return userName.value.charAt(0).toUpperCase()
 })
 
 const userRole = computed(() => {
-  const role = user.value?.role
-
-  const key = typeof role === "string" ? role : role?.key
-
-  if (!key) return "Invitado"
-
-  const rolesMap = {
-    admin: "Administrador",
-    tech: "Administrador Técnico",
-    viewer: "Visualizador",
-    mantenciones: "Mantenciones",
-  }
-
-  return rolesMap[key] || key
+  return currentRole.value?.name || "Sin rol asignado"
 })
 
 const toggleDropdown = () => {
@@ -227,9 +181,8 @@ const handleKeydown = (event) => {
 }
 
 const logout = () => {
-  localStorage.removeItem("user")
-  user.value = {}
+  logoutSession()
   showDropdown.value = false
-  router.push("/")
+  router.replace("/login")
 }
 </script>

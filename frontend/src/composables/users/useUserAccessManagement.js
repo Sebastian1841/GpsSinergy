@@ -1,54 +1,23 @@
 import { computed, ref, watch } from "vue"
 
+import { useMockDatabase } from "../mock/useMockDatabase.js"
 import { useDebouncedValue } from "../ui/useDebouncedValue.js"
 
-import {
-  mockApplications,
-  mockCompanies,
-  mockModuleFunctions,
-  mockOperationalScopes,
-  mockPermissions,
-  mockRoles,
-  mockSystemModules,
-  mockUserAccesses,
-  mockUsers,
-} from "../../data/users/mockUserAccessData.js"
-
-import { cloneData, userMatchesSearch } from "../../utils/users/userAccessUtils.js"
+import { userMatchesSearch } from "../../utils/users/userAccessUtils.js"
 
 const DEFAULT_VISIBLE_USER_LIMIT = 50
 const USER_LIMIT_INCREMENT = 50
 
-const mockAssets = [
-  {
-    id: "asset-001",
-    patent: "TWDR56",
-    name: "Camioneta JAC",
-    applicationId: "app-001",
-    status: "active",
-  },
-  {
-    id: "asset-002",
-    patent: "GKZK26",
-    name: "Camión reparto",
-    applicationId: "app-001",
-    status: "active",
-  },
-  {
-    id: "asset-003",
-    patent: "MAESOL",
-    name: "Vehículo supervisor",
-    applicationId: "app-002",
-    status: "active",
-  },
-  {
-    id: "asset-004",
-    patent: "SSGY01",
-    name: "Camioneta SsangYong",
-    applicationId: "app-003",
-    status: "inactive",
-  },
-]
+const buildUniqueSequentialId = (prefix, items = []) => {
+  const expression = new RegExp(`^${prefix}-(\\d+)$`)
+  const highestId = items.reduce((highest, item) => {
+    const match = String(item.id || "").match(expression)
+
+    return match ? Math.max(highest, Number(match[1])) : highest
+  }, 0)
+
+  return `${prefix}-${String(highestId + 1).padStart(3, "0")}`
+}
 
 const createEmptyPermissions = () => {
   return {
@@ -157,24 +126,30 @@ const createEmptyDraftUser = (initialApplicationId = null) => {
 }
 
 export function useUserAccessManagement() {
-  const users = ref(cloneData(mockUsers))
-  const modules = ref(cloneData(mockSystemModules))
-  const moduleFunctions = ref(cloneData(mockModuleFunctions))
-  const accesses = ref(
-    cloneData(mockUserAccesses).map((access) => {
-      return normalizeAccess({
-        access,
-        modules: modules.value,
-        moduleFunctions: moduleFunctions.value,
-      })
-    }),
-  )
-  const companies = ref(cloneData(mockCompanies))
-  const applications = ref(cloneData(mockApplications))
-  const permissions = ref(cloneData(mockPermissions))
-  const scopes = ref(cloneData(mockOperationalScopes))
-  const roles = ref(cloneData(mockRoles))
-  const assets = ref(cloneData(mockAssets))
+  const {
+    users,
+    accesses,
+    companies,
+    applications,
+    modules,
+    moduleFunctions,
+    permissions,
+    scopes,
+    roles,
+    assets,
+    createUser: createDatabaseUser,
+    updateUser: updateDatabaseUser,
+    createAccess: createDatabaseAccess,
+    deleteAccess: deleteDatabaseAccess,
+  } = useMockDatabase()
+
+  accesses.value = accesses.value.map((access) => {
+    return normalizeAccess({
+      access,
+      modules: modules.value,
+      moduleFunctions: moduleFunctions.value,
+    })
+  })
 
   const searchTerm = ref("")
   const selectedRole = ref("all")
@@ -374,13 +349,19 @@ export function useUserAccessManagement() {
     const password = draftUser.value.password.trim()
     const email = draftUser.value.email.trim()
 
-    if (!name || !username || !password || !email) return
+    const identityAlreadyExists = users.value.some((user) => {
+      return (
+        user.username?.trim().toLowerCase() === username.toLowerCase() ||
+        user.email?.trim().toLowerCase() === email.toLowerCase()
+      )
+    })
 
-    const nextNumber = users.value.length + 1
-    const userId = `user-${String(nextNumber).padStart(3, "0")}`
-    const accessId = `access-${String(accesses.value.length + 1).padStart(3, "0")}`
+    if (!name || !username || !password || !email || identityAlreadyExists) return
 
-    users.value.unshift({
+    const userId = buildUniqueSequentialId("user", users.value)
+    const accessId = buildUniqueSequentialId("access", accesses.value)
+
+    createDatabaseUser({
       id: userId,
       name,
       username,
@@ -401,7 +382,7 @@ export function useUserAccessManagement() {
 
       access.role = draftUser.value.initialRole
 
-      accesses.value.unshift(access)
+      createDatabaseAccess(access)
     }
 
     selectedUserId.value = userId
@@ -414,15 +395,31 @@ export function useUserAccessManagement() {
     const user = users.value.find((item) => item.id === draftUser.value.id)
 
     if (!user) return
+    if (user.isPlatformAdmin) return
 
-    user.name = draftUser.value.name.trim()
-    user.username = draftUser.value.username.trim()
-    user.email = draftUser.value.email.trim()
-    user.status = draftUser.value.status
+    const nextUsername = draftUser.value.username.trim()
+    const nextEmail = draftUser.value.email.trim()
+    const identityAlreadyExists = users.value.some((item) => {
+      return (
+        item.id !== user.id &&
+        (item.username?.trim().toLowerCase() === nextUsername.toLowerCase() ||
+          item.email?.trim().toLowerCase() === nextEmail.toLowerCase())
+      )
+    })
 
-    if (draftUser.value.password.trim()) {
-      user.password = draftUser.value.password.trim()
-    }
+    if (identityAlreadyExists) return
+
+    updateDatabaseUser(user.id, {
+      name: draftUser.value.name.trim(),
+      username: nextUsername,
+      email: nextEmail,
+      status: draftUser.value.status,
+      ...(draftUser.value.password.trim()
+        ? {
+            password: draftUser.value.password.trim(),
+          }
+        : {}),
+    })
 
     const primaryAccess = selectedUserAccesses.value[0]
     if (primaryAccess) {
@@ -443,6 +440,7 @@ export function useUserAccessManagement() {
 
   const toggleSelectedUserStatus = () => {
     if (!selectedUser.value) return
+    if (selectedUser.value.isPlatformAdmin) return
 
     selectedUser.value.status = selectedUser.value.status === "active" ? "inactive" : "active"
   }
@@ -456,9 +454,9 @@ export function useUserAccessManagement() {
 
     if (alreadyExists) return
 
-    const accessId = `access-${String(accesses.value.length + 1).padStart(3, "0")}`
+    const accessId = buildUniqueSequentialId("access", accesses.value)
 
-    accesses.value.unshift(
+    createDatabaseAccess(
       createDefaultAccess({
         id: accessId,
         userId: selectedUser.value.id,
@@ -470,7 +468,7 @@ export function useUserAccessManagement() {
   }
 
   const removeApplicationAccess = (accessId) => {
-    accesses.value = accesses.value.filter((access) => access.id !== accessId)
+    deleteDatabaseAccess(accessId)
   }
 
   const updateAccessRole = (accessId, roleId) => {
@@ -611,6 +609,20 @@ export function useUserAccessManagement() {
 
     if (scopeType === "sucursal") {
       access.scope.assetIds = []
+
+      const application = applicationsById.value.get(access.applicationId)
+      const activeSucursales = (application?.sucursales || []).filter((sucursal) => {
+        return sucursal.active !== false
+      })
+      const validSucursalIds = new Set(activeSucursales.map((sucursal) => String(sucursal.id)))
+      const selectedSucursalIds = (access.scope.sucursalIds || []).filter((sucursalId) => {
+        return validSucursalIds.has(String(sucursalId))
+      })
+
+      access.scope.sucursalIds =
+        selectedSucursalIds.length || !activeSucursales.length
+          ? selectedSucursalIds
+          : [activeSucursales[0].id]
     }
 
     if (scopeType === "selected-assets") {
@@ -634,8 +646,10 @@ export function useUserAccessManagement() {
 
   const toggleScopeAsset = (accessId, assetId) => {
     const access = accesses.value.find((item) => item.id === accessId)
+    const asset = assets.value.find((item) => String(item.id) === String(assetId))
 
-    if (!access || !assetId) return
+    if (!access || !asset) return
+    if (String(asset.applicationId) !== String(access.applicationId)) return
 
     if (!Array.isArray(access.scope.assetIds)) {
       access.scope.assetIds = []
@@ -648,6 +662,31 @@ export function useUserAccessManagement() {
 
     access.scope.assetIds = [...access.scope.assetIds, assetId]
     access.scope.type = "selected-assets"
+  }
+
+  const toggleScopeSucursal = (accessId, sucursalId) => {
+    const access = accesses.value.find((item) => item.id === accessId)
+    const application = applicationsById.value.get(access?.applicationId)
+    const sucursal = application?.sucursales?.find((item) => {
+      return String(item.id) === String(sucursalId)
+    })
+
+    if (!access || !sucursal || sucursal.active === false) return
+
+    if (!Array.isArray(access.scope.sucursalIds)) {
+      access.scope.sucursalIds = []
+    }
+
+    const isSelected = access.scope.sucursalIds.some((id) => {
+      return String(id) === String(sucursalId)
+    })
+
+    access.scope.sucursalIds = isSelected
+      ? access.scope.sucursalIds.filter((id) => String(id) !== String(sucursalId))
+      : [...access.scope.sucursalIds, sucursal.id]
+
+    access.scope.assetIds = []
+    access.scope.type = "sucursal"
   }
 
   return {
@@ -707,5 +746,6 @@ export function useUserAccessManagement() {
     updateOperationalScope,
     toggleScopeOption,
     toggleScopeAsset,
+    toggleScopeSucursal,
   }
 }

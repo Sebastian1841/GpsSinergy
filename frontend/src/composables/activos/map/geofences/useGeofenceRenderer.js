@@ -87,14 +87,17 @@ export function createGeofenceRendererController({
 
     if (!layer) return null
 
-    layer.bindTooltip(`${geofence.name} · clic para editar`, {
-      direction: "top",
-      sticky: true,
-      className: "sinergy-geofence-tooltip",
-    })
+    layer.bindTooltip(
+      props.canEditGeofences === false ? geofence.name : `${geofence.name} · clic para editar`,
+      {
+        direction: "top",
+        sticky: true,
+        className: "sinergy-geofence-tooltip",
+      },
+    )
 
     layer.on("click", () => {
-      if (drawMode.value) return
+      if (drawMode.value || props.canEditGeofences === false) return
 
       onStartEditGeofence(geofence.id)
     })

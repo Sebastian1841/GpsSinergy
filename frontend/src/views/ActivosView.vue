@@ -11,13 +11,20 @@
         <FleetListPanel
           :activos="filteredActivos"
           :all-activos="tableActivos"
-          :geofences="geofences"
+          :geofences="permittedGeofences"
           :selected-geofence-id="selectedGeofenceId"
           :selected-id="selectedId"
           :active-filter="statusFilter"
           :active-section="activeSidebarSection"
           :search="sidebarSearch"
           :empresa-sucursales="empresaSucursales"
+          :sucursal-companies="sucursalCompanies"
+          :selected-sucursal-company-id="selectedSucursalCompanyId"
+          :show-sucursal-company-selector="activeCompanyId === 'general' && isPlatformAdmin"
+          :allowed-sections="allowedSidebarSections"
+          :can-manage-assets="canManageAssets"
+          :can-create-assets="canCreateAssets"
+          :can-edit-geofences="canEditGeofences"
           class="min-h-0 flex-1"
           @select="selectActivo"
           @select-filter="setStatusFilter"
@@ -30,6 +37,7 @@
           @device-action="handleDeviceAction"
           @geofence-selected="handleSidebarGeofenceSelected"
           @geofence-delete="handleGeofenceDeleted"
+          @select-sucursal-company="selectSucursalCompany"
           @alternar-sucursales-habilitadas="alternarSucursalesFlotaHabilitadas"
           @agregar-sucursal="agregarSucursalFlota"
           @actualizar-nombre-sucursal="actualizarNombreSucursalFlota"
@@ -59,16 +67,18 @@
       <div class="flex min-h-0 flex-col overflow-hidden bg-[#eef2f7]">
         <div class="relative grid min-h-0 flex-1 overflow-hidden p-3">
           <ActivosMapPanel
-            :activos="mapActivos"
-            :all-activos="tableActivos"
+            :activos="permittedMapActivos"
+            :all-activos="permittedMapStatsActivos"
             :telemetry-batch="latestTelemetryBatch"
             :selected-id="selectedId"
             :selected-geofence-id="selectedGeofenceId"
-            :geofences="geofences"
+            :geofences="permittedGeofences"
             :itinerary-route="selectedItineraryRoute"
             :selected-itinerary-point="selectedItineraryPoint"
             :active-filter="statusFilter"
             :app-sidebar-open="props.appSidebarOpen"
+            :can-view-geofences="canViewGeofences"
+            :can-edit-geofences="canEditGeofences"
             class="min-h-0"
             @select="selectActivo"
             @select-filter="setStatusFilter"
@@ -111,10 +121,9 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount } from "vue"
+import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 
-import { mockActivos } from "../data/mockActivos"
 import { createMockFleetSnapshot } from "../data/mockTelemetryStream.js"
 import { normalizeId } from "../utils/idUtils.js"
 
@@ -130,7 +139,9 @@ import { useFleetTelemetry } from "../composables/activos/fleet/useFleetTelemetr
 import { useSucursalesFlota } from "../composables/activos/fleet/useSucursalesFlota.js"
 import { useGeofences } from "../composables/activos/geocercas/useGeofences.js"
 import { useConfirmDialog } from "../composables/ui/useConfirmDialog.js"
-import { usePersistedFleetState } from "../composables/activos/fleet/usePersistedFleetState.js"
+import { usePersistedFleetLayout } from "../composables/activos/fleet/usePersistedFleetLayout.js"
+import { useMockDatabase } from "../composables/mock/useMockDatabase.js"
+import { useAccessControl } from "../composables/auth/useAccessControl.js"
 
 import { useActivosCrud } from "../composables/activos/view/useActivosCrud.js"
 import { useActivosFilters } from "../composables/activos/view/useActivosFilters.js"
@@ -146,6 +157,8 @@ const props = defineProps({
 })
 
 const route = useRoute()
+const { isPlatformAdmin, accessibleCompanies, visibleAssets, canAccessFunction } =
+  useAccessControl()
 
 const STRESS_FLEET_COUNT = Number(import.meta.env.VITE_FLEET_STRESS_COUNT || 0)
 const STRESS_BATCH_SIZE = Number(import.meta.env.VITE_FLEET_STRESS_BATCH_SIZE || 250)
@@ -157,19 +170,120 @@ const MOCK_TELEMETRY_INTERVAL_MS = 1000
 const MOCK_TELEMETRY_BATCH_SIZE = STRESS_FLEET_COUNT > 0 ? STRESS_BATCH_SIZE : 18
 const TABLE_SYNC_INTERVAL_MS = 2500
 
-const baseMockActivos =
+const stressFleetSnapshot =
   import.meta.env.DEV && STRESS_FLEET_COUNT > 0
     ? createMockFleetSnapshot({
         count: STRESS_FLEET_COUNT,
       })
-    : mockActivos
+    : null
 
-const { geofences, createGeofence, updateGeofence, deleteGeofence } = useGeofences()
+const {
+  assets: databaseAssets,
+  getApplicationForCompany,
+  createAsset: createDatabaseAsset,
+  updateAsset: updateDatabaseAsset,
+  deleteAsset: deleteDatabaseAsset,
+} = useMockDatabase()
+
+const activeCompanyId = computed(() => String(route.params.empresaId || "general"))
+const permissionCompanyId = computed(() => {
+  return activeCompanyId.value === "general" ? null : activeCompanyId.value
+})
+
+const canManageAssets = computed(() => {
+  return canAccessFunction("gps", permissionCompanyId.value, "edit")
+})
+
+const canCreateAssets = computed(() => {
+  return activeCompanyId.value !== "general" && canManageAssets.value
+})
+
+const canViewGps = computed(() => {
+  return canAccessFunction("gps", permissionCompanyId.value, "view")
+})
+
+const canViewItineraries = computed(() => {
+  return canAccessFunction("itineraries", permissionCompanyId.value, "view")
+})
+
+const canViewGeofences = computed(() => {
+  return canAccessFunction("geofences", permissionCompanyId.value, "view")
+})
+
+const canEditGeofences = computed(() => {
+  return (
+    activeCompanyId.value !== "general" &&
+    canAccessFunction("geofences", permissionCompanyId.value, "edit")
+  )
+})
+
+const allowedSidebarSections = computed(() => {
+  const sections = []
+
+  if (canViewGps.value) sections.push("activos")
+  if (canViewItineraries.value) sections.push("itinerarios")
+  if (canViewGeofences.value) sections.push("geocercas")
+  if (isPlatformAdmin.value) sections.push("sucursales")
+
+  return sections
+})
+
+const sucursalCompanies = computed(() => {
+  return accessibleCompanies.value.map((company) => ({
+    id: String(company.id),
+    name: company.name,
+  }))
+})
+
+const selectedSucursalCompanyId = ref("")
+
+watch(
+  [activeCompanyId, sucursalCompanies],
+  ([routeCompanyId, companies]) => {
+    if (routeCompanyId !== "general") {
+      selectedSucursalCompanyId.value = routeCompanyId
+      return
+    }
+
+    const selectionExists = companies.some((company) => {
+      return company.id === selectedSucursalCompanyId.value
+    })
+
+    if (!selectionExists) {
+      selectedSucursalCompanyId.value = companies[0]?.id || ""
+    }
+  },
+  { immediate: true },
+)
+
+const selectSucursalCompany = (companyId) => {
+  const exists = sucursalCompanies.value.some((company) => company.id === String(companyId))
+
+  if (exists) {
+    selectedSucursalCompanyId.value = String(companyId)
+  }
+}
+
+const baseMockActivos = computed(() => {
+  if (stressFleetSnapshot && isPlatformAdmin.value) return stressFleetSnapshot
+  if (activeCompanyId.value === "general") return visibleAssets.value
+
+  return visibleAssets.value.filter((activo) => {
+    return String(activo.companyId) === activeCompanyId.value
+  })
+})
+
+const { geofences, createGeofence, updateGeofence, deleteGeofence } = useGeofences({
+  companyId: activeCompanyId,
+})
+
+const permittedGeofences = computed(() => {
+  return canViewGeofences.value ? geofences.value : []
+})
 
 const { confirmDialog, openConfirmDialog, confirmAction, cancelAction } = useConfirmDialog()
 
-const { customActivos, deletedActivoIds, editedActivos, leftPanelWidth, persistPanelWidth } =
-  usePersistedFleetState()
+const { leftPanelWidth, persistPanelWidth } = usePersistedFleetLayout()
 
 const {
   activos: telemetryActivos,
@@ -230,7 +344,7 @@ const {
 } = filters
 
 selection = useActivosSelection({
-  baseSelectedId: baseMockActivos[0]?.id || null,
+  baseSelectedId: baseMockActivos.value[0]?.id || null,
   getMapActivos: () => telemetrySync?.mapActivos.value || [],
   activeSidebarSection,
   refreshMapLayout,
@@ -255,15 +369,12 @@ const {
   showActivoModal,
   showEditActivoModal,
   editingActivo,
-  openAddActivoModal,
-  handleAddActivo,
-  handleUpdateActivo,
-  handleDeviceAction,
+  openAddActivoModal: openAddActivoModalBase,
+  handleAddActivo: handleAddActivoBase,
+  handleUpdateActivo: handleUpdateActivoBase,
+  handleDeviceAction: handleDeviceActionBase,
 } = useActivosCrud({
   baseMockActivos,
-  customActivos,
-  deletedActivoIds,
-  editedActivos,
 
   getNormalizedActivos: () => telemetrySync?.normalizedActivos.value || [],
   getMapActivos: () => telemetrySync?.mapActivos.value || [],
@@ -279,7 +390,50 @@ const {
   closeTerminalModal,
   openFleetTerminalModal,
   refreshMapLayout,
+  createActivo: (activo) => {
+    if (!canCreateAssets.value) return
+
+    const companyId = activeCompanyId.value
+    const application = getApplicationForCompany(companyId)
+
+    createDatabaseAsset({
+      ...activo,
+      companyId,
+      applicationId: application?.id || null,
+      sucursalId: null,
+      patente: activo.patente || `MOCK-${String(databaseAssets.value.length + 1).padStart(3, "0")}`,
+      patent: activo.patente || `MOCK-${String(databaseAssets.value.length + 1).padStart(3, "0")}`,
+    })
+  },
+  updateActivo: (assetId, changes) => {
+    if (!canManageAssets.value) return
+    updateDatabaseAsset(assetId, changes)
+  },
+  removeActivo: (assetId) => {
+    if (!canManageAssets.value) return
+    deleteDatabaseAsset(assetId)
+  },
 })
+
+const openAddActivoModal = () => {
+  if (!canCreateAssets.value) return
+  openAddActivoModalBase()
+}
+
+const handleAddActivo = (payload) => {
+  if (!canCreateAssets.value) return
+  handleAddActivoBase(payload)
+}
+
+const handleUpdateActivo = (payload) => {
+  if (!canManageAssets.value) return
+  handleUpdateActivoBase(payload)
+}
+
+const handleDeviceAction = (payload) => {
+  if (!canManageAssets.value) return
+  handleDeviceActionBase(payload)
+}
 
 telemetrySync = useActivosTelemetrySync({
   telemetryActivos,
@@ -301,6 +455,14 @@ telemetrySync = useActivosTelemetrySync({
 const { tableActivos, latestTelemetryBatch, mapActivos, filteredActivos, cleanupTelemetrySync } =
   telemetrySync
 
+const permittedMapActivos = computed(() => {
+  return canViewGps.value ? mapActivos.value : []
+})
+
+const permittedMapStatsActivos = computed(() => {
+  return canViewGps.value ? tableActivos.value : []
+})
+
 const {
   empresaSucursales,
   alternarSucursalesHabilitadas: alternarSucursalesFlotaHabilitadas,
@@ -311,10 +473,12 @@ const {
   actualizarSucursalActivo: actualizarSucursalActivoFlota,
 } = useSucursalesFlota({
   activos: tableActivos,
-  companyId: String(route.params.empresaId || "general"),
+  companyId: selectedSucursalCompanyId,
 })
 
 const handleGeofenceCreated = async (geofence) => {
+  if (!canEditGeofences.value) return
+
   createGeofence(geofence)
 
   selectedGeofenceId.value = geofence?.id || null
@@ -323,10 +487,14 @@ const handleGeofenceCreated = async (geofence) => {
 }
 
 const handleGeofenceUpdated = (updatedGeofence) => {
+  if (!canEditGeofences.value) return
+
   updateGeofence(updatedGeofence)
 }
 
 const handleGeofenceDeleted = async (geofenceId) => {
+  if (!canEditGeofences.value) return
+
   deleteGeofence(geofenceId)
 
   if (normalizeId(selectedGeofenceId.value) === normalizeId(geofenceId)) {

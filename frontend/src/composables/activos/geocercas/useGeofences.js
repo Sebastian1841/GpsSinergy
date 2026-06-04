@@ -1,4 +1,4 @@
-import { ref, watch } from "vue"
+import { computed, ref, unref, watch } from "vue"
 
 import { getGeofenceColor, removeLegacyGeofenceColorFields } from "../../../utils/geofenceUtils.js"
 
@@ -165,13 +165,28 @@ const persistGeofences = (geofences) => {
   }
 }
 
-export function useGeofences() {
-  const geofences = ref(readStoredGeofences())
+export function useGeofences({ companyId = "general" } = {}) {
+  const allGeofences = ref(readStoredGeofences())
+  const resolvedCompanyId = computed(() => String(unref(companyId) || "general"))
+
+  const geofences = computed(() => {
+    if (resolvedCompanyId.value === "general") return allGeofences.value
+
+    return allGeofences.value.filter((geofence) => {
+      return String(geofence.companyId || "") === resolvedCompanyId.value
+    })
+  })
 
   const updateGeofence = (updatedGeofence) => {
     if (!updatedGeofence?.id) return
 
-    geofences.value = geofences.value.map((geofence) => {
+    const visibleGeofenceExists = geofences.value.some((geofence) => {
+      return normalizeGeofenceId(geofence.id) === normalizeGeofenceId(updatedGeofence.id)
+    })
+
+    if (!visibleGeofenceExists) return
+
+    allGeofences.value = allGeofences.value.map((geofence) => {
       if (normalizeGeofenceId(geofence.id) !== normalizeGeofenceId(updatedGeofence.id)) {
         return geofence
       }
@@ -186,7 +201,10 @@ export function useGeofences() {
   }
 
   const createGeofence = (geofence) => {
-    const normalizedGeofence = normalizeGeofence(geofence)
+    const normalizedGeofence = normalizeGeofence({
+      ...geofence,
+      companyId: resolvedCompanyId.value,
+    })
 
     if (!normalizedGeofence) return
 
@@ -199,20 +217,33 @@ export function useGeofences() {
       return
     }
 
-    geofences.value = [...geofences.value, normalizedGeofence]
+    allGeofences.value = [...allGeofences.value, normalizedGeofence]
   }
 
   const deleteGeofence = (geofenceId) => {
-    geofences.value = geofences.value.filter((geofence) => {
+    const visibleGeofenceExists = geofences.value.some((geofence) => {
+      return normalizeGeofenceId(geofence.id) === normalizeGeofenceId(geofenceId)
+    })
+
+    if (!visibleGeofenceExists) return
+
+    allGeofences.value = allGeofences.value.filter((geofence) => {
       return normalizeGeofenceId(geofence.id) !== normalizeGeofenceId(geofenceId)
     })
   }
 
   const clearGeofences = () => {
-    geofences.value = []
+    if (resolvedCompanyId.value === "general") {
+      allGeofences.value = []
+      return
+    }
+
+    allGeofences.value = allGeofences.value.filter((geofence) => {
+      return String(geofence.companyId || "") !== resolvedCompanyId.value
+    })
   }
 
-  watch(geofences, (nextGeofences) => {
+  watch(allGeofences, (nextGeofences) => {
     persistGeofences(nextGeofences)
   })
 

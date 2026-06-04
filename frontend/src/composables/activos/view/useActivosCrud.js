@@ -1,4 +1,4 @@
-import { computed, ref } from "vue"
+import { computed, ref, unref } from "vue"
 
 const fallbackDrivers = [
   "Carlos Ramírez",
@@ -27,9 +27,9 @@ const formatKm = (value) => {
 
 export function useActivosCrud({
   baseMockActivos,
-  customActivos,
-  deletedActivoIds,
-  editedActivos,
+  customActivos = ref([]),
+  deletedActivoIds = ref([]),
+  editedActivos = ref({}),
   getNormalizedActivos,
   getMapActivos,
   selectedId,
@@ -42,6 +42,9 @@ export function useActivosCrud({
   closeTerminalModal,
   openFleetTerminalModal,
   refreshMapLayout,
+  createActivo,
+  updateActivo,
+  removeActivo,
 }) {
   const showActivoModal = ref(false)
   const showEditActivoModal = ref(false)
@@ -55,10 +58,14 @@ export function useActivosCrud({
     })
   }
 
+  const getBaseActivos = () => {
+    return unref(baseMockActivos) || []
+  }
+
   const rawActivos = computed(() => {
     const deletedIds = new Set(deletedActivoIds.value.map((id) => String(id)))
 
-    return [...customActivos.value, ...baseMockActivos]
+    return [...customActivos.value, ...getBaseActivos()]
       .filter((activo) => {
         return !deletedIds.has(String(activo.id))
       })
@@ -147,11 +154,7 @@ export function useActivosCrud({
   })
 
   const createActivoId = () => {
-    const ids = [...customActivos.value, ...baseMockActivos]
-      .map((activo) => Number(activo.id))
-      .filter((id) => Number.isFinite(id))
-
-    return Math.max(0, ...ids) + 1
+    return `asset-${Date.now()}`
   }
 
   const getCurrentTimeLabel = () => {
@@ -259,7 +262,11 @@ export function useActivosCrud({
       lng: -70.6693 + customActivos.value.length * 0.002,
     }
 
-    customActivos.value = [newActivo, ...customActivos.value]
+    if (createActivo) {
+      createActivo(newActivo)
+    } else {
+      customActivos.value = [newActivo, ...customActivos.value]
+    }
 
     sectionSearch.value = {
       ...sectionSearch.value,
@@ -303,9 +310,13 @@ export function useActivosCrud({
 
     const data = buildActivoDataFromForm(form, baseActivo)
 
-    editedActivos.value = {
-      ...editedActivos.value,
-      [String(id)]: data,
+    if (updateActivo) {
+      updateActivo(id, data)
+    } else {
+      editedActivos.value = {
+        ...editedActivos.value,
+        [String(id)]: data,
+      }
     }
 
     selectedId.value = id
@@ -338,21 +349,25 @@ export function useActivosCrud({
 
     if (!confirmed) return
 
-    customActivos.value = customActivos.value.filter((item) => {
-      return String(item.id) !== String(activo.id)
-    })
+    if (removeActivo) {
+      removeActivo(activo.id)
+    } else {
+      customActivos.value = customActivos.value.filter((item) => {
+        return String(item.id) !== String(activo.id)
+      })
 
-    if (!deletedActivoIds.value.some((id) => String(id) === String(activo.id))) {
-      deletedActivoIds.value = [...deletedActivoIds.value, activo.id]
+      if (!deletedActivoIds.value.some((id) => String(id) === String(activo.id))) {
+        deletedActivoIds.value = [...deletedActivoIds.value, activo.id]
+      }
+
+      const nextEditedActivos = {
+        ...editedActivos.value,
+      }
+
+      delete nextEditedActivos[String(activo.id)]
+
+      editedActivos.value = nextEditedActivos
     }
-
-    const nextEditedActivos = {
-      ...editedActivos.value,
-    }
-
-    delete nextEditedActivos[String(activo.id)]
-
-    editedActivos.value = nextEditedActivos
 
     removeTerminalHistory(activo)
 

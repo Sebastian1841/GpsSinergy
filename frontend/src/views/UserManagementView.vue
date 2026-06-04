@@ -48,6 +48,8 @@
             :scopes="scopes"
             :roles="roles"
             :assets="assets"
+            :can-impersonate="canImpersonateSelectedUser"
+            @impersonate-user="handleImpersonateSelectedUser"
             @edit-user="openEditUserModal"
             @toggle-user-status="toggleSelectedUserStatus"
             @add-application-access="addApplicationAccess"
@@ -60,6 +62,7 @@
             @update-operational-scope="updateOperationalScope"
             @toggle-scope-option="toggleScopeOption"
             @toggle-scope-asset="toggleScopeAsset"
+            @toggle-scope-sucursal="toggleScopeSucursal"
           />
         </main>
       </div>
@@ -79,6 +82,9 @@
 </template>
 
 <script setup>
+import { computed } from "vue"
+import { useRoute, useRouter } from "vue-router"
+
 import UserAccessDetail from "../components/users/UserAccessDetail.vue"
 import UserEditorModal from "../components/users/UserEditorModal.vue"
 import UserFiltersBar from "../components/users/UserFiltersBar.vue"
@@ -86,6 +92,11 @@ import UserListPanel from "../components/users/UserListPanel.vue"
 import UserManagementHeader from "../components/users/UserManagementHeader.vue"
 
 import { useUserAccessManagement } from "../composables/users/useUserAccessManagement.js"
+import { useAuthSession } from "../composables/auth/useAuthSession.js"
+
+const route = useRoute()
+const router = useRouter()
+const { canImpersonateUser, startImpersonation, defaultAuthenticatedRoute } = useAuthSession()
 
 const {
   accesses,
@@ -136,7 +147,22 @@ const {
   updateOperationalScope,
   toggleScopeOption,
   toggleScopeAsset,
+  toggleScopeSucursal,
 } = useUserAccessManagement()
+
+const canImpersonateSelectedUser = computed(() => {
+  return canImpersonateUser(selectedUser.value?.id)
+})
+
+const handleImpersonateSelectedUser = async () => {
+  if (!selectedUser.value) return
+
+  const result = startImpersonation(selectedUser.value.id, route.fullPath)
+
+  if (!result.ok) return
+
+  await router.replace(defaultAuthenticatedRoute.value)
+}
 
 const updateDraftUser = (nextDraftUser) => {
   draftUser.value = nextDraftUser

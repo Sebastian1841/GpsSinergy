@@ -25,6 +25,14 @@
       @toggle-asset="$emit('toggle-scope-asset', access.id, $event)"
     />
 
+    <UserSucursalScopeSelector
+      v-if="access.scope?.type === 'sucursal'"
+      :sucursales="sucursales"
+      :assets="scopeAssets"
+      :selected-ids="access.scope?.sucursalIds || []"
+      @toggle-sucursal="$emit('toggle-scope-sucursal', access.id, $event)"
+    />
+
     <div class="mt-3 grid gap-2">
       <button
         type="button"
@@ -59,6 +67,7 @@
 import { computed } from "vue"
 
 import UserAssetScopeSelector from "./UserAssetScopeSelector.vue"
+import UserSucursalScopeSelector from "./UserSucursalScopeSelector.vue"
 
 const props = defineProps({
   access: {
@@ -73,9 +82,18 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  sucursales: {
+    type: Array,
+    default: () => [],
+  },
 })
 
-defineEmits(["update-operational-scope", "toggle-scope-option", "toggle-scope-asset"])
+defineEmits([
+  "update-operational-scope",
+  "toggle-scope-option",
+  "toggle-scope-asset",
+  "toggle-scope-sucursal",
+])
 
 const mainScopes = computed(() => {
   return props.scopes.filter((scope) => {
@@ -85,14 +103,14 @@ const mainScopes = computed(() => {
 
 const scopeAssets = computed(() => {
   return props.assets.filter((asset) => {
-    return !asset.applicationId || asset.applicationId === props.access.applicationId
+    return asset.applicationId === props.access.applicationId
   })
 })
 
 const getScopeLabel = (scopeId) => {
   const labels = {
     "all-assets": "Toda la flota",
-    sucursal: "Solo sucursal asignada",
+    sucursal: "Sucursales seleccionadas",
     "selected-assets": "Solo activos seleccionados",
   }
 
