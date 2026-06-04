@@ -17,6 +17,7 @@
           :active-filter="statusFilter"
           :active-section="activeSidebarSection"
           :search="sidebarSearch"
+          :empresa-sucursales="empresaSucursales"
           class="min-h-0 flex-1"
           @select="selectActivo"
           @select-filter="setStatusFilter"
@@ -29,6 +30,12 @@
           @device-action="handleDeviceAction"
           @geofence-selected="handleSidebarGeofenceSelected"
           @geofence-delete="handleGeofenceDeleted"
+          @alternar-sucursales-habilitadas="alternarSucursalesFlotaHabilitadas"
+          @agregar-sucursal="agregarSucursalFlota"
+          @actualizar-nombre-sucursal="actualizarNombreSucursalFlota"
+          @alternar-estado-sucursal="alternarEstadoSucursalFlota"
+          @eliminar-sucursal="eliminarSucursalFlota"
+          @actualizar-sucursal-activo="actualizarSucursalActivoFlota"
         />
       </div>
 
@@ -105,6 +112,7 @@
 
 <script setup>
 import { onBeforeUnmount } from "vue"
+import { useRoute } from "vue-router"
 
 import { mockActivos } from "../data/mockActivos"
 import { createMockFleetSnapshot } from "../data/mockTelemetryStream.js"
@@ -119,6 +127,7 @@ import ConfirmDialog from "../components/ui/ConfirmDialog.vue"
 
 import { useFleetTerminal } from "../composables/activos/fleet/useFleetTerminal"
 import { useFleetTelemetry } from "../composables/activos/fleet/useFleetTelemetry.js"
+import { useSucursalesFlota } from "../composables/activos/fleet/useSucursalesFlota.js"
 import { useGeofences } from "../composables/activos/geocercas/useGeofences.js"
 import { useConfirmDialog } from "../composables/ui/useConfirmDialog.js"
 import { usePersistedFleetState } from "../composables/activos/fleet/usePersistedFleetState.js"
@@ -135,6 +144,8 @@ const props = defineProps({
     default: false,
   },
 })
+
+const route = useRoute()
 
 const STRESS_FLEET_COUNT = Number(import.meta.env.VITE_FLEET_STRESS_COUNT || 0)
 const STRESS_BATCH_SIZE = Number(import.meta.env.VITE_FLEET_STRESS_BATCH_SIZE || 250)
@@ -289,6 +300,19 @@ telemetrySync = useActivosTelemetrySync({
 
 const { tableActivos, latestTelemetryBatch, mapActivos, filteredActivos, cleanupTelemetrySync } =
   telemetrySync
+
+const {
+  empresaSucursales,
+  alternarSucursalesHabilitadas: alternarSucursalesFlotaHabilitadas,
+  agregarSucursal: agregarSucursalFlota,
+  actualizarNombreSucursal: actualizarNombreSucursalFlota,
+  alternarEstadoSucursal: alternarEstadoSucursalFlota,
+  eliminarSucursal: eliminarSucursalFlota,
+  actualizarSucursalActivo: actualizarSucursalActivoFlota,
+} = useSucursalesFlota({
+  activos: tableActivos,
+  companyId: String(route.params.empresaId || "general"),
+})
 
 const handleGeofenceCreated = async (geofence) => {
   createGeofence(geofence)

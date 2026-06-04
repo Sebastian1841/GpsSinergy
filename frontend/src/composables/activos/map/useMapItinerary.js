@@ -1,5 +1,10 @@
 import L from "leaflet"
 
+const ITINERARY_MAX_RENDER_POINTS = 800
+const ITINERARY_MIN_DETAIL_ZOOM = 14
+const ITINERARY_MAX_STOP_MARKERS = 120
+const ITINERARY_MAX_ROUTE_ARROWS = 4
+
 const itineraryRoutePalette = [
   {
     main: "#102372",
@@ -41,6 +46,28 @@ const isValidLatLng = (point) => {
 
 const toLatLng = (point) => {
   return [Number(point.lat), Number(point.lng)]
+}
+
+const buildRenderableItineraryPoints = (points = []) => {
+  if (!Array.isArray(points)) return []
+
+  if (points.length <= ITINERARY_MAX_RENDER_POINTS) {
+    return [...points]
+  }
+
+  const renderPoints = []
+  const lastIndex = points.length - 1
+  const step = lastIndex / (ITINERARY_MAX_RENDER_POINTS - 1)
+
+  for (let index = 0; index < ITINERARY_MAX_RENDER_POINTS; index += 1) {
+    const point = points[Math.round(index * step)]
+
+    if (point) {
+      renderPoints.push(point)
+    }
+  }
+
+  return renderPoints
 }
 
 const getBearing = (fromPoint, toPoint) => {
@@ -280,11 +307,13 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
 
     return sourceRoutes
       .map((item, index) => {
-        const points = (item.points || item.rows || []).filter(isValidLatLng)
+        const rawPoints = (item.points || item.rows || []).filter(isValidLatLng)
+        const points = buildRenderableItineraryPoints(rawPoints)
 
         return {
           ...item,
           index,
+          rawPoints,
           points,
           asset: item.asset || route.asset,
           summary: item.summary || route.summary,
@@ -334,8 +363,7 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
     if (!layers.itineraryLayer) return
     if (!points.length || points.length < 3) return
 
-    const maxArrows = 4
-    const step = Math.max(2, Math.floor(points.length / (maxArrows + 1)))
+    const step = Math.max(2, Math.floor(points.length / (ITINERARY_MAX_ROUTE_ARROWS + 1)))
 
     for (let index = step; index < points.length - 1; index += step) {
       const previousPoint = points[index - 1]
@@ -379,6 +407,91 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
     selectedItineraryPointLayer.addTo(layers.itineraryLayer)
   }
 
+  const renderMovingRoutePoints = ({ points, routeColor }) => {
+    if (!layers.itineraryLayer) return
+    if (!points.length || points.length > 120) return
+
+    points.forEach((point, pointIndex) => {
+      const isIntermediate = pointIndex > 0 && pointIndex < points.length - 1
+      const isMoving = Number(point.speed) > 0
+
+      if (!isIntermediate || !isMoving) return
+
+      addRouteLayer(
+        L.circleMarker(toLatLng(point), {
+          radius: 2.6,
+          color: "#ffffff",
+          weight: 1.2,
+          fillColor: routeColor,
+          fillOpacity: 0.78,
+          opacity: 1,
+          interactive: false,
+          renderer: getRenderer(),
+        }),
+      )
+    })
+  }
+
+  const renderStopMarkers = ({ points, firstPoint, lastPoint }) => {
+    if (!layers.itineraryLayer) return
+
+    points
+      .filter((point) => {
+        const isFirst = point.id === firstPoint?.id
+        const isLast = point.id === lastPoint?.id
+        const isStop = Number(point.speed) === 0
+
+        return isStop && !isFirst && !isLast
+      })
+      .slice(0, ITINERARY_MAX_STOP_MARKERS)
+      .forEach((point) => {
+        addRouteLayer(
+          L.marker(toLatLng(point), {
+            icon: createItineraryIcon({
+              type: "stop",
+              label: "",
+            }),
+            zIndexOffset: 850,
+          }).bindTooltip(buildItineraryTooltip(point, "Parada"), {
+            direction: "top",
+            className: "sinergy-geofence-tooltip",
+          }),
+        )
+      })
+  }
+
+  const renderRouteEndpointMarkers = ({ firstPoint, lastPoint }) => {
+    if (firstPoint) {
+      addRouteLayer(
+        L.marker(toLatLng(firstPoint), {
+          icon: createItineraryIcon({
+            type: "start",
+            label: "I",
+          }),
+          zIndexOffset: 900,
+        }).bindTooltip(buildItineraryTooltip(firstPoint, "Inicio"), {
+          direction: "top",
+          className: "sinergy-geofence-tooltip",
+        }),
+      )
+    }
+
+    if (lastPoint && lastPoint.id !== firstPoint?.id) {
+      addRouteLayer(
+        L.marker(toLatLng(lastPoint), {
+          icon: createItineraryIcon({
+            type: "end",
+            label: "F",
+          }),
+          zIndexOffset: 900,
+        }).bindTooltip(buildItineraryTooltip(lastPoint, "Fin"), {
+          direction: "top",
+          className: "sinergy-geofence-tooltip",
+        }),
+      )
+    }
+  }
+
   const renderItineraryRoute = ({ fit = false } = {}) => {
     const map = getMap()
 
@@ -394,6 +507,8 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
       return
     }
 
+    const zoom = map.getZoom?.() ?? 0
+    const showRouteDetails = zoom >= ITINERARY_MIN_DETAIL_ZOOM
     const allLatLngs = []
 
     routes.forEach((currentRoute, routeIndex) => {
@@ -413,30 +528,15 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
         addRouteLayer(L.polyline(latLngs, styles.main))
         addRouteLayer(L.polyline(latLngs, styles.flow))
 
-        renderRouteDirectionArrows({
-          points,
-          routeColor: routeFlowColor,
-        })
+        if (showRouteDetails) {
+          renderRouteDirectionArrows({
+            points,
+            routeColor: routeFlowColor,
+          })
 
-        if (points.length <= 120) {
-          points.forEach((point, pointIndex) => {
-            const isIntermediate = pointIndex > 0 && pointIndex < points.length - 1
-            const isMoving = Number(point.speed) > 0
-
-            if (!isIntermediate || !isMoving) return
-
-            addRouteLayer(
-              L.circleMarker(toLatLng(point), {
-                radius: 2.6,
-                color: "#ffffff",
-                weight: 1.2,
-                fillColor: routeColor,
-                fillOpacity: 0.78,
-                opacity: 1,
-                interactive: false,
-                renderer: getRenderer(),
-              }),
-            )
+          renderMovingRoutePoints({
+            points,
+            routeColor,
           })
         }
       }
@@ -444,56 +544,18 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
       const firstPoint = points[0]
       const lastPoint = points[points.length - 1]
 
-      if (firstPoint) {
-        addRouteLayer(
-          L.marker(toLatLng(firstPoint), {
-            icon: createItineraryIcon({
-              type: "start",
-              label: "I",
-            }),
-            zIndexOffset: 900,
-          }).bindTooltip(buildItineraryTooltip(firstPoint, "Inicio"), {
-            direction: "top",
-            className: "sinergy-geofence-tooltip",
-          }),
-        )
-      }
-
-      if (lastPoint && lastPoint.id !== firstPoint?.id) {
-        addRouteLayer(
-          L.marker(toLatLng(lastPoint), {
-            icon: createItineraryIcon({
-              type: "end",
-              label: "F",
-            }),
-            zIndexOffset: 900,
-          }).bindTooltip(buildItineraryTooltip(lastPoint, "Fin"), {
-            direction: "top",
-            className: "sinergy-geofence-tooltip",
-          }),
-        )
-      }
-
-      points.forEach((point) => {
-        const isFirst = point.id === firstPoint?.id
-        const isLast = point.id === lastPoint?.id
-        const isStop = Number(point.speed) === 0
-
-        if (!isStop || isFirst || isLast) return
-
-        addRouteLayer(
-          L.marker(toLatLng(point), {
-            icon: createItineraryIcon({
-              type: "stop",
-              label: "",
-            }),
-            zIndexOffset: 850,
-          }).bindTooltip(buildItineraryTooltip(point, "Parada"), {
-            direction: "top",
-            className: "sinergy-geofence-tooltip",
-          }),
-        )
+      renderRouteEndpointMarkers({
+        firstPoint,
+        lastPoint,
       })
+
+      if (showRouteDetails) {
+        renderStopMarkers({
+          points,
+          firstPoint,
+          lastPoint,
+        })
+      }
     })
 
     renderSelectedItineraryPoint()

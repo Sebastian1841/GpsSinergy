@@ -8,6 +8,7 @@ export function useActivosFilters({ onLeaveItinerarios, onFilterChanged, refresh
     activos: "",
     itinerarios: "",
     geocercas: "",
+    sucursales: "",
   })
 
   const normalizeText = (value) => {
@@ -60,7 +61,7 @@ export function useActivosFilters({ onLeaveItinerarios, onFilterChanged, refresh
   }
 
   const setSidebarSection = async (section) => {
-    const allowedSections = ["activos", "itinerarios", "geocercas"]
+    const allowedSections = ["activos", "itinerarios", "geocercas", "sucursales"]
     const nextSection = allowedSections.includes(section) ? section : "activos"
 
     activeSidebarSection.value = nextSection

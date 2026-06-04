@@ -4,6 +4,19 @@
   font-family: inherit;
 }
 
+.sinergy-map-layer-hidden {
+  visibility: hidden !important;
+}
+
+.leaflet-dragging .sinergy-marker,
+.leaflet-dragging .sinergy-marker-cluster {
+  box-shadow: none !important;
+}
+
+.leaflet-dragging .sinergy-itinerary-route-flow {
+  animation: none !important;
+}
+
 .geofence-draw-active {
   cursor: crosshair !important;
 }

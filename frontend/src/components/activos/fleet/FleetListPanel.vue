@@ -2,7 +2,7 @@
   <aside class="flex h-full min-h-0 flex-col overflow-hidden bg-white">
     <!-- Navegación lateral -->
     <div class="shrink-0 border-b border-[#d8dee8] bg-white px-3 py-3">
-      <div class="grid grid-cols-3 gap-1 rounded-xl border border-[#d8dee8] bg-[#f8fafc] p-1">
+      <div class="grid grid-cols-4 gap-1 rounded-xl border border-[#d8dee8] bg-[#f8fafc] p-1">
         <button
           v-for="section in menuSections"
           :key="section.key"
@@ -35,8 +35,17 @@
             />
 
             <path
-              v-else
+              v-else-if="section.key === 'geocercas'"
               d="M12 21s7-4.6 7-11.25A7 7 0 0 0 5 9.75C5 16.4 12 21 12 21ZM12 12.25a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+
+            <path
+              v-else
+              d="M4 20V8l8-4 8 4v12M8 20v-6h8v6M9 10h.01M15 10h.01"
               stroke="currentColor"
               stroke-width="1.8"
               stroke-linecap="round"
@@ -63,7 +72,10 @@
       </div>
 
       <!-- Buscador + acciones -->
-      <div v-if="localActiveSection !== 'itinerarios'" class="mt-3 flex items-center gap-2">
+      <div
+        v-if="!['itinerarios', 'sucursales'].includes(localActiveSection)"
+        class="mt-3 flex items-center gap-2"
+      >
         <div class="relative min-w-0 flex-1">
           <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
             <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" aria-hidden="true">
@@ -272,7 +284,10 @@
       />
     </div>
 
-    <div v-else class="min-h-0 flex-1 overflow-auto bg-[#f8fafc] p-3">
+    <div
+      v-else-if="localActiveSection === 'geocercas'"
+      class="min-h-0 flex-1 overflow-auto bg-[#f8fafc] p-3"
+    >
       <div class="flex min-h-full flex-col rounded-2xl border border-[#d8dee8] bg-white p-4">
         <div class="mb-4 flex items-start justify-between gap-3">
           <div class="min-w-0">
@@ -387,6 +402,18 @@
       </div>
     </div>
 
+    <div v-else class="min-h-0 flex-1 overflow-auto bg-[#eef2f7] p-3">
+      <GestionSucursalesPanel
+        :company="empresaSucursales"
+        @alternar-sucursales-habilitadas="$emit('alternar-sucursales-habilitadas')"
+        @agregar-sucursal="$emit('agregar-sucursal', $event)"
+        @actualizar-nombre-sucursal="handleActualizarNombreSucursal"
+        @alternar-estado-sucursal="$emit('alternar-estado-sucursal', $event)"
+        @eliminar-sucursal="$emit('eliminar-sucursal', $event)"
+        @actualizar-sucursal-activo="$emit('actualizar-sucursal-activo', $event)"
+      />
+    </div>
+
     <div
       v-if="localActiveSection === 'activos'"
       class="shrink-0 border-t border-[#d8dee8] bg-[#f8fafc] px-3 py-2"
@@ -413,6 +440,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from "vue"
+import GestionSucursalesPanel from "../sucursales/GestionSucursalesPanel.vue"
 import ItineraryPanel from "../itinerarios/ItineraryPanel.vue"
 import FleetTable from "./FleetTable.vue"
 import FleetContextMenu from "./FleetContextMenu.vue"
@@ -460,6 +488,15 @@ const props = defineProps({
     type: String,
     default: "activos",
   },
+  empresaSucursales: {
+    type: Object,
+    default: () => ({
+      sucursalesHabilitadas: true,
+      sucursales: [],
+      assets: [],
+      assetsCount: 0,
+    }),
+  },
   columns: {
     type: Array,
     default: () => [
@@ -490,6 +527,12 @@ const emit = defineEmits([
   "device-action",
   "geofence-selected",
   "geofence-delete",
+  "alternar-sucursales-habilitadas",
+  "agregar-sucursal",
+  "actualizar-nombre-sucursal",
+  "alternar-estado-sucursal",
+  "eliminar-sucursal",
+  "actualizar-sucursal-activo",
 ])
 
 const showColumns = ref(false)
@@ -567,6 +610,11 @@ const menuSections = computed(() => [
     key: "geocercas",
     label: "Geocercas",
     count: props.geofences.length,
+  },
+  {
+    key: "sucursales",
+    label: "Sucursales",
+    count: props.empresaSucursales.sucursales?.length || 0,
   },
 ])
 
@@ -650,6 +698,10 @@ const handleGeofenceSelect = (geofence) => {
   if (!geofence?.id) return
 
   emit("geofence-selected", geofence)
+}
+
+const handleActualizarNombreSucursal = (sucursalId, nombreSucursal) => {
+  emit("actualizar-nombre-sucursal", sucursalId, nombreSucursal)
 }
 
 const closeDeviceContextMenu = () => {

@@ -97,7 +97,7 @@ export function useActivosMap({ props, emit, mapRef }) {
       ...tileConfig.options,
       updateWhenIdle: true,
       updateWhenZooming: false,
-      keepBuffer: 2,
+      keepBuffer: 4,
     })
   }
 
@@ -120,6 +120,20 @@ export function useActivosMap({ props, emit, mapRef }) {
     if (!map) return
 
     map.invalidateSize()
+  }
+
+  const setLayerGroupVisibility = (layer, visible) => {
+    if (!layer?.eachLayer) return
+
+    layer.eachLayer((childLayer) => {
+      const element = childLayer.getElement?.()
+
+      if (element) {
+        element.classList.toggle("sinergy-map-layer-hidden", !visible)
+      }
+
+      setLayerGroupVisibility(childLayer, visible)
+    })
   }
 
   const movementTrails = createMovementTrailController({
@@ -166,6 +180,26 @@ export function useActivosMap({ props, emit, mapRef }) {
     layers,
   })
 
+  const handleMapZoomEnd = () => {
+    assetMarkers.refreshActivoMarkers()
+    movementTrails.redrawAllMovementTrails()
+    itineraryMap.renderItineraryRoute()
+  }
+
+  const handleMapMoveEnd = () => {
+    setLayerGroupVisibility(layers.movementTrailLayer, true)
+    setLayerGroupVisibility(layers.itineraryLayer, true)
+
+    assetMarkers.refreshActivoMarkers()
+    movementTrails.redrawAllMovementTrails()
+    itineraryMap.renderItineraryRoute()
+  }
+
+  const handleMapMoveStart = () => {
+    setLayerGroupVisibility(layers.movementTrailLayer, false)
+    setLayerGroupVisibility(layers.itineraryLayer, false)
+  }
+
   onMounted(async () => {
     await nextTick()
 
@@ -175,6 +209,13 @@ export function useActivosMap({ props, emit, mapRef }) {
       zoomControl: false,
       attributionControl: false,
       preferCanvas: true,
+      inertia: true,
+      inertiaDeceleration: 2600,
+      inertiaMaxSpeed: 1600,
+      easeLinearity: 0.22,
+      zoomAnimation: true,
+      fadeAnimation: true,
+      markerZoomAnimation: false,
     }).setView([-33.4489, -70.6693], 13)
 
     leafletMap.value = map
@@ -203,7 +244,9 @@ export function useActivosMap({ props, emit, mapRef }) {
     map.on("click", geofenceMap.handleMapClick)
     map.on("mousemove", geofenceMap.handleMapMouseMove)
     map.on("dblclick", geofenceMap.handleMapDoubleClick)
-    map.on("zoomend", assetMarkers.refreshActivoMarkers)
+    map.on("zoomend", handleMapZoomEnd)
+    map.on("movestart", handleMapMoveStart)
+    map.on("moveend", handleMapMoveEnd)
 
     geofenceMap.renderGeofences()
 
@@ -231,7 +274,9 @@ export function useActivosMap({ props, emit, mapRef }) {
       map.off("click", geofenceMap.handleMapClick)
       map.off("mousemove", geofenceMap.handleMapMouseMove)
       map.off("dblclick", geofenceMap.handleMapDoubleClick)
-      map.off("zoomend", assetMarkers.refreshActivoMarkers)
+      map.off("zoomend", handleMapZoomEnd)
+      map.off("movestart", handleMapMoveStart)
+      map.off("moveend", handleMapMoveEnd)
     }
 
     assetMarkers.clearMarkerCache()
@@ -258,6 +303,7 @@ export function useActivosMap({ props, emit, mapRef }) {
     () => {
       applyTileLayer()
       movementTrails.redrawAllMovementTrails()
+      itineraryMap.renderItineraryRoute()
     },
   )
 
@@ -274,7 +320,7 @@ export function useActivosMap({ props, emit, mapRef }) {
   watch(
     () => props.selectedId,
     () => {
-      assetMarkers.syncActivoMarkers(props.activos)
+      assetMarkers.refreshActivoMarkers()
       assetMarkers.centerSelected()
     },
   )

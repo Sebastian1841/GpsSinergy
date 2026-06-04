@@ -92,6 +92,74 @@
               ></span>
             </RouterLink>
           </li>
+
+          <li>
+            <RouterLink
+              to="/empresas"
+              class="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-white/75 transition-colors duration-100 hover:bg-white/[0.08] hover:text-white"
+              active-class="sidebar-link-active"
+              @click="$emit('update:isOpen', false)"
+            >
+              <div
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/70 transition-colors duration-100 group-hover:bg-[#ff6600] group-hover:text-white"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M4 20h16M6 20V7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13M9 9h1M14 9h1M9 13h1M14 13h1M11 20v-3h2v3"
+                  />
+                </svg>
+              </div>
+
+              <span class="min-w-0 flex-1 truncate"> Empresas </span>
+
+              <span
+                class="h-2 w-2 rounded-full bg-transparent transition-colors duration-100 group-hover:bg-[#ff6600]"
+              ></span>
+            </RouterLink>
+          </li>
+
+          <li>
+            <RouterLink
+              to="/usuarios"
+              class="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-white/75 transition-colors duration-100 hover:bg-white/[0.08] hover:text-white"
+              active-class="sidebar-link-active"
+              @click="$emit('update:isOpen', false)"
+            >
+              <div
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/70 transition-colors duration-100 group-hover:bg-[#ff6600] group-hover:text-white"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0ZM4.5 20a7.5 7.5 0 0 1 15 0M18.5 8.5a3 3 0 0 1 0 5M21 20a5.5 5.5 0 0 0-3-4.9"
+                  />
+                </svg>
+              </div>
+
+              <span class="min-w-0 flex-1 truncate"> Gestión de usuarios </span>
+
+              <span
+                class="h-2 w-2 rounded-full bg-transparent transition-colors duration-100 group-hover:bg-[#ff6600]"
+              ></span>
+            </RouterLink>
+          </li>
         </ul>
       </nav>
 

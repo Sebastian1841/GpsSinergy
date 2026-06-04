@@ -1,7 +1,11 @@
 import { ref } from "vue"
 
 const MOVEMENT_TRAIL_PANE = "movementTrailPane"
-const MOVEMENT_TRAIL_MAX_POINTS = 55
+const MOVEMENT_TRAIL_MAX_RAW_POINTS = 600
+const MOVEMENT_TRAIL_MAX_RENDER_POINTS = 55
+const MOVEMENT_TRAIL_MIN_RENDER_ZOOM = 13
+const MOVEMENT_TRAIL_MIN_START_MARKER_ZOOM = 15
+const MOVEMENT_TRAIL_MAX_START_MARKERS = 80
 const MOVEMENT_TRAIL_MIN_DISTANCE_METERS = 14
 const MOVEMENT_TRAIL_MAX_JUMP_METERS = 5000
 
@@ -13,6 +17,41 @@ const MOVEMENT_TRAIL_HALO_WEIGHT = 7
 const MOVEMENT_TRAIL_SATELLITE_HALO_COLOR = "#ffffff"
 const MOVEMENT_TRAIL_SATELLITE_CORE_COLOR = "#FF7A1A"
 
+const buildRenderableTrailPoints = (points = []) => {
+  if (!Array.isArray(points)) return []
+
+  if (points.length <= MOVEMENT_TRAIL_MAX_RENDER_POINTS) {
+    return [...points]
+  }
+
+  const renderPoints = []
+  const lastIndex = points.length - 1
+  const step = lastIndex / (MOVEMENT_TRAIL_MAX_RENDER_POINTS - 1)
+
+  for (let index = 0; index < MOVEMENT_TRAIL_MAX_RENDER_POINTS; index += 1) {
+    const pointIndex = Math.round(index * step)
+    const point = points[pointIndex]
+
+    if (point) {
+      renderPoints.push(point)
+    }
+  }
+
+  return renderPoints
+}
+
+const trimRawTrailPoints = (points = []) => {
+  if (!Array.isArray(points)) return []
+
+  if (points.length <= MOVEMENT_TRAIL_MAX_RAW_POINTS) {
+    return points
+  }
+
+  points.splice(0, points.length - MOVEMENT_TRAIL_MAX_RAW_POINTS)
+
+  return points
+}
+
 export function createMovementTrailController({
   L,
   getMap,
@@ -23,9 +62,12 @@ export function createMovementTrailController({
 }) {
   const showMovementTrails = ref(true)
   const movementTrailCache = new Map()
-  const pendingTrailIds = new Set()
+  const startMarkerCache = new Map()
 
   let pendingTrailFrame = null
+  let sharedHaloLine = null
+  let sharedCoreLine = null
+  let sharedStyleSignature = ""
   let cachedStartIcon = null
   let cachedStartIconSignature = ""
 
@@ -75,6 +117,24 @@ export function createMovementTrailController({
     }
 
     return layers.movementTrailLayer
+  }
+
+  const shouldRenderMovementTrails = () => {
+    const map = getMap()
+    const zoom = map?.getZoom?.() ?? 0
+
+    return Boolean(showMovementTrails.value && zoom >= MOVEMENT_TRAIL_MIN_RENDER_ZOOM)
+  }
+
+  const shouldRenderStartMarkers = (entries = []) => {
+    const map = getMap()
+    const zoom = map?.getZoom?.() ?? 0
+
+    return Boolean(
+      showMovementTrails.value &&
+      zoom >= MOVEMENT_TRAIL_MIN_START_MARKER_ZOOM &&
+      entries.length <= MOVEMENT_TRAIL_MAX_START_MARKERS,
+    )
   }
 
   const getMovementTrailStyle = () => {
@@ -165,55 +225,150 @@ export function createMovementTrailController({
     return L.latLng(activoLatLng[0], activoLatLng[1])
   }
 
-  const removeMovementTrailLayers = (trail) => {
-    const layer = ensureMovementTrailLayer()
+  const getRenderableTrailEntries = () => {
+    const entries = []
 
-    if (!layer || !trail) return
+    movementTrailCache.forEach((trail, activoId) => {
+      if ((trail.renderPoints || []).length < 2) return
 
-    if (trail.haloLine) {
-      layer.removeLayer(trail.haloLine)
-      trail.haloLine = null
-    }
+      entries.push({
+        activoId,
+        path: trail.renderPoints,
+      })
+    })
 
-    if (trail.coreLine) {
-      layer.removeLayer(trail.coreLine)
-      trail.coreLine = null
-    }
-
-    if (trail.startMarker) {
-      layer.removeLayer(trail.startMarker)
-      trail.startMarker = null
-    }
-
-    trail.styleSignature = ""
-    trail.startSignature = ""
+    return entries
   }
 
-  const clearRenderedMovementTrailSegments = () => {
-    movementTrailCache.forEach((trail) => {
-      removeMovementTrailLayers(trail)
+  const removeSharedMovementTrailLines = () => {
+    const layer = ensureMovementTrailLayer()
+
+    if (!layer) return
+
+    if (sharedHaloLine) {
+      layer.removeLayer(sharedHaloLine)
+      sharedHaloLine = null
+    }
+
+    if (sharedCoreLine) {
+      layer.removeLayer(sharedCoreLine)
+      sharedCoreLine = null
+    }
+
+    sharedStyleSignature = ""
+  }
+
+  const removeStartMarker = (activoId) => {
+    const cachedMarker = startMarkerCache.get(activoId)
+    const layer = ensureMovementTrailLayer()
+
+    if (!cachedMarker) return
+
+    if (layer) {
+      layer.removeLayer(cachedMarker.marker)
+    }
+
+    startMarkerCache.delete(activoId)
+  }
+
+  const clearStartMarkers = () => {
+    const markerIds = Array.from(startMarkerCache.keys())
+
+    markerIds.forEach((activoId) => {
+      removeStartMarker(activoId)
     })
   }
 
-  const updateMovementTrailLayer = (activoId, { forceStyle = false } = {}) => {
+  const clearRenderedMovementTrailSegments = () => {
+    removeSharedMovementTrailLines()
+    clearStartMarkers()
+  }
+
+  const syncStartMarkers = ({ entries, trailStyle, styleSignature }) => {
     const layer = ensureMovementTrailLayer()
-    const normalizedActivoId = normalizeId(activoId)
-    const trail = movementTrailCache.get(normalizedActivoId)
 
-    if (!layer || !trail) return
+    if (!layer) return
 
-    if (!showMovementTrails.value || trail.points.length < 2) {
-      removeMovementTrailLayers(trail)
+    if (!shouldRenderStartMarkers(entries)) {
+      clearStartMarkers()
+      return
+    }
+
+    const nextMarkerIds = new Set()
+
+    entries.slice(0, MOVEMENT_TRAIL_MAX_START_MARKERS).forEach((entry) => {
+      const firstPoint = entry.path[0]
+      const startSignature = getLatLngSignature(firstPoint)
+      const cachedMarker = startMarkerCache.get(entry.activoId)
+
+      nextMarkerIds.add(entry.activoId)
+
+      if (!cachedMarker) {
+        const marker = L.marker(firstPoint, {
+          pane: MOVEMENT_TRAIL_PANE,
+          icon: getTrailStartIcon(trailStyle, styleSignature),
+          interactive: false,
+        })
+
+        marker.addTo(layer)
+
+        startMarkerCache.set(entry.activoId, {
+          marker,
+          startSignature,
+          styleSignature,
+        })
+
+        return
+      }
+
+      if (cachedMarker.startSignature !== startSignature) {
+        cachedMarker.marker.setLatLng(firstPoint)
+        cachedMarker.startSignature = startSignature
+      }
+
+      if (cachedMarker.styleSignature !== styleSignature) {
+        cachedMarker.marker.setIcon(getTrailStartIcon(trailStyle, styleSignature))
+        cachedMarker.styleSignature = styleSignature
+      }
+    })
+
+    const staleMarkerIds = []
+
+    startMarkerCache.forEach((_cachedMarker, activoId) => {
+      if (!nextMarkerIds.has(activoId)) {
+        staleMarkerIds.push(activoId)
+      }
+    })
+
+    staleMarkerIds.forEach((activoId) => {
+      removeStartMarker(activoId)
+    })
+  }
+
+  const renderMovementTrails = ({ forceStyle = false } = {}) => {
+    const layer = ensureMovementTrailLayer()
+
+    if (!layer) return
+
+    if (!shouldRenderMovementTrails()) {
+      clearRenderedMovementTrailSegments()
+      return
+    }
+
+    const entries = getRenderableTrailEntries()
+
+    if (!entries.length) {
+      clearRenderedMovementTrailSegments()
       return
     }
 
     const trailStyle = getMovementTrailStyle()
     const styleSignature = getTrailStyleSignature(trailStyle)
-    const shouldUpdateStyle = forceStyle || trail.styleSignature !== styleSignature
-    const path = trail.points
+    const shouldUpdateStyle = forceStyle || sharedStyleSignature !== styleSignature
+    const paths = entries.map((entry) => entry.path)
 
-    if (!trail.haloLine) {
-      trail.haloLine = L.polyline(path, {
+    if (!sharedHaloLine) {
+      sharedHaloLine = L.polyline(paths, {
         pane: MOVEMENT_TRAIL_PANE,
         color: trailStyle.haloColor,
         weight: trailStyle.haloWeight,
@@ -224,12 +379,12 @@ export function createMovementTrailController({
         interactive: false,
       })
 
-      trail.haloLine.addTo(layer)
+      sharedHaloLine.addTo(layer)
     } else {
-      trail.haloLine.setLatLngs(path)
+      sharedHaloLine.setLatLngs(paths)
 
       if (shouldUpdateStyle) {
-        trail.haloLine.setStyle({
+        sharedHaloLine.setStyle({
           color: trailStyle.haloColor,
           weight: trailStyle.haloWeight,
           opacity: trailStyle.haloOpacity,
@@ -237,8 +392,8 @@ export function createMovementTrailController({
       }
     }
 
-    if (!trail.coreLine) {
-      trail.coreLine = L.polyline(path, {
+    if (!sharedCoreLine) {
+      sharedCoreLine = L.polyline(paths, {
         pane: MOVEMENT_TRAIL_PANE,
         color: trailStyle.coreColor,
         weight: trailStyle.coreWeight,
@@ -249,12 +404,12 @@ export function createMovementTrailController({
         interactive: false,
       })
 
-      trail.coreLine.addTo(layer)
+      sharedCoreLine.addTo(layer)
     } else {
-      trail.coreLine.setLatLngs(path)
+      sharedCoreLine.setLatLngs(paths)
 
       if (shouldUpdateStyle) {
-        trail.coreLine.setStyle({
+        sharedCoreLine.setStyle({
           color: trailStyle.coreColor,
           weight: trailStyle.coreWeight,
           opacity: trailStyle.coreOpacity,
@@ -262,34 +417,16 @@ export function createMovementTrailController({
       }
     }
 
-    const firstPoint = path[0]
-    const startSignature = getLatLngSignature(firstPoint)
+    syncStartMarkers({
+      entries,
+      trailStyle,
+      styleSignature,
+    })
 
-    if (!trail.startMarker) {
-      trail.startMarker = L.marker(firstPoint, {
-        pane: MOVEMENT_TRAIL_PANE,
-        icon: getTrailStartIcon(trailStyle, styleSignature),
-        interactive: false,
-      })
-
-      trail.startMarker.addTo(layer)
-    } else {
-      if (trail.startSignature !== startSignature) {
-        trail.startMarker.setLatLng(firstPoint)
-      }
-
-      if (shouldUpdateStyle) {
-        trail.startMarker.setIcon(getTrailStartIcon(trailStyle, styleSignature))
-      }
-    }
-
-    trail.styleSignature = styleSignature
-    trail.startSignature = startSignature
+    sharedStyleSignature = styleSignature
   }
 
   const clearPendingMovementTrailUpdates = () => {
-    pendingTrailIds.clear()
-
     if (pendingTrailFrame === null) return
 
     cancelTrailFrame(pendingTrailFrame)
@@ -298,23 +435,10 @@ export function createMovementTrailController({
 
   const flushPendingMovementTrailUpdates = () => {
     pendingTrailFrame = null
-
-    const trailIds = Array.from(pendingTrailIds)
-
-    pendingTrailIds.clear()
-
-    trailIds.forEach((activoId) => {
-      updateMovementTrailLayer(activoId)
-    })
+    renderMovementTrails()
   }
 
-  const scheduleMovementTrailUpdate = (activoId) => {
-    const normalizedActivoId = normalizeId(activoId)
-
-    if (!normalizedActivoId) return
-
-    pendingTrailIds.add(normalizedActivoId)
-
+  const scheduleMovementTrailRender = () => {
     if (pendingTrailFrame !== null) return
 
     pendingTrailFrame = requestTrailFrame(flushPendingMovementTrailUpdates)
@@ -323,10 +447,12 @@ export function createMovementTrailController({
   const redrawAllMovementTrails = () => {
     clearPendingMovementTrailUpdates()
 
-    movementTrailCache.forEach((_trail, activoId) => {
-      updateMovementTrailLayer(activoId, {
-        forceStyle: true,
-      })
+    movementTrailCache.forEach((trail) => {
+      trail.renderPoints = buildRenderableTrailPoints(trail.rawPoints)
+    })
+
+    renderMovementTrails({
+      forceStyle: true,
     })
   }
 
@@ -343,18 +469,14 @@ export function createMovementTrailController({
 
     if (!trail) {
       trail = {
-        points: [],
-        haloLine: null,
-        coreLine: null,
-        startMarker: null,
-        styleSignature: "",
-        startSignature: "",
+        rawPoints: [],
+        renderPoints: [],
       }
 
       movementTrailCache.set(activoId, trail)
     }
 
-    const lastPoint = trail.points[trail.points.length - 1]
+    const lastPoint = trail.rawPoints[trail.rawPoints.length - 1]
 
     if (lastPoint) {
       const distance = lastPoint.distanceTo(currentLatLng)
@@ -364,30 +486,28 @@ export function createMovementTrailController({
       }
 
       if (distance > MOVEMENT_TRAIL_MAX_JUMP_METERS) {
-        removeMovementTrailLayers(trail)
-        trail.points = [currentLatLng]
+        trail.rawPoints = [currentLatLng]
+        trail.renderPoints = [currentLatLng]
+        scheduleMovementTrailRender()
         return
       }
     }
 
-    trail.points.push(currentLatLng)
+    trail.rawPoints.push(currentLatLng)
+    trimRawTrailPoints(trail.rawPoints)
+    trail.renderPoints = buildRenderableTrailPoints(trail.rawPoints)
 
-    if (trail.points.length > MOVEMENT_TRAIL_MAX_POINTS) {
-      trail.points.shift()
-    }
-
-    scheduleMovementTrailUpdate(activoId)
+    scheduleMovementTrailRender()
   }
 
   const removeMovementTrail = (id) => {
     const activoId = normalizeId(id)
-    const trail = movementTrailCache.get(activoId)
 
-    if (!trail) return
+    if (!movementTrailCache.has(activoId)) return
 
-    pendingTrailIds.delete(activoId)
-    removeMovementTrailLayers(trail)
     movementTrailCache.delete(activoId)
+    removeStartMarker(activoId)
+    scheduleMovementTrailRender()
   }
 
   const clearMovementTrails = () => {

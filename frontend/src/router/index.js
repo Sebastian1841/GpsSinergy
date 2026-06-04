@@ -5,6 +5,9 @@ import { createRouter, createWebHistory } from "vue-router"
 // ==================
 import ActivosView from "../views/ActivosView.vue"
 
+const CompanyManagementView = () => import("../views/CompanyManagementView.vue")
+const UserManagementView = () => import("../views/UserManagementView.vue")
+
 // ==================
 // RUTAS
 // ==================
@@ -27,12 +30,48 @@ const routes = [
   },
 
   // ==================
+  // GESTION DE USUARIOS
+  // ==================
+  {
+    path: "/usuarios",
+    name: "UserManagement",
+    component: UserManagementView,
+  },
+
+  // ==================
+  // GESTION DE EMPRESAS
+  // ==================
+  {
+    path: "/empresas",
+    name: "CompanyManagement",
+    component: CompanyManagementView,
+  },
+
+  // ==================
   // ACTIVOS EMPRESA
   // ==================
   {
     path: "/app/:empresaId/activos",
     name: "AppActivos",
     component: ActivosView,
+  },
+
+  // ==================
+  // GESTION DE USUARIOS EMPRESA
+  // ==================
+  {
+    path: "/app/:empresaId/usuarios",
+    name: "AppUserManagement",
+    component: UserManagementView,
+  },
+
+  // ==================
+  // GESTION DE EMPRESAS EMPRESA
+  // ==================
+  {
+    path: "/app/:empresaId/empresas",
+    name: "AppCompanyManagement",
+    component: CompanyManagementView,
   },
 
   // ==================
