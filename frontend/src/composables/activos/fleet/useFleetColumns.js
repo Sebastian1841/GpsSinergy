@@ -141,8 +141,9 @@ export function useFleetColumns({ columns, normalizeText = defaultNormalizeText 
 
     const [sourceKey] = nextOrder.splice(sourceIndex, 1)
     const adjustedTargetIndex = nextOrder.indexOf(targetColumnKey)
+    const insertionIndex = sourceIndex < targetIndex ? adjustedTargetIndex + 1 : adjustedTargetIndex
 
-    nextOrder.splice(adjustedTargetIndex, 0, sourceKey)
+    nextOrder.splice(insertionIndex, 0, sourceKey)
     columnOrderKeys.value = nextOrder
   }
 

@@ -104,6 +104,7 @@
     />
 
     <GeofenceSelectorModal
+      v-if="showGeofenceModal"
       v-model="showGeofenceModal"
       :geofence-items="geofenceItems"
       :selected-geofence-id="activeGeofenceId"
@@ -115,6 +116,7 @@
     />
 
     <GeofenceHistoryModal
+      v-if="showGeofenceHistoryModal"
       v-model="showGeofenceHistoryModal"
       :geofence="selectedHistoryGeofence"
       :events="selectedHistoryEvents"
@@ -123,19 +125,33 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue"
 import "leaflet/dist/leaflet.css"
 import "../../../assets/styles/activos-map.css"
 
 import MapFloatingTools from "./MapFloatingTools.vue"
 import TopStatsBar from "./TopStatsBar.vue"
 import GeofenceEditorPanel from "../geocercas/GeofenceEditorPanel.vue"
-import GeofenceSelectorModal from "../geocercas/GeofenceSelectorModal.vue"
-import GeofenceHistoryModal from "../geocercas/GeofenceHistoryModal.vue"
 import { buildMockGeofenceHistory } from "../../../data/mockGeofenceHistoryData.js"
 import { useActivosMap } from "../../../composables/activos/map/useActivosMap.js"
 import { DEFAULT_GEOFENCE_COLOR, normalizeGeofenceColor } from "../../../utils/geofenceUtils.js"
 import { normalizeId } from "../../../utils/idUtils.js"
+
+const GeofenceSelectorModal = defineAsyncComponent(
+  () => import("../geocercas/GeofenceSelectorModal.vue"),
+)
+
+const GeofenceHistoryModal = defineAsyncComponent(
+  () => import("../geocercas/GeofenceHistoryModal.vue"),
+)
 
 const props = defineProps({
   activos: {

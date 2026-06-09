@@ -1,4 +1,4 @@
-import { computed, ref, watch } from "vue"
+import { computed, ref } from "vue"
 
 import { mockDatabaseSeed } from "../../data/mockDatabase.js"
 
@@ -102,11 +102,6 @@ const schedulePersistDatabase = () => {
     persistDatabase()
   }, PERSIST_DEBOUNCE_MS)
 }
-
-watch([companies, applicationDefinitions, assets, users, accesses], schedulePersistDatabase, {
-  deep: true,
-  flush: "post",
-})
 
 if (typeof window !== "undefined") {
   window.addEventListener("beforeunload", () => {
@@ -368,6 +363,8 @@ const createCompany = (company) => {
     type: company.status === "internal" ? "Administracion interna" : "Empresa cliente",
   })
 
+  schedulePersistDatabase()
+
   return getCompany(companyId)
 }
 
@@ -380,12 +377,15 @@ const createUser = (user) => {
 
   if (identityExists) return null
 
-  users.value.unshift({
+  const nextUser = {
     ...user,
     isPlatformAdmin: Boolean(user.isPlatformAdmin),
-  })
+  }
 
-  return user
+  users.value.unshift(nextUser)
+  schedulePersistDatabase()
+
+  return nextUser
 }
 
 const updateUser = (userId, changes) => {
@@ -394,6 +394,8 @@ const updateUser = (userId, changes) => {
   if (!user) return null
 
   Object.assign(user, changes)
+  schedulePersistDatabase()
+
   return user
 }
 
@@ -413,15 +415,22 @@ const createAccess = (access) => {
   }
 
   accesses.value.unshift(access)
+  schedulePersistDatabase()
+
   return access
 }
 
 const deleteAccess = (accessId) => {
   const normalizedAccessId = normalizeKey(accessId)
+  const previousLength = accesses.value.length
 
   accesses.value = accesses.value.filter((access) => {
     return normalizeKey(access.id) !== normalizedAccessId
   })
+
+  if (accesses.value.length !== previousLength) {
+    schedulePersistDatabase()
+  }
 }
 
 const updateCompany = (companyId, changes) => {
@@ -430,11 +439,15 @@ const updateCompany = (companyId, changes) => {
   if (!company) return null
 
   Object.assign(company, changes)
+  schedulePersistDatabase()
+
   return company
 }
 
 const createAsset = (asset) => {
   assets.value.unshift(asset)
+  schedulePersistDatabase()
+
   return asset
 }
 
@@ -453,11 +466,16 @@ const updateAsset = (assetId, changes) => {
     return updatedAsset
   })
 
+  if (updatedAsset) {
+    schedulePersistDatabase()
+  }
+
   return updatedAsset
 }
 
 const deleteAsset = (assetId) => {
   const normalizedId = normalizeKey(assetId)
+  const previousAssetsLength = assets.value.length
 
   assets.value = assets.value.filter((asset) => normalizeKey(asset.id) !== normalizedId)
 
@@ -470,6 +488,10 @@ const deleteAsset = (assetId) => {
       return normalizeKey(id) !== normalizedId
     })
   })
+
+  if (assets.value.length !== previousAssetsLength) {
+    schedulePersistDatabase()
+  }
 }
 
 const addSucursal = (companyId, sucursal) => {
@@ -478,6 +500,8 @@ const addSucursal = (companyId, sucursal) => {
   if (!company) return null
 
   company.sucursales = [...(company.sucursales || []), sucursal]
+  schedulePersistDatabase()
+
   return sucursal
 }
 
@@ -488,6 +512,8 @@ const updateSucursal = (sucursalId, changes) => {
   if (!sucursal) return null
 
   Object.assign(sucursal, changes)
+  schedulePersistDatabase()
+
   return sucursal
 }
 
@@ -517,6 +543,8 @@ const deleteSucursal = (sucursalId) => {
       return normalizeKey(id) !== normalizedSucursalId
     })
   })
+
+  schedulePersistDatabase()
 }
 
 export function useMockDatabase() {

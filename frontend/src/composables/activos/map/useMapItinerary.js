@@ -1,9 +1,12 @@
 import L from "leaflet"
 
+import { endDevMeasure, startDevMeasure } from "../../../utils/performanceUtils.js"
+
 const ITINERARY_MAX_RENDER_POINTS = 800
 const ITINERARY_MIN_DETAIL_ZOOM = 14
 const ITINERARY_MAX_STOP_MARKERS = 120
 const ITINERARY_MAX_ROUTE_ARROWS = 4
+const RENDER_ITINERARY_ROUTE_MEASURE = "renderItineraryRoute"
 
 const itineraryRoutePalette = [
   {
@@ -493,91 +496,97 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
   }
 
   const renderItineraryRoute = ({ fit = false } = {}) => {
-    const map = getMap()
+    const measure = startDevMeasure(RENDER_ITINERARY_ROUTE_MEASURE)
 
-    if (!map || !layers.itineraryLayer) return
+    try {
+      const map = getMap()
 
-    clearItineraryRouteLayers()
+      if (!map || !layers.itineraryLayer) return
 
-    const route = props.itineraryRoute
-    const routes = getItineraryRoutes()
+      clearItineraryRouteLayers()
 
-    if (!route || !routes.length) {
-      clearSelectedItineraryPoint()
-      return
-    }
+      const route = props.itineraryRoute
+      const routes = getItineraryRoutes()
 
-    const zoom = map.getZoom?.() ?? 0
-    const showRouteDetails = zoom >= ITINERARY_MIN_DETAIL_ZOOM
-    const allLatLngs = []
-
-    routes.forEach((currentRoute, routeIndex) => {
-      const points = currentRoute.points
-      const latLngs = points.map(toLatLng)
-      const routePalette = getItineraryRoutePalette(routeIndex)
-      const routeColor = routePalette.main
-      const routeFlowColor = routePalette.flow
-
-      allLatLngs.push(...latLngs)
-
-      if (latLngs.length >= 2) {
-        const styles = createItineraryRouteStyles(routeIndex)
-
-        addRouteLayer(L.polyline(latLngs, styles.halo))
-        addRouteLayer(L.polyline(latLngs, styles.base))
-        addRouteLayer(L.polyline(latLngs, styles.main))
-        addRouteLayer(L.polyline(latLngs, styles.flow))
-
-        if (showRouteDetails) {
-          renderRouteDirectionArrows({
-            points,
-            routeColor: routeFlowColor,
-          })
-
-          renderMovingRoutePoints({
-            points,
-            routeColor,
-          })
-        }
-      }
-
-      const firstPoint = points[0]
-      const lastPoint = points[points.length - 1]
-
-      renderRouteEndpointMarkers({
-        firstPoint,
-        lastPoint,
-      })
-
-      if (showRouteDetails) {
-        renderStopMarkers({
-          points,
-          firstPoint,
-          lastPoint,
-        })
-      }
-    })
-
-    renderSelectedItineraryPoint()
-
-    if (fit && allLatLngs.length) {
-      if (allLatLngs.length === 1) {
-        map.setView(allLatLngs[0], 16, {
-          animate: false,
-        })
-
+      if (!route || !routes.length) {
+        clearSelectedItineraryPoint()
         return
       }
 
-      const bounds = L.latLngBounds(allLatLngs)
+      const zoom = map.getZoom?.() ?? 0
+      const showRouteDetails = zoom >= ITINERARY_MIN_DETAIL_ZOOM
+      const allLatLngs = []
 
-      if (bounds.isValid()) {
-        map.fitBounds(bounds, {
-          padding: [45, 45],
-          maxZoom: 16,
-          animate: false,
+      routes.forEach((currentRoute, routeIndex) => {
+        const points = currentRoute.points
+        const latLngs = points.map(toLatLng)
+        const routePalette = getItineraryRoutePalette(routeIndex)
+        const routeColor = routePalette.main
+        const routeFlowColor = routePalette.flow
+
+        allLatLngs.push(...latLngs)
+
+        if (latLngs.length >= 2) {
+          const styles = createItineraryRouteStyles(routeIndex)
+
+          addRouteLayer(L.polyline(latLngs, styles.halo))
+          addRouteLayer(L.polyline(latLngs, styles.base))
+          addRouteLayer(L.polyline(latLngs, styles.main))
+          addRouteLayer(L.polyline(latLngs, styles.flow))
+
+          if (showRouteDetails) {
+            renderRouteDirectionArrows({
+              points,
+              routeColor: routeFlowColor,
+            })
+
+            renderMovingRoutePoints({
+              points,
+              routeColor,
+            })
+          }
+        }
+
+        const firstPoint = points[0]
+        const lastPoint = points[points.length - 1]
+
+        renderRouteEndpointMarkers({
+          firstPoint,
+          lastPoint,
         })
+
+        if (showRouteDetails) {
+          renderStopMarkers({
+            points,
+            firstPoint,
+            lastPoint,
+          })
+        }
+      })
+
+      renderSelectedItineraryPoint()
+
+      if (fit && allLatLngs.length) {
+        if (allLatLngs.length === 1) {
+          map.setView(allLatLngs[0], 16, {
+            animate: false,
+          })
+
+          return
+        }
+
+        const bounds = L.latLngBounds(allLatLngs)
+
+        if (bounds.isValid()) {
+          map.fitBounds(bounds, {
+            padding: [45, 45],
+            maxZoom: 16,
+            animate: false,
+          })
+        }
       }
+    } finally {
+      endDevMeasure(measure)
     }
   }
 

@@ -12,6 +12,20 @@ const cloneFleetSnapshot = (snapshot = []) => {
   })
 }
 
+const getChangedIdsFromUpdates = (updates = []) => {
+  if (!Array.isArray(updates)) return []
+
+  return [
+    ...new Set(
+      updates
+        .map((update) => {
+          return normalizeId(update?.id || update?.activo?.id)
+        })
+        .filter(Boolean),
+    ),
+  ]
+}
+
 export function useActivosTelemetrySync({
   telemetryActivos,
   baseNormalizedActivos,
@@ -30,6 +44,7 @@ export function useActivosTelemetrySync({
 }) {
   const tableActivos = shallowRef([])
   const latestTelemetryBatch = ref([])
+  const latestTelemetryChangedIds = ref([])
 
   let tableSyncTimer = null
   let pendingFullTableSync = false
@@ -77,16 +92,20 @@ export function useActivosTelemetrySync({
     tableActivos.value = cloneFleetSnapshot(normalizedActivos.value)
   }
 
-  const queueTableUpdates = (updates = []) => {
-    if (!Array.isArray(updates)) return
+  const queueTableChangedIds = (changedIds = []) => {
+    if (!Array.isArray(changedIds)) return
 
-    updates.forEach((update) => {
-      const id = normalizeId(update?.id)
+    changedIds.forEach((id) => {
+      const normalizedId = normalizeId(id)
 
-      if (id) {
-        pendingTableUpdateIds.add(id)
+      if (normalizedId) {
+        pendingTableUpdateIds.add(normalizedId)
       }
     })
+  }
+
+  const queueTableUpdates = (updates = []) => {
+    queueTableChangedIds(getChangedIdsFromUpdates(updates))
   }
 
   const buildActivoIndex = (activos = []) => {
@@ -157,12 +176,18 @@ export function useActivosTelemetrySync({
     pendingTableUpdateIds = new Set()
   }
 
-  const scheduleTableActivosSync = ({ immediate = false, full = false, updates = [] } = {}) => {
+  const scheduleTableActivosSync = ({
+    immediate = false,
+    full = false,
+    updates = [],
+    changedIds = [],
+  } = {}) => {
     if (full) {
       pendingFullTableSync = true
     }
 
     queueTableUpdates(updates)
+    queueTableChangedIds(changedIds)
 
     if (immediate) {
       if (tableSyncTimer) {
@@ -187,7 +212,10 @@ export function useActivosTelemetrySync({
     baseNormalizedActivos,
     (snapshot) => {
       latestTelemetryBatch.value = []
+      latestTelemetryChangedIds.value = []
+
       replaceFleetSnapshot(snapshot)
+
       scheduleTableActivosSync({
         immediate: true,
         full: true,
@@ -211,6 +239,7 @@ export function useActivosTelemetrySync({
       Respaldo para telemetría real o externa:
       si telemetryActivos cambia fuera de startMockTelemetry/onBatch,
       la tabla igual se actualiza, pero de forma lenta.
+      En el flujo normal, onBatch entrega changedIds y esto solo reutiliza el timer pendiente.
     */
     scheduleTableActivosSync()
   })
@@ -244,10 +273,15 @@ export function useActivosTelemetrySync({
       intervalMs: mockTelemetryIntervalMs,
       batchSize: mockTelemetryBatchSize,
       onBatch: (batch = []) => {
+        const changedIds = getChangedIdsFromUpdates(batch)
+
         latestTelemetryBatch.value = batch
+        latestTelemetryChangedIds.value = changedIds
+
         appendTelemetryPulses(batch)
+
         scheduleTableActivosSync({
-          updates: batch,
+          changedIds,
         })
       },
     })
@@ -269,6 +303,7 @@ export function useActivosTelemetrySync({
     normalizedActivos,
     tableActivos,
     latestTelemetryBatch,
+    latestTelemetryChangedIds,
     mapActivos,
     filteredActivos,
 

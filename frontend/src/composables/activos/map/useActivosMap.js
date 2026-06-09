@@ -1,4 +1,4 @@
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import L from "leaflet"
 
 import { normalizeId } from "../../../utils/idUtils.js"
@@ -13,6 +13,7 @@ import {
   buildItineraryRouteSignature,
   buildSelectedItineraryPointSignature,
 } from "./mapSignatures.js"
+import { normalizeSignatureValue } from "../../../utils/mapSignatureUtils.js"
 
 const MAP_TILE_LAYERS = {
   standard: {
@@ -89,6 +90,31 @@ export function useActivosMap({ props, emit, mapRef }) {
     draftLayer: null,
     editLayer: null,
   }
+
+  const activosMarkerMetadataSignature = computed(() => {
+    return (props.activos || [])
+      .map((activo) => {
+        return [
+          normalizeId(activo?.id),
+          activo?.vehiculo,
+          activo?.patente,
+          activo?.patent,
+          activo?.name,
+          activo?.nombrePantalla,
+          activo?.displayName,
+          activo?.deviceId,
+          activo?.imei,
+          activo?.trackerModelLabel,
+          activo?.trackerManufacturer,
+          activo?.protocol,
+          activo?.sucursalId,
+          activo?.driver,
+        ]
+          .map(normalizeSignatureValue)
+          .join(":")
+      })
+      .join("|")
+  })
 
   const getActivoLatLng = (activo) => {
     if (!activo) return null
@@ -325,15 +351,21 @@ export function useActivosMap({ props, emit, mapRef }) {
     },
   )
 
-  watch(
-    () => props.activos,
-    (activos) => {
-      assetMarkers.syncActivoMarkers(activos)
-    },
-    {
-      deep: false,
-    },
-  )
+  /*
+    Importante:
+    No observar props.activos completo, porque cambia con cada pulso GPS.
+    El batch incremental ya mueve marcadores por applyActivoTelemetryBatch().
+    Este full sync queda solo para cambios estructurales o metadatos visibles:
+    - cambia la cantidad de activos visibles
+    - cambia el conjunto de IDs visibles
+    - cambia filtro/grupo/empresa y por eso cambia la lista de IDs
+    - cambia nombre, patente, dispositivo, modelo o sucursal del activo
+  */
+  watch(activosMarkerMetadataSignature, () => {
+    assetMarkers.syncActivoMarkers(props.activos, {
+      fit: false,
+    })
+  })
 
   watch(
     () => props.selectedId,

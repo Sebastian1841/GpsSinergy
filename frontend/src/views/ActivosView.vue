@@ -124,16 +124,13 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from "vue"
+import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 
 import { normalizeId } from "../utils/idUtils.js"
 
 import FleetListPanel from "../components/activos/fleet/FleetListPanel.vue"
 import ActivosMapPanel from "../components/activos/map/ActivosMapPanel.vue"
-import AddActivoModal from "../components/activos/fleet/AddActivoModal.vue"
-import FleetEditModal from "../components/activos/fleet/FleetEditModal.vue"
-import FleetTerminalModal from "../components/activos/fleet/FleetTerminalModal.vue"
 import ConfirmDialog from "../components/ui/ConfirmDialog.vue"
 
 import { useFleetTerminal } from "../composables/activos/fleet/useFleetTerminal"
@@ -152,6 +149,18 @@ import { useActivosLayout } from "../composables/activos/view/useActivosLayout.j
 import { useActivosSelection } from "../composables/activos/view/useActivosSelection.js"
 import { useActivosTelemetrySync } from "../composables/activos/view/useActivosTelemetrySync.js"
 import { usePersonalAssetGroups } from "../composables/activos/fleet/usePersonalAssetGroups.js"
+
+const AddActivoModal = defineAsyncComponent(
+  () => import("../components/activos/fleet/AddActivoModal.vue"),
+)
+
+const FleetEditModal = defineAsyncComponent(
+  () => import("../components/activos/fleet/FleetEditModal.vue"),
+)
+
+const FleetTerminalModal = defineAsyncComponent(
+  () => import("../components/activos/fleet/FleetTerminalModal.vue"),
+)
 
 const props = defineProps({
   appSidebarOpen: {

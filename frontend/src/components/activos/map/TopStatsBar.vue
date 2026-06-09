@@ -50,31 +50,48 @@ const props = defineProps({
 
 defineEmits(["select-filter"])
 
-const online = computed(() => {
-  return props.activos.filter((activo) => activo.estado !== "offline").length
-})
+const statsCount = computed(() => {
+  const result = {
+    online: 0,
+    moving: 0,
+    stopped: 0,
+    idle: 0,
+    offline: 0,
+  }
 
-const moving = computed(() => {
-  return props.activos.filter((activo) => activo.estado === "moving").length
-})
+  props.activos.forEach((activo) => {
+    const estado = activo?.estado || "offline"
 
-const stopped = computed(() => {
-  return props.activos.filter((activo) => activo.estado === "stopped").length
-})
+    if (estado === "offline") {
+      result.offline += 1
+      return
+    }
 
-const idle = computed(() => {
-  return props.activos.filter((activo) => activo.estado === "idle").length
-})
+    result.online += 1
 
-const offline = computed(() => {
-  return props.activos.filter((activo) => activo.estado === "offline").length
+    if (estado === "moving") {
+      result.moving += 1
+      return
+    }
+
+    if (estado === "stopped") {
+      result.stopped += 1
+      return
+    }
+
+    if (estado === "idle") {
+      result.idle += 1
+    }
+  })
+
+  return result
 })
 
 const stats = computed(() => [
   {
     label: "Activos en línea",
     shortLabel: "Online",
-    value: online.value,
+    value: statsCount.value.online,
     dot: "bg-emerald-500",
     valueClass: "text-[#102372]",
     filter: "online",
@@ -82,7 +99,7 @@ const stats = computed(() => [
   {
     label: "En ruta",
     shortLabel: "Ruta",
-    value: moving.value,
+    value: statsCount.value.moving,
     dot: "bg-emerald-500",
     valueClass: "text-emerald-600",
     filter: "moving",
@@ -90,7 +107,7 @@ const stats = computed(() => [
   {
     label: "Detenidos",
     shortLabel: "Stop",
-    value: stopped.value,
+    value: statsCount.value.stopped,
     dot: "bg-red-500",
     valueClass: "text-red-500",
     filter: "stopped",
@@ -98,7 +115,7 @@ const stats = computed(() => [
   {
     label: "En espera",
     shortLabel: "Espera",
-    value: idle.value,
+    value: statsCount.value.idle,
     dot: "bg-sky-500",
     valueClass: "text-sky-600",
     filter: "idle",
@@ -106,7 +123,7 @@ const stats = computed(() => [
   {
     label: "Offline",
     shortLabel: "Offline",
-    value: offline.value,
+    value: statsCount.value.offline,
     dot: "bg-slate-500",
     valueClass: "text-slate-700",
     filter: "offline",

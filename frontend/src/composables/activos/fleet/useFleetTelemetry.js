@@ -1,15 +1,17 @@
 import { computed, onBeforeUnmount, shallowRef, triggerRef } from "vue"
 import { createMockTelemetryStream } from "../../../data/mockTelemetryStream.js"
 import { parseNumberFromLabel } from "../../../utils/numberUtils.js"
+import { endDevMeasure, startDevMeasure } from "../../../utils/performanceUtils.js"
+import { formatTelemetryTime, getTelemetryTimestamp } from "../../../utils/telemetryUtils.js"
 import {
-  formatTelemetryTime,
-  getTelemetryTimestamp,
-  normalizeTelemetryReports,
-} from "../../../utils/telemetryUtils.js"
+  appendTelemetryReports,
+  clearReportsForAsset,
+  clearTelemetryHistory,
+} from "./useTelemetryHistory.js"
 
 const DEFAULT_MOCK_INTERVAL_MS = 1000
 const DEFAULT_MOCK_BATCH_SIZE = 25
-const TELEMETRY_REPORTS_LIMIT = 500
+const APPLY_TELEMETRY_BATCH_MEASURE = "applyTelemetryBatch"
 
 const normalizeId = (value) => {
   return String(value ?? "")
@@ -33,6 +35,38 @@ const formatSpeedLabel = (value) => {
   if (!isValidNumber(numberValue)) return "-"
 
   return `${Number(numberValue).toFixed(1)} km/h`
+}
+
+const removeTelemetryReportsFromActivo = (activo = {}) => {
+  const cleanActivo = { ...activo }
+
+  delete cleanActivo.telemetryReports
+
+  return cleanActivo
+}
+
+const appendActivoTelemetryReports = (activo = {}) => {
+  const id = normalizeId(activo?.id)
+  const telemetryReports = Array.isArray(activo?.telemetryReports) ? activo.telemetryReports : []
+
+  if (!id || !telemetryReports.length) return
+
+  appendTelemetryReports(
+    telemetryReports.map((report) => ({
+      ...report,
+      id,
+      assetId: id,
+      activo,
+      isLiveTelemetry: report.isLiveTelemetry ?? false,
+      isCurrentLocation: report.isCurrentLocation ?? false,
+    })),
+  )
+}
+
+const appendSnapshotTelemetryReports = (snapshot = []) => {
+  snapshot.forEach((activo) => {
+    appendActivoTelemetryReports(activo)
+  })
 }
 
 const normalizeTelemetryUpdate = (update = {}) => {
@@ -77,82 +111,6 @@ const normalizeTelemetryUpdate = (update = {}) => {
   }
 }
 
-const buildTelemetryHistoryPoint = (activo = {}, update = {}) => {
-  const timestamp = getTelemetryTimestamp(update)
-  const assetId = normalizeId(activo.id || update.id)
-  const speedValue = parseNumberFromLabel(
-    update.speed ??
-      update.velocidad_kmh ??
-      update.velocidad ??
-      activo.speed ??
-      activo.velocidad ??
-      0,
-    null,
-  )
-
-  const lat = update.lat ?? activo.lat
-  const lng = update.lng ?? activo.lng
-  const cleanTimestamp = String(timestamp).replace(/\D/g, "")
-
-  return {
-    id: `${assetId}-telemetry-${cleanTimestamp}`,
-    assetId,
-    timestamp,
-
-    lat,
-    lng,
-
-    speed: speedValue ?? 0,
-    velocidad: update.velocidad || formatSpeedLabel(speedValue ?? 0),
-    velocidad_kmh: speedValue ?? 0,
-
-    estado: update.estado || activo.estado,
-
-    address:
-      update.address ||
-      update.direccion ||
-      activo.address ||
-      activo.direccion ||
-      "Ubicacion actual",
-    direccion:
-      update.direccion ||
-      update.address ||
-      activo.direccion ||
-      activo.address ||
-      "Ubicacion actual",
-
-    event: "Reporte GPS",
-
-    odometer: update.odometer || update.odometro || activo.odometer || activo.odometro || null,
-    odometro: update.odometro || update.odometer || activo.odometro || activo.odometer || null,
-
-    isLiveTelemetry: true,
-    isCurrentLocation: true,
-  }
-}
-
-const getTelemetryReportKey = (report = {}) => {
-  return [report.assetId, report.timestamp, report.lat, report.lng, report.speed]
-    .map((value) => String(value ?? ""))
-    .join("|")
-}
-
-const appendTelemetryReport = ({ activo, update }) => {
-  const currentReports = normalizeTelemetryReports(activo.telemetryReports)
-  const nextReport = buildTelemetryHistoryPoint(activo, update)
-  const nextReportKey = getTelemetryReportKey(nextReport)
-
-  const alreadyExists = currentReports.some((report) => {
-    return getTelemetryReportKey(report) === nextReportKey
-  })
-
-  if (alreadyExists) {
-    return currentReports
-  }
-
-  return [...currentReports, nextReport].slice(-TELEMETRY_REPORTS_LIMIT)
-}
-
 const mergeTelemetryIntoActivo = (activo = {}, update = {}) => {
   const timestamp = getTelemetryTimestamp(update)
 
@@ -168,12 +126,7 @@ const mergeTelemetryIntoActivo = (activo = {}, update = {}) => {
 
   const hasSpeed = isValidNumber(speedValue)
 
-  const telemetryReports = appendTelemetryReport({
-    activo,
-    update,
-  })
-
-  return {
+  return removeTelemetryReportsFromActivo({
     ...activo,
     ...update,
 
@@ -201,27 +154,27 @@ const mergeTelemetryIntoActivo = (activo = {}, update = {}) => {
 
     odometro: update.odometro || update.odometer || activo.odometro,
     odometer: update.odometer || update.odometro || activo.odometer,
-
-    telemetryReports,
-  }
+  })
 }
 
 export function useFleetTelemetry(initialSnapshot = [], options = {}) {
   const activos = shallowRef([])
   const activosById = shallowRef(new Map())
+  const assetOrderIds = shallowRef([])
 
   const indexById = new Map()
 
   let mockTelemetryStream = null
 
   const activeCount = computed(() => {
-    return activos.value.length
+    return assetOrderIds.value.length
   })
 
   const rebuildIndexes = (snapshot = []) => {
     indexById.clear()
 
     const nextActivosById = new Map()
+    const nextAssetOrderIds = []
 
     snapshot.forEach((activo, index) => {
       const id = normalizeId(activo?.id)
@@ -230,18 +183,20 @@ export function useFleetTelemetry(initialSnapshot = [], options = {}) {
 
       indexById.set(id, index)
       nextActivosById.set(id, activo)
+      nextAssetOrderIds.push(id)
     })
 
     activosById.value = nextActivosById
+    assetOrderIds.value = nextAssetOrderIds
   }
 
   const replaceFleetSnapshot = (snapshot = []) => {
-    const nextSnapshot = Array.isArray(snapshot)
-      ? snapshot.map((activo) => ({
-          ...activo,
-          telemetryReports: normalizeTelemetryReports(activo.telemetryReports),
-        }))
-      : []
+    const sourceSnapshot = Array.isArray(snapshot) ? snapshot : []
+
+    clearTelemetryHistory()
+    appendSnapshotTelemetryReports(sourceSnapshot)
+
+    const nextSnapshot = sourceSnapshot.map(removeTelemetryReportsFromActivo)
 
     activos.value = nextSnapshot
     rebuildIndexes(nextSnapshot)
@@ -256,38 +211,34 @@ export function useFleetTelemetry(initialSnapshot = [], options = {}) {
 
     if (!id) return
 
+    appendActivoTelemetryReports(activo)
+
+    const cleanActivo = removeTelemetryReportsFromActivo(activo)
     const existingIndex = indexById.get(id)
 
     if (existingIndex === undefined) {
-      const nextActivo = {
-        ...activo,
-        telemetryReports: normalizeTelemetryReports(activo.telemetryReports),
-      }
+      indexById.set(id, activos.value.length)
+      activosById.value.set(id, cleanActivo)
 
-      const nextSnapshot = [...activos.value, nextActivo]
+      activos.value = [...activos.value, cleanActivo]
+      assetOrderIds.value = [...assetOrderIds.value, id]
 
-      activos.value = nextSnapshot
-      rebuildIndexes(nextSnapshot)
-      triggerRef(activos)
       triggerRef(activosById)
+      triggerRef(assetOrderIds)
+
       return
     }
 
     const currentActivo = activos.value[existingIndex]
 
     const nextActivo = {
-      ...activo,
-      telemetryReports: normalizeTelemetryReports(
-        activo.telemetryReports || currentActivo?.telemetryReports,
-      ),
+      ...currentActivo,
+      ...cleanActivo,
     }
 
-    const nextSnapshot = activos.value.map((currentItem, index) => {
-      return index === existingIndex ? nextActivo : currentItem
-    })
+    activos.value[existingIndex] = nextActivo
+    activosById.value.set(id, nextActivo)
 
-    activos.value = nextSnapshot
-    rebuildIndexes(nextSnapshot)
     triggerRef(activos)
     triggerRef(activosById)
   }
@@ -302,54 +253,64 @@ export function useFleetTelemetry(initialSnapshot = [], options = {}) {
       return index !== existingIndex
     })
 
+    clearReportsForAsset(normalizedId)
+
     activos.value = nextSnapshot
     rebuildIndexes(nextSnapshot)
+
     triggerRef(activos)
     triggerRef(activosById)
+    triggerRef(assetOrderIds)
   }
 
   const applyTelemetryBatch = (batch = []) => {
-    if (!Array.isArray(batch) || !batch.length) return []
+    const measure = startDevMeasure(APPLY_TELEMETRY_BATCH_MEASURE)
 
-    const updatesById = new Map()
+    try {
+      if (!Array.isArray(batch) || !batch.length) return []
 
-    batch.forEach((rawUpdate) => {
-      const update = normalizeTelemetryUpdate(rawUpdate)
+      const updatesById = new Map()
 
-      if (!update) return
+      batch.forEach((rawUpdate) => {
+        const update = normalizeTelemetryUpdate(rawUpdate)
 
-      updatesById.set(update.id, update)
-    })
+        if (!update) return
 
-    if (!updatesById.size) return []
-
-    const appliedUpdates = []
-
-    const nextSnapshot = activos.value.map((activo) => {
-      const id = normalizeId(activo?.id)
-      const update = updatesById.get(id)
-
-      if (!update) return activo
-
-      const nextActivo = mergeTelemetryIntoActivo(activo, update)
-
-      appliedUpdates.push({
-        ...update,
-        activo: nextActivo,
+        updatesById.set(update.id, update)
       })
 
-      return nextActivo
-    })
+      if (!updatesById.size) return []
 
-    if (appliedUpdates.length) {
-      activos.value = nextSnapshot
-      rebuildIndexes(nextSnapshot)
+      const appliedUpdates = []
 
-      triggerRef(activos)
-      triggerRef(activosById)
+      updatesById.forEach((update) => {
+        const currentActivo = activosById.value.get(update.id)
+        const existingIndex = indexById.get(update.id)
+
+        if (!currentActivo || existingIndex === undefined) return
+
+        const nextActivo = mergeTelemetryIntoActivo(currentActivo, update)
+
+        activosById.value.set(update.id, nextActivo)
+        activos.value[existingIndex] = nextActivo
+
+        appliedUpdates.push({
+          ...update,
+          activo: nextActivo,
+        })
+      })
+
+      if (appliedUpdates.length) {
+        appendTelemetryReports(appliedUpdates)
+
+        triggerRef(activos)
+        triggerRef(activosById)
+      }
+
+      return appliedUpdates
+    } finally {
+      endDevMeasure(measure)
     }
-
-    return appliedUpdates
   }
 
   const getActivoById = (id) => {
@@ -397,6 +358,7 @@ export function useFleetTelemetry(initialSnapshot = [], options = {}) {
   return {
     activos,
     activosById,
+    assetOrderIds,
     activeCount,
 
     applyTelemetryBatch,

@@ -1,9 +1,14 @@
+import { endDevMeasure, startDevMeasure } from "../../../../utils/performanceUtils.js"
+
 const ASSET_CLUSTER_DEFAULT_MAX_ZOOM = 12
 const ASSET_CLUSTER_DENSE_MAX_ZOOM = 14
 const ASSET_CLUSTER_DENSE_MIN_ACTIVOS = 250
 
 const ASSET_CLUSTER_BASE_GRID_SIZE = 76
 const ASSET_CLUSTER_MIN_GRID_SIZE = 44
+const ASSET_CLUSTER_VIEWPORT_PRECISION = 3
+
+const RENDER_MARKER_CLUSTERS_MEASURE = "renderMarkerClusters"
 
 const normalizeClusterValue = (value) => {
   if (value === null || value === undefined) return ""
@@ -13,6 +18,14 @@ const normalizeClusterValue = (value) => {
 
 const normalizeActivoId = (activo) => {
   return String(activo?.id ?? "")
+}
+
+const roundMapValue = (value, precision = ASSET_CLUSTER_VIEWPORT_PRECISION) => {
+  const numberValue = Number(value)
+
+  if (!Number.isFinite(numberValue)) return ""
+
+  return numberValue.toFixed(precision)
 }
 
 const resolveAssetClusterMaxZoom = (activos = []) => {
@@ -40,6 +53,19 @@ export const shouldClusterAssetMarkers = (map, activos = []) => {
   return zoom <= maxClusterZoom
 }
 
+const buildViewportSignature = (map) => {
+  const bounds = map?.getBounds?.()
+
+  if (!bounds) return "no-bounds"
+
+  const north = bounds.getNorth?.()
+  const south = bounds.getSouth?.()
+  const east = bounds.getEast?.()
+  const west = bounds.getWest?.()
+
+  return [north, south, east, west].map((value) => roundMapValue(value)).join(":")
+}
+
 const buildClusterSignature = (cluster) => {
   return [
     cluster.id,
@@ -49,6 +75,40 @@ const buildClusterSignature = (cluster) => {
   ]
     .map(normalizeClusterValue)
     .join(":")
+}
+
+const buildClusterInputSignature = ({ map, activos = [], getActivoLatLng, isActivoSelected }) => {
+  if (!map) return ""
+
+  const zoom = map.getZoom()
+  const gridSize = resolveAssetClusterGridSize({
+    zoom,
+    activos,
+  })
+
+  const viewportSignature = buildViewportSignature(map)
+
+  const assetCellSignature = activos
+    .map((activo) => {
+      const activoId = normalizeActivoId(activo)
+      const activoLatLng = getActivoLatLng(activo)
+
+      if (!activoId || !activoLatLng) return ""
+
+      if (isActivoSelected(activo)) {
+        return `${activoId}:selected`
+      }
+
+      const point = map.project(activoLatLng, zoom)
+      const cellX = Math.floor(point.x / gridSize)
+      const cellY = Math.floor(point.y / gridSize)
+
+      return `${activoId}:${cellX}:${cellY}`
+    })
+    .filter(Boolean)
+    .join("|")
+
+  return [zoom, gridSize, activos.length, viewportSignature, assetCellSignature].join("::")
 }
 
 const getClusteredActivos = ({ map, activos = [], getActivoLatLng, isActivoSelected }) => {
@@ -142,6 +202,39 @@ export const createAssetMarkerClusterController = ({
 }) => {
   const clusterCache = new Map()
 
+  let cachedClusterInputSignature = ""
+  let cachedClusterResult = null
+
+  const resetClusterResultCache = () => {
+    cachedClusterInputSignature = ""
+    cachedClusterResult = null
+  }
+
+  const getCachedClusteredActivos = ({ map, activos = [] }) => {
+    const nextSignature = buildClusterInputSignature({
+      map,
+      activos,
+      getActivoLatLng,
+      isActivoSelected,
+    })
+
+    if (cachedClusterResult && cachedClusterInputSignature === nextSignature) {
+      return cachedClusterResult
+    }
+
+    const nextResult = getClusteredActivos({
+      map,
+      activos,
+      getActivoLatLng,
+      isActivoSelected,
+    })
+
+    cachedClusterInputSignature = nextSignature
+    cachedClusterResult = nextResult
+
+    return nextResult
+  }
+
   const getClusterTooltipLabel = (count) => {
     return `${count} activos`
   }
@@ -208,6 +301,7 @@ export const createAssetMarkerClusterController = ({
     })
 
     clusterCache.clear()
+    resetClusterResultCache()
   }
 
   const removeStaleClusterMarkers = (nextClusterIds) => {
@@ -230,85 +324,89 @@ export const createAssetMarkerClusterController = ({
   }
 
   const renderMarkerClusters = (activos = []) => {
-    const map = getMap()
+    const measure = startDevMeasure(RENDER_MARKER_CLUSTERS_MEASURE)
 
-    if (!map || !layers.markerLayer) return
+    try {
+      const map = getMap()
 
-    if (!shouldClusterAssetMarkers(map, activos)) {
-      clearClusterMarkers()
+      if (!map || !layers.markerLayer) return
 
-      activos.forEach((activo) => {
+      if (!shouldClusterAssetMarkers(map, activos)) {
+        clearClusterMarkers()
+
+        activos.forEach((activo) => {
+          upsertIndividualMarker(activo, {
+            trackTrail: false,
+          })
+        })
+
+        return
+      }
+
+      const { clusters, singletons } = getCachedClusteredActivos({
+        map,
+        activos,
+      })
+
+      const singletonActivoIds = new Set()
+      const nextClusterIds = new Set()
+
+      singletons.forEach(({ activo }) => {
+        const markerId = normalizeActivoId(activo)
+
+        if (!markerId) return
+
+        singletonActivoIds.add(markerId)
+
         upsertIndividualMarker(activo, {
           trackTrail: false,
         })
       })
 
-      return
-    }
+      activos.forEach((activo) => {
+        const markerId = normalizeActivoId(activo)
 
-    const { clusters, singletons } = getClusteredActivos({
-      map,
-      activos,
-      getActivoLatLng,
-      isActivoSelected,
-    })
+        if (!markerId || singletonActivoIds.has(markerId)) return
 
-    const singletonActivoIds = new Set()
-    const nextClusterIds = new Set()
-
-    singletons.forEach(({ activo }) => {
-      const markerId = normalizeActivoId(activo)
-
-      if (!markerId) return
-
-      singletonActivoIds.add(markerId)
-
-      upsertIndividualMarker(activo, {
-        trackTrail: false,
+        hideIndividualMarker(markerId)
       })
-    })
 
-    activos.forEach((activo) => {
-      const markerId = normalizeActivoId(activo)
+      clusters.forEach((cluster) => {
+        const clusterId = cluster.id
+        const signature = buildClusterSignature(cluster)
+        const cachedCluster = clusterCache.get(clusterId)
 
-      if (!markerId || singletonActivoIds.has(markerId)) return
+        nextClusterIds.add(clusterId)
 
-      hideIndividualMarker(markerId)
-    })
+        if (cachedCluster?.signature === signature) {
+          return
+        }
 
-    clusters.forEach((cluster) => {
-      const clusterId = cluster.id
-      const signature = buildClusterSignature(cluster)
-      const cachedCluster = clusterCache.get(clusterId)
+        if (cachedCluster) {
+          updateClusterMarker({
+            cachedCluster,
+            cluster,
+            signature,
+          })
 
-      nextClusterIds.add(clusterId)
+          return
+        }
 
-      if (cachedCluster?.signature === signature) {
-        return
-      }
+        const marker = createClusterMarker(cluster, activos)
 
-      if (cachedCluster) {
-        updateClusterMarker({
-          cachedCluster,
-          cluster,
+        marker.addTo(layers.markerLayer)
+
+        clusterCache.set(clusterId, {
+          marker,
           signature,
+          count: cluster.count,
         })
-
-        return
-      }
-
-      const marker = createClusterMarker(cluster, activos)
-
-      marker.addTo(layers.markerLayer)
-
-      clusterCache.set(clusterId, {
-        marker,
-        signature,
-        count: cluster.count,
       })
-    })
 
-    removeStaleClusterMarkers(nextClusterIds)
+      removeStaleClusterMarkers(nextClusterIds)
+    } finally {
+      endDevMeasure(measure)
+    }
   }
 
   return {

@@ -4,6 +4,10 @@ import { normalizeId } from "../../../utils/idUtils.js"
 
 const STORAGE_KEY = "sinergy-personal-asset-groups"
 const SELECTED_GROUP_KEY = "sinergy-selected-personal-asset-group"
+const PERSIST_DEBOUNCE_MS = 200
+
+let groupsPersistTimer = null
+let selectedPersistTimer = null
 
 const readJsonStorage = (key, fallback) => {
   if (typeof window === "undefined") return fallback
@@ -19,6 +23,32 @@ const writeJsonStorage = (key, value) => {
   if (typeof window === "undefined") return
 
   window.localStorage.setItem(key, JSON.stringify(value))
+}
+
+const scheduleGroupsPersist = () => {
+  if (typeof window === "undefined") return
+
+  if (groupsPersistTimer) {
+    window.clearTimeout(groupsPersistTimer)
+  }
+
+  groupsPersistTimer = window.setTimeout(() => {
+    groupsPersistTimer = null
+    writeJsonStorage(STORAGE_KEY, personalAssetGroups.value)
+  }, PERSIST_DEBOUNCE_MS)
+}
+
+const scheduleSelectedPersist = () => {
+  if (typeof window === "undefined") return
+
+  if (selectedPersistTimer) {
+    window.clearTimeout(selectedPersistTimer)
+  }
+
+  selectedPersistTimer = window.setTimeout(() => {
+    selectedPersistTimer = null
+    writeJsonStorage(SELECTED_GROUP_KEY, selectedPersonalAssetGroupsByScope.value)
+  }, PERSIST_DEBOUNCE_MS)
 }
 
 const normalizeName = (value) => {
@@ -37,26 +67,6 @@ const buildGroupId = ({ userId, companyId }) => {
 
 const personalAssetGroups = ref(readJsonStorage(STORAGE_KEY, []))
 const selectedPersonalAssetGroupsByScope = ref(readJsonStorage(SELECTED_GROUP_KEY, {}))
-
-watch(
-  personalAssetGroups,
-  (groups) => {
-    writeJsonStorage(STORAGE_KEY, groups)
-  },
-  {
-    deep: true,
-  },
-)
-
-watch(
-  selectedPersonalAssetGroupsByScope,
-  (groupsByScope) => {
-    writeJsonStorage(SELECTED_GROUP_KEY, groupsByScope)
-  },
-  {
-    deep: true,
-  },
-)
 
 export function usePersonalAssetGroups({ userId, companyId, availableActivos }) {
   const resolvedUserId = computed(() => normalizeId(unref(userId)))
@@ -90,6 +100,7 @@ export function usePersonalAssetGroups({ userId, companyId, availableActivos }) 
       }
 
       selectedPersonalAssetGroupsByScope.value = nextGroupsByScope
+      scheduleSelectedPersist()
     },
   })
 
@@ -181,6 +192,8 @@ export function usePersonalAssetGroups({ userId, companyId, availableActivos }) 
     }
 
     personalAssetGroups.value = [group, ...personalAssetGroups.value]
+    scheduleGroupsPersist()
+
     selectedGroupId.value = group.id
 
     return group
@@ -194,6 +207,8 @@ export function usePersonalAssetGroups({ userId, companyId, availableActivos }) 
     group.assetIds = normalizeAssetIds(assetIds)
     group.updatedAt = new Date().toISOString()
 
+    scheduleGroupsPersist()
+
     return group
   }
 
@@ -206,15 +221,22 @@ export function usePersonalAssetGroups({ userId, companyId, availableActivos }) 
     group.name = groupName
     group.updatedAt = new Date().toISOString()
 
+    scheduleGroupsPersist()
+
     return group
   }
 
   const deletePersonalAssetGroup = (groupId) => {
     const normalizedGroupId = normalizeId(groupId)
+    const previousLength = personalAssetGroups.value.length
 
     personalAssetGroups.value = personalAssetGroups.value.filter((group) => {
       return normalizeId(group.id) !== normalizedGroupId
     })
+
+    if (personalAssetGroups.value.length !== previousLength) {
+      scheduleGroupsPersist()
+    }
 
     if (normalizeId(selectedGroupId.value) === normalizedGroupId) {
       selectedGroupId.value = null
@@ -237,6 +259,8 @@ export function usePersonalAssetGroups({ userId, companyId, availableActivos }) 
 
     group.assetIds = Array.from(currentAssetIds)
     group.updatedAt = new Date().toISOString()
+
+    scheduleGroupsPersist()
   }
 
   const filterActivosBySelectedGroup = (activos = []) => {

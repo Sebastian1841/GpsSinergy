@@ -302,6 +302,7 @@
         <ItineraryTable
           v-else
           :rows="routeResult.rows"
+          :route="routeResult"
           :selected-point-id="selectedPointId"
           @select-point="selectPoint"
         />

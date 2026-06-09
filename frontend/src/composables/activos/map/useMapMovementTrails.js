@@ -1,5 +1,7 @@
 import { ref } from "vue"
 
+import { endDevMeasure, startDevMeasure } from "../../../utils/performanceUtils.js"
+
 const MOVEMENT_TRAIL_PANE = "movementTrailPane"
 
 const MOVEMENT_TRAIL_MAX_BACKGROUND_RAW_POINTS = 140
@@ -21,6 +23,8 @@ const MOVEMENT_TRAIL_HALO_WEIGHT = 7
 
 const MOVEMENT_TRAIL_SATELLITE_HALO_COLOR = "#ffffff"
 const MOVEMENT_TRAIL_SATELLITE_CORE_COLOR = "#FF7A1A"
+
+const RENDER_MOVEMENT_TRAILS_MEASURE = "renderMovementTrails"
 
 const buildRenderableTrailPoints = (points = []) => {
   if (!Array.isArray(points)) return []
@@ -434,84 +438,90 @@ export function createMovementTrailController({
   }
 
   const renderMovementTrails = ({ forceStyle = false } = {}) => {
-    const layer = ensureMovementTrailLayer()
+    const measure = startDevMeasure(RENDER_MOVEMENT_TRAILS_MEASURE)
 
-    if (!layer) return
+    try {
+      const layer = ensureMovementTrailLayer()
 
-    if (!shouldRenderMovementTrails()) {
-      clearRenderedMovementTrailSegments()
-      return
-    }
+      if (!layer) return
 
-    const entries = getRenderableTrailEntries()
+      if (!shouldRenderMovementTrails()) {
+        clearRenderedMovementTrailSegments()
+        return
+      }
 
-    if (!entries.length) {
-      clearRenderedMovementTrailSegments()
-      return
-    }
+      const entries = getRenderableTrailEntries()
 
-    const trailStyle = getMovementTrailStyle()
-    const styleSignature = getTrailStyleSignature(trailStyle)
-    const shouldUpdateStyle = forceStyle || sharedStyleSignature !== styleSignature
-    const paths = entries.map((entry) => entry.path)
+      if (!entries.length) {
+        clearRenderedMovementTrailSegments()
+        return
+      }
 
-    if (!sharedHaloLine) {
-      sharedHaloLine = L.polyline(paths, {
-        pane: MOVEMENT_TRAIL_PANE,
-        color: trailStyle.haloColor,
-        weight: trailStyle.haloWeight,
-        opacity: trailStyle.haloOpacity,
-        lineCap: "round",
-        lineJoin: "round",
-        smoothFactor: 1.8,
-        interactive: false,
-      })
+      const trailStyle = getMovementTrailStyle()
+      const styleSignature = getTrailStyleSignature(trailStyle)
+      const shouldUpdateStyle = forceStyle || sharedStyleSignature !== styleSignature
+      const paths = entries.map((entry) => entry.path)
 
-      sharedHaloLine.addTo(layer)
-    } else {
-      sharedHaloLine.setLatLngs(paths)
-
-      if (shouldUpdateStyle) {
-        sharedHaloLine.setStyle({
+      if (!sharedHaloLine) {
+        sharedHaloLine = L.polyline(paths, {
+          pane: MOVEMENT_TRAIL_PANE,
           color: trailStyle.haloColor,
           weight: trailStyle.haloWeight,
           opacity: trailStyle.haloOpacity,
+          lineCap: "round",
+          lineJoin: "round",
+          smoothFactor: 1.8,
+          interactive: false,
         })
+
+        sharedHaloLine.addTo(layer)
+      } else {
+        sharedHaloLine.setLatLngs(paths)
+
+        if (shouldUpdateStyle) {
+          sharedHaloLine.setStyle({
+            color: trailStyle.haloColor,
+            weight: trailStyle.haloWeight,
+            opacity: trailStyle.haloOpacity,
+          })
+        }
       }
-    }
 
-    if (!sharedCoreLine) {
-      sharedCoreLine = L.polyline(paths, {
-        pane: MOVEMENT_TRAIL_PANE,
-        color: trailStyle.coreColor,
-        weight: trailStyle.coreWeight,
-        opacity: trailStyle.coreOpacity,
-        lineCap: "round",
-        lineJoin: "round",
-        smoothFactor: 1.8,
-        interactive: false,
-      })
-
-      sharedCoreLine.addTo(layer)
-    } else {
-      sharedCoreLine.setLatLngs(paths)
-
-      if (shouldUpdateStyle) {
-        sharedCoreLine.setStyle({
+      if (!sharedCoreLine) {
+        sharedCoreLine = L.polyline(paths, {
+          pane: MOVEMENT_TRAIL_PANE,
           color: trailStyle.coreColor,
           weight: trailStyle.coreWeight,
           opacity: trailStyle.coreOpacity,
+          lineCap: "round",
+          lineJoin: "round",
+          smoothFactor: 1.8,
+          interactive: false,
         })
+
+        sharedCoreLine.addTo(layer)
+      } else {
+        sharedCoreLine.setLatLngs(paths)
+
+        if (shouldUpdateStyle) {
+          sharedCoreLine.setStyle({
+            color: trailStyle.coreColor,
+            weight: trailStyle.coreWeight,
+            opacity: trailStyle.coreOpacity,
+          })
+        }
       }
+
+      syncStartMarkers({
+        entries,
+        trailStyle,
+        styleSignature,
+      })
+
+      sharedStyleSignature = styleSignature
+    } finally {
+      endDevMeasure(measure)
     }
-
-    syncStartMarkers({
-      entries,
-      trailStyle,
-      styleSignature,
-    })
-
-    sharedStyleSignature = styleSignature
   }
 
   const clearPendingMovementTrailUpdates = () => {

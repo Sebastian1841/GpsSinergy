@@ -117,14 +117,58 @@
             </div>
           </div>
 
-          <p class="mt-2 text-[10px] font-bold text-slate-400">
-            {{ sortedRows.length }} de {{ normalizedRows.length }} registros visibles
-          </p>
+          <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-[10px] font-bold text-slate-400">
+              {{ paginationStart }}-{{ paginationEnd }} de {{ totalItems }} registros
+            </p>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <label
+                class="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.08em] text-slate-400"
+              >
+                Filas
+                <select
+                  v-model.number="pageSize"
+                  class="h-8 cursor-pointer rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-black text-slate-700 outline-none transition focus:border-[#102372]"
+                >
+                  <option v-for="option in pageSizeOptions" :key="option" :value="option">
+                    {{ option }}
+                  </option>
+                </select>
+              </label>
+
+              <div class="flex items-center gap-1">
+                <button
+                  type="button"
+                  class="h-8 cursor-pointer rounded-lg border border-slate-200 bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600] disabled:cursor-not-allowed disabled:opacity-40"
+                  :disabled="currentPage <= 1"
+                  @pointerdown.stop
+                  @click.stop="currentPage -= 1"
+                >
+                  Ant.
+                </button>
+
+                <span class="min-w-[72px] text-center text-[10px] font-black text-slate-500">
+                  {{ currentPage }} / {{ totalPages }}
+                </span>
+
+                <button
+                  type="button"
+                  class="h-8 cursor-pointer rounded-lg border border-slate-200 bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600] disabled:cursor-not-allowed disabled:opacity-40"
+                  :disabled="currentPage >= totalPages"
+                  @pointerdown.stop
+                  @click.stop="currentPage += 1"
+                >
+                  Sig.
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="min-h-0 flex-1 overflow-auto p-4 sm:p-5">
           <div
-            v-if="!sortedRows.length"
+            v-if="!totalItems"
             class="flex min-h-[230px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center"
           >
             <div
@@ -203,7 +247,7 @@
             </div>
 
             <div
-              v-for="row in sortedRows"
+              v-for="row in paginatedRows"
               :key="row.key"
               class="grid gap-2 border-b border-slate-100 bg-white px-4 py-3 last:border-b-0 hover:bg-slate-50 md:grid-cols-[1.2fr_0.8fr_0.8fr_0.55fr_0.55fr] md:items-center"
             >
@@ -352,6 +396,10 @@ const dateTo = ref("")
 
 const sortKey = ref("date")
 const sortDirection = ref("desc")
+
+const currentPage = ref(1)
+const pageSize = ref(50)
+const pageSizeOptions = [25, 50, 100, 200]
 
 const safeEvents = computed(() => {
   return Array.isArray(props.events) ? props.events : []
@@ -644,6 +692,29 @@ const sortedRows = computed(() => {
   })
 })
 
+const totalItems = computed(() => sortedRows.value.length)
+
+const totalPages = computed(() => {
+  return Math.max(1, Math.ceil(totalItems.value / pageSize.value))
+})
+
+const paginationStart = computed(() => {
+  if (!totalItems.value) return 0
+
+  return (currentPage.value - 1) * pageSize.value + 1
+})
+
+const paginationEnd = computed(() => {
+  return Math.min(currentPage.value * pageSize.value, totalItems.value)
+})
+
+const paginatedRows = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+
+  return sortedRows.value.slice(start, end)
+})
+
 const getDefaultSortDirection = (key) => {
   if (["date", "speed", "duration"].includes(key)) {
     return "desc"
@@ -740,6 +811,7 @@ const resetFiltersToDefault = () => {
   dateTo.value = ""
   sortKey.value = "date"
   sortDirection.value = "desc"
+  currentPage.value = 1
 }
 
 const clearFilters = () => {
@@ -767,6 +839,20 @@ const handleKeydown = (event) => {
     closeModal()
   }
 }
+
+watch([pageSize, totalItems], () => {
+  if (currentPage.value > totalPages.value) {
+    currentPage.value = totalPages.value
+  }
+
+  if (currentPage.value < 1) {
+    currentPage.value = 1
+  }
+})
+
+watch([searchTerm, datePreset, dateFrom, dateTo, sortKey, sortDirection], () => {
+  currentPage.value = 1
+})
 
 watch(
   () => props.modelValue,

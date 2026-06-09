@@ -1,6 +1,7 @@
 import { computed } from "vue"
 
 import { normalizeSignatureValue } from "../../../utils/mapSignatureUtils.js"
+import { endDevMeasure, startDevMeasure } from "../../../utils/performanceUtils.js"
 import { formatTelemetryTime } from "../../../utils/telemetryUtils.js"
 import {
   createAssetMarkerClusterController,
@@ -11,6 +12,8 @@ import { createClusterIcon, createMarkerIcon } from "./assetMarkers/assetMarkerI
 const NORMAL_MARKER_RADIUS = 6
 const NORMAL_MARKER_SELECTED_RADIUS = 8
 const NORMAL_MARKER_STROKE_COLOR = "#ffffff"
+const SYNC_ACTIVO_MARKERS_MEASURE = "syncActivoMarkers"
+const APPLY_ACTIVO_TELEMETRY_BATCH_MEASURE = "applyActivoTelemetryBatch"
 
 const statusMarkerStyles = {
   moving: {
@@ -103,6 +106,56 @@ export function createAssetMarkerController({
 
   const getAllLatestActivos = () => {
     return Array.from(latestActivosById.values())
+  }
+
+  const getUpdateMarkerId = (update = {}) => {
+    return normalizeId(update?.id || update?.activo?.id || update?.assetId)
+  }
+
+  const getChangedIdsFromUpdates = (updates = []) => {
+    return [
+      ...new Set(
+        updates
+          .map((update) => {
+            return getUpdateMarkerId(update)
+          })
+          .filter(Boolean),
+      ),
+    ]
+  }
+
+  const normalizeTelemetryBatchPayload = (payload = []) => {
+    if (Array.isArray(payload)) {
+      return {
+        updates: payload,
+        changedIds: getChangedIdsFromUpdates(payload),
+      }
+    }
+
+    const updates = Array.isArray(payload?.updates)
+      ? payload.updates
+      : Array.isArray(payload?.batch)
+        ? payload.batch
+        : Array.isArray(payload?.appliedUpdates)
+          ? payload.appliedUpdates
+          : []
+
+    const changedIds = Array.isArray(payload?.changedIds)
+      ? [
+          ...new Set(
+            payload.changedIds
+              .map((id) => {
+                return normalizeId(id)
+              })
+              .filter(Boolean),
+          ),
+        ]
+      : getChangedIdsFromUpdates(updates)
+
+    return {
+      updates,
+      changedIds,
+    }
   }
 
   const isActivoSelected = (activo) => {
@@ -517,19 +570,25 @@ export function createAssetMarkerController({
       movementTrails.registerMovementTrailPoint(activo)
     }
 
+    const shouldCluster = shouldClusterAssetMarkers(map, getAllLatestActivos())
+
     if (!isActivoInsideViewport(activoLatLng) && !isActivoSelected(activo)) {
       hideCachedMarker(markerId)
-      scheduleClusterRefresh()
+
+      if (shouldCluster) {
+        scheduleClusterRefresh()
+      }
+
       return null
     }
 
-    if (shouldClusterAssetMarkers(map, getAllLatestActivos()) && !isActivoSelected(activo)) {
+    if (shouldCluster && !isActivoSelected(activo)) {
       hideCachedMarker(markerId)
       scheduleClusterRefresh()
       return null
     }
 
-    if (!shouldClusterAssetMarkers(map, getAllLatestActivos())) {
+    if (!shouldCluster) {
       markerClusters.clearClusterMarkers()
     }
 
@@ -539,9 +598,23 @@ export function createAssetMarkerController({
   }
 
   const mergeTelemetryUpdateIntoActivo = (activo = {}, update = {}) => {
+    const sourceUpdate = update?.activo
+      ? {
+          ...update.activo,
+          id: update.activo.id ?? update.id,
+        }
+      : update
+
     const timestamp =
-      update.timestamp || update.updatedAt || activo.timestamp || activo.lastTelemetryAt
-    const speedValue = update.velocidad ?? update.speed
+      sourceUpdate.timestamp ||
+      sourceUpdate.updatedAt ||
+      sourceUpdate.updated_at ||
+      sourceUpdate.lastReport ||
+      sourceUpdate.lastTelemetryAt ||
+      activo.timestamp ||
+      activo.lastTelemetryAt
+
+    const speedValue = sourceUpdate.velocidad ?? sourceUpdate.velocidad_kmh ?? sourceUpdate.speed
     const speedLabel = formatTelemetrySpeed(speedValue)
     const timeLabel = formatTelemetryTime(timestamp, {
       fallback: null,
@@ -549,22 +622,33 @@ export function createAssetMarkerController({
 
     return {
       ...activo,
-      ...update,
+      ...sourceUpdate,
 
-      id: activo.id ?? update.id,
+      id: activo.id ?? sourceUpdate.id,
 
-      lat: update.lat ?? activo.lat,
-      lng: update.lng ?? activo.lng,
+      lat: sourceUpdate.lat ?? activo.lat,
+      lng: sourceUpdate.lng ?? activo.lng,
 
-      estado: update.estado || update.status || activo.estado,
+      estado: sourceUpdate.estado || sourceUpdate.status || activo.estado,
 
       speed: isValidNumber(speedValue) ? Number(speedValue) : activo.speed,
-      velocidad: speedLabel || activo.velocidad,
+      velocidad: speedLabel || sourceUpdate.velocidad || activo.velocidad,
+      velocidad_kmh: isValidNumber(speedValue) ? Number(speedValue) : activo.velocidad_kmh,
 
       timestamp: timestamp || activo.timestamp,
       lastTelemetryAt: timestamp || activo.lastTelemetryAt,
-      datosUlt: timeLabel || activo.datosUlt,
+      datosUlt: timeLabel || sourceUpdate.datosUlt || activo.datosUlt,
     }
+  }
+
+  const getActivoFallbackById = (markerId) => {
+    return (
+      latestActivosById.get(markerId) ||
+      (props.activos || []).find((activo) => {
+        return normalizeId(activo.id) === markerId
+      }) ||
+      null
+    )
   }
 
   const flushPendingTelemetryUpdates = () => {
@@ -574,12 +658,22 @@ export function createAssetMarkerController({
 
     pendingTelemetryUpdatesById.clear()
 
+    if (!groupedUpdates.length) return
+
+    const map = getMap()
+
+    if (!map || !layers.markerLayer) return
+
+    const shouldCluster = shouldClusterAssetMarkers(map, getAllLatestActivos())
+
+    if (!shouldCluster) {
+      markerClusters.clearClusterMarkers()
+    }
+
+    let shouldRefreshClusters = false
+
     groupedUpdates.forEach(([markerId, updates]) => {
-      const currentActivo =
-        latestActivosById.get(markerId) ||
-        (props.activos || []).find((activo) => {
-          return normalizeId(activo.id) === markerId
-        })
+      const currentActivo = getActivoFallbackById(markerId)
 
       if (!currentActivo) return
 
@@ -587,15 +681,25 @@ export function createAssetMarkerController({
 
       updates.forEach((update) => {
         nextActivo = mergeTelemetryUpdateIntoActivo(nextActivo, update)
-
-        latestActivosById.set(markerId, nextActivo)
-        movementTrails.registerMovementTrailPoint(nextActivo)
       })
 
-      upsertActivoMarker(nextActivo, {
+      latestActivosById.set(markerId, nextActivo)
+      movementTrails.registerMovementTrailPoint(nextActivo)
+
+      if (shouldCluster && !isActivoSelected(nextActivo)) {
+        hideCachedMarker(markerId)
+        shouldRefreshClusters = true
+        return
+      }
+
+      upsertIndividualMarker(nextActivo, {
         trackTrail: false,
       })
     })
+
+    if (shouldRefreshClusters) {
+      scheduleClusterRefresh()
+    }
   }
 
   const scheduleTelemetryFlush = () => {
@@ -604,106 +708,128 @@ export function createAssetMarkerController({
     pendingTelemetryFrame = requestClusterFrame(flushPendingTelemetryUpdates)
   }
 
-  const applyActivoTelemetryBatch = (updates = []) => {
-    if (!Array.isArray(updates) || !updates.length) return []
+  const applyActivoTelemetryBatch = (payload = []) => {
+    const measure = startDevMeasure(APPLY_ACTIVO_TELEMETRY_BATCH_MEASURE)
 
-    updates.forEach((update) => {
-      const markerId = normalizeId(update?.id)
+    try {
+      const { updates, changedIds } = normalizeTelemetryBatchPayload(payload)
 
-      if (!markerId) return
+      if (!updates.length && !changedIds.length) return []
 
-      const pendingUpdates = pendingTelemetryUpdatesById.get(markerId) || []
+      changedIds.forEach((changedId) => {
+        const markerId = normalizeId(changedId)
 
-      pendingUpdates.push(update)
-      pendingTelemetryUpdatesById.set(markerId, pendingUpdates)
-    })
+        if (!markerId || pendingTelemetryUpdatesById.has(markerId)) return
 
-    scheduleTelemetryFlush()
+        pendingTelemetryUpdatesById.set(markerId, [])
+      })
 
-    return updates
+      updates.forEach((update) => {
+        const markerId = getUpdateMarkerId(update)
+
+        if (!markerId) return
+
+        const pendingUpdates = pendingTelemetryUpdatesById.get(markerId) || []
+
+        pendingUpdates.push(update)
+        pendingTelemetryUpdatesById.set(markerId, pendingUpdates)
+      })
+
+      scheduleTelemetryFlush()
+
+      return updates
+    } finally {
+      endDevMeasure(measure)
+    }
   }
 
   const syncActivoMarkers = (activos = [], { fit = false } = {}) => {
-    const map = getMap()
+    const measure = startDevMeasure(SYNC_ACTIVO_MARKERS_MEASURE)
 
-    if (!map || !layers.markerLayer) return
+    try {
+      const map = getMap()
 
-    const bounds = []
-    const nextMarkerIds = new Set()
-    const nextVisibleActivos = []
-    const nextVisibleActivoIds = new Set()
+      if (!map || !layers.markerLayer) return
 
-    ;(activos || []).forEach((activo) => {
-      const markerId = normalizeId(activo?.id)
+      const bounds = []
+      const nextMarkerIds = new Set()
+      const nextVisibleActivos = []
+      const nextVisibleActivoIds = new Set()
 
-      if (!markerId) return
+      ;(activos || []).forEach((activo) => {
+        const markerId = normalizeId(activo?.id)
 
-      const activoLatLng = getActivoLatLng(activo)
+        if (!markerId) return
 
-      if (!activoLatLng) {
+        const activoLatLng = getActivoLatLng(activo)
+
+        if (!activoLatLng) {
+          removeActivoMarker(markerId)
+          return
+        }
+
+        latestActivosById.set(markerId, activo)
+        nextMarkerIds.add(markerId)
+        bounds.push(activoLatLng)
+
+        movementTrails.registerMovementTrailPoint(activo)
+
+        if (!isActivoInsideViewport(activoLatLng) && !isActivoSelected(activo)) {
+          hideCachedMarker(markerId)
+          return
+        }
+
+        nextVisibleActivos.push(activo)
+        nextVisibleActivoIds.add(markerId)
+      })
+
+      visibleActivoIds = nextVisibleActivoIds
+
+      const staleMarkerIds = []
+
+      markerCache.forEach((_cachedMarker, markerId) => {
+        if (!nextMarkerIds.has(markerId)) {
+          staleMarkerIds.push(markerId)
+        }
+      })
+
+      staleMarkerIds.forEach((markerId) => {
         removeActivoMarker(markerId)
-        return
-      }
+      })
 
-      latestActivosById.set(markerId, activo)
-      nextMarkerIds.add(markerId)
-      bounds.push(activoLatLng)
+      const staleActivoIds = []
 
-      movementTrails.registerMovementTrailPoint(activo)
+      latestActivosById.forEach((_activo, activoId) => {
+        if (!nextMarkerIds.has(activoId)) {
+          staleActivoIds.push(activoId)
+        }
+      })
 
-      if (!isActivoInsideViewport(activoLatLng) && !isActivoSelected(activo)) {
-        hideCachedMarker(markerId)
-        return
-      }
+      staleActivoIds.forEach((activoId) => {
+        latestActivosById.delete(activoId)
+        movementTrails.removeMovementTrail(activoId)
+      })
 
-      nextVisibleActivos.push(activo)
-      nextVisibleActivoIds.add(markerId)
-    })
+      if (shouldClusterAssetMarkers(map, activos)) {
+        markerClusters.renderMarkerClusters(getVisibleActivos())
+      } else {
+        markerClusters.clearClusterMarkers()
 
-    visibleActivoIds = nextVisibleActivoIds
-
-    const staleMarkerIds = []
-
-    markerCache.forEach((_cachedMarker, markerId) => {
-      if (!nextMarkerIds.has(markerId)) {
-        staleMarkerIds.push(markerId)
-      }
-    })
-
-    staleMarkerIds.forEach((markerId) => {
-      removeActivoMarker(markerId)
-    })
-
-    const staleActivoIds = []
-
-    latestActivosById.forEach((_activo, activoId) => {
-      if (!nextMarkerIds.has(activoId)) {
-        staleActivoIds.push(activoId)
-      }
-    })
-
-    staleActivoIds.forEach((activoId) => {
-      latestActivosById.delete(activoId)
-      movementTrails.removeMovementTrail(activoId)
-    })
-
-    if (shouldClusterAssetMarkers(map, activos)) {
-      markerClusters.renderMarkerClusters(getVisibleActivos())
-    } else {
-      markerClusters.clearClusterMarkers()
-
-      nextVisibleActivos.forEach((activo) => {
-        upsertIndividualMarker(activo, {
-          trackTrail: false,
+        nextVisibleActivos.forEach((activo) => {
+          upsertIndividualMarker(activo, {
+            trackTrail: false,
+          })
         })
-      })
-    }
+      }
 
-    if (fit && bounds.length && !props.selectedId && !props.itineraryRoute) {
-      map.fitBounds(bounds, {
-        padding: [30, 30],
-        maxZoom: 14,
-      })
+      if (fit && bounds.length && !props.selectedId && !props.itineraryRoute) {
+        map.fitBounds(bounds, {
+          padding: [30, 30],
+          maxZoom: 14,
+        })
+      }
+    } finally {
+      endDevMeasure(measure)
     }
   }
 
