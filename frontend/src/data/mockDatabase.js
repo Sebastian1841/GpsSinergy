@@ -19,36 +19,26 @@ const createFunctionAccess = (functionId, permissions = {}) => ({
   permissions: createPermissions(permissions),
 })
 
-const createAccessScope = (scope = {}) => ({
-  type: "all-assets",
-  sucursalIds: [],
-  assetIds: [],
-  criticalAlerts: false,
-  reports: false,
-  ...scope,
-})
+const createAccessScope = (scope = {}) => {
+  const cleanScope = {
+    ...scope,
+  }
 
-const createAccessGroup = ({
-  id,
-  applicationId,
-  name,
-  description,
-  role = "viewer",
-  scope = {},
-}) => ({
-  id,
-  applicationId,
-  name,
-  description,
-  role,
-  scope: createAccessScope(scope),
-})
+  delete cleanScope.criticalAlerts
+  delete cleanScope.reports
+
+  return {
+    type: "all-assets",
+    sucursalIds: [],
+    assetIds: [],
+    ...cleanScope,
+  }
+}
 
 const createAccess = ({
   id,
   userId,
   applicationId,
-  groupId = null,
   role,
   status = "active",
   functions = [],
@@ -64,7 +54,6 @@ const createAccess = ({
     id,
     userId,
     applicationId,
-    groupId,
     role,
     status,
     modules: ["assets", "users"].map((moduleId) => ({
@@ -130,7 +119,7 @@ const createAsset = ({
   ignicion: estado === "moving" || estado === "idle" ? "Encendida" : "Apagada",
 })
 
-export const mockReportTypes = [
+const mockReportTypes = [
   {
     id: "mileage",
     name: "Kilometraje",
@@ -185,17 +174,11 @@ export const mockReportTypes = [
     description: "Horas de motor, ralenti y actividad operacional.",
     category: "Telemetria",
   },
-  {
-    id: "maintenance",
-    name: "Mantenciones",
-    description: "Vencimientos, revisiones y disponibilidad operacional.",
-    category: "Administracion",
-  },
 ]
 
 const allReportIds = mockReportTypes.map((reportType) => reportType.id)
 
-export const mockCompanies = [
+const mockCompanies = [
   {
     id: "company-001",
     applicationId: "app-001",
@@ -206,10 +189,8 @@ export const mockCompanies = [
     contactName: "Claudio Rivas",
     contactEmail: "claudio.rivas@tsp.cl",
     contactPhone: "+56 9 4421 8912",
-    billingEmail: "finanzas@tsp.cl",
     region: "Metropolitana",
     city: "Santiago",
-    timezone: "America/Santiago",
     createdAt: "2026-01-15",
     lastTelemetryAt: "Hace 2 min",
     workspacePath: "/app/company-001/activos",
@@ -234,10 +215,8 @@ export const mockCompanies = [
     contactName: "Maria Torres",
     contactEmail: "maria.torres@flr.cl",
     contactPhone: "+56 9 8764 2011",
-    billingEmail: "administracion@flr.cl",
     region: "Araucania",
     city: "Temuco",
-    timezone: "America/Santiago",
     createdAt: "2026-02-03",
     lastTelemetryAt: "Hace 5 min",
     workspacePath: "/app/company-002/activos",
@@ -261,10 +240,8 @@ export const mockCompanies = [
     contactName: "Jorge Medina",
     contactEmail: "jorge.medina@constructoranorte.cl",
     contactPhone: "+56 9 3320 7814",
-    billingEmail: "pagos@constructoranorte.cl",
     region: "Antofagasta",
     city: "Calama",
-    timezone: "America/Santiago",
     createdAt: "2026-03-21",
     lastTelemetryAt: "Hace 14 min",
     workspacePath: "/app/company-003/activos",
@@ -275,7 +252,7 @@ export const mockCompanies = [
       { id: "sucursal-company-003-003", name: "Faena Sierra", active: true },
     ],
     reports: buildReportAccess(
-      ["mileage", "route-history", "stops", "speed", "alerts", "engine-hours", "maintenance"],
+      ["mileage", "route-history", "stops", "speed", "alerts", "engine-hours"],
       mockReportTypes,
     ),
   },
@@ -289,10 +266,8 @@ export const mockCompanies = [
     contactName: "Equipo Sinergy",
     contactEmail: "admin@sinergy.cl",
     contactPhone: "+56 2 2400 0000",
-    billingEmail: "admin@sinergy.cl",
     region: "Metropolitana",
     city: "Santiago",
-    timezone: "America/Santiago",
     createdAt: "2026-01-01",
     lastTelemetryAt: "Hace 1 min",
     workspacePath: "/app/company-004/activos",
@@ -302,7 +277,7 @@ export const mockCompanies = [
   },
 ]
 
-export const mockApplicationDefinitions = mockCompanies.map((company) => ({
+const mockApplicationDefinitions = mockCompanies.map((company) => ({
   id: company.applicationId,
   companyId: company.id,
   shortName: company.shortName,
@@ -507,7 +482,7 @@ export const mockAssets = [
   }),
 ]
 
-export const mockSystemModules = [
+const mockSystemModules = [
   {
     id: "assets",
     name: "Activos",
@@ -520,7 +495,7 @@ export const mockSystemModules = [
   },
 ]
 
-export const mockModuleFunctions = [
+const mockModuleFunctions = [
   { id: "gps", moduleId: "assets", name: "Control GPS", description: "Monitoreo de activos." },
   { id: "geofences", moduleId: "assets", name: "Geocercas", description: "Control territorial." },
   {
@@ -530,10 +505,10 @@ export const mockModuleFunctions = [
     description: "Historial de recorridos.",
   },
   {
-    id: "maintenance",
+    id: "branches",
     moduleId: "assets",
-    name: "Mantenciones",
-    description: "Control de mantenimiento.",
+    name: "Sucursales",
+    description: "Administracion y asignacion de sucursales.",
   },
   { id: "reports", moduleId: "assets", name: "Reportes", description: "Informes operativos." },
   {
@@ -562,13 +537,13 @@ export const mockModuleFunctions = [
   },
 ]
 
-export const mockPermissions = [
+const mockPermissions = [
   { id: "view", name: "Ver" },
   { id: "edit", name: "Editar" },
   { id: "admin", name: "Administrar" },
 ]
 
-export const mockOperationalScopes = [
+const mockOperationalScopes = [
   { id: "all-assets", name: "Todos los activos", description: "Acceso a toda la flota." },
   { id: "sucursal", name: "Sucursal asignada", description: "Acceso por sucursal." },
   {
@@ -576,11 +551,9 @@ export const mockOperationalScopes = [
     name: "Activos especificos",
     description: "Acceso a activos seleccionados.",
   },
-  { id: "critical-alerts", name: "Alertas criticas", description: "Gestion de alertas." },
-  { id: "reports", name: "Reportes", description: "Visualizacion de reportes." },
 ]
 
-export const mockRoles = [
+const mockRoles = [
   { id: "admin", name: "Administrador" },
   { id: "supervisor", name: "Supervisor" },
   { id: "operator", name: "Operador" },
@@ -588,80 +561,7 @@ export const mockRoles = [
   { id: "viewer", name: "Visualizador" },
 ]
 
-export const mockAccessGroups = [
-  createAccessGroup({
-    id: "group-app-001-admin",
-    applicationId: "app-001",
-    name: "Administradores Transportes San Pedro",
-    description: "Acceso completo a usuarios, permisos y toda la flota.",
-    role: "admin",
-    scope: {
-      type: "all-assets",
-      criticalAlerts: true,
-      reports: true,
-    },
-  }),
-  createAccessGroup({
-    id: "group-app-001-base-norte",
-    applicationId: "app-001",
-    name: "Base norte",
-    description: "Puede ver solamente las patentes asignadas a la base norte.",
-    role: "supervisor",
-    scope: {
-      type: "sucursal",
-      sucursalIds: ["sucursal-company-001-002"],
-      criticalAlerts: true,
-      reports: true,
-    },
-  }),
-  createAccessGroup({
-    id: "group-app-001-cliente",
-    applicationId: "app-001",
-    name: "Cliente limitado",
-    description: "Acceso restringido a patentes especificas.",
-    role: "viewer",
-    scope: {
-      type: "selected-assets",
-      assetIds: ["asset-001", "asset-002"],
-    },
-  }),
-  createAccessGroup({
-    id: "group-app-002-supervisores",
-    applicationId: "app-002",
-    name: "Supervisores Forestal",
-    description: "Acceso completo a la flota forestal.",
-    role: "supervisor",
-    scope: {
-      type: "all-assets",
-      criticalAlerts: true,
-      reports: true,
-    },
-  }),
-  createAccessGroup({
-    id: "group-app-003-calama",
-    applicationId: "app-003",
-    name: "Operacion Calama",
-    description: "Operadores con acceso solo a la sucursal Calama.",
-    role: "operator",
-    scope: {
-      type: "sucursal",
-      sucursalIds: ["sucursal-company-003-001"],
-      criticalAlerts: true,
-    },
-  }),
-  createAccessGroup({
-    id: "group-app-004-soporte",
-    applicationId: "app-004",
-    name: "Soporte interno",
-    description: "Equipo tecnico interno con acceso a la flota de soporte.",
-    role: "technician",
-    scope: {
-      type: "all-assets",
-    },
-  }),
-]
-
-export const mockUsers = [
+const mockUsers = [
   {
     id: "user-001",
     name: "Administrador Principal",
@@ -703,8 +603,7 @@ export const mockUsers = [
     id: "user-005",
     name: "Soporte Tecnico",
     username: "soporte",
-    password: "soporte1234",
-    email: "soporte@sinergy.cl",
+    password: "soporte@sinergy.cl",
     status: "inactive",
     lastAccess: "Lun 18:03",
   },
@@ -714,16 +613,15 @@ const adminAssetFunctions = [
   createFunctionAccess("gps", { view: true, edit: true, admin: true }),
   createFunctionAccess("geofences", { view: true, edit: true, admin: true }),
   createFunctionAccess("itineraries", { view: true, edit: true }),
-  createFunctionAccess("maintenance", { view: true, edit: true }),
+  createFunctionAccess("branches", { view: true, edit: true, admin: true }),
   createFunctionAccess("reports", { view: true }),
 ]
 
-export const mockUserAccesses = [
+const mockUserAccesses = [
   createAccess({
     id: "access-001",
     userId: "user-001",
     applicationId: "app-001",
-    groupId: "group-app-001-admin",
     role: "admin",
     functions: [
       ...adminAssetFunctions,
@@ -734,62 +632,53 @@ export const mockUserAccesses = [
     ],
     scope: {
       type: "all-assets",
-      criticalAlerts: true,
-      reports: true,
     },
   }),
   createAccess({
     id: "access-002",
     userId: "user-001",
     applicationId: "app-002",
-    groupId: "group-app-002-supervisores",
     role: "supervisor",
     functions: adminAssetFunctions,
     scope: {
       type: "all-assets",
-      criticalAlerts: true,
-      reports: true,
     },
   }),
   createAccess({
     id: "access-003",
     userId: "user-002",
     applicationId: "app-003",
-    groupId: "group-app-003-calama",
     role: "operator",
     functions: [
       createFunctionAccess("gps", { view: true, edit: true }),
       createFunctionAccess("itineraries", { view: true }),
+      createFunctionAccess("branches", { view: true }),
     ],
     scope: {
       type: "sucursal",
       sucursalIds: ["sucursal-company-003-001"],
-      criticalAlerts: true,
     },
   }),
   createAccess({
     id: "access-004",
     userId: "user-003",
     applicationId: "app-001",
-    groupId: "group-app-001-base-norte",
     role: "supervisor",
     functions: [
       createFunctionAccess("gps", { view: true }),
       createFunctionAccess("geofences", { view: true, edit: true }),
+      createFunctionAccess("branches", { view: true }),
       createFunctionAccess("reports", { view: true }),
     ],
     scope: {
       type: "sucursal",
       sucursalIds: ["sucursal-company-001-002"],
-      criticalAlerts: true,
-      reports: true,
     },
   }),
   createAccess({
     id: "access-005",
     userId: "user-004",
     applicationId: "app-001",
-    groupId: "group-app-001-cliente",
     role: "viewer",
     status: "pending",
     functions: [createFunctionAccess("gps", { view: true })],
@@ -802,11 +691,10 @@ export const mockUserAccesses = [
     id: "access-006",
     userId: "user-005",
     applicationId: "app-004",
-    groupId: "group-app-004-soporte",
     role: "technician",
     functions: [
       createFunctionAccess("gps", { view: true }),
-      createFunctionAccess("maintenance", { view: true, edit: true }),
+      createFunctionAccess("branches", { view: true }),
     ],
     scope: {
       type: "all-assets",
@@ -820,7 +708,6 @@ export const mockDatabaseSeed = {
   assets: mockAssets,
   users: mockUsers,
   accesses: mockUserAccesses,
-  accessGroups: mockAccessGroups,
   reportTypes: mockReportTypes,
   modules: mockSystemModules,
   moduleFunctions: mockModuleFunctions,

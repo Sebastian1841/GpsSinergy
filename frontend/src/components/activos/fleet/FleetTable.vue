@@ -15,8 +15,13 @@
             <th
               v-for="column in visibleColumns"
               :key="column.key"
-              class="whitespace-nowrap px-2 text-[10px] font-black uppercase tracking-[0.03em] text-white"
+              draggable="true"
+              class="group relative whitespace-nowrap px-2 text-[10px] font-black uppercase tracking-[0.03em] text-white"
               :class="column.align === 'right' ? 'text-right' : 'text-left'"
+              @dragstart="handleColumnDragStart($event, column.key)"
+              @dragover.prevent
+              @drop="handleColumnDrop(column.key)"
+              @dragend="handleColumnDragEnd"
             >
               <button
                 type="button"
@@ -44,85 +49,92 @@
                   {{ getSortIcon(column.key) }}
                 </span>
               </button>
+
+              <span
+                class="absolute right-0 top-0 h-full w-1 cursor-col-resize bg-white/0 transition group-hover:bg-[#FF6600]"
+                title="Cambiar ancho de columna"
+                @mousedown.stop.prevent="startColumnResize($event, column)"
+                @dragstart.stop.prevent
+              ></span>
             </th>
           </tr>
         </thead>
 
         <tbody>
           <tr
-            v-for="activo in paginatedActivos"
-            :key="activo.id"
-            :data-activo-id="String(activo.id)"
+            v-for="row in paginatedTableRows"
+            :key="row.id"
+            :data-activo-id="row.id"
             class="h-[32px] cursor-context-menu border-b border-[#edf1f5] transition hover:bg-[#f6f8fb]"
-            :class="isSelected(activo) ? 'bg-[#fff7ed]' : 'bg-white'"
-            @click.left="$emit('select', activo)"
-            @contextmenu.prevent.stop="$emit('open-context-menu', { event: $event, activo })"
+            :class="row.isSelected ? 'bg-[#fff7ed]' : 'bg-white'"
+            @click.left="$emit('select', row.activo)"
+            @contextmenu.prevent.stop="
+              $emit('open-context-menu', { event: $event, activo: row.activo })
+            "
           >
             <td
-              v-for="column in visibleColumns"
-              :key="column.key"
+              v-for="cell in row.cells"
+              :key="cell.column.key"
               class="max-w-[190px] truncate px-2"
               :class="[
-                column.align === 'right' ? 'text-right' : 'text-left',
-                isSelected(activo) && column.key === firstVisibleColumnKey
+                cell.column.align === 'right' ? 'text-right' : 'text-left',
+                row.isSelected && cell.column.key === firstVisibleColumnKey
                   ? 'shadow-[inset_3px_0_0_#FF6600]'
                   : '',
               ]"
-              :title="resolveCellValue(activo, column)"
+              :title="cell.value"
             >
-              <template v-if="column.key === 'estado'">
+              <template v-if="cell.column.key === 'estado'">
                 <span
                   class="inline-flex max-w-full items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[10px] font-black"
-                  :class="statusChipClass(activo.estado)"
+                  :class="statusChipClass(row.activo.estado)"
                 >
                   <span
                     class="h-1.5 w-1.5 shrink-0 rounded-full"
-                    :class="statusDotClass(activo.estado)"
+                    :class="statusDotClass(row.activo.estado)"
                   ></span>
 
                   <span class="truncate">
-                    {{ statusLabel(activo.estado) }}
+                    {{ statusLabel(row.activo.estado) }}
                   </span>
                 </span>
               </template>
 
-              <template v-else-if="column.key === 'vehiculo'">
+              <template v-else-if="cell.column.key === 'vehiculo'">
                 <span class="block truncate font-black text-[#102372]">
-                  {{ activo.vehiculo || "-" }}
+                  {{ cell.value }}
                 </span>
               </template>
 
-              <template v-else-if="column.key === 'trackerModelLabel'">
+              <template v-else-if="cell.column.key === 'trackerModelLabel'">
                 <span class="block truncate font-bold text-slate-700">
-                  {{ resolveCellValue(activo, column) }}
+                  {{ cell.value }}
                 </span>
               </template>
 
-              <template v-else-if="column.key === 'imei'">
+              <template v-else-if="cell.column.key === 'imei'">
                 <span class="block truncate font-mono text-[10px] font-bold text-slate-600">
-                  {{ resolveCellValue(activo, column) }}
+                  {{ cell.value }}
                 </span>
               </template>
 
-              <template v-else-if="column.key === 'protocol'">
+              <template v-else-if="cell.column.key === 'protocol'">
                 <span
                   class="inline-flex rounded-md bg-[#eef3ff] px-1.5 py-0.5 text-[10px] font-black uppercase text-[#102372]"
                 >
-                  {{ resolveCellValue(activo, column) }}
+                  {{ cell.value }}
                 </span>
               </template>
 
-              <template
-                v-else-if="['horometroDiario', 'horometroTotal', 'odometro'].includes(column.key)"
-              >
+              <template v-else-if="numericDetailColumnKeys.has(cell.column.key)">
                 <span class="font-bold text-slate-700">
-                  {{ resolveCellValue(activo, column) }}
+                  {{ cell.value }}
                 </span>
               </template>
 
               <template v-else>
                 <span class="block truncate font-semibold text-slate-600">
-                  {{ resolveCellValue(activo, column) }}
+                  {{ cell.value }}
                 </span>
               </template>
             </td>
@@ -199,7 +211,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue"
+import { computed, onBeforeUnmount, ref, watch } from "vue"
 
 const props = defineProps({
   activos: {
@@ -232,11 +244,28 @@ const props = defineProps({
   },
 })
 
-defineEmits(["select", "toggle-sort", "open-context-menu"])
+const emit = defineEmits([
+  "select",
+  "toggle-sort",
+  "open-context-menu",
+  "resize-column",
+  "move-column",
+])
 
 const pageSizeOptions = [25, 50, 100, 200]
 const currentPage = ref(1)
 const pageSize = ref(50)
+const draggedColumnKey = ref("")
+
+let resizeState = null
+
+const numericDetailColumnKeys = new Set(["horometroDiario", "horometroTotal", "odometro"])
+
+const selectedIdString = computed(() => {
+  if (props.selectedId === null || props.selectedId === undefined) return ""
+
+  return String(props.selectedId)
+})
 
 const totalItems = computed(() => {
   return props.activos.length
@@ -262,46 +291,6 @@ const paginatedActivos = computed(() => {
 
   return props.activos.slice(start, end)
 })
-
-const clampCurrentPage = () => {
-  if (currentPage.value > totalPages.value) {
-    currentPage.value = totalPages.value
-  }
-
-  if (currentPage.value < 1) {
-    currentPage.value = 1
-  }
-}
-
-const goToPreviousPage = () => {
-  currentPage.value = Math.max(1, currentPage.value - 1)
-}
-
-const goToNextPage = () => {
-  currentPage.value = Math.min(totalPages.value, currentPage.value + 1)
-}
-
-const goToSelectedActivoPage = () => {
-  if (props.selectedId === null || props.selectedId === undefined) return
-
-  const selectedIndex = props.activos.findIndex((activo) => {
-    return String(activo.id) === String(props.selectedId)
-  })
-
-  if (selectedIndex < 0) return
-
-  currentPage.value = Math.floor(selectedIndex / pageSize.value) + 1
-}
-
-const isSelected = (activo) => {
-  if (props.selectedId === null || props.selectedId === undefined) return false
-
-  return String(props.selectedId) === String(activo.id)
-}
-
-const resolveCellValue = (activo, column) => {
-  return props.getCellValue(activo, column)
-}
 
 const statusLabel = (estado) => {
   const labels = {
@@ -336,6 +325,121 @@ const statusChipClass = (estado) => {
   return classes[estado] || "bg-slate-100 text-slate-500"
 }
 
+const resolveCellValue = (activo, column) => {
+  if (column.key === "estado") {
+    return statusLabel(activo.estado)
+  }
+
+  if (column.key === "vehiculo") {
+    return activo.vehiculo || "-"
+  }
+
+  return props.getCellValue(activo, column)
+}
+
+const parseColumnWidth = (value, fallback = 110) => {
+  const match = String(value || "").match(/-?\d+(\.\d+)?/)
+  const parsedValue = match ? Number(match[0]) : fallback
+
+  return Number.isFinite(parsedValue) ? parsedValue : fallback
+}
+
+const handleColumnDragStart = (event, columnKey) => {
+  draggedColumnKey.value = columnKey
+  event.dataTransfer?.setData("text/plain", columnKey)
+  event.dataTransfer?.setDragImage?.(event.currentTarget, 8, 8)
+}
+
+const handleColumnDrop = (targetColumnKey) => {
+  if (!draggedColumnKey.value || draggedColumnKey.value === targetColumnKey) return
+
+  emit("move-column", draggedColumnKey.value, targetColumnKey)
+  draggedColumnKey.value = ""
+}
+
+const handleColumnDragEnd = () => {
+  draggedColumnKey.value = ""
+}
+
+const stopColumnResize = () => {
+  if (!resizeState) return
+
+  window.removeEventListener("mousemove", handleColumnResize)
+  window.removeEventListener("mouseup", stopColumnResize)
+  resizeState = null
+}
+
+const handleColumnResize = (event) => {
+  if (!resizeState) return
+
+  const nextWidth = resizeState.startWidth + event.clientX - resizeState.startX
+
+  emit("resize-column", resizeState.columnKey, nextWidth)
+}
+
+const startColumnResize = (event, column) => {
+  stopColumnResize()
+
+  const headerCell = event.currentTarget.closest("th")
+
+  resizeState = {
+    columnKey: column.key,
+    startX: event.clientX,
+    startWidth: headerCell?.offsetWidth || parseColumnWidth(column.width),
+  }
+
+  window.addEventListener("mousemove", handleColumnResize)
+  window.addEventListener("mouseup", stopColumnResize)
+}
+
+const paginatedTableRows = computed(() => {
+  return paginatedActivos.value.map((activo) => {
+    const activoId = String(activo.id)
+
+    return {
+      id: activoId,
+      activo,
+      isSelected: selectedIdString.value === activoId,
+      cells: props.visibleColumns.map((column) => {
+        return {
+          column,
+          value: resolveCellValue(activo, column),
+        }
+      }),
+    }
+  })
+})
+
+const clampCurrentPage = () => {
+  if (currentPage.value > totalPages.value) {
+    currentPage.value = totalPages.value
+  }
+
+  if (currentPage.value < 1) {
+    currentPage.value = 1
+  }
+}
+
+const goToPreviousPage = () => {
+  currentPage.value = Math.max(1, currentPage.value - 1)
+}
+
+const goToNextPage = () => {
+  currentPage.value = Math.min(totalPages.value, currentPage.value + 1)
+}
+
+const goToSelectedActivoPage = () => {
+  if (!selectedIdString.value) return
+
+  const selectedIndex = props.activos.findIndex((activo) => {
+    return String(activo.id) === selectedIdString.value
+  })
+
+  if (selectedIndex < 0) return
+
+  currentPage.value = Math.floor(selectedIndex / pageSize.value) + 1
+}
+
 watch(
   [pageSize, () => props.activos.length],
   () => {
@@ -352,4 +456,8 @@ watch(
     goToSelectedActivoPage()
   },
 )
+
+onBeforeUnmount(() => {
+  stopColumnResize()
+})
 </script>

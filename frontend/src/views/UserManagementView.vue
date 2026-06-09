@@ -1,7 +1,11 @@
 <template>
   <section class="h-full min-h-0 bg-[#eef2f7]">
     <div class="grid h-full min-h-0 grid-rows-[auto_1fr]">
-      <UserManagementHeader :summary-items="summaryItems" @create-user="openCreateUserModal" />
+      <UserManagementHeader
+        :summary-items="summaryItems"
+        :can-create-users="canCreateUsersForRoute"
+        @create-user="handleOpenCreateUserModal"
+      />
 
       <div
         class="grid min-h-0 grid-cols-1 gap-3 overflow-hidden p-3 xl:grid-cols-[320px_minmax(0,1fr)]"
@@ -49,20 +53,21 @@
             :roles="roles"
             :assets="assets"
             :can-impersonate="canImpersonateSelectedUser"
+            :can-edit-users="canEditUsersForRoute"
+            :can-manage-user-permissions="canManageUserPermissionsForRoute"
             @impersonate-user="handleImpersonateSelectedUser"
-            @edit-user="openEditUserModal"
-            @toggle-user-status="toggleSelectedUserStatus"
-            @add-application-access="addApplicationAccess"
-            @update-access-role="updateAccessRole"
-            @toggle-access-status="toggleAccessStatus"
-            @remove-application-access="removeApplicationAccess"
-            @toggle-module-access="toggleModuleAccess"
-            @toggle-function-access="toggleFunctionAccess"
-            @toggle-permission="togglePermission"
-            @update-operational-scope="updateOperationalScope"
-            @toggle-scope-option="toggleScopeOption"
-            @toggle-scope-asset="toggleScopeAsset"
-            @toggle-scope-sucursal="toggleScopeSucursal"
+            @edit-user="handleOpenEditUserModal"
+            @toggle-user-status="handleToggleSelectedUserStatus"
+            @add-application-access="handleAddApplicationAccess"
+            @update-access-role="handleUpdateAccessRole"
+            @toggle-access-status="handleToggleAccessStatus"
+            @remove-application-access="handleRemoveApplicationAccess"
+            @toggle-module-access="handleToggleModuleAccess"
+            @toggle-function-access="handleToggleFunctionAccess"
+            @toggle-permission="handleTogglePermission"
+            @update-operational-scope="handleUpdateOperationalScope"
+            @toggle-scope-asset="handleToggleScopeAsset"
+            @toggle-scope-sucursal="handleToggleScopeSucursal"
           />
         </main>
       </div>
@@ -76,7 +81,7 @@
       :applications="applications"
       @update:draft-user="updateDraftUser"
       @close="closeEditorModal"
-      @save="saveUserFromModal"
+      @save="handleSaveUserFromModal"
     />
   </section>
 </template>
@@ -92,11 +97,13 @@ import UserListPanel from "../components/users/UserListPanel.vue"
 import UserManagementHeader from "../components/users/UserManagementHeader.vue"
 
 import { useUserAccessManagement } from "../composables/users/useUserAccessManagement.js"
+import { useAccessControl } from "../composables/auth/useAccessControl.js"
 import { useAuthSession } from "../composables/auth/useAuthSession.js"
 
 const route = useRoute()
 const router = useRouter()
 const { canImpersonateUser, startImpersonation, defaultAuthenticatedRoute } = useAuthSession()
+const { canAccessFunction } = useAccessControl()
 
 const {
   accesses,
@@ -145,14 +152,114 @@ const {
   toggleFunctionAccess,
   togglePermission,
   updateOperationalScope,
-  toggleScopeOption,
   toggleScopeAsset,
   toggleScopeSucursal,
 } = useUserAccessManagement()
 
+const routeCompanyId = computed(() => {
+  return route.params.empresaId || null
+})
+
+const canCreateUsersForRoute = computed(() => {
+  return canAccessFunction("users-create", routeCompanyId.value, "edit")
+})
+
+const canEditUsersForRoute = computed(() => {
+  return canAccessFunction("users-edit", routeCompanyId.value, "edit")
+})
+
+const canManageUserPermissionsForRoute = computed(() => {
+  return canAccessFunction("users-permissions", routeCompanyId.value, "admin")
+})
+
 const canImpersonateSelectedUser = computed(() => {
   return canImpersonateUser(selectedUser.value?.id)
 })
+
+const handleOpenCreateUserModal = () => {
+  if (!canCreateUsersForRoute.value) return
+
+  openCreateUserModal()
+}
+
+const handleOpenEditUserModal = () => {
+  if (!canEditUsersForRoute.value) return
+
+  openEditUserModal()
+}
+
+const handleSaveUserFromModal = () => {
+  if (editorMode.value === "create" && !canCreateUsersForRoute.value) return
+  if (editorMode.value === "edit" && !canEditUsersForRoute.value) return
+
+  saveUserFromModal()
+}
+
+const handleToggleSelectedUserStatus = () => {
+  if (!canEditUsersForRoute.value) return
+
+  toggleSelectedUserStatus()
+}
+
+const handleAddApplicationAccess = (applicationId) => {
+  if (!canManageUserPermissionsForRoute.value) return
+
+  addApplicationAccess(applicationId)
+}
+
+const handleRemoveApplicationAccess = (accessId) => {
+  if (!canManageUserPermissionsForRoute.value) return
+
+  removeApplicationAccess(accessId)
+}
+
+const handleUpdateAccessRole = (accessId, roleId) => {
+  if (!canManageUserPermissionsForRoute.value) return
+
+  updateAccessRole(accessId, roleId)
+}
+
+const handleToggleAccessStatus = (accessId) => {
+  if (!canManageUserPermissionsForRoute.value) return
+
+  toggleAccessStatus(accessId)
+}
+
+const handleToggleModuleAccess = (accessId, moduleId) => {
+  if (!canManageUserPermissionsForRoute.value) return
+
+  toggleModuleAccess(accessId, moduleId)
+}
+
+const handleToggleFunctionAccess = (accessId, functionId) => {
+  if (!canManageUserPermissionsForRoute.value) return
+
+  toggleFunctionAccess(accessId, functionId)
+}
+
+const handleTogglePermission = (accessId, functionId, permissionId) => {
+  if (!canManageUserPermissionsForRoute.value) return
+
+  togglePermission(accessId, functionId, permissionId)
+}
+
+const handleUpdateOperationalScope = (accessId, scopeType) => {
+  if (!canManageUserPermissionsForRoute.value) return
+
+  updateOperationalScope(accessId, scopeType)
+}
+
+const handleToggleScopeAsset = (accessId, assetId) => {
+  if (!canManageUserPermissionsForRoute.value) return
+
+  toggleScopeAsset(accessId, assetId)
+}
+
+const handleToggleScopeSucursal = (accessId, sucursalId) => {
+  if (!canManageUserPermissionsForRoute.value) return
+
+  toggleScopeSucursal(accessId, sucursalId)
+}
 
 const handleImpersonateSelectedUser = async () => {
   if (!selectedUser.value) return

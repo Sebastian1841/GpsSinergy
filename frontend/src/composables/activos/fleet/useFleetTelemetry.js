@@ -1,8 +1,15 @@
 import { computed, onBeforeUnmount, shallowRef, triggerRef } from "vue"
 import { createMockTelemetryStream } from "../../../data/mockTelemetryStream.js"
+import { parseNumberFromLabel } from "../../../utils/numberUtils.js"
+import {
+  formatTelemetryTime,
+  getTelemetryTimestamp,
+  normalizeTelemetryReports,
+} from "../../../utils/telemetryUtils.js"
 
 const DEFAULT_MOCK_INTERVAL_MS = 1000
 const DEFAULT_MOCK_BATCH_SIZE = 25
+const TELEMETRY_REPORTS_LIMIT = 500
 
 const normalizeId = (value) => {
   return String(value ?? "")
@@ -20,25 +27,12 @@ const normalizeCoordinate = (value, fallback = null) => {
   return numberValue
 }
 
-const formatTelemetryTime = (timestamp) => {
-  if (!timestamp) return "-"
-
-  const date = new Date(timestamp)
-
-  if (Number.isNaN(date.getTime())) return "-"
-
-  return date.toLocaleTimeString("es-CL", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  })
-}
-
 const formatSpeedLabel = (value) => {
-  if (!isValidNumber(value)) return "-"
+  const numberValue = parseNumberFromLabel(value, null)
 
-  return `${Number(value).toFixed(1)} km/h`
+  if (!isValidNumber(numberValue)) return "-"
+
+  return `${Number(numberValue).toFixed(1)} km/h`
 }
 
 const normalizeTelemetryUpdate = (update = {}) => {
@@ -46,36 +40,169 @@ const normalizeTelemetryUpdate = (update = {}) => {
 
   if (!id) return null
 
+  const timestamp = getTelemetryTimestamp(update)
+  const speedValue = parseNumberFromLabel(
+    update.speed ?? update.velocidad_kmh ?? update.velocidad ?? 0,
+    null,
+  )
+
   return {
+    ...update,
+
     id,
+
     lat: normalizeCoordinate(update.lat),
     lng: normalizeCoordinate(update.lng),
+
     estado: update.estado || update.status || null,
-    velocidad: isValidNumber(update.velocidad) ? Number(update.velocidad) : null,
-    speed: isValidNumber(update.speed) ? Number(update.speed) : null,
-    timestamp: update.timestamp || update.updatedAt || new Date().toISOString(),
+
+    speed: speedValue ?? 0,
+    velocidad: update.velocidad || formatSpeedLabel(speedValue ?? 0),
+    velocidad_kmh: speedValue ?? 0,
+
+    timestamp,
+    lastReport: timestamp,
+    lastReportAt: timestamp,
+    reportedAt: timestamp,
+    updatedAt: timestamp,
+    updated_at: timestamp,
+
+    datosUlt: update.datosUlt || formatTelemetryTime(timestamp),
+
+    direccion: update.direccion || update.address || null,
+    address: update.address || update.direccion || null,
+
+    odometro: update.odometro || update.odometer || null,
+    odometer: update.odometer || update.odometro || null,
   }
 }
 
+const buildTelemetryHistoryPoint = (activo = {}, update = {}) => {
+  const timestamp = getTelemetryTimestamp(update)
+  const assetId = normalizeId(activo.id || update.id)
+  const speedValue = parseNumberFromLabel(
+    update.speed ??
+      update.velocidad_kmh ??
+      update.velocidad ??
+      activo.speed ??
+      activo.velocidad ??
+      0,
+    null,
+  )
+
+  const lat = update.lat ?? activo.lat
+  const lng = update.lng ?? activo.lng
+  const cleanTimestamp = String(timestamp).replace(/\D/g, "")
+
+  return {
+    id: `${assetId}-telemetry-${cleanTimestamp}`,
+    assetId,
+    timestamp,
+
+    lat,
+    lng,
+
+    speed: speedValue ?? 0,
+    velocidad: update.velocidad || formatSpeedLabel(speedValue ?? 0),
+    velocidad_kmh: speedValue ?? 0,
+
+    estado: update.estado || activo.estado,
+
+    address:
+      update.address ||
+      update.direccion ||
+      activo.address ||
+      activo.direccion ||
+      "Ubicacion actual",
+    direccion:
+      update.direccion ||
+      update.address ||
+      activo.direccion ||
+      activo.address ||
+      "Ubicacion actual",
+
+    event: "Reporte GPS",
+
+    odometer: update.odometer || update.odometro || activo.odometer || activo.odometro || null,
+    odometro: update.odometro || update.odometer || activo.odometro || activo.odometer || null,
+
+    isLiveTelemetry: true,
+    isCurrentLocation: true,
+  }
+}
+
+const getTelemetryReportKey = (report = {}) => {
+  return [report.assetId, report.timestamp, report.lat, report.lng, report.speed]
+    .map((value) => String(value ?? ""))
+    .join("|")
+}
+
+const appendTelemetryReport = ({ activo, update }) => {
+  const currentReports = normalizeTelemetryReports(activo.telemetryReports)
+  const nextReport = buildTelemetryHistoryPoint(activo, update)
+  const nextReportKey = getTelemetryReportKey(nextReport)
+
+  const alreadyExists = currentReports.some((report) => {
+    return getTelemetryReportKey(report) === nextReportKey
+  })
+
+  if (alreadyExists) {
+    return currentReports
+  }
+
+  return [...currentReports, nextReport].slice(-TELEMETRY_REPORTS_LIMIT)
+}
+
 const mergeTelemetryIntoActivo = (activo = {}, update = {}) => {
-  const speedValue = update.velocidad ?? update.speed
+  const timestamp = getTelemetryTimestamp(update)
+
+  const speedValue = parseNumberFromLabel(
+    update.speed ??
+      update.velocidad_kmh ??
+      update.velocidad ??
+      activo.speed ??
+      activo.velocidad ??
+      0,
+    null,
+  )
+
   const hasSpeed = isValidNumber(speedValue)
-  const timestamp = update.timestamp || new Date().toISOString()
+
+  const telemetryReports = appendTelemetryReport({
+    activo,
+    update,
+  })
 
   return {
     ...activo,
+    ...update,
 
     lat: update.lat ?? activo.lat,
     lng: update.lng ?? activo.lng,
 
     estado: update.estado || activo.estado,
 
-    speed: hasSpeed ? Number(speedValue) : activo.speed,
+    speed: hasSpeed ? speedValue : activo.speed,
     velocidad: hasSpeed ? formatSpeedLabel(speedValue) : activo.velocidad,
+    velocidad_kmh: hasSpeed ? speedValue : activo.velocidad_kmh,
 
     lastTelemetryAt: timestamp,
     timestamp,
-    datosUlt: formatTelemetryTime(timestamp),
+    lastReport: timestamp,
+    lastReportAt: timestamp,
+    reportedAt: timestamp,
+    updatedAt: timestamp,
+    updated_at: timestamp,
+
+    datosUlt: update.datosUlt || formatTelemetryTime(timestamp),
+
+    direccion: update.direccion || update.address || activo.direccion,
+    address: update.address || update.direccion || activo.address || activo.direccion,
+
+    odometro: update.odometro || update.odometer || activo.odometro,
+    odometer: update.odometer || update.odometro || activo.odometer,
+
+    telemetryReports,
   }
 }
 
@@ -109,7 +236,12 @@ export function useFleetTelemetry(initialSnapshot = [], options = {}) {
   }
 
   const replaceFleetSnapshot = (snapshot = []) => {
-    const nextSnapshot = Array.isArray(snapshot) ? [...snapshot] : []
+    const nextSnapshot = Array.isArray(snapshot)
+      ? snapshot.map((activo) => ({
+          ...activo,
+          telemetryReports: normalizeTelemetryReports(activo.telemetryReports),
+        }))
+      : []
 
     activos.value = nextSnapshot
     rebuildIndexes(nextSnapshot)
@@ -127,18 +259,35 @@ export function useFleetTelemetry(initialSnapshot = [], options = {}) {
     const existingIndex = indexById.get(id)
 
     if (existingIndex === undefined) {
-      indexById.set(id, activos.value.length)
-      activos.value.push(activo)
-      activosById.value.set(id, activo)
+      const nextActivo = {
+        ...activo,
+        telemetryReports: normalizeTelemetryReports(activo.telemetryReports),
+      }
 
+      const nextSnapshot = [...activos.value, nextActivo]
+
+      activos.value = nextSnapshot
+      rebuildIndexes(nextSnapshot)
       triggerRef(activos)
       triggerRef(activosById)
       return
     }
 
-    activos.value[existingIndex] = activo
-    activosById.value.set(id, activo)
+    const currentActivo = activos.value[existingIndex]
 
+    const nextActivo = {
+      ...activo,
+      telemetryReports: normalizeTelemetryReports(
+        activo.telemetryReports || currentActivo?.telemetryReports,
+      ),
+    }
+
+    const nextSnapshot = activos.value.map((currentItem, index) => {
+      return index === existingIndex ? nextActivo : currentItem
+    })
+
+    activos.value = nextSnapshot
+    rebuildIndexes(nextSnapshot)
     triggerRef(activos)
     triggerRef(activosById)
   }
@@ -149,10 +298,12 @@ export function useFleetTelemetry(initialSnapshot = [], options = {}) {
 
     if (existingIndex === undefined) return
 
-    activos.value.splice(existingIndex, 1)
-    activosById.value.delete(normalizedId)
-    rebuildIndexes(activos.value)
+    const nextSnapshot = activos.value.filter((_, index) => {
+      return index !== existingIndex
+    })
 
+    activos.value = nextSnapshot
+    rebuildIndexes(nextSnapshot)
     triggerRef(activos)
     triggerRef(activosById)
   }
@@ -160,29 +311,40 @@ export function useFleetTelemetry(initialSnapshot = [], options = {}) {
   const applyTelemetryBatch = (batch = []) => {
     if (!Array.isArray(batch) || !batch.length) return []
 
-    const appliedUpdates = []
+    const updatesById = new Map()
 
     batch.forEach((rawUpdate) => {
       const update = normalizeTelemetryUpdate(rawUpdate)
 
       if (!update) return
 
-      const existingIndex = indexById.get(update.id)
+      updatesById.set(update.id, update)
+    })
 
-      if (existingIndex === undefined) return
+    if (!updatesById.size) return []
 
-      const currentActivo = activos.value[existingIndex]
+    const appliedUpdates = []
 
-      if (!currentActivo) return
+    const nextSnapshot = activos.value.map((activo) => {
+      const id = normalizeId(activo?.id)
+      const update = updatesById.get(id)
 
-      const nextActivo = mergeTelemetryIntoActivo(currentActivo, update)
+      if (!update) return activo
 
-      activos.value[existingIndex] = nextActivo
-      activosById.value.set(update.id, nextActivo)
-      appliedUpdates.push(update)
+      const nextActivo = mergeTelemetryIntoActivo(activo, update)
+
+      appliedUpdates.push({
+        ...update,
+        activo: nextActivo,
+      })
+
+      return nextActivo
     })
 
     if (appliedUpdates.length) {
+      activos.value = nextSnapshot
+      rebuildIndexes(nextSnapshot)
+
       triggerRef(activos)
       triggerRef(activosById)
     }
@@ -226,23 +388,6 @@ export function useFleetTelemetry(initialSnapshot = [], options = {}) {
     return mockTelemetryStream
   }
 
-  const generateMockTelemetryBatch = ({
-    batchSize = options.batchSize || DEFAULT_MOCK_BATCH_SIZE,
-  } = {}) => {
-    if (!mockTelemetryStream) {
-      mockTelemetryStream = createMockTelemetryStream({
-        activos: activos.value,
-        intervalMs: options.intervalMs || DEFAULT_MOCK_INTERVAL_MS,
-        batchSize,
-      })
-    }
-
-    const batch = mockTelemetryStream.generateBatch()
-    const appliedUpdates = applyTelemetryBatch(batch)
-
-    return appliedUpdates
-  }
-
   replaceFleetSnapshot(initialSnapshot)
 
   onBeforeUnmount(() => {
@@ -262,6 +407,5 @@ export function useFleetTelemetry(initialSnapshot = [], options = {}) {
 
     startMockTelemetry,
     stopMockTelemetry,
-    generateMockTelemetryBatch,
   }
 }

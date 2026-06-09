@@ -33,24 +33,12 @@ export const getCompanyStatusClass = (status) => {
   return classes[status] || "bg-slate-100 text-slate-500"
 }
 
-export const getCompanyAvatarClass = (status) => {
-  if (status === "active") return "bg-[#102372]"
-  if (status === "pending") return "bg-amber-600"
-  if (status === "internal") return "bg-slate-700"
-
-  return "bg-slate-400"
-}
-
 export const getCompanyWorkspacePath = (company = {}) => {
   return company.workspacePath || `/app/${company.id}/activos`
 }
 
 export const getEnabledCompanyReports = (company = {}) => {
   return (company.reports || []).filter((reportAccess) => reportAccess.enabled)
-}
-
-export const getReportTypeById = (reportTypes = [], reportId) => {
-  return reportTypes.find((reportType) => reportType.id === reportId) || null
 }
 
 export const getCompanyOperationHealth = (company = {}) => {
@@ -72,10 +60,8 @@ export const companyMatchesSearch = ({ company, term = "" }) => {
     company.rut,
     company.contactName,
     company.contactEmail,
-    company.billingEmail,
     company.region,
     company.city,
-    company.timezone,
     ...(company.sucursales || []).map((sucursal) => sucursal.name),
   ]
     .filter(Boolean)

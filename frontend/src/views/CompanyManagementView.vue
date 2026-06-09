@@ -21,6 +21,7 @@
           :can-show-more="canShowMoreCompanies"
           :get-company-health="getCompanyHealth"
           @configure-company="openCompanyConfigPanel"
+          @enter-company="enterCompanyWorkspace"
           @clear-filters="clearFilters"
           @show-more="showMoreCompanies"
         />
@@ -42,6 +43,7 @@
       @alternar-estado-sucursal="alternarEstadoSucursal"
       @eliminar-sucursal="eliminarSucursal"
       @actualizar-sucursal-activo="actualizarSucursalActivo"
+      @enter-company="enterCompanyWorkspace"
     />
 
     <CompanyEditorModal
@@ -57,6 +59,7 @@
 
 <script setup>
 import { ref } from "vue"
+import { useRouter } from "vue-router"
 
 import CompanyCatalog from "../components/companies/CompanyCatalog.vue"
 import CompanyConfigPanel from "../components/companies/CompanyConfigPanel.vue"
@@ -65,6 +68,9 @@ import CompanyFiltersBar from "../components/companies/CompanyFiltersBar.vue"
 import CompanyManagementHeader from "../components/companies/CompanyManagementHeader.vue"
 
 import { useCompanyManagement } from "../composables/companies/useCompanyManagement.js"
+import { getCompanyWorkspacePath } from "../utils/companies/companyUtils.js"
+
+const router = useRouter()
 
 const {
   reportTypes,
@@ -104,6 +110,12 @@ const showConfigPanel = ref(false)
 const openCompanyConfigPanel = (companyId) => {
   selectCompany(companyId)
   showConfigPanel.value = true
+}
+
+const enterCompanyWorkspace = (company) => {
+  if (!company?.id) return
+
+  router.push(getCompanyWorkspacePath(company))
 }
 
 const updateDraftCompany = (nextDraftCompany) => {

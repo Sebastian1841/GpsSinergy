@@ -11,7 +11,6 @@ export const mockItineraryAssets = mockAssets.map((asset) => ({
   lng: asset.lng,
   speed: Number(asset.speed) || 0,
   direccion: asset.direccion,
-  last_report: "2026-05-14T23:59:59",
 }))
 
 const CURRENT_MOCK_DATE = "2026-05-14"
@@ -234,21 +233,6 @@ const getRoutePointOffset = ({ assetId, pointIndex, dayIndex, assetIndex }) => {
   }
 }
 
-const buildCurrentLocationPoint = ({ asset, dateString, odometer }) => {
-  return createPoint({
-    id: `${asset.id}-${dateString}-current`,
-    assetId: asset.id,
-    timestamp: asset.last_report || `${dateString}T23:59:59`,
-    lat: asset.lat,
-    lng: asset.lng,
-    speed: Number(asset.speed) || 0,
-    address: asset.direccion || `Ubicación actual ${asset.patente}`,
-    event: "Ubicación actual",
-    odometer,
-    isCurrentLocation: true,
-  })
-}
-
 const getItineraryProfile = (asset, assetIndex) => {
   return (
     itineraryAssetProfiles[asset.id] || {
@@ -296,7 +280,7 @@ const generateDailyPointsForAsset = ({ asset, dateString, dayIndex, assetIndex }
   const startHour = 7 + ((assetIndex + dayIndex) % 3)
   const startMinute = (assetIndex * 7 + dayIndex * 3) % 45
 
-  const points = Array.from({ length: pointCount }, (_, index) => {
+  return Array.from({ length: pointCount }, (_, index) => {
     const isFirst = index === 0
     const isLast = index === pointCount - 1
     const isStop = isFirst || isLast || index === 3 || index === 5
@@ -340,21 +324,6 @@ const generateDailyPointsForAsset = ({ asset, dateString, dayIndex, assetIndex }
       odometer: profile.odometerStart + odometerIncrement,
     })
   })
-
-  if (dateString === CURRENT_MOCK_DATE && hasValidLocation(asset)) {
-    const lastHistoricalPoint = points[points.length - 1]
-
-    return [
-      ...points.slice(0, -1),
-      buildCurrentLocationPoint({
-        asset,
-        dateString,
-        odometer: lastHistoricalPoint?.odometer || profile.odometerStart,
-      }),
-    ]
-  }
-
-  return points
 }
 
 const generateMonthlyItineraryPoints = () => {
@@ -377,7 +346,48 @@ const generateMonthlyItineraryPoints = () => {
   }).flat()
 }
 
-export const mockItineraryPoints = generateMonthlyItineraryPoints()
+const mockItineraryPoints = generateMonthlyItineraryPoints()
+
+const getFallbackAssetIndex = (asset) => {
+  return String(asset?.id || asset?.patente || "")
+    .split("")
+    .reduce((total, character) => total + character.charCodeAt(0), 0)
+}
+
+const buildDateRange = ({ fromDate, toDate }) => {
+  const start = new Date(`${fromDate}T00:00:00`)
+  const end = new Date(`${toDate}T00:00:00`)
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return []
+
+  const dates = []
+  const cursor = new Date(start)
+  const maxDays = 31
+
+  while (cursor <= end && dates.length < maxDays) {
+    dates.push(toDateString(cursor))
+    cursor.setDate(cursor.getDate() + 1)
+  }
+
+  return dates
+}
+
+const generateFallbackItineraryPoints = ({ asset, fromDate, toDate }) => {
+  if (!asset || !hasValidLocation(asset)) return []
+
+  const assetIndex = getFallbackAssetIndex(asset)
+
+  return buildDateRange({ fromDate, toDate })
+    .flatMap((dateString, dayIndex) => {
+      return generateDailyPointsForAsset({
+        asset,
+        dateString,
+        dayIndex,
+        assetIndex,
+      })
+    })
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+}
 
 export const getLatestItineraryDate = () => {
   const dates = mockItineraryPoints.map((point) => point.timestamp.slice(0, 10)).sort()
@@ -391,7 +401,7 @@ export const addDays = (dateString, amount) => {
   return date.toISOString().slice(0, 10)
 }
 
-export const formatDateLabel = (timestamp) => {
+const formatDateLabel = (timestamp) => {
   if (!timestamp) return "-"
 
   const date = new Date(timestamp)
@@ -403,7 +413,7 @@ export const formatDateLabel = (timestamp) => {
   }).format(date)
 }
 
-export const formatTimeLabel = (timestamp) => {
+const formatTimeLabel = (timestamp) => {
   if (!timestamp) return "-"
 
   const date = new Date(timestamp)
@@ -415,7 +425,7 @@ export const formatTimeLabel = (timestamp) => {
   }).format(date)
 }
 
-export const formatMinutes = (minutes) => {
+const formatMinutes = (minutes) => {
   if (!Number.isFinite(minutes) || minutes <= 0) return "0 min"
 
   const hours = Math.floor(minutes / 60)
@@ -427,7 +437,7 @@ export const formatMinutes = (minutes) => {
   return `${hours} h ${mins} min`
 }
 
-export const haversineDistanceKm = (pointA, pointB) => {
+const haversineDistanceKm = (pointA, pointB) => {
   if (!pointA || !pointB) return 0
 
   const earthRadiusKm = 6371
@@ -448,14 +458,22 @@ export const haversineDistanceKm = (pointA, pointB) => {
   return earthRadiusKm * c
 }
 
-export const filterItineraryPoints = ({ assetId, fromDate, toDate }) => {
-  return mockItineraryPoints
+export const filterItineraryPoints = ({ assetId, asset, fromDate, toDate }) => {
+  const historicalPoints = mockItineraryPoints
     .filter((point) => {
       const date = point.timestamp.slice(0, 10)
 
       return point.assetId === assetId && date >= fromDate && date <= toDate
     })
     .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+
+  if (historicalPoints.length) return historicalPoints
+
+  return generateFallbackItineraryPoints({
+    asset,
+    fromDate,
+    toDate,
+  })
 }
 
 export const buildItineraryResult = ({ asset, points }) => {

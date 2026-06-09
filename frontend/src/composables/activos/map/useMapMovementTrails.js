@@ -1,13 +1,18 @@
 import { ref } from "vue"
 
 const MOVEMENT_TRAIL_PANE = "movementTrailPane"
-const MOVEMENT_TRAIL_MAX_RAW_POINTS = 600
+
+const MOVEMENT_TRAIL_MAX_BACKGROUND_RAW_POINTS = 140
+const MOVEMENT_TRAIL_MAX_SELECTED_RAW_POINTS = 900
 const MOVEMENT_TRAIL_MAX_RENDER_POINTS = 55
+const MOVEMENT_TRAIL_MAX_VIEWPORT_ENTRIES = 350
+
 const MOVEMENT_TRAIL_MIN_RENDER_ZOOM = 13
 const MOVEMENT_TRAIL_MIN_START_MARKER_ZOOM = 15
 const MOVEMENT_TRAIL_MAX_START_MARKERS = 80
 const MOVEMENT_TRAIL_MIN_DISTANCE_METERS = 14
 const MOVEMENT_TRAIL_MAX_JUMP_METERS = 5000
+const MOVEMENT_TRAIL_VIEWPORT_PADDING = 0.18
 
 const MOVEMENT_TRAIL_COLOR = "#FF6600"
 const MOVEMENT_TRAIL_HALO_COLOR = "#102372"
@@ -40,14 +45,14 @@ const buildRenderableTrailPoints = (points = []) => {
   return renderPoints
 }
 
-const trimRawTrailPoints = (points = []) => {
+const trimRawTrailPoints = (points = [], maxPoints = MOVEMENT_TRAIL_MAX_BACKGROUND_RAW_POINTS) => {
   if (!Array.isArray(points)) return []
 
-  if (points.length <= MOVEMENT_TRAIL_MAX_RAW_POINTS) {
+  if (points.length <= maxPoints) {
     return points
   }
 
-  points.splice(0, points.length - MOVEMENT_TRAIL_MAX_RAW_POINTS)
+  points.splice(0, points.length - maxPoints)
 
   return points
 }
@@ -59,6 +64,7 @@ export function createMovementTrailController({
   layers,
   getActivoLatLng,
   normalizeId,
+  getSelectedActivoId = () => null,
 }) {
   const showMovementTrails = ref(true)
   const movementTrailCache = new Map()
@@ -70,6 +76,7 @@ export function createMovementTrailController({
   let sharedStyleSignature = ""
   let cachedStartIcon = null
   let cachedStartIconSignature = ""
+  let boundViewportMap = null
 
   const requestTrailFrame = (callback) => {
     if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
@@ -86,6 +93,69 @@ export function createMovementTrailController({
     }
 
     clearTimeout(frameId)
+  }
+
+  const getNormalizedSelectedActivoId = () => {
+    return normalizeId(getSelectedActivoId?.())
+  }
+
+  const isSelectedTrail = (activoId) => {
+    const selectedActivoId = getNormalizedSelectedActivoId()
+
+    return Boolean(selectedActivoId && selectedActivoId === normalizeId(activoId))
+  }
+
+  const getMaxRawPointsForTrail = (activoId) => {
+    return isSelectedTrail(activoId)
+      ? MOVEMENT_TRAIL_MAX_SELECTED_RAW_POINTS
+      : MOVEMENT_TRAIL_MAX_BACKGROUND_RAW_POINTS
+  }
+
+  const getViewportBounds = () => {
+    const map = getMap()
+    const bounds = map?.getBounds?.()
+
+    if (!bounds) return null
+
+    if (typeof bounds.pad === "function") {
+      return bounds.pad(MOVEMENT_TRAIL_VIEWPORT_PADDING)
+    }
+
+    return bounds
+  }
+
+  const trailHasPointInsideViewport = (trail, viewportBounds) => {
+    if (!trail || !viewportBounds) return true
+
+    const points = trail.renderPoints?.length ? trail.renderPoints : trail.rawPoints
+
+    if (!points?.length) return false
+
+    const lastPoint = points[points.length - 1]
+
+    if (lastPoint && viewportBounds.contains(lastPoint)) {
+      return true
+    }
+
+    return points.some((point) => viewportBounds.contains(point))
+  }
+
+  const bindMovementTrailViewportEvents = (map) => {
+    if (!map || boundViewportMap === map) return
+
+    if (boundViewportMap) {
+      boundViewportMap.off("moveend zoomend resize", scheduleMovementTrailRender)
+    }
+
+    boundViewportMap = map
+    boundViewportMap.on("moveend zoomend resize", scheduleMovementTrailRender)
+  }
+
+  const unbindMovementTrailViewportEvents = () => {
+    if (!boundViewportMap) return
+
+    boundViewportMap.off("moveend zoomend resize", scheduleMovementTrailRender)
+    boundViewportMap = null
   }
 
   const ensureMovementTrailPane = () => {
@@ -111,6 +181,7 @@ export function createMovementTrailController({
     if (!map) return null
 
     ensureMovementTrailPane()
+    bindMovementTrailViewportEvents(map)
 
     if (!layers.movementTrailLayer) {
       layers.movementTrailLayer = L.layerGroup().addTo(map)
@@ -227,15 +298,32 @@ export function createMovementTrailController({
 
   const getRenderableTrailEntries = () => {
     const entries = []
+    const selectedEntries = []
+    const viewportEntries = []
+    const viewportBounds = getViewportBounds()
 
     movementTrailCache.forEach((trail, activoId) => {
       if ((trail.renderPoints || []).length < 2) return
 
-      entries.push({
+      const entry = {
         activoId,
         path: trail.renderPoints,
-      })
+      }
+
+      if (isSelectedTrail(activoId)) {
+        selectedEntries.push(entry)
+        return
+      }
+
+      if (!trailHasPointInsideViewport(trail, viewportBounds)) {
+        return
+      }
+
+      viewportEntries.push(entry)
     })
+
+    entries.push(...selectedEntries)
+    entries.push(...viewportEntries.slice(0, MOVEMENT_TRAIL_MAX_VIEWPORT_ENTRIES))
 
     return entries
   }
@@ -438,14 +526,21 @@ export function createMovementTrailController({
     renderMovementTrails()
   }
 
-  const scheduleMovementTrailRender = () => {
+  function scheduleMovementTrailRender() {
     if (pendingTrailFrame !== null) return
 
     pendingTrailFrame = requestTrailFrame(flushPendingMovementTrailUpdates)
   }
 
+  const trimAllRawTrailsBySelection = () => {
+    movementTrailCache.forEach((trail, activoId) => {
+      trimRawTrailPoints(trail.rawPoints, getMaxRawPointsForTrail(activoId))
+    })
+  }
+
   const redrawAllMovementTrails = () => {
     clearPendingMovementTrailUpdates()
+    trimAllRawTrailsBySelection()
 
     movementTrailCache.forEach((trail) => {
       trail.renderPoints = buildRenderableTrailPoints(trail.rawPoints)
@@ -494,7 +589,7 @@ export function createMovementTrailController({
     }
 
     trail.rawPoints.push(currentLatLng)
-    trimRawTrailPoints(trail.rawPoints)
+    trimRawTrailPoints(trail.rawPoints, getMaxRawPointsForTrail(activoId))
     trail.renderPoints = buildRenderableTrailPoints(trail.rawPoints)
 
     scheduleMovementTrailRender()
@@ -516,6 +611,11 @@ export function createMovementTrailController({
     movementTrailCache.clear()
   }
 
+  const cleanupMovementTrails = () => {
+    clearMovementTrails()
+    unbindMovementTrailViewportEvents()
+  }
+
   const toggleMovementTrails = () => {
     showMovementTrails.value = !showMovementTrails.value
 
@@ -534,6 +634,7 @@ export function createMovementTrailController({
     registerMovementTrailPoint,
     removeMovementTrail,
     clearMovementTrails,
+    cleanupMovementTrails,
     toggleMovementTrails,
     redrawAllMovementTrails,
   }

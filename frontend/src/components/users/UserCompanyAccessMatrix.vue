@@ -33,7 +33,9 @@
           <div class="flex flex-wrap items-center gap-2">
             <select
               :value="access.role"
-              class="h-8 cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-2 text-[10px] font-black text-[#102372] outline-none transition focus:border-[#ff6600] focus:ring-2 focus:ring-[#ff6600]/10"
+              :disabled="!canManageUserPermissions"
+              class="h-8 rounded-lg border border-[#d8dee8] bg-white px-2 text-[10px] font-black text-[#102372] outline-none transition focus:border-[#ff6600] focus:ring-2 focus:ring-[#ff6600]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+              :class="canManageUserPermissions ? 'cursor-pointer' : 'cursor-not-allowed'"
               @change="$emit('update-access-role', access.id, $event.target.value)"
             >
               <option v-for="role in roles" :key="role.id" :value="role.id">
@@ -43,12 +45,13 @@
 
             <button
               type="button"
-              class="h-8 rounded-lg border px-3 text-[10px] font-black transition"
+              class="h-8 rounded-lg border px-3 text-[10px] font-black transition disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
               :class="
                 access.status === 'active'
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                   : 'border-slate-200 bg-slate-100 text-slate-500'
               "
+              :disabled="!canManageUserPermissions"
               @click="$emit('toggle-access-status', access.id)"
             >
               {{ access.status === "active" ? "Activo" : "Inactivo" }}
@@ -56,7 +59,8 @@
 
             <button
               type="button"
-              class="h-8 rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-slate-500 transition hover:border-red-200 hover:text-red-600"
+              class="h-8 rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-slate-500 transition hover:border-red-200 hover:text-red-600 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:hover:border-slate-200 disabled:hover:text-slate-400"
+              :disabled="!canManageUserPermissions"
               @click="$emit('remove-application-access', access.id)"
             >
               Quitar
@@ -71,6 +75,7 @@
           :modules="modules"
           :module-functions="moduleFunctions"
           :permissions="permissions"
+          :can-manage-user-permissions="canManageUserPermissions"
           @toggle-module-access="handleToggleModuleAccess"
           @toggle-function-access="handleToggleFunctionAccess"
           @toggle-permission="handleTogglePermission"
@@ -81,8 +86,8 @@
           :scopes="scopes"
           :assets="assets"
           :sucursales="getApplication(access.applicationId)?.sucursales || []"
+          :can-manage-user-permissions="canManageUserPermissions"
           @update-operational-scope="handleUpdateOperationalScope"
-          @toggle-scope-option="handleToggleScopeOption"
           @toggle-scope-asset="handleToggleScopeAsset"
           @toggle-scope-sucursal="handleToggleScopeSucursal"
         />
@@ -142,6 +147,10 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  canManageUserPermissions: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits([
@@ -152,7 +161,6 @@ const emit = defineEmits([
   "toggle-function-access",
   "toggle-permission",
   "update-operational-scope",
-  "toggle-scope-option",
   "toggle-scope-asset",
   "toggle-scope-sucursal",
 ])
@@ -169,30 +177,38 @@ const getCompanyName = (applicationId) => {
 }
 
 const handleUpdateOperationalScope = (accessId, scopeId) => {
+  if (!props.canManageUserPermissions) return
+
   emit("update-operational-scope", accessId, scopeId)
 }
 
-const handleToggleScopeOption = (accessId, optionKey) => {
-  emit("toggle-scope-option", accessId, optionKey)
-}
-
 const handleToggleScopeAsset = (accessId, assetId) => {
+  if (!props.canManageUserPermissions) return
+
   emit("toggle-scope-asset", accessId, assetId)
 }
 
 const handleToggleScopeSucursal = (accessId, sucursalId) => {
+  if (!props.canManageUserPermissions) return
+
   emit("toggle-scope-sucursal", accessId, sucursalId)
 }
 
 const handleToggleModuleAccess = (accessId, moduleId) => {
+  if (!props.canManageUserPermissions) return
+
   emit("toggle-module-access", accessId, moduleId)
 }
 
 const handleToggleFunctionAccess = (accessId, functionId) => {
+  if (!props.canManageUserPermissions) return
+
   emit("toggle-function-access", accessId, functionId)
 }
 
 const handleTogglePermission = (accessId, functionId, permissionId) => {
+  if (!props.canManageUserPermissions) return
+
   emit("toggle-permission", accessId, functionId, permissionId)
 }
 </script>

@@ -5,6 +5,13 @@ import { useMockDatabase } from "../mock/useMockDatabase.js"
 
 const normalizeKey = (value) => String(value ?? "")
 
+const USER_FUNCTIONS = {
+  view: "users-view",
+  create: "users-create",
+  edit: "users-edit",
+  permissions: "users-permissions",
+}
+
 const isCompanyAvailable = (company) => {
   return company?.status === "active" || company?.status === "internal"
 }
@@ -119,6 +126,22 @@ export function useAccessControl() {
     })
   }
 
+  const canViewUsers = computed(() => {
+    return canAccessFunction(USER_FUNCTIONS.view, null, "view")
+  })
+
+  const canCreateUsers = computed(() => {
+    return canAccessFunction(USER_FUNCTIONS.create, null, "edit")
+  })
+
+  const canEditUsers = computed(() => {
+    return canAccessFunction(USER_FUNCTIONS.edit, null, "edit")
+  })
+
+  const canManageUserPermissions = computed(() => {
+    return canAccessFunction(USER_FUNCTIONS.permissions, null, "admin")
+  })
+
   const accessibleCompanyIds = computed(() => {
     if (isPlatformAdmin.value) {
       return new Set(companies.value.map((company) => normalizeKey(company.id)))
@@ -181,25 +204,16 @@ export function useAccessControl() {
     })
   })
 
-  const getVisibleAssetsForCompany = (companyId) => {
-    return visibleAssets.value.filter((asset) => {
-      return normalizeKey(asset.companyId) === normalizeKey(companyId)
-    })
-  }
-
-  const firstAccessibleCompanyId = computed(() => {
-    return accessibleCompanies.value[0]?.id || null
-  })
-
   return {
     isPlatformAdmin,
-    activeAccesses,
-    accessibleCompanyIds,
     accessibleCompanies,
     visibleAssets,
-    firstAccessibleCompanyId,
-    getAccessesForCompany,
-    getVisibleAssetsForCompany,
+
+    canViewUsers,
+    canCreateUsers,
+    canEditUsers,
+    canManageUserPermissions,
+
     canAccessCompany,
     canAccessModule,
     canAccessFunction,

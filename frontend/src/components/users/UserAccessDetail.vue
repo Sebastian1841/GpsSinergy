@@ -35,7 +35,7 @@
           </button>
 
           <button
-            v-if="!user.isPlatformAdmin"
+            v-if="canEditUsers"
             type="button"
             class="h-9 rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#102372]/40"
             @click="$emit('edit-user')"
@@ -44,7 +44,7 @@
           </button>
 
           <button
-            v-if="!user.isPlatformAdmin"
+            v-if="canEditUsers"
             type="button"
             class="h-9 rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#ff6600] transition hover:border-[#ff6600]/50"
             @click="$emit('toggle-user-status')"
@@ -67,7 +67,10 @@
             </p>
           </div>
 
-          <div class="flex min-w-0 flex-col gap-2 sm:flex-row md:w-full md:max-w-[560px]">
+          <div
+            v-if="canManageUserPermissions"
+            class="flex min-w-0 flex-col gap-2 sm:flex-row md:w-full md:max-w-[560px]"
+          >
             <UserApplicationSearchSelect
               v-model="applicationToAddId"
               :applications="availableApplications"
@@ -83,6 +86,13 @@
               Agregar
             </button>
           </div>
+
+          <p
+            v-else
+            class="rounded-lg border border-[#d8dee8] bg-[#f8fafc] px-3 py-2 text-[10px] font-black text-slate-500"
+          >
+            Permisos en modo solo lectura
+          </p>
         </div>
       </section>
 
@@ -97,6 +107,7 @@
           :scopes="scopes"
           :roles="roles"
           :assets="assets"
+          :can-manage-user-permissions="canManageUserPermissions"
           @update-access-role="handleUpdateAccessRole"
           @toggle-access-status="handleToggleAccessStatus"
           @remove-application-access="handleRemoveApplicationAccess"
@@ -104,7 +115,6 @@
           @toggle-function-access="handleToggleFunctionAccess"
           @toggle-permission="handleTogglePermission"
           @update-operational-scope="handleUpdateOperationalScope"
-          @toggle-scope-option="handleToggleScopeOption"
           @toggle-scope-asset="handleToggleScopeAsset"
           @toggle-scope-sucursal="handleToggleScopeSucursal"
         />
@@ -180,6 +190,14 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  canEditUsers: {
+    type: Boolean,
+    default: false,
+  },
+  canManageUserPermissions: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits([
@@ -194,7 +212,6 @@ const emit = defineEmits([
   "toggle-function-access",
   "toggle-permission",
   "update-operational-scope",
-  "toggle-scope-option",
   "toggle-scope-asset",
   "toggle-scope-sucursal",
 ])
@@ -219,6 +236,7 @@ watch(
 )
 
 const handleAddApplicationAccess = () => {
+  if (!props.canManageUserPermissions) return
   if (!applicationToAddId.value) return
 
   emit("add-application-access", applicationToAddId.value)
@@ -226,42 +244,56 @@ const handleAddApplicationAccess = () => {
 }
 
 const handleUpdateAccessRole = (accessId, roleId) => {
+  if (!props.canManageUserPermissions) return
+
   emit("update-access-role", accessId, roleId)
 }
 
 const handleToggleAccessStatus = (accessId) => {
+  if (!props.canManageUserPermissions) return
+
   emit("toggle-access-status", accessId)
 }
 
 const handleRemoveApplicationAccess = (accessId) => {
+  if (!props.canManageUserPermissions) return
+
   emit("remove-application-access", accessId)
 }
 
 const handleToggleModuleAccess = (accessId, moduleId) => {
+  if (!props.canManageUserPermissions) return
+
   emit("toggle-module-access", accessId, moduleId)
 }
 
 const handleToggleFunctionAccess = (accessId, functionId) => {
+  if (!props.canManageUserPermissions) return
+
   emit("toggle-function-access", accessId, functionId)
 }
 
 const handleTogglePermission = (accessId, functionId, permissionId) => {
+  if (!props.canManageUserPermissions) return
+
   emit("toggle-permission", accessId, functionId, permissionId)
 }
 
 const handleUpdateOperationalScope = (accessId, scopeId) => {
+  if (!props.canManageUserPermissions) return
+
   emit("update-operational-scope", accessId, scopeId)
 }
 
-const handleToggleScopeOption = (accessId, optionKey) => {
-  emit("toggle-scope-option", accessId, optionKey)
-}
-
 const handleToggleScopeAsset = (accessId, assetId) => {
+  if (!props.canManageUserPermissions) return
+
   emit("toggle-scope-asset", accessId, assetId)
 }
 
 const handleToggleScopeSucursal = (accessId, sucursalId) => {
+  if (!props.canManageUserPermissions) return
+
   emit("toggle-scope-sucursal", accessId, sucursalId)
 }
 </script>

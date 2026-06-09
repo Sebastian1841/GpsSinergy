@@ -190,7 +190,6 @@ const canImpersonateUser = (userId) => {
     authenticatedUserIsPlatformAdmin.value &&
     target &&
     target.status === "active" &&
-    !target.isPlatformAdmin &&
     String(target.id) !== String(authenticatedUser.value?.id),
   )
 }
@@ -236,7 +235,6 @@ export function useAuthSession() {
     currentRole,
     isAuthenticated,
     isPlatformAdmin,
-    authenticatedUserIsPlatformAdmin,
     isImpersonating,
     defaultAuthenticatedRoute,
     login,

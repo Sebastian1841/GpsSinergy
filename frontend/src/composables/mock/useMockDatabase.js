@@ -12,6 +12,23 @@ const cloneData = (value) => JSON.parse(JSON.stringify(value))
 
 const normalizeKey = (value) => String(value ?? "")
 
+const normalizeLowerKey = (value) => {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+}
+
+const buildAccessUniqueKey = ({ userId, applicationId }) => {
+  return `${normalizeKey(userId)}::${normalizeKey(applicationId)}`
+}
+
+const emptyCompanyAssetStats = Object.freeze({
+  assetsCount: 0,
+  activeAssetsCount: 0,
+  movingAssetsCount: 0,
+  alertsCount: 0,
+})
+
 const normalizeUsers = (items = []) => {
   return items.map((user) => ({
     ...user,
@@ -106,6 +123,42 @@ const companiesById = computed(() => {
   return new Map(companies.value.map((company) => [normalizeKey(company.id), company]))
 })
 
+const usersById = computed(() => {
+  return new Map(users.value.map((user) => [normalizeKey(user.id), user]))
+})
+
+const usersByUsername = computed(() => {
+  return new Map(
+    users.value
+      .map((user) => [normalizeLowerKey(user.username), user])
+      .filter(([username]) => Boolean(username)),
+  )
+})
+
+const usersByEmail = computed(() => {
+  return new Map(
+    users.value
+      .map((user) => [normalizeLowerKey(user.email), user])
+      .filter(([email]) => Boolean(email)),
+  )
+})
+
+const accessesById = computed(() => {
+  return new Map(accesses.value.map((access) => [normalizeKey(access.id), access]))
+})
+
+const accessesByUserApplicationKey = computed(() => {
+  return new Map(
+    accesses.value.map((access) => [
+      buildAccessUniqueKey({
+        userId: access.userId,
+        applicationId: access.applicationId,
+      }),
+      access,
+    ]),
+  )
+})
+
 const applicationDefinitionsById = computed(() => {
   return new Map(
     applicationDefinitions.value.map((application) => [normalizeKey(application.id), application]),
@@ -121,43 +174,89 @@ const applicationDefinitionsByCompanyId = computed(() => {
   )
 })
 
-const assetsByApplicationId = computed(() => {
-  const groupedAssets = new Map()
+const assetIndexes = computed(() => {
+  const byId = new Map()
+  const byApplicationId = new Map()
+  const byCompanyId = new Map()
+  const statsByCompanyId = new Map()
 
-  assets.value.forEach((asset) => {
-    const applicationId = normalizeKey(asset.applicationId)
-
-    if (!applicationId) return
-
-    if (!groupedAssets.has(applicationId)) {
-      groupedAssets.set(applicationId, [])
+  const ensureGroupedList = (map, key) => {
+    if (!map.has(key)) {
+      map.set(key, [])
     }
 
-    groupedAssets.get(applicationId).push(asset)
-  })
+    return map.get(key)
+  }
 
-  return groupedAssets
-})
+  const ensureCompanyStats = (companyId) => {
+    if (!statsByCompanyId.has(companyId)) {
+      statsByCompanyId.set(companyId, {
+        assetsCount: 0,
+        activeAssetsCount: 0,
+        movingAssetsCount: 0,
+        alertsCount: 0,
+      })
+    }
 
-const assetsByCompanyId = computed(() => {
-  const groupedAssets = new Map()
+    return statsByCompanyId.get(companyId)
+  }
 
   assets.value.forEach((asset) => {
+    const assetId = normalizeKey(asset.id)
+    const applicationId = normalizeKey(asset.applicationId)
+
+    if (assetId) {
+      byId.set(assetId, asset)
+    }
+
+    if (applicationId) {
+      ensureGroupedList(byApplicationId, applicationId).push(asset)
+    }
+
     const directCompanyId = normalizeKey(asset.companyId)
-    const application = applicationDefinitionsById.value.get(normalizeKey(asset.applicationId))
+    const application = applicationDefinitionsById.value.get(applicationId)
     const fallbackCompanyId = normalizeKey(application?.companyId)
     const companyId = directCompanyId || fallbackCompanyId
 
     if (!companyId) return
 
-    if (!groupedAssets.has(companyId)) {
-      groupedAssets.set(companyId, [])
+    ensureGroupedList(byCompanyId, companyId).push(asset)
+
+    const stats = ensureCompanyStats(companyId)
+
+    stats.assetsCount += 1
+
+    if (asset.estado !== "offline") {
+      stats.activeAssetsCount += 1
     }
 
-    groupedAssets.get(companyId).push(asset)
+    if (asset.estado === "moving") {
+      stats.movingAssetsCount += 1
+    }
+
+    if (asset.choque && asset.choque !== "-") {
+      stats.alertsCount += 1
+    }
   })
 
-  return groupedAssets
+  return {
+    byId,
+    byApplicationId,
+    byCompanyId,
+    statsByCompanyId,
+  }
+})
+
+const assetsByApplicationId = computed(() => {
+  return assetIndexes.value.byApplicationId
+})
+
+const assetsByCompanyId = computed(() => {
+  return assetIndexes.value.byCompanyId
+})
+
+const assetStatsByCompanyId = computed(() => {
+  return assetIndexes.value.statsByCompanyId
 })
 
 const userIdsByApplicationId = computed(() => {
@@ -198,6 +297,7 @@ const companyRecords = computed(() => {
   return companies.value.map((company) => {
     const companyId = normalizeKey(company.id)
     const companyAssets = assetsByCompanyId.value.get(companyId) || []
+    const companyAssetStats = assetStatsByCompanyId.value.get(companyId) || emptyCompanyAssetStats
     const application =
       applicationDefinitionsByCompanyId.value.get(companyId) ||
       applicationDefinitionsById.value.get(normalizeKey(company.applicationId))
@@ -209,10 +309,10 @@ const companyRecords = computed(() => {
       ...company,
       applicationId,
       assets: companyAssets,
-      assetsCount: companyAssets.length,
-      activeAssetsCount: companyAssets.filter((asset) => asset.estado !== "offline").length,
-      movingAssetsCount: companyAssets.filter((asset) => asset.estado === "moving").length,
-      alertsCount: companyAssets.filter((asset) => asset.choque && asset.choque !== "-").length,
+      assetsCount: companyAssetStats.assetsCount,
+      activeAssetsCount: companyAssetStats.activeAssetsCount,
+      movingAssetsCount: companyAssetStats.movingAssetsCount,
+      alertsCount: companyAssetStats.alertsCount,
       usersCount: companyUserIds.size,
     }
   })
@@ -224,25 +324,31 @@ const applicationRecordsByCompanyId = computed(() => {
   )
 })
 
+const sucursalesById = computed(() => {
+  const index = new Map()
+
+  companies.value.forEach((company) => {
+    ;(company.sucursales || []).forEach((sucursal) => {
+      const sucursalId = normalizeKey(sucursal.id)
+
+      if (!sucursalId) return
+
+      index.set(sucursalId, {
+        company,
+        sucursal,
+      })
+    })
+  })
+
+  return index
+})
+
 const getCompany = (companyId) => {
   return companiesById.value.get(normalizeKey(companyId)) || null
 }
 
-const getCompanyRecord = (companyId) => {
-  return (
-    companyRecords.value.find((company) => normalizeKey(company.id) === normalizeKey(companyId)) ||
-    null
-  )
-}
-
 const getApplicationForCompany = (companyId) => {
   return applicationRecordsByCompanyId.value.get(normalizeKey(companyId)) || null
-}
-
-const getAssetsForCompany = (companyId) => {
-  if (!companyId || companyId === "general") return assets.value
-
-  return assetsByCompanyId.value.get(normalizeKey(companyId)) || []
 }
 
 const createCompany = (company) => {
@@ -266,13 +372,11 @@ const createCompany = (company) => {
 }
 
 const createUser = (user) => {
-  const identityExists = users.value.some((item) => {
-    return (
-      normalizeKey(item.id) === normalizeKey(user.id) ||
-      String(item.username || "").toLowerCase() === String(user.username || "").toLowerCase() ||
-      String(item.email || "").toLowerCase() === String(user.email || "").toLowerCase()
-    )
-  })
+  const identityExists = Boolean(
+    usersById.value.has(normalizeKey(user.id)) ||
+    usersByUsername.value.has(normalizeLowerKey(user.username)) ||
+    usersByEmail.value.has(normalizeLowerKey(user.email)),
+  )
 
   if (identityExists) return null
 
@@ -285,7 +389,7 @@ const createUser = (user) => {
 }
 
 const updateUser = (userId, changes) => {
-  const user = users.value.find((item) => normalizeKey(item.id) === normalizeKey(userId))
+  const user = usersById.value.get(normalizeKey(userId))
 
   if (!user) return null
 
@@ -294,21 +398,19 @@ const updateUser = (userId, changes) => {
 }
 
 const createAccess = (access) => {
-  const userExists = users.value.some(
-    (user) => normalizeKey(user.id) === normalizeKey(access.userId),
+  const userExists = usersById.value.has(normalizeKey(access.userId))
+  const applicationExists = applicationDefinitionsById.value.has(normalizeKey(access.applicationId))
+  const accessIdExists = accessesById.value.has(normalizeKey(access.id))
+  const userApplicationAccessExists = accessesByUserApplicationKey.value.has(
+    buildAccessUniqueKey({
+      userId: access.userId,
+      applicationId: access.applicationId,
+    }),
   )
-  const applicationExists = applicationDefinitions.value.some((application) => {
-    return normalizeKey(application.id) === normalizeKey(access.applicationId)
-  })
-  const alreadyExists = accesses.value.some((item) => {
-    return (
-      normalizeKey(item.id) === normalizeKey(access.id) ||
-      (normalizeKey(item.userId) === normalizeKey(access.userId) &&
-        normalizeKey(item.applicationId) === normalizeKey(access.applicationId))
-    )
-  })
 
-  if (!userExists || !applicationExists || alreadyExists) return null
+  if (!userExists || !applicationExists || accessIdExists || userApplicationAccessExists) {
+    return null
+  }
 
   accesses.value.unshift(access)
   return access
@@ -337,12 +439,21 @@ const createAsset = (asset) => {
 }
 
 const updateAsset = (assetId, changes) => {
-  const asset = assets.value.find((item) => normalizeKey(item.id) === normalizeKey(assetId))
+  const normalizedAssetId = normalizeKey(assetId)
+  let updatedAsset = null
 
-  if (!asset) return null
+  assets.value = assets.value.map((asset) => {
+    if (normalizeKey(asset.id) !== normalizedAssetId) return asset
 
-  Object.assign(asset, changes)
-  return asset
+    updatedAsset = {
+      ...asset,
+      ...changes,
+    }
+
+    return updatedAsset
+  })
+
+  return updatedAsset
 }
 
 const deleteAsset = (assetId) => {
@@ -351,6 +462,10 @@ const deleteAsset = (assetId) => {
   assets.value = assets.value.filter((asset) => normalizeKey(asset.id) !== normalizedId)
 
   accesses.value.forEach((access) => {
+    if (!access.scope) {
+      access.scope = {}
+    }
+
     access.scope.assetIds = (access.scope.assetIds || []).filter((id) => {
       return normalizeKey(id) !== normalizedId
     })
@@ -367,13 +482,8 @@ const addSucursal = (companyId, sucursal) => {
 }
 
 const updateSucursal = (sucursalId, changes) => {
-  const normalizedSucursalId = normalizeKey(sucursalId)
-  const company = companies.value.find((item) => {
-    return item.sucursales?.some((sucursal) => normalizeKey(sucursal.id) === normalizedSucursalId)
-  })
-  const sucursal = company?.sucursales?.find((item) => {
-    return normalizeKey(item.id) === normalizedSucursalId
-  })
+  const indexedSucursal = sucursalesById.value.get(normalizeKey(sucursalId))
+  const sucursal = indexedSucursal?.sucursal
 
   if (!sucursal) return null
 
@@ -383,13 +493,12 @@ const updateSucursal = (sucursalId, changes) => {
 
 const deleteSucursal = (sucursalId) => {
   const normalizedSucursalId = normalizeKey(sucursalId)
-  const company = companies.value.find((item) => {
-    return item.sucursales?.some((sucursal) => normalizeKey(sucursal.id) === normalizedSucursalId)
-  })
+  const indexedSucursal = sucursalesById.value.get(normalizedSucursalId)
+  const company = indexedSucursal?.company
 
   if (!company) return
 
-  company.sucursales = company.sucursales.filter((sucursal) => {
+  company.sucursales = (company.sucursales || []).filter((sucursal) => {
     return normalizeKey(sucursal.id) !== normalizedSucursalId
   })
 
@@ -400,18 +509,14 @@ const deleteSucursal = (sucursalId) => {
   })
 
   accesses.value.forEach((access) => {
+    if (!access.scope) {
+      access.scope = {}
+    }
+
     access.scope.sucursalIds = (access.scope.sucursalIds || []).filter((id) => {
       return normalizeKey(id) !== normalizedSucursalId
     })
   })
-}
-
-const resetDatabase = () => {
-  companies.value = cloneData(mockDatabaseSeed.companies)
-  applicationDefinitions.value = cloneData(mockDatabaseSeed.applicationDefinitions)
-  assets.value = cloneData(mockDatabaseSeed.assets)
-  users.value = normalizeUsers(cloneData(mockDatabaseSeed.users))
-  accesses.value = cloneData(mockDatabaseSeed.accesses)
 }
 
 export function useMockDatabase() {
@@ -430,9 +535,7 @@ export function useMockDatabase() {
     roles,
 
     getCompany,
-    getCompanyRecord,
     getApplicationForCompany,
-    getAssetsForCompany,
     createCompany,
     updateCompany,
     createUser,
@@ -445,6 +548,5 @@ export function useMockDatabase() {
     addSucursal,
     updateSucursal,
     deleteSucursal,
-    resetDatabase,
   }
 }

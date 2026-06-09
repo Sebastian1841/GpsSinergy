@@ -1,5 +1,6 @@
 import { computed, ref, watch } from "vue"
 
+import { useCompanyBranches } from "./useCompanyBranches.js"
 import { useMockDatabase } from "../mock/useMockDatabase.js"
 import { useDebouncedValue } from "../ui/useDebouncedValue.js"
 
@@ -21,10 +22,8 @@ const createEmptyDraftCompany = () => ({
   contactName: "",
   contactEmail: "",
   contactPhone: "",
-  billingEmail: "",
   region: "",
   city: "",
-  timezone: "America/Santiago",
 })
 
 const createCompanyReports = (reportTypes = []) => {
@@ -46,6 +45,7 @@ export function useCompanyManagement() {
   const {
     companyRecords: companies,
     reportTypes,
+    getCompany,
     createCompany: createDatabaseCompany,
     updateCompany: updateDatabaseCompany,
     updateAsset,
@@ -53,6 +53,22 @@ export function useCompanyManagement() {
     updateSucursal,
     deleteSucursal: deleteDatabaseSucursal,
   } = useMockDatabase()
+
+  const {
+    alternarSucursalesHabilitadas: toggleCompanyBranchesEnabled,
+    agregarSucursal: addCompanyBranch,
+    actualizarNombreSucursal: updateCompanyBranchName,
+    alternarEstadoSucursal: toggleCompanyBranchStatus,
+    eliminarSucursal: deleteCompanyBranch,
+    actualizarSucursalActivo: updateAssetBranch,
+  } = useCompanyBranches({
+    getCompany,
+    updateCompany: updateDatabaseCompany,
+    updateAsset,
+    addSucursal: addDatabaseSucursal,
+    updateSucursal,
+    deleteSucursal: deleteDatabaseSucursal,
+  })
 
   const searchTerm = ref("")
   const selectedStatus = ref("all")
@@ -200,6 +216,8 @@ export function useCompanyManagement() {
       movingAssetsCount: _movingAssetsCount,
       alertsCount: _alertsCount,
       usersCount: _usersCount,
+      billingEmail: _billingEmail,
+      timezone: _timezone,
       ...companyChanges
     } = draftCompany.value
 
@@ -245,53 +263,44 @@ export function useCompanyManagement() {
   const alternarSucursalesHabilitadas = () => {
     if (!selectedCompany.value) return
 
-    updateDatabaseCompany(selectedCompany.value.id, {
-      sucursalesHabilitadas: !selectedCompany.value.sucursalesHabilitadas,
-    })
+    toggleCompanyBranchesEnabled(
+      selectedCompany.value.id,
+      selectedCompany.value.sucursalesHabilitadas !== false,
+    )
   }
 
   const agregarSucursal = (name) => {
-    const nombreSucursal = name.trim()
+    if (!selectedCompany.value) return
 
-    if (!selectedCompany.value || !nombreSucursal) return
-
-    addDatabaseSucursal(selectedCompany.value.id, {
-      id: `sucursal-${selectedCompany.value.id}-${Date.now()}`,
-      name: nombreSucursal,
-      active: true,
-    })
+    addCompanyBranch(selectedCompany.value.id, name)
   }
 
   const actualizarNombreSucursal = (sucursalId, name) => {
-    updateSucursal(sucursalId, { name })
+    updateCompanyBranchName(sucursalId, name, selectedCompany.value?.sucursales || [])
   }
 
   const alternarEstadoSucursal = (sucursalId) => {
-    const sucursal = selectedCompany.value?.sucursales?.find((item) => item.id === sucursalId)
-
-    if (!sucursal) return
-
-    updateSucursal(sucursalId, { active: !sucursal.active })
+    toggleCompanyBranchStatus(sucursalId, selectedCompany.value?.sucursales || [])
   }
 
   const eliminarSucursal = (sucursalId) => {
-    deleteDatabaseSucursal(sucursalId)
+    deleteCompanyBranch(sucursalId, selectedCompany.value?.sucursales || [])
   }
 
   const actualizarSucursalActivo = ({ assetId, sucursalId }) => {
     if (!selectedCompany.value) return
 
-    const assetBelongsToCompany = selectedCompany.value.assets?.some((asset) => {
-      return String(asset.id) === String(assetId)
+    const asset = selectedCompany.value.assets?.find((item) => {
+      return String(item.id) === String(assetId)
     })
-    const siguienteSucursalId = sucursalId || null
-    const sucursalExiste =
-      !siguienteSucursalId ||
-      selectedCompany.value.sucursales?.some((sucursal) => sucursal.id === siguienteSucursalId)
 
-    if (!assetBelongsToCompany || !sucursalExiste) return
+    if (!asset) return
 
-    updateAsset(assetId, { sucursalId: siguienteSucursalId })
+    updateAssetBranch({
+      asset,
+      sucursalId,
+      sucursales: selectedCompany.value.sucursales || [],
+    })
   }
 
   const getCompanyHealth = (company) => {

@@ -1,5 +1,9 @@
-const ASSET_CLUSTER_MAX_ZOOM = 12
-const ASSET_CLUSTER_GRID_SIZE = 76
+const ASSET_CLUSTER_DEFAULT_MAX_ZOOM = 12
+const ASSET_CLUSTER_DENSE_MAX_ZOOM = 14
+const ASSET_CLUSTER_DENSE_MIN_ACTIVOS = 250
+
+const ASSET_CLUSTER_BASE_GRID_SIZE = 76
+const ASSET_CLUSTER_MIN_GRID_SIZE = 44
 
 const normalizeClusterValue = (value) => {
   if (value === null || value === undefined) return ""
@@ -11,8 +15,29 @@ const normalizeActivoId = (activo) => {
   return String(activo?.id ?? "")
 }
 
-export const shouldClusterAssetMarkers = (map) => {
-  return (map?.getZoom?.() ?? 0) <= ASSET_CLUSTER_MAX_ZOOM
+const resolveAssetClusterMaxZoom = (activos = []) => {
+  return activos.length >= ASSET_CLUSTER_DENSE_MIN_ACTIVOS
+    ? ASSET_CLUSTER_DENSE_MAX_ZOOM
+    : ASSET_CLUSTER_DEFAULT_MAX_ZOOM
+}
+
+const resolveAssetClusterGridSize = ({ zoom, activos = [] }) => {
+  if (activos.length >= ASSET_CLUSTER_DENSE_MIN_ACTIVOS) {
+    if (zoom >= 14) return ASSET_CLUSTER_MIN_GRID_SIZE
+    if (zoom >= 13) return 54
+    return ASSET_CLUSTER_BASE_GRID_SIZE
+  }
+
+  if (zoom >= 12) return 58
+
+  return ASSET_CLUSTER_BASE_GRID_SIZE
+}
+
+export const shouldClusterAssetMarkers = (map, activos = []) => {
+  const zoom = map?.getZoom?.() ?? 0
+  const maxClusterZoom = resolveAssetClusterMaxZoom(activos)
+
+  return zoom <= maxClusterZoom
 }
 
 const buildClusterSignature = (cluster) => {
@@ -35,6 +60,11 @@ const getClusteredActivos = ({ map, activos = [], getActivoLatLng, isActivoSelec
   }
 
   const zoom = map.getZoom()
+  const gridSize = resolveAssetClusterGridSize({
+    zoom,
+    activos,
+  })
+
   const clustersByKey = new Map()
   const singletons = []
 
@@ -52,8 +82,10 @@ const getClusteredActivos = ({ map, activos = [], getActivoLatLng, isActivoSelec
 
     const point = map.project(activoLatLng, zoom)
     const key = [
-      Math.floor(point.x / ASSET_CLUSTER_GRID_SIZE),
-      Math.floor(point.y / ASSET_CLUSTER_GRID_SIZE),
+      zoom,
+      gridSize,
+      Math.floor(point.x / gridSize),
+      Math.floor(point.y / gridSize),
     ].join(":")
 
     if (!clustersByKey.has(key)) {
@@ -124,7 +156,7 @@ export const createAssetMarkerClusterController = ({
     })
   }
 
-  const createClusterMarker = (cluster) => {
+  const createClusterMarker = (cluster, activos = []) => {
     const marker = L.marker(cluster.latLng, {
       icon: createClusterIcon({
         L,
@@ -141,7 +173,10 @@ export const createAssetMarkerClusterController = ({
 
       if (!map) return
 
-      map.flyTo(marker.getLatLng(), ASSET_CLUSTER_MAX_ZOOM + 1, {
+      const maxClusterZoom = resolveAssetClusterMaxZoom(activos)
+      const targetZoom = Math.min(maxClusterZoom + 1, map.getMaxZoom?.() ?? maxClusterZoom + 1)
+
+      map.flyTo(marker.getLatLng(), targetZoom, {
         duration: 0.35,
       })
     })
@@ -152,14 +187,16 @@ export const createAssetMarkerClusterController = ({
   const updateClusterMarker = ({ cachedCluster, cluster, signature }) => {
     cachedCluster.marker.setLatLng(cluster.latLng)
 
-    cachedCluster.marker.setIcon(
-      createClusterIcon({
-        L,
-        count: cluster.count,
-      }),
-    )
+    if (cachedCluster.count !== cluster.count) {
+      cachedCluster.marker.setIcon(
+        createClusterIcon({
+          L,
+          count: cluster.count,
+        }),
+      )
 
-    bindClusterTooltip(cachedCluster.marker, cluster.count)
+      bindClusterTooltip(cachedCluster.marker, cluster.count)
+    }
 
     cachedCluster.signature = signature
     cachedCluster.count = cluster.count
@@ -197,7 +234,7 @@ export const createAssetMarkerClusterController = ({
 
     if (!map || !layers.markerLayer) return
 
-    if (!shouldClusterAssetMarkers(map)) {
+    if (!shouldClusterAssetMarkers(map, activos)) {
       clearClusterMarkers()
 
       activos.forEach((activo) => {
@@ -260,7 +297,7 @@ export const createAssetMarkerClusterController = ({
         return
       }
 
-      const marker = createClusterMarker(cluster)
+      const marker = createClusterMarker(cluster, activos)
 
       marker.addTo(layers.markerLayer)
 

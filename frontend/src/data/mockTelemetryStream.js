@@ -1,3 +1,5 @@
+import { formatTelemetryTime } from "../utils/telemetryUtils.js"
+
 const DEFAULT_INTERVAL_MS = 1000
 const DEFAULT_BATCH_SIZE = 25
 const DEFAULT_BASE_LAT = -33.4489
@@ -46,15 +48,6 @@ const roundSpeed = (value) => {
   return Number(Number(value).toFixed(1))
 }
 
-const formatCurrentTime = () => {
-  return new Date().toLocaleTimeString("es-CL", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  })
-}
-
 const getFallbackCoordinate = ({ index, type }) => {
   const offset = index * 0.0018
 
@@ -72,6 +65,7 @@ const getInitialStatus = (activo) => {
 const getInitialSpeed = (activo) => {
   if (isValidNumber(activo?.speed)) return Number(activo.speed)
   if (isValidNumber(activo?.velocidad)) return Number(activo.velocidad)
+  if (isValidNumber(activo?.velocidad_kmh)) return Number(activo.velocidad_kmh)
 
   if (activo?.estado === TELEMETRY_STATUS.MOVING) {
     return randomInteger(20, 75)
@@ -85,6 +79,14 @@ const createTelemetryStateFromActivo = (activo, index = 0) => {
 
   if (!id) return null
 
+  const timestamp =
+    activo?.timestamp ||
+    activo?.lastReport ||
+    activo?.lastReportAt ||
+    activo?.reportedAt ||
+    activo?.updatedAt ||
+    new Date().toISOString()
+
   return {
     id,
     lat: normalizeCoordinate(activo.lat, getFallbackCoordinate({ index, type: "lat" })),
@@ -92,7 +94,8 @@ const createTelemetryStateFromActivo = (activo, index = 0) => {
     estado: getInitialStatus(activo),
     velocidad: getInitialSpeed(activo),
     heading: randomBetween(0, 360),
-    updatedAt: new Date().toISOString(),
+    updatedAt: timestamp,
+    timestamp,
   }
 }
 
@@ -167,7 +170,35 @@ const pickIdsForBatch = ({ ids, batchSize }) => {
   return Array.from(selectedIds)
 }
 
-export const generateTelemetryBatch = ({
+const buildTelemetryReport = ({ id, nextState, timestamp }) => {
+  const speedValue = Number(nextState.velocidad) || 0
+  const speedLabel = `${speedValue} km/h`
+  const currentTimeLabel = formatTelemetryTime(timestamp, {
+    fallbackToNow: true,
+  })
+
+  return {
+    id,
+    lat: nextState.lat,
+    lng: nextState.lng,
+    estado: nextState.estado,
+
+    speed: speedValue,
+    velocidad: speedLabel,
+    velocidad_kmh: speedValue,
+
+    timestamp,
+    lastReport: timestamp,
+    lastReportAt: timestamp,
+    reportedAt: timestamp,
+    updatedAt: timestamp,
+    updated_at: timestamp,
+
+    datosUlt: currentTimeLabel,
+  }
+}
+
+const generateTelemetryBatch = ({
   telemetryState,
   activos = [],
   batchSize = DEFAULT_BATCH_SIZE,
@@ -218,19 +249,17 @@ export const generateTelemetryBatch = ({
         estado,
         velocidad,
         heading,
+        timestamp,
         updatedAt: timestamp,
       }
 
       state.set(id, nextState)
 
-      return {
+      return buildTelemetryReport({
         id,
-        lat: nextState.lat,
-        lng: nextState.lng,
-        estado: nextState.estado,
-        velocidad: nextState.velocidad,
+        nextState,
         timestamp,
-      }
+      })
     })
     .filter(Boolean)
 }
@@ -330,70 +359,4 @@ export const createMockTelemetryStream = ({
     stop,
     isRunning,
   }
-}
-
-export const createMockFleetSnapshot = ({
-  count = 1000,
-  baseLat = DEFAULT_BASE_LAT,
-  baseLng = DEFAULT_BASE_LNG,
-} = {}) => {
-  const statuses = [
-    TELEMETRY_STATUS.MOVING,
-    TELEMETRY_STATUS.IDLE,
-    TELEMETRY_STATUS.STOPPED,
-    TELEMETRY_STATUS.OFFLINE,
-  ]
-
-  return Array.from({ length: count }, (_, index) => {
-    const row = Math.floor(index / 100)
-    const col = index % 100
-    const estado = statuses[index % statuses.length]
-    const vehicleNumber = String(index + 1).padStart(5, "0")
-
-    const lat = baseLat + row * 0.003 + Math.random() * 0.001
-    const lng = baseLng + col * 0.003 + Math.random() * 0.001
-
-    return {
-      id: `stress-${index + 1}`,
-      source: "stress",
-
-      vehiculo: `STRESS-${vehicleNumber}`,
-      name: `STRESS-${vehicleNumber}`,
-      nombrePantalla: `STRESS-${vehicleNumber}`,
-      patente: `ST-${vehicleNumber}`,
-
-      estado,
-      lat: roundCoordinate(lat),
-      lng: roundCoordinate(lng),
-
-      velocidad: estado === TELEMETRY_STATUS.MOVING ? `${randomInteger(20, 90)} km/h` : "0 km/h",
-
-      combustible: `${randomInteger(25, 95)}%`,
-      odometro: `${randomInteger(5000, 250000).toLocaleString("es-CL")} km`,
-      direccion: "Ubicación simulada para prueba de estrés",
-      datosUlt: formatCurrentTime(),
-
-      imei: `999${String(index + 1).padStart(12, "0")}`,
-      protocol: "tcp",
-      trackerModel: "stress-model",
-      trackerModelLabel: "Stress GPS",
-      trackerManufacturer: "Sinergy Mock",
-
-      descripcion: "Activo generado para prueba de rendimiento",
-      fechaIngreso: "-",
-      fechaBaja: "-",
-      fechaSuspension: "-",
-
-      horometroDiario: "-",
-      horometroTotal: "-",
-      conductor: "-",
-      ibutton: "-",
-      choque: "-",
-
-      ignicion:
-        estado === TELEMETRY_STATUS.MOVING || estado === TELEMETRY_STATUS.IDLE
-          ? "Encendida"
-          : "Apagada",
-    }
-  })
 }

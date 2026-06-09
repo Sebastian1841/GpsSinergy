@@ -69,7 +69,7 @@
       <div class="space-y-2">
         <!-- Buscador + selector de dispositivos + acciones -->
         <section class="relative">
-          <div class="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1.5">
+          <div class="grid grid-cols-[minmax(0,1fr)_auto_auto_auto_auto] items-center gap-1.5">
             <div
               class="flex h-8 min-w-0 overflow-hidden rounded-lg border border-[#d8dee8] bg-white transition focus-within:border-[#FF6600] focus-within:ring-2 focus-within:ring-[#FF6600]/15"
             >
@@ -129,6 +129,24 @@
               @click="searchItinerary"
             >
               Buscar
+            </button>
+
+            <button
+              type="button"
+              class="h-8 shrink-0 cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[#d8dee8] disabled:hover:text-[#102372]"
+              :disabled="!canRefreshItinerary"
+              @click="refreshItinerary"
+            >
+              Actualizar
+            </button>
+
+            <button
+              type="button"
+              class="h-8 shrink-0 cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[#d8dee8] disabled:hover:text-[#102372]"
+              :disabled="!canExportItinerary"
+              @click="exportItinerary"
+            >
+              Exportar
             </button>
 
             <button
@@ -198,7 +216,7 @@
                     ></span>
 
                     <span class="truncate text-[11px] font-black text-[#102372]">
-                      {{ asset.patente }}
+                      {{ asset.displayName || asset.patente }}
                     </span>
                   </span>
 
@@ -323,6 +341,8 @@
 </template>
 
 <script setup>
+import { computed } from "vue"
+
 import ItineraryDaySummary from "./ItineraryDaySummary.vue"
 import ItinerarySummary from "./ItinerarySummary.vue"
 import ItineraryTable from "./ItineraryTable.vue"
@@ -335,7 +355,6 @@ import {
   addDays,
   buildItineraryResult,
   filterItineraryPoints,
-  getLatestItineraryDate,
   mockItineraryAssets,
 } from "../../../data/mockItineraryData"
 
@@ -348,7 +367,16 @@ const props = defineProps({
 
 const emit = defineEmits(["route-selected", "point-selected", "clear-route"])
 
-const latestDate = getLatestItineraryDate()
+const getLocalDateString = () => {
+  const date = new Date()
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+
+  return `${year}-${month}-${day}`
+}
+
+const latestDate = getLocalDateString()
 
 const rangeOptions = [
   {
@@ -420,6 +448,7 @@ const {
   selectedPointId,
 
   handleGenerateRoute,
+  handleRefreshRoute,
   handleSelectPoint,
   handleClearRoute,
 } = useItineraryRoute({
@@ -439,8 +468,107 @@ const {
 })
 
 const searchItinerary = handleGenerateRoute
+const refreshItinerary = handleRefreshRoute
 const selectPoint = handleSelectPoint
 const clearResult = handleClearRoute
+
+const canRefreshItinerary = computed(() => {
+  return Boolean(routeResult.value)
+})
+
+const canExportItinerary = computed(() => {
+  return Boolean(routeResult.value?.rows?.length)
+})
+
+const escapeCsvValue = (value) => {
+  const text = String(value ?? "")
+
+  if (!/[",\n\r;]/.test(text)) return text
+
+  return `"${text.replace(/"/g, '""')}"`
+}
+
+const getRouteAssetLabel = (row) => {
+  return (
+    row.assetDisplayName ||
+    row.assetPatente ||
+    routeResult.value?.asset?.displayName ||
+    routeResult.value?.asset?.patente ||
+    "-"
+  )
+}
+
+const buildItineraryCsv = () => {
+  const headers = [
+    "Activo",
+    "Patente",
+    "Dispositivo",
+    "Fecha",
+    "Hora",
+    "Estado",
+    "Velocidad",
+    "Direccion",
+    "Evento",
+    "Km acumulado",
+    "Latitud",
+    "Longitud",
+  ]
+
+  const rows = (routeResult.value?.rows || []).map((row) => [
+    getRouteAssetLabel(row),
+    row.assetPatente || routeResult.value?.asset?.patente || "",
+    row.assetDeviceId || routeResult.value?.asset?.deviceId || "",
+    row.dateLabel || "",
+    row.timeLabel || "",
+    row.status === "moving" ? "Movimiento" : "Detenido",
+    row.speedLabel || row.speed || "",
+    row.address || "",
+    row.event || "",
+    row.accumulatedDistanceLabel || "",
+    row.lat ?? "",
+    row.lng ?? "",
+  ])
+
+  return [headers, ...rows]
+    .map((row) => {
+      return row.map(escapeCsvValue).join(";")
+    })
+    .join("\n")
+}
+
+const buildExportFilename = () => {
+  const assetLabel =
+    routeResult.value?.asset?.displayName ||
+    routeResult.value?.asset?.patente ||
+    routeResult.value?.asset?.id ||
+    "itinerario"
+
+  const normalizedAssetLabel = String(assetLabel)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase()
+
+  return `itinerario-${normalizedAssetLabel || "activos"}-${fromDate.value}-${toDate.value}.csv`
+}
+
+const exportItinerary = () => {
+  if (!canExportItinerary.value) return
+
+  const csv = `\uFEFF${buildItineraryCsv()}`
+  const blob = new Blob([csv], {
+    type: "text/csv;charset=utf-8;",
+  })
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement("a")
+
+  link.href = url
+  link.download = buildExportFilename()
+  link.click()
+
+  window.URL.revokeObjectURL(url)
+}
 
 const statusLabel = (estado) => {
   const labels = {

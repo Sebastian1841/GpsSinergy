@@ -63,6 +63,7 @@
             <RouterLink
               :to="item.to"
               class="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-white/75 transition-colors duration-100 hover:bg-white/[0.08] hover:text-white"
+              :class="isNavigationItemActive(item) ? 'sidebar-link-active' : ''"
               active-class="sidebar-link-active"
               @click="$emit('update:isOpen', false)"
             >
@@ -182,9 +183,11 @@
 
 <script setup>
 import { computed } from "vue"
+import { useRoute } from "vue-router"
 
 import { useAccessControl } from "../../composables/auth/useAccessControl.js"
 
+const route = useRoute()
 const { isPlatformAdmin, accessibleCompanies } = useAccessControl()
 
 const assetNavigationItems = computed(() => {
@@ -202,6 +205,14 @@ const assetNavigationItems = computed(() => {
     label: company.name,
   }))
 })
+
+const isNavigationItemActive = (item) => {
+  if (item.to === "/activos") {
+    return route.name === "Activos" || route.name === "AppActivos"
+  }
+
+  return route.path === item.to
+}
 
 defineProps({
   isOpen: { type: Boolean, default: false },

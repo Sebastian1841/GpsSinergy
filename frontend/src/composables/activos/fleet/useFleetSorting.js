@@ -14,6 +14,29 @@ const statusOrder = {
   offline: 4,
 }
 
+const numericColumnKeys = new Set([
+  "velocidad",
+  "combustible",
+  "odometro",
+  "horometroDiario",
+  "horometroTotal",
+])
+
+const dateColumnKeys = new Set([
+  "datosUlt",
+  "last_report",
+  "lastReport",
+  "fecha",
+  "fechaIngreso",
+  "fechaBaja",
+  "fechaSuspension",
+])
+
+const textCollator = new Intl.Collator("es", {
+  numeric: true,
+  sensitivity: "base",
+})
+
 export function useFleetSorting({
   activos,
   columns,
@@ -35,6 +58,12 @@ export function useFleetSorting({
     return Array.isArray(value) ? value : []
   })
 
+  const activeSortColumn = computed(() => {
+    if (!sortColumnKey.value) return null
+
+    return safeColumns.value.find((item) => item.key === sortColumnKey.value) || null
+  })
+
   const parseSortableNumber = (value) => {
     if (value === null || value === undefined) return null
 
@@ -43,7 +72,11 @@ export function useFleetSorting({
       .replace(",", ".")
       .match(/-?\d+(\.\d+)?/)
 
-    return match ? Number(match[0]) : null
+    if (!match) return null
+
+    const parsedValue = Number(match[0])
+
+    return Number.isFinite(parsedValue) ? parsedValue : null
   }
 
   const parseSortableDate = (value) => {
@@ -72,32 +105,20 @@ export function useFleetSorting({
   }
 
   const getSortableValue = (activo, column) => {
+    if (!column?.key) return ""
+
     if (column.key === "estado") {
-      return statusOrder[activo.estado] || 99
+      return statusOrder[activo?.estado] || 99
     }
 
     const value =
       typeof getCellValue === "function" ? getCellValue(activo, column) : activo?.[column.key]
 
-    if (
-      ["velocidad", "combustible", "odometro", "horometroDiario", "horometroTotal"].includes(
-        column.key,
-      )
-    ) {
+    if (numericColumnKeys.has(column.key)) {
       return parseSortableNumber(value)
     }
 
-    if (
-      [
-        "datosUlt",
-        "last_report",
-        "lastReport",
-        "fecha",
-        "fechaIngreso",
-        "fechaBaja",
-        "fechaSuspension",
-      ].includes(column.key)
-    ) {
+    if (dateColumnKeys.has(column.key)) {
       return parseSortableDate(value)
     }
 
@@ -116,30 +137,37 @@ export function useFleetSorting({
       return valueA - valueB
     }
 
-    return String(valueA).localeCompare(String(valueB), "es", {
-      numeric: true,
-      sensitivity: "base",
-    })
+    return textCollator.compare(String(valueA), String(valueB))
   }
 
   const sortedActivos = computed(() => {
-    if (!sortColumnKey.value) {
-      return safeActivos.value
-    }
-
-    const column = safeColumns.value.find((item) => item.key === sortColumnKey.value)
+    const activosList = safeActivos.value
+    const column = activeSortColumn.value
 
     if (!column) {
-      return safeActivos.value
+      return activosList
     }
 
-    return [...safeActivos.value].sort((activoA, activoB) => {
-      const valueA = getSortableValue(activoA, column)
-      const valueB = getSortableValue(activoB, column)
-      const result = compareValues(valueA, valueB)
+    const directionMultiplier = sortDirection.value === "asc" ? 1 : -1
 
-      return sortDirection.value === "asc" ? result : result * -1
-    })
+    return activosList
+      .map((activo, index) => {
+        return {
+          activo,
+          index,
+          sortValue: getSortableValue(activo, column),
+        }
+      })
+      .sort((itemA, itemB) => {
+        const result = compareValues(itemA.sortValue, itemB.sortValue)
+
+        if (result !== 0) {
+          return result * directionMultiplier
+        }
+
+        return itemA.index - itemB.index
+      })
+      .map((item) => item.activo)
   })
 
   const toggleSort = (columnKey) => {

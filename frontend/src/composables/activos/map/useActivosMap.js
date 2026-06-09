@@ -52,6 +52,21 @@ const MAP_TILE_LAYERS = {
   },
 }
 
+const buildItineraryFitKey = (route) => {
+  if (!route) return ""
+
+  const sourceRoutes = Array.isArray(route.routes) && route.routes.length ? route.routes : [route]
+  const routeIds = sourceRoutes
+    .map((item) => {
+      return item.asset?.id || item.asset?.activoId || item.id || ""
+    })
+    .join("|")
+
+  return [route.queryKey, route.id, route.asset?.id, route.asset?.activoId, routeIds]
+    .map((value) => String(value ?? ""))
+    .join(":")
+}
+
 export function useActivosMap({ props, emit, mapRef }) {
   const drawMode = ref(null)
   const draftPolygonPoints = ref([])
@@ -64,6 +79,7 @@ export function useActivosMap({ props, emit, mapRef }) {
   let map = null
   let currentTileLayer = null
   let itineraryRenderer = null
+  let lastItineraryFitKey = ""
 
   const layers = {
     markerLayer: null,
@@ -143,6 +159,7 @@ export function useActivosMap({ props, emit, mapRef }) {
     layers,
     getActivoLatLng,
     normalizeId,
+    getSelectedActivoId: () => props.selectedId,
   })
 
   const assetMarkers = createAssetMarkerController({
@@ -182,7 +199,6 @@ export function useActivosMap({ props, emit, mapRef }) {
 
   const handleMapZoomEnd = () => {
     assetMarkers.refreshActivoMarkers()
-    movementTrails.redrawAllMovementTrails()
     itineraryMap.renderItineraryRoute()
   }
 
@@ -191,7 +207,6 @@ export function useActivosMap({ props, emit, mapRef }) {
     setLayerGroupVisibility(layers.itineraryLayer, true)
 
     assetMarkers.refreshActivoMarkers()
-    movementTrails.redrawAllMovementTrails()
     itineraryMap.renderItineraryRoute()
   }
 
@@ -250,6 +265,8 @@ export function useActivosMap({ props, emit, mapRef }) {
 
     geofenceMap.renderGeofences()
 
+    lastItineraryFitKey = buildItineraryFitKey(props.itineraryRoute)
+
     itineraryMap.renderItineraryRoute({
       fit: Boolean(props.itineraryRoute),
     })
@@ -280,6 +297,7 @@ export function useActivosMap({ props, emit, mapRef }) {
     }
 
     assetMarkers.clearMarkerCache()
+    movementTrails.cleanupMovementTrails()
     geofenceMap.cancelAll()
     geofenceMap.clearGeofenceCache?.()
     itineraryMap.clearItineraryRoute()
@@ -322,6 +340,7 @@ export function useActivosMap({ props, emit, mapRef }) {
     () => {
       assetMarkers.refreshActivoMarkers()
       assetMarkers.centerSelected()
+      movementTrails.redrawAllMovementTrails()
     },
   )
 
@@ -335,8 +354,13 @@ export function useActivosMap({ props, emit, mapRef }) {
   watch(
     () => buildItineraryRouteSignature(props.itineraryRoute),
     () => {
+      const nextItineraryFitKey = buildItineraryFitKey(props.itineraryRoute)
+      const shouldFit = Boolean(props.itineraryRoute) && nextItineraryFitKey !== lastItineraryFitKey
+
+      lastItineraryFitKey = nextItineraryFitKey
+
       itineraryMap.renderItineraryRoute({
-        fit: Boolean(props.itineraryRoute),
+        fit: shouldFit,
       })
     },
   )

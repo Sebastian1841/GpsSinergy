@@ -1,8 +1,59 @@
 import { computed, ref, watch } from "vue"
+import { parseNumberFromLabel } from "../../../utils/numberUtils.js"
+import { normalizeTelemetryReports } from "../../../utils/telemetryUtils.js"
 
 const getFirstDefined = (...values) => {
   return values.find((value) => {
     return value !== undefined && value !== null && value !== ""
+  })
+}
+
+const getDisplayName = (activo) => {
+  return (
+    activo.vehiculo ||
+    activo.nombrePantalla ||
+    activo.displayName ||
+    activo.name ||
+    activo.patente ||
+    activo.patent ||
+    `Activo ${activo.id}`
+  )
+}
+
+const normalizeAssetId = (asset) => {
+  return String(
+    getFirstDefined(
+      asset?.id,
+      asset?.activoId,
+      asset?.deviceId,
+      asset?.imei,
+      asset?.patente,
+      asset?.patent,
+      "",
+    ),
+  )
+}
+
+const normalizeTimestamp = (activo) => {
+  return getFirstDefined(
+    activo.timestamp,
+    activo.lastReport,
+    activo.last_report,
+    activo.reportedAt,
+    activo.lastReportAt,
+    activo.fechaHora,
+    activo.fechaUltimoReporte,
+    activo.updatedAt,
+    activo.updated_at,
+    activo.datosUlt,
+  )
+}
+
+const areStringArraysEqual = (firstArray = [], secondArray = []) => {
+  if (firstArray.length !== secondArray.length) return false
+
+  return firstArray.every((value, index) => {
+    return String(value) === String(secondArray[index])
   })
 }
 
@@ -16,53 +67,127 @@ export function useItineraryAssets({
   const selectedAssetIds = ref([])
 
   const normalizedAssets = computed(() => {
-    const fromProps = (props.activos || []).map((activo) => ({
-      id: activo.id,
-      patente:
-        activo.patente || activo.patent || activo.vehiculo || activo.name || `Activo ${activo.id}`,
-      deviceId: activo.imei || activo.deviceId || activo.identificador || "Sin dispositivo",
-      conductor: activo.conductor || activo.ibutton_name || activo.ibuttonName || "Sin conductor",
-      estado: activo.estado || "offline",
+    const sourceAssets = props.activos?.length ? props.activos : mockItineraryAssets
 
-      lat: getFirstDefined(activo.lat, activo.latitude, activo.latitud),
-      lng: getFirstDefined(activo.lng, activo.lon, activo.longitude, activo.longitud),
-      speed: getFirstDefined(activo.speed, activo.velocidad, activo.velocidad_kmh, 0),
-      direccion: getFirstDefined(activo.direccion, activo.address, activo.direccion_actual),
-      lastReport: getFirstDefined(
-        activo.last_report,
-        activo.lastReport,
-        activo.timestamp,
-        activo.updated_at,
-        activo.datosUlt,
-      ),
-      odometer: getFirstDefined(activo.odometer, activo.odometro, activo.kilometraje),
-    }))
+    const fromProps = sourceAssets.map((activo) => {
+      const id = normalizeAssetId(activo)
+      const timestamp = normalizeTimestamp(activo)
+      const speedValue = parseNumberFromLabel(
+        getFirstDefined(activo.speed, activo.velocidad_kmh, activo.velocidad, 0),
+      )
 
-    const sourceAssets = fromProps
+      return {
+        id,
+        activoId: getFirstDefined(activo.activoId, activo.id, id),
 
-    return sourceAssets.map((currentAsset) => {
+        displayName: getDisplayName(activo),
+        patente:
+          activo.patente || activo.patent || activo.vehiculo || activo.name || `Activo ${id}`,
+
+        deviceId: activo.imei || activo.deviceId || activo.identificador || "Sin dispositivo",
+        conductor: activo.conductor || activo.ibutton_name || activo.ibuttonName || "Sin conductor",
+        estado: activo.estado || "offline",
+
+        lat: getFirstDefined(activo.lat, activo.latitude, activo.latitud),
+        lng: getFirstDefined(activo.lng, activo.lon, activo.longitude, activo.longitud),
+
+        speed: speedValue,
+        velocidad: getFirstDefined(activo.velocidad, `${speedValue} km/h`),
+        velocidad_kmh: speedValue,
+
+        direccion: getFirstDefined(activo.direccion, activo.address, activo.direccion_actual),
+        address: getFirstDefined(activo.address, activo.direccion, activo.direccion_actual),
+
+        timestamp,
+        lastReport: timestamp,
+        last_report: activo.last_report,
+        reportedAt: activo.reportedAt || timestamp,
+        lastReportAt: activo.lastReportAt || timestamp,
+        fechaHora: activo.fechaHora,
+        fechaUltimoReporte: activo.fechaUltimoReporte,
+        updated_at: activo.updated_at,
+        updatedAt: activo.updatedAt || timestamp,
+        datosUlt: activo.datosUlt,
+
+        odometer: getFirstDefined(activo.odometer, activo.odometro, activo.kilometraje),
+        odometro: getFirstDefined(activo.odometro, activo.odometer, activo.kilometraje),
+
+        telemetryReports: normalizeTelemetryReports(activo.telemetryReports),
+      }
+    })
+
+    return fromProps.map((currentAsset) => {
       const itineraryAsset = mockItineraryAssets.find((asset) => {
         const sameId = String(asset.id) === String(currentAsset.id)
+        const sameActivoId = String(asset.id) === String(currentAsset.activoId)
         const samePatente = normalizeText(asset.patente) === normalizeText(currentAsset.patente)
         const sameDevice = normalizeText(asset.deviceId) === normalizeText(currentAsset.deviceId)
 
-        return sameId || samePatente || sameDevice
+        return sameId || sameActivoId || samePatente || sameDevice
       })
+
+      const timestamp = getFirstDefined(
+        currentAsset.timestamp,
+        currentAsset.lastReport,
+        currentAsset.reportedAt,
+        currentAsset.lastReportAt,
+        currentAsset.updatedAt,
+        currentAsset.datosUlt,
+        itineraryAsset?.timestamp,
+        itineraryAsset?.lastReport,
+        itineraryAsset?.last_report,
+      )
+
+      const speedValue = parseNumberFromLabel(
+        getFirstDefined(
+          currentAsset.speed,
+          currentAsset.velocidad_kmh,
+          currentAsset.velocidad,
+          itineraryAsset?.speed,
+          itineraryAsset?.velocidad_kmh,
+          itineraryAsset?.velocidad,
+          0,
+        ),
+      )
 
       return {
         ...itineraryAsset,
-        id: itineraryAsset?.id || String(currentAsset.id),
-        activoId: currentAsset.id,
+
+        id: currentAsset.id,
+        activoId: currentAsset.activoId,
+
+        displayName: currentAsset.displayName || itineraryAsset?.displayName,
         patente: currentAsset.patente || itineraryAsset?.patente,
         deviceId: currentAsset.deviceId || itineraryAsset?.deviceId,
         conductor: currentAsset.conductor || itineraryAsset?.conductor,
-        estado: currentAsset.estado || itineraryAsset?.estado,
+        estado: currentAsset.estado || itineraryAsset?.estado || "offline",
+
         lat: currentAsset.lat ?? itineraryAsset?.lat,
         lng: currentAsset.lng ?? itineraryAsset?.lng,
-        speed: currentAsset.speed ?? itineraryAsset?.speed ?? 0,
+
+        speed: speedValue,
+        velocidad: currentAsset.velocidad || `${speedValue} km/h`,
+        velocidad_kmh: speedValue,
+
         direccion: currentAsset.direccion || itineraryAsset?.direccion,
-        lastReport: currentAsset.lastReport || itineraryAsset?.last_report,
+        address: currentAsset.address || currentAsset.direccion || itineraryAsset?.direccion,
+
+        timestamp,
+        lastReport: timestamp,
+        last_report: currentAsset.last_report || itineraryAsset?.last_report,
+
+        reportedAt: currentAsset.reportedAt || timestamp,
+        lastReportAt: currentAsset.lastReportAt || timestamp,
+        fechaHora: currentAsset.fechaHora || itineraryAsset?.fechaHora,
+        fechaUltimoReporte: currentAsset.fechaUltimoReporte || itineraryAsset?.fechaUltimoReporte,
+        updated_at: currentAsset.updated_at || itineraryAsset?.updated_at,
+        updatedAt: currentAsset.updatedAt || timestamp,
+        datosUlt: currentAsset.datosUlt || itineraryAsset?.datosUlt,
+
         odometer: currentAsset.odometer ?? itineraryAsset?.odometer,
+        odometro: currentAsset.odometro ?? itineraryAsset?.odometro ?? itineraryAsset?.odometer,
+
+        telemetryReports: normalizeTelemetryReports(currentAsset.telemetryReports),
       }
     })
   })
@@ -74,6 +199,7 @@ export function useItineraryAssets({
 
     return normalizedAssets.value.filter((asset) => {
       return (
+        normalizeText(asset.displayName).includes(term) ||
         normalizeText(asset.patente).includes(term) ||
         normalizeText(asset.deviceId).includes(term) ||
         normalizeText(asset.conductor).includes(term)
@@ -82,9 +208,15 @@ export function useItineraryAssets({
   })
 
   const selectedAssets = computed(() => {
-    const selected = new Set(selectedAssetIds.value)
+    const selected = new Set(
+      selectedAssetIds.value.map((assetId) => {
+        return String(assetId)
+      }),
+    )
 
-    return normalizedAssets.value.filter((asset) => selected.has(asset.id))
+    return normalizedAssets.value.filter((asset) => {
+      return selected.has(String(asset.id))
+    })
   })
 
   const selectedAssetsSummary = computed(() => {
@@ -94,18 +226,19 @@ export function useItineraryAssets({
 
     if (selectedAssets.value.length === 1) {
       const asset = selectedAssets.value[0]
+      const label = asset.displayName || asset.patente
 
-      return `${asset.patente} · ${asset.deviceId}`
+      return `${label} - ${asset.deviceId}`
     }
 
     const labels = selectedAssets.value
       .slice(0, 2)
-      .map((asset) => asset.patente)
+      .map((asset) => asset.displayName || asset.patente)
       .join(", ")
 
     const remaining = selectedAssets.value.length - 2
 
-    return remaining > 0 ? `${labels} +${remaining} más` : labels
+    return remaining > 0 ? `${labels} +${remaining} mas` : labels
   })
 
   const primarySelectedAsset = computed(() => {
@@ -113,22 +246,28 @@ export function useItineraryAssets({
   })
 
   const isAssetSelected = (assetId) => {
-    return selectedAssetIds.value.includes(assetId)
+    return selectedAssetIds.value.includes(String(assetId))
   }
 
   const toggleAsset = (asset) => {
     formError.value = ""
 
-    if (isAssetSelected(asset.id)) {
-      selectedAssetIds.value = selectedAssetIds.value.filter((id) => id !== asset.id)
+    const assetId = String(asset.id)
+
+    if (isAssetSelected(assetId)) {
+      selectedAssetIds.value = selectedAssetIds.value.filter((id) => {
+        return String(id) !== assetId
+      })
       return
     }
 
-    selectedAssetIds.value = [...selectedAssetIds.value, asset.id]
+    selectedAssetIds.value = [...selectedAssetIds.value, assetId]
   }
 
   const selectAllVisibleAssets = () => {
-    const ids = filteredAssets.value.map((asset) => asset.id)
+    const ids = filteredAssets.value.map((asset) => {
+      return String(asset.id)
+    })
 
     selectedAssetIds.value = [...new Set([...selectedAssetIds.value, ...ids])]
     formError.value = ""
@@ -143,16 +282,29 @@ export function useItineraryAssets({
     filteredAssets,
     (assets) => {
       if (!assets.length) {
-        selectedAssetIds.value = []
+        if (selectedAssetIds.value.length) {
+          selectedAssetIds.value = []
+        }
+
         return
       }
 
-      const availableIds = new Set(normalizedAssets.value.map((asset) => asset.id))
+      const availableIds = new Set(
+        normalizedAssets.value.map((asset) => {
+          return String(asset.id)
+        }),
+      )
 
-      selectedAssetIds.value = selectedAssetIds.value.filter((id) => availableIds.has(id))
+      const nextSelectedAssetIds = selectedAssetIds.value.filter((id) => {
+        return availableIds.has(String(id))
+      })
 
-      if (!selectedAssetIds.value.length) {
-        selectedAssetIds.value = [assets[0].id]
+      if (!nextSelectedAssetIds.length) {
+        nextSelectedAssetIds.push(String(assets[0].id))
+      }
+
+      if (!areStringArraysEqual(selectedAssetIds.value, nextSelectedAssetIds)) {
+        selectedAssetIds.value = nextSelectedAssetIds
       }
     },
     {

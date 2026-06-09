@@ -1,5 +1,3 @@
-import { mockAssets } from "./mockDatabase.js"
-
 const buildVehiclePool = (activos = []) => {
   return activos.map((activo) => ({
     patent: activo.patente || activo.patent || "Sin patente",
@@ -82,7 +80,7 @@ const getGeofenceSeed = (geofence) => {
   return seed || 1
 }
 
-export const buildMockGeofenceHistory = (geofence, activos = mockAssets) => {
+export const buildMockGeofenceHistory = (geofence, activos = []) => {
   if (!geofence) return []
 
   const vehiclePool = buildVehiclePool(activos)

@@ -1,11 +1,7 @@
-export const normalizeText = (value) => {
+const normalizeText = (value) => {
   return String(value || "")
     .trim()
     .toLowerCase()
-}
-
-export const cloneData = (value) => {
-  return JSON.parse(JSON.stringify(value))
 }
 
 export const getUserInitials = (name) => {
@@ -28,17 +24,6 @@ export const getStatusLabel = (status) => {
   return labels[status] || "Sin estado"
 }
 
-export const getStatusClass = (status) => {
-  const classes = {
-    active: "bg-emerald-50 text-emerald-700",
-    pending: "bg-[#fff3eb] text-[#ff6600]",
-    inactive: "bg-slate-100 text-slate-500",
-    internal: "bg-[#eef3ff] text-[#102372]",
-  }
-
-  return classes[status] || "bg-slate-100 text-slate-500"
-}
-
 export const getAvatarClass = (status) => {
   const classes = {
     active: "bg-[#102372]",
@@ -50,47 +35,30 @@ export const getAvatarClass = (status) => {
   return classes[status] || "bg-[#102372]"
 }
 
-export const getRoleLabel = (roles = [], roleId) => {
+const getRoleLabel = (roles = [], roleId) => {
   return roles.find((role) => role.id === roleId)?.name || "Sin rol"
 }
 
-export const getCompanyById = (companies = [], companyId) => {
+const getCompanyById = (companies = [], companyId) => {
   return companies.find((company) => company.id === companyId) || null
 }
 
-export const getApplicationById = (applications = [], applicationId) => {
+const getApplicationById = (applications = [], applicationId) => {
   return applications.find((application) => application.id === applicationId) || null
 }
 
-export const getModuleById = (modules = [], moduleId) => {
+const getModuleById = (modules = [], moduleId) => {
   return modules.find((module) => module.id === moduleId) || null
 }
 
-export const getModuleFunctionById = (moduleFunctions = [], functionId) => {
+const getModuleFunctionById = (moduleFunctions = [], functionId) => {
   return moduleFunctions.find((moduleFunction) => moduleFunction.id === functionId) || null
 }
 
-export const getApplicationCompany = ({ application, companies = [] }) => {
+const getApplicationCompany = ({ application, companies = [] }) => {
   if (!application) return null
 
   return getCompanyById(companies, application.companyId)
-}
-
-export const getEnabledModulesCount = (access) => {
-  return (access?.modules || []).filter((moduleAccess) => moduleAccess.enabled).length
-}
-
-export const getAccessSummary = ({ access, applications = [], modules = [] }) => {
-  const application = getApplicationById(applications, access?.applicationId)
-  const enabledModules = getEnabledModulesCount(access)
-  const totalModules = modules.length
-
-  return {
-    applicationName: application?.name || "Sin aplicación",
-    applicationShortName: application?.shortName || "APP",
-    enabledModules,
-    totalModules,
-  }
 }
 
 export const userMatchesSearch = ({

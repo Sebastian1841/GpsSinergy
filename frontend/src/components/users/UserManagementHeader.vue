@@ -9,6 +9,7 @@
       </div>
 
       <button
+        v-if="canCreateUsers"
         type="button"
         class="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#102372] px-4 text-[11px] font-black text-white transition hover:bg-[#0c1b59] active:scale-[0.98] lg:justify-self-end"
         @click="$emit('create-user')"
@@ -35,6 +36,10 @@ const props = defineProps({
   summaryItems: {
     type: Array,
     default: () => [],
+  },
+  canCreateUsers: {
+    type: Boolean,
+    default: false,
   },
 })
 

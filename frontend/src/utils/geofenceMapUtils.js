@@ -12,9 +12,9 @@ export const makeGeofenceId = () => {
   )
 }
 
-export const toRad = (value) => (value * Math.PI) / 180
+const toRad = (value) => (value * Math.PI) / 180
 
-export const toDeg = (value) => (value * 180) / Math.PI
+const toDeg = (value) => (value * 180) / Math.PI
 
 export const getCircleEdgePoint = (center, radiusMeters) => {
   const earthRadius = 6378137

@@ -1,5 +1,6 @@
 import { computed, ref, watch } from "vue"
 
+import { useAuthSession } from "../auth/useAuthSession.js"
 import { useMockDatabase } from "../mock/useMockDatabase.js"
 import { useDebouncedValue } from "../ui/useDebouncedValue.js"
 
@@ -7,6 +8,16 @@ import { userMatchesSearch } from "../../utils/users/userAccessUtils.js"
 
 const DEFAULT_VISIBLE_USER_LIMIT = 50
 const USER_LIMIT_INCREMENT = 50
+
+const USERS_MODULE_ID = "users"
+const USER_VIEW_FUNCTION_ID = "users-view"
+const USER_PERMISSIONS_FUNCTION_ID = "users-permissions"
+
+const normalizeKey = (value) => String(value ?? "")
+
+const clonePlainObject = (value) => {
+  return JSON.parse(JSON.stringify(value))
+}
 
 const buildUniqueSequentialId = (prefix, items = []) => {
   const expression = new RegExp(`^${prefix}-(\\d+)$`)
@@ -24,6 +35,14 @@ const createEmptyPermissions = () => {
     view: false,
     edit: false,
     admin: false,
+  }
+}
+
+const createCleanScope = (scope = {}) => {
+  return {
+    type: scope.type || "sucursal",
+    sucursalIds: Array.isArray(scope.sucursalIds) ? scope.sucursalIds : [],
+    assetIds: Array.isArray(scope.assetIds) ? scope.assetIds : [],
   }
 }
 
@@ -61,13 +80,7 @@ const createDefaultAccess = ({ id, userId, applicationId, modules, moduleFunctio
     status: "active",
     modules: createDefaultModuleAccess(modules),
     functions: createDefaultFunctionAccess(moduleFunctions),
-    scope: {
-      type: "sucursal",
-      sucursalIds: [],
-      assetIds: [],
-      criticalAlerts: false,
-      reports: false,
-    },
+    scope: createCleanScope(),
   }
 }
 
@@ -109,6 +122,7 @@ const normalizeAccess = ({ access, modules, moduleFunctions }) => {
     ...access,
     modules: normalizedModules,
     functions: normalizedFunctions,
+    scope: createCleanScope(access.scope),
   }
 }
 
@@ -126,6 +140,8 @@ const createEmptyDraftUser = (initialApplicationId = null) => {
 }
 
 export function useUserAccessManagement() {
+  const { currentUser, isPlatformAdmin } = useAuthSession()
+
   const {
     users,
     accesses,
@@ -166,6 +182,10 @@ export function useUserAccessManagement() {
   const editorMode = ref("create")
 
   const draftUser = ref(createEmptyDraftUser(applications.value[0]?.id || null))
+
+  const currentUserId = computed(() => {
+    return normalizeKey(currentUser.value?.id)
+  })
 
   const applicationsById = computed(() => {
     return new Map(applications.value.map((application) => [application.id, application]))
@@ -285,6 +305,205 @@ export function useUserAccessManagement() {
     ]
   })
 
+  const isCurrentUserRecord = (user) => {
+    return Boolean(currentUserId.value) && normalizeKey(user?.id) === currentUserId.value
+  }
+
+  const isCurrentUserAccess = (access) => {
+    return Boolean(currentUserId.value) && normalizeKey(access?.userId) === currentUserId.value
+  }
+
+  const getModuleFunction = (functionId) => {
+    return moduleFunctions.value.find((item) => {
+      return normalizeKey(item.id) === normalizeKey(functionId)
+    })
+  }
+
+  const accessHasModuleEnabled = (access, moduleId) => {
+    const moduleAccess = access?.modules?.find((item) => {
+      return normalizeKey(item.moduleId) === normalizeKey(moduleId)
+    })
+
+    if (moduleAccess) return Boolean(moduleAccess.enabled)
+
+    return (access?.functions || []).some((functionAccess) => {
+      const moduleFunction = getModuleFunction(functionAccess.functionId)
+
+      return moduleFunction?.moduleId === moduleId && functionAccess.enabled
+    })
+  }
+
+  const accessHasFunctionPermission = (access, functionId, permissionId = "view") => {
+    if (!access || access.status !== "active") return false
+    if (!accessHasModuleEnabled(access, USERS_MODULE_ID)) return false
+
+    const functionAccess = (access.functions || []).find((item) => {
+      return normalizeKey(item.functionId) === normalizeKey(functionId)
+    })
+
+    if (!functionAccess?.enabled) return false
+    if (!permissionId) return true
+
+    return Boolean(functionAccess.permissions?.[permissionId])
+  }
+
+  const hasSafeSelfUserManagementAccess = (candidateAccesses = accesses.value) => {
+    if (isPlatformAdmin.value) return true
+    if (!currentUserId.value) return true
+
+    const selfAccesses = candidateAccesses.filter((access) => {
+      return isCurrentUserAccess(access)
+    })
+
+    const hasUsersView = selfAccesses.some((access) => {
+      return accessHasFunctionPermission(access, USER_VIEW_FUNCTION_ID, "view")
+    })
+
+    const hasUsersPermissions = selfAccesses.some((access) => {
+      return accessHasFunctionPermission(access, USER_PERMISSIONS_FUNCTION_ID, "admin")
+    })
+
+    return hasUsersView && hasUsersPermissions
+  }
+
+  const canApplySelfAccessChange = (accessId, applyChange) => {
+    const targetAccess = accesses.value.find((access) => access.id === accessId)
+
+    if (!targetAccess) return false
+    if (!isCurrentUserAccess(targetAccess)) return true
+
+    const candidateAccesses = accesses.value.map((access) => {
+      if (access.id !== accessId) return access
+
+      const clonedAccess = clonePlainObject(access)
+      applyChange(clonedAccess)
+
+      return clonedAccess
+    })
+
+    return hasSafeSelfUserManagementAccess(candidateAccesses)
+  }
+
+  const canRemoveSelfAccess = (accessId) => {
+    const targetAccess = accesses.value.find((access) => access.id === accessId)
+
+    if (!targetAccess) return false
+    if (!isCurrentUserAccess(targetAccess)) return true
+
+    const candidateAccesses = accesses.value.filter((access) => access.id !== accessId)
+
+    return hasSafeSelfUserManagementAccess(candidateAccesses)
+  }
+
+  const applyToggleAccessStatus = (access) => {
+    access.status = access.status === "active" ? "inactive" : "active"
+  }
+
+  const applyToggleModuleAccess = (access, moduleId) => {
+    const moduleAccess = access?.modules?.find((item) => item.moduleId === moduleId)
+
+    if (!moduleAccess) return
+
+    moduleAccess.enabled = !moduleAccess.enabled
+
+    if (!moduleAccess.enabled) {
+      access.functions = (access.functions || []).map((functionAccess) => {
+        const moduleFunction = moduleFunctions.value.find(
+          (item) => item.id === functionAccess.functionId,
+        )
+
+        if (moduleFunction?.moduleId !== moduleId) return functionAccess
+
+        return {
+          ...functionAccess,
+          enabled: false,
+          permissions: createEmptyPermissions(),
+        }
+      })
+      return
+    }
+
+    const enabledModuleFunctions = (access.functions || []).filter((functionAccess) => {
+      const moduleFunction = moduleFunctions.value.find(
+        (item) => item.id === functionAccess.functionId,
+      )
+
+      return moduleFunction?.moduleId === moduleId && functionAccess.enabled
+    })
+
+    if (enabledModuleFunctions.length) return
+
+    const firstFunction = moduleFunctions.value.find((moduleFunction) => {
+      return moduleFunction.moduleId === moduleId
+    })
+
+    if (!firstFunction) return
+
+    const functionAccess = access.functions?.find((item) => item.functionId === firstFunction.id)
+    if (!functionAccess) return
+
+    functionAccess.enabled = true
+    functionAccess.permissions.view = true
+  }
+
+  const applyToggleFunctionAccess = (access, functionId) => {
+    const functionAccess = access?.functions?.find((item) => item.functionId === functionId)
+    const moduleFunction = moduleFunctions.value.find((item) => item.id === functionId)
+
+    if (!access || !functionAccess || !moduleFunction) return
+
+    functionAccess.enabled = !functionAccess.enabled
+
+    const parentModuleAccess = access.modules?.find(
+      (item) => item.moduleId === moduleFunction.moduleId,
+    )
+
+    if (functionAccess.enabled) {
+      if (parentModuleAccess) parentModuleAccess.enabled = true
+
+      if (!Object.values(functionAccess.permissions || {}).some(Boolean)) {
+        functionAccess.permissions.view = true
+      }
+      return
+    }
+
+    functionAccess.permissions = createEmptyPermissions()
+
+    const hasEnabledFunctions = (access.functions || []).some((item) => {
+      const itemFunction = moduleFunctions.value.find((moduleFunctionItem) => {
+        return moduleFunctionItem.id === item.functionId
+      })
+
+      return itemFunction?.moduleId === moduleFunction.moduleId && item.enabled
+    })
+
+    if (parentModuleAccess && !hasEnabledFunctions) {
+      parentModuleAccess.enabled = false
+    }
+  }
+
+  const applyTogglePermission = (access, functionId, permissionId) => {
+    const functionAccess = access?.functions?.find((item) => item.functionId === functionId)
+
+    if (!functionAccess || !functionAccess.enabled) return
+
+    functionAccess.permissions[permissionId] = !functionAccess.permissions[permissionId]
+
+    if (permissionId === "edit" && functionAccess.permissions.edit) {
+      functionAccess.permissions.view = true
+    }
+
+    if (permissionId === "admin" && functionAccess.permissions.admin) {
+      functionAccess.permissions.view = true
+      functionAccess.permissions.edit = true
+    }
+
+    if (permissionId === "view" && !functionAccess.permissions.view) {
+      functionAccess.permissions.edit = false
+      functionAccess.permissions.admin = false
+    }
+  }
+
   watch(
     [debouncedSearchTerm, selectedRole, selectedCompany, selectedStatus, selectedModule],
     () => {
@@ -395,10 +614,13 @@ export function useUserAccessManagement() {
     const user = users.value.find((item) => item.id === draftUser.value.id)
 
     if (!user) return
-    if (user.isPlatformAdmin) return
 
     const nextUsername = draftUser.value.username.trim()
     const nextEmail = draftUser.value.email.trim()
+    const nextStatus = draftUser.value.status
+
+    if (!isPlatformAdmin.value && isCurrentUserRecord(user) && nextStatus !== "active") return
+
     const identityAlreadyExists = users.value.some((item) => {
       return (
         item.id !== user.id &&
@@ -413,7 +635,7 @@ export function useUserAccessManagement() {
       name: draftUser.value.name.trim(),
       username: nextUsername,
       email: nextEmail,
-      status: draftUser.value.status,
+      status: nextStatus,
       ...(draftUser.value.password.trim()
         ? {
             password: draftUser.value.password.trim(),
@@ -440,7 +662,7 @@ export function useUserAccessManagement() {
 
   const toggleSelectedUserStatus = () => {
     if (!selectedUser.value) return
-    if (selectedUser.value.isPlatformAdmin) return
+    if (!isPlatformAdmin.value && isCurrentUserRecord(selectedUser.value)) return
 
     selectedUser.value.status = selectedUser.value.status === "active" ? "inactive" : "active"
   }
@@ -468,6 +690,8 @@ export function useUserAccessManagement() {
   }
 
   const removeApplicationAccess = (accessId) => {
+    if (!canRemoveSelfAccess(accessId)) return
+
     deleteDatabaseAccess(accessId)
   }
 
@@ -483,93 +707,39 @@ export function useUserAccessManagement() {
     const access = accesses.value.find((item) => item.id === accessId)
 
     if (!access) return
+    if (!canApplySelfAccessChange(accessId, applyToggleAccessStatus)) return
 
-    access.status = access.status === "active" ? "inactive" : "active"
+    applyToggleAccessStatus(access)
   }
 
   const toggleModuleAccess = (accessId, moduleId) => {
     const access = accesses.value.find((item) => item.id === accessId)
-    const moduleAccess = access?.modules?.find((item) => item.moduleId === moduleId)
 
-    if (!moduleAccess) return
-
-    moduleAccess.enabled = !moduleAccess.enabled
-
-    if (!moduleAccess.enabled) {
-      access.functions = (access.functions || []).map((functionAccess) => {
-        const moduleFunction = moduleFunctions.value.find(
-          (item) => item.id === functionAccess.functionId,
-        )
-
-        if (moduleFunction?.moduleId !== moduleId) return functionAccess
-
-        return {
-          ...functionAccess,
-          enabled: false,
-          permissions: createEmptyPermissions(),
-        }
+    if (!access) return
+    if (
+      !canApplySelfAccessChange(accessId, (nextAccess) => {
+        applyToggleModuleAccess(nextAccess, moduleId)
       })
+    ) {
       return
     }
 
-    const enabledModuleFunctions = (access.functions || []).filter((functionAccess) => {
-      const moduleFunction = moduleFunctions.value.find(
-        (item) => item.id === functionAccess.functionId,
-      )
-
-      return moduleFunction?.moduleId === moduleId && functionAccess.enabled
-    })
-
-    if (enabledModuleFunctions.length) return
-
-    const firstFunction = moduleFunctions.value.find((moduleFunction) => {
-      return moduleFunction.moduleId === moduleId
-    })
-
-    if (!firstFunction) return
-
-    const functionAccess = access.functions?.find((item) => item.functionId === firstFunction.id)
-    if (!functionAccess) return
-
-    functionAccess.enabled = true
-    functionAccess.permissions.view = true
+    applyToggleModuleAccess(access, moduleId)
   }
 
   const toggleFunctionAccess = (accessId, functionId) => {
     const access = accesses.value.find((item) => item.id === accessId)
-    const functionAccess = access?.functions?.find((item) => item.functionId === functionId)
-    const moduleFunction = moduleFunctions.value.find((item) => item.id === functionId)
 
-    if (!access || !functionAccess || !moduleFunction) return
-
-    functionAccess.enabled = !functionAccess.enabled
-
-    const parentModuleAccess = access.modules?.find(
-      (item) => item.moduleId === moduleFunction.moduleId,
-    )
-
-    if (functionAccess.enabled) {
-      if (parentModuleAccess) parentModuleAccess.enabled = true
-
-      if (!Object.values(functionAccess.permissions || {}).some(Boolean)) {
-        functionAccess.permissions.view = true
-      }
+    if (!access) return
+    if (
+      !canApplySelfAccessChange(accessId, (nextAccess) => {
+        applyToggleFunctionAccess(nextAccess, functionId)
+      })
+    ) {
       return
     }
 
-    functionAccess.permissions = createEmptyPermissions()
-
-    const hasEnabledFunctions = (access.functions || []).some((item) => {
-      const itemFunction = moduleFunctions.value.find((moduleFunctionItem) => {
-        return moduleFunctionItem.id === item.functionId
-      })
-
-      return itemFunction?.moduleId === moduleFunction.moduleId && item.enabled
-    })
-
-    if (parentModuleAccess && !hasEnabledFunctions) {
-      parentModuleAccess.enabled = false
-    }
+    applyToggleFunctionAccess(access, functionId)
   }
 
   const togglePermission = (accessId, functionId, permissionId) => {
@@ -577,22 +747,15 @@ export function useUserAccessManagement() {
     const functionAccess = access?.functions?.find((item) => item.functionId === functionId)
 
     if (!functionAccess || !functionAccess.enabled) return
-
-    functionAccess.permissions[permissionId] = !functionAccess.permissions[permissionId]
-
-    if (permissionId === "edit" && functionAccess.permissions.edit) {
-      functionAccess.permissions.view = true
+    if (
+      !canApplySelfAccessChange(accessId, (nextAccess) => {
+        applyTogglePermission(nextAccess, functionId, permissionId)
+      })
+    ) {
+      return
     }
 
-    if (permissionId === "admin" && functionAccess.permissions.admin) {
-      functionAccess.permissions.view = true
-      functionAccess.permissions.edit = true
-    }
-
-    if (permissionId === "view" && !functionAccess.permissions.view) {
-      functionAccess.permissions.edit = false
-      functionAccess.permissions.admin = false
-    }
+    applyTogglePermission(access, functionId, permissionId)
   }
 
   const updateOperationalScope = (accessId, scopeType) => {
@@ -627,20 +790,6 @@ export function useUserAccessManagement() {
 
     if (scopeType === "selected-assets") {
       access.scope.sucursalIds = []
-    }
-  }
-
-  const toggleScopeOption = (accessId, optionKey) => {
-    const access = accesses.value.find((item) => item.id === accessId)
-
-    if (!access) return
-
-    if (optionKey === "critical-alerts") {
-      access.scope.criticalAlerts = !access.scope.criticalAlerts
-    }
-
-    if (optionKey === "reports") {
-      access.scope.reports = !access.scope.reports
     }
   }
 
@@ -744,7 +893,6 @@ export function useUserAccessManagement() {
     toggleFunctionAccess,
     togglePermission,
     updateOperationalScope,
-    toggleScopeOption,
     toggleScopeAsset,
     toggleScopeSucursal,
   }

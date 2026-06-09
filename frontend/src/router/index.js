@@ -5,12 +5,47 @@ import { useAuthSession } from "../composables/auth/useAuthSession.js"
 // ==================
 // VISTAS
 // ==================
-import ActivosView from "../views/ActivosView.vue"
-
+const ActivosView = () => import("../views/ActivosView.vue")
 const CompanyManagementView = () => import("../views/CompanyManagementView.vue")
 const UserManagementView = () => import("../views/UserManagementView.vue")
 const LoginView = () => import("../views/LoginView.vue")
 const NoAccessView = () => import("../views/NoAccessView.vue")
+
+const LAST_COMPANY_CACHE_KEY = "sinergy-last-company-id"
+
+const readLastCompanyId = () => {
+  if (typeof window === "undefined") return null
+
+  return window.localStorage.getItem(LAST_COMPANY_CACHE_KEY)
+}
+
+const persistLastCompanyId = (companyId) => {
+  if (typeof window === "undefined") return
+
+  if (companyId) {
+    window.localStorage.setItem(LAST_COMPANY_CACHE_KEY, String(companyId))
+    return
+  }
+
+  window.localStorage.removeItem(LAST_COMPANY_CACHE_KEY)
+}
+
+const getLastAccessibleAssetsCompany = ({ accessibleCompanies, canAccessModule }) => {
+  const companies = accessibleCompanies.value || []
+  const cachedCompanyId = String(readLastCompanyId() || "")
+
+  const cachedCompany = companies.find((company) => {
+    return String(company.id) === cachedCompanyId && canAccessModule("assets", company.id)
+  })
+
+  if (cachedCompany) return cachedCompany
+
+  return (
+    companies.find((company) => {
+      return canAccessModule("assets", company.id)
+    }) || null
+  )
+}
 
 // ==================
 // RUTAS
@@ -58,7 +93,7 @@ const routes = [
     name: "UserManagement",
     component: UserManagementView,
     meta: {
-      requiresPlatformAdmin: true,
+      requiresUserManagementView: true,
     },
   },
 
@@ -94,7 +129,10 @@ const routes = [
     name: "AppUserManagement",
     component: UserManagementView,
     meta: {
-      requiresPlatformAdmin: true,
+      requiresFunction: {
+        id: "users-view",
+        permission: "view",
+      },
     },
   },
 
@@ -157,7 +195,13 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   const { isAuthenticated, isPlatformAdmin, defaultAuthenticatedRoute } = useAuthSession()
-  const { canAccessCompany, canAccessModule } = useAccessControl()
+  const {
+    accessibleCompanies,
+    canAccessCompany,
+    canAccessModule,
+    canAccessFunction,
+    canViewUsers,
+  } = useAccessControl()
 
   if (to.meta.public) {
     return isAuthenticated.value ? defaultAuthenticatedRoute.value : true
@@ -170,6 +214,25 @@ router.beforeEach((to) => {
         redirect: to.fullPath,
       },
     }
+  }
+
+  if (to.path === "/activos") {
+    const targetCompany = getLastAccessibleAssetsCompany({
+      accessibleCompanies,
+      canAccessModule,
+    })
+
+    if (targetCompany) {
+      return `/app/${targetCompany.id}/activos`
+    }
+
+    return isPlatformAdmin.value
+      ? {
+          name: "CompanyManagement",
+        }
+      : {
+          name: "NoAccess",
+        }
   }
 
   if (to.meta.requiresPlatformAdmin && !isPlatformAdmin.value) {
@@ -194,6 +257,34 @@ router.beforeEach((to) => {
     return {
       name: "NoAccess",
     }
+  }
+
+  if (to.meta.requiresUserManagementView && !canViewUsers.value) {
+    return defaultAuthenticatedRoute.value === to.fullPath
+      ? {
+          name: "NoAccess",
+        }
+      : defaultAuthenticatedRoute.value
+  }
+
+  if (to.meta.requiresFunction) {
+    const functionAccess = to.meta.requiresFunction
+
+    const canEnter = canAccessFunction(
+      functionAccess.id,
+      companyId || null,
+      functionAccess.permission || "view",
+    )
+
+    if (!canEnter) {
+      return {
+        name: "NoAccess",
+      }
+    }
+  }
+
+  if (companyId) {
+    persistLastCompanyId(companyId)
   }
 
   return true

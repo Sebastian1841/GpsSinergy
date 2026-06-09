@@ -44,12 +44,13 @@
               Editar datos
             </button>
 
-            <RouterLink
-              :to="getCompanyWorkspacePath(company)"
+            <button
+              type="button"
               class="hidden h-9 items-center justify-center rounded-lg bg-[#FF6600] px-3 text-[10px] font-black text-white transition hover:bg-[#e65c00] sm:inline-flex"
+              @click="$emit('enter-company', company)"
             >
               Abrir empresa
-            </RouterLink>
+            </button>
 
             <button
               type="button"
@@ -182,12 +183,13 @@
               >
                 Editar datos
               </button>
-              <RouterLink
-                :to="getCompanyWorkspacePath(company)"
+              <button
+                type="button"
                 class="inline-flex h-10 items-center justify-center rounded-lg bg-[#FF6600] text-[10px] font-black text-white"
+                @click="$emit('enter-company', company)"
               >
                 Abrir empresa
-              </RouterLink>
+              </button>
             </div>
           </div>
 
@@ -223,7 +225,6 @@ import CompanyReportPanel from "./CompanyReportPanel.vue"
 import {
   getCompanyInitials,
   getCompanyStatusLabel,
-  getCompanyWorkspacePath,
   getEnabledCompanyReports,
 } from "../../utils/companies/companyUtils.js"
 
@@ -257,6 +258,7 @@ const emit = defineEmits([
   "alternar-estado-sucursal",
   "eliminar-sucursal",
   "actualizar-sucursal-activo",
+  "enter-company",
 ])
 
 const activeTab = ref("summary")
@@ -322,20 +324,14 @@ const companyDetails = computed(() => [
     value: props.company?.contactPhone || "Sin telefono",
   },
   {
-    label: "Facturacion",
-    value: props.company?.billingEmail || "Sin correo",
-  },
-  {
     label: "Ubicacion",
     value: `${props.company?.city || "-"} - ${props.company?.region || "-"}`,
   },
   {
-    label: "Zona horaria",
-    value: props.company?.timezone || "Sin zona horaria",
-  },
-  {
     label: "Cuenta",
-    value: `${props.company?.usersCount || 0} usuarios - ${props.company?.sucursales?.length || 0} sucursales`,
+    value: `${props.company?.usersCount || 0} usuarios - ${
+      props.company?.sucursales?.length || 0
+    } sucursales`,
   },
   {
     label: "Reportes",

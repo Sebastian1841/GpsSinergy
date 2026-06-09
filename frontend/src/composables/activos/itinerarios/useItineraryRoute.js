@@ -1,13 +1,10 @@
-import { ref } from "vue"
+import { ref, unref } from "vue"
+import { parseNumberFromLabel } from "../../../utils/numberUtils.js"
 
-const parseNumberFromLabel = (label) => {
-  if (!label) return 0
+const LIVE_TELEMETRY_POINTS_LIMIT = 500
 
-  const value = String(label)
-    .replace(",", ".")
-    .match(/[\d.]+/)
-
-  return value ? Number(value[0]) || 0 : 0
+const padTimePart = (value, size = 2) => {
+  return String(value).padStart(size, "0")
 }
 
 const parseMinutesFromLabel = (label) => {
@@ -49,17 +46,158 @@ const hasValidAssetLocation = (asset) => {
   return Number.isFinite(lat) && Number.isFinite(lng)
 }
 
-const areSameCoordinates = (pointA, pointB) => {
-  if (!pointA || !pointB) return false
+const hasValidPointLocation = (point) => {
+  const lat = Number(point?.lat)
+  const lng = Number(point?.lng)
 
-  const latA = Number(pointA.lat)
-  const lngA = Number(pointA.lng)
-  const latB = Number(pointB.lat)
-  const lngB = Number(pointB.lng)
+  return Number.isFinite(lat) && Number.isFinite(lng)
+}
 
-  if (![latA, lngA, latB, lngB].every(Number.isFinite)) return false
+const normalizeAssetId = (asset) => {
+  return String(asset?.id || asset?.activoId || asset?.deviceId || asset?.patente || "")
+}
 
-  return Math.abs(latA - latB) < 0.000001 && Math.abs(lngA - lngB) < 0.000001
+const normalizePointKey = (point) => {
+  return [
+    point?.assetId,
+    point?.timestamp,
+    point?.lat,
+    point?.lng,
+    point?.speed,
+    point?.isLiveTelemetry ? "live" : "historical",
+  ]
+    .map((value) => String(value ?? ""))
+    .join("|")
+}
+
+const sortPointsByTimestamp = (points = []) => {
+  return [...points].sort((firstPoint, secondPoint) => {
+    const firstTime = new Date(firstPoint.timestamp || 0).getTime()
+    const secondTime = new Date(secondPoint.timestamp || 0).getTime()
+
+    return firstTime - secondTime
+  })
+}
+
+const mergeRoutePoints = (...pointLists) => {
+  const pointsByKey = new Map()
+
+  pointLists.flat().forEach((point) => {
+    if (!point?.timestamp) return
+
+    pointsByKey.set(normalizePointKey(point), point)
+  })
+
+  return sortPointsByTimestamp(Array.from(pointsByKey.values()))
+}
+
+const normalizeDateOnly = (value) => {
+  const rawValue = unref(value)
+
+  if (!rawValue) {
+    const now = new Date()
+
+    return [now.getFullYear(), padTimePart(now.getMonth() + 1), padTimePart(now.getDate())].join(
+      "-",
+    )
+  }
+
+  const rawText = String(rawValue)
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(rawText)) {
+    return rawText.slice(0, 10)
+  }
+
+  const date = new Date(rawText)
+
+  if (Number.isNaN(date.getTime())) {
+    const now = new Date()
+
+    return [now.getFullYear(), padTimePart(now.getMonth() + 1), padTimePart(now.getDate())].join(
+      "-",
+    )
+  }
+
+  return [date.getFullYear(), padTimePart(date.getMonth() + 1), padTimePart(date.getDate())].join(
+    "-",
+  )
+}
+
+const isTimeOnlyValue = (value) => {
+  return /^\d{1,2}:\d{2}(:\d{2})?(\.\d{1,3})?$/.test(String(value || "").trim())
+}
+
+const buildDateFromTimeOnly = ({ dateString, timeValue }) => {
+  const cleanTime = String(timeValue || "").trim()
+  const [hours = "00", minutes = "00", rawSeconds = "00"] = cleanTime.split(":")
+  const [seconds = "00", rawMilliseconds = "000"] = String(rawSeconds).split(".")
+
+  return new Date(
+    `${dateString}T${padTimePart(hours)}:${padTimePart(minutes)}:${padTimePart(seconds)}.${padTimePart(
+      rawMilliseconds,
+      3,
+    )}`,
+  )
+}
+
+const parseAssetReportDate = ({ asset, referenceDate }) => {
+  const candidates = [
+    asset?.timestamp,
+    asset?.lastReport,
+    asset?.reportedAt,
+    asset?.lastReportAt,
+    asset?.fechaHora,
+    asset?.fechaUltimoReporte,
+    asset?.updatedAt,
+    asset?.updated_at,
+    asset?.datosUlt,
+  ]
+
+  for (const candidate of candidates) {
+    if (!candidate) continue
+
+    if (isTimeOnlyValue(candidate)) {
+      const timeOnlyDate = buildDateFromTimeOnly({
+        dateString: referenceDate,
+        timeValue: candidate,
+      })
+
+      if (!Number.isNaN(timeOnlyDate.getTime())) {
+        return timeOnlyDate
+      }
+    }
+
+    const date = new Date(candidate)
+
+    if (!Number.isNaN(date.getTime())) {
+      return date
+    }
+  }
+
+  return new Date()
+}
+
+const buildTimestampOnReferenceDate = ({ source, referenceDate }) => {
+  const reportDate = parseAssetReportDate({
+    asset: source,
+    referenceDate,
+  })
+
+  const reportTime = [
+    padTimePart(reportDate.getHours()),
+    padTimePart(reportDate.getMinutes()),
+    padTimePart(reportDate.getSeconds()),
+  ].join(":")
+
+  const milliseconds = padTimePart(reportDate.getMilliseconds(), 3)
+
+  return `${referenceDate}T${reportTime}.${milliseconds}`
+}
+
+const isPointInsideDateRange = ({ point, fromDate, toDate }) => {
+  const date = String(point?.timestamp || "").slice(0, 10)
+
+  return date >= fromDate && date <= toDate
 }
 
 export function useItineraryRoute({
@@ -79,6 +217,7 @@ export function useItineraryRoute({
 }) {
   const routeResult = ref(null)
   const selectedPointId = ref(null)
+  const liveTelemetryPointsByAssetId = new Map()
 
   const validateSearch = () => {
     formError.value = ""
@@ -102,7 +241,7 @@ export function useItineraryRoute({
   }
 
   const getCurrentReferenceDate = () => {
-    return latestDate
+    return normalizeDateOnly(latestDate)
   }
 
   const isCurrentDateInsideRange = () => {
@@ -116,75 +255,146 @@ export function useItineraryRoute({
   }
 
   const getCurrentLocationTimestamp = (asset) => {
-    const currentDate = getCurrentReferenceDate()
-    const fallbackTimestamp = `${currentDate}T23:59:59`
-
-    if (!asset?.lastReport) return fallbackTimestamp
-
-    const lastReportDate = new Date(asset.lastReport)
-
-    if (Number.isNaN(lastReportDate.getTime())) {
-      return fallbackTimestamp
-    }
-
-    const assetReportDay = String(asset.lastReport).slice(0, 10)
-
-    if (assetReportDay < currentDate) {
-      return fallbackTimestamp
-    }
-
-    return asset.lastReport
+    return buildTimestampOnReferenceDate({
+      source: asset,
+      referenceDate: getCurrentReferenceDate(),
+    })
   }
 
   const buildCurrentLocationPoint = (asset) => {
+    const timestamp = getCurrentLocationTimestamp(asset)
+    const assetId = normalizeAssetId(asset)
+    const cleanTimestamp = timestamp.replace(/\D/g, "")
+
     return {
-      id: `${asset.id}-current-location`,
-      assetId: asset.id,
-      timestamp: getCurrentLocationTimestamp(asset),
+      id: `${assetId}-live-current-${cleanTimestamp}`,
+      assetId,
+      timestamp,
       lat: Number(asset.lat),
       lng: Number(asset.lng),
-      speed: Number(asset.speed) || 0,
-      address: asset.direccion || "Ubicación actual",
-      event: "Ubicación actual",
-      odometer: asset.odometer || null,
+      speed: parseNumberFromLabel(asset.speed ?? asset.velocidad ?? asset.velocidad_kmh),
+      address: asset.direccion || asset.address || "Ubicacion actual",
+      event: "Reporte GPS",
+      odometer: asset.odometer || asset.odometro || null,
       isCurrentLocation: true,
+      isLiveTelemetry: true,
     }
   }
 
-  const appendCurrentLocationIfNeeded = ({ asset, points }) => {
-    if (!shouldAppendCurrentLocation(asset)) return points
+  const normalizeTelemetryReportPoint = ({ asset, report, index }) => {
+    const referenceDate = getCurrentReferenceDate()
+    const timestamp = buildTimestampOnReferenceDate({
+      source: report,
+      referenceDate,
+    })
+
+    const assetId = normalizeAssetId(asset)
+    const cleanTimestamp = timestamp.replace(/\D/g, "")
+
+    return {
+      id: report.id || `${assetId}-live-history-${cleanTimestamp}-${index}`,
+      assetId,
+      timestamp,
+      lat: Number(report.lat ?? asset.lat),
+      lng: Number(report.lng ?? asset.lng),
+      speed: parseNumberFromLabel(report.speed ?? report.velocidad ?? report.velocidad_kmh),
+      address: report.address || report.direccion || asset.direccion || "Ubicacion actual",
+      event: report.event || "Reporte GPS",
+      odometer: report.odometer || report.odometro || asset.odometer || asset.odometro || null,
+      isCurrentLocation: Boolean(report.isCurrentLocation),
+      isLiveTelemetry: true,
+    }
+  }
+
+  const recordLiveTelemetryPoint = (asset) => {
+    if (!shouldAppendCurrentLocation(asset)) return
 
     const currentPoint = buildCurrentLocationPoint(asset)
-    const lastPoint = points[points.length - 1]
+    const assetId = normalizeAssetId(asset)
+    const currentPoints = liveTelemetryPointsByAssetId.get(assetId) || []
+    const currentPointKey = normalizePointKey(currentPoint)
 
-    if (areSameCoordinates(lastPoint, currentPoint)) {
-      return [
-        ...points.slice(0, -1),
-        {
-          ...lastPoint,
-          ...currentPoint,
-        },
-      ]
-    }
+    const alreadyExists = currentPoints.some((point) => {
+      return normalizePointKey(point) === currentPointKey
+    })
 
-    return [...points, currentPoint]
+    if (alreadyExists) return
+
+    liveTelemetryPointsByAssetId.set(
+      assetId,
+      [...currentPoints, currentPoint].slice(-LIVE_TELEMETRY_POINTS_LIMIT),
+    )
+  }
+
+  const getLiveTelemetryPointsForAsset = (asset) => {
+    return liveTelemetryPointsByAssetId.get(normalizeAssetId(asset)) || []
+  }
+
+  const buildRouteQueryKey = (assets = []) => {
+    return [
+      fromDate.value,
+      toDate.value,
+      ...assets.map((asset) => {
+        return normalizeAssetId(asset)
+      }),
+    ]
+      .map((value) => String(value ?? ""))
+      .join("|")
+  }
+
+  const getTelemetryReportsForAsset = (asset) => {
+    if (!Array.isArray(asset?.telemetryReports)) return []
+
+    return asset.telemetryReports
+      .map((report, index) => {
+        return normalizeTelemetryReportPoint({
+          asset,
+          report,
+          index,
+        })
+      })
+      .filter((point) => {
+        return hasValidPointLocation(point)
+      })
+      .filter((point) => {
+        return isPointInsideDateRange({
+          point,
+          fromDate: fromDate.value,
+          toDate: toDate.value,
+        })
+      })
   }
 
   const getRoutePointsForAsset = (asset) => {
-    const historicalPoints = filterItineraryPoints({
+    const telemetryReports = getTelemetryReportsForAsset(asset)
+
+    /*
+      Esto solo agrega una foto del estado actual cuando presionas Buscar o Actualizar.
+      No actualiza la tabla automáticamente.
+      Los reportes acumulados reales vendrán desde asset.telemetryReports.
+    */
+    recordLiveTelemetryPoint(asset)
+
+    const liveTelemetryPoints = getLiveTelemetryPointsForAsset(asset)
+
+    if (telemetryReports.length || liveTelemetryPoints.length) {
+      return mergeRoutePoints(telemetryReports, liveTelemetryPoints)
+    }
+
+    return filterItineraryPoints({
       assetId: asset.id,
+      asset,
       fromDate: fromDate.value,
       toDate: toDate.value,
-    })
-
-    return appendCurrentLocationIfNeeded({
-      asset,
-      points: historicalPoints,
     })
   }
 
   const buildMultipleRouteResult = (assets) => {
-    const routes = assets.map((asset) => {
+    const cleanAssets = assets.filter(Boolean)
+
+    if (!cleanAssets.length) return null
+
+    const routes = cleanAssets.map((asset) => {
       const points = getRoutePointsForAsset(asset)
 
       return buildItineraryResult({
@@ -199,6 +409,7 @@ export function useItineraryRoute({
           ...row,
           id: `${route.asset.id}-${row.id}`,
           assetId: route.asset.id,
+          assetDisplayName: route.asset.displayName,
           assetPatente: route.asset.patente,
           assetDeviceId: route.asset.deviceId,
         }))
@@ -218,23 +429,23 @@ export function useItineraryRoute({
       return total + parseMinutesFromLabel(route.summary?.movingLabel)
     }, 0)
 
-    const primaryAsset = assets[0]
+    const primaryAsset = cleanAssets[0]
 
-    if (assets.length === 1) {
+    if (cleanAssets.length === 1) {
       return routes[0]
     }
 
     return {
-      id: `multi-${assets.map((asset) => asset.id).join("-")}`,
+      id: `multi-${cleanAssets.map((asset) => asset.id).join("-")}`,
       asset: {
         ...primaryAsset,
         id: primaryAsset.id,
-        patente: `${assets.length} dispositivos`,
+        patente: `${cleanAssets.length} dispositivos`,
         deviceId: "Selección múltiple",
-        conductor: `${assets.length} rutas combinadas`,
+        conductor: `${cleanAssets.length} rutas combinadas`,
         estado: "moving",
       },
-      assets,
+      assets: cleanAssets,
       routes,
       rows,
       summary: {
@@ -242,7 +453,7 @@ export function useItineraryRoute({
         distanceLabel: formatDistance(totalDistance),
         movingLabel: formatMinutes(totalMovingMinutes),
         pointsCount: rows.length,
-        assetsCount: assets.length,
+        assetsCount: cleanAssets.length,
       },
     }
   }
@@ -251,6 +462,30 @@ export function useItineraryRoute({
     if (!routeResult.value) return
 
     emit("route-selected", routeResult.value)
+  }
+
+  const rebuildRouteResult = ({ resetSelectedPoint = false } = {}) => {
+    const assets = selectedAssets.value.length
+      ? selectedAssets.value
+      : [primarySelectedAsset.value].filter(Boolean)
+
+    const nextRouteResult = buildMultipleRouteResult(assets)
+
+    if (!nextRouteResult) return
+
+    routeResult.value = {
+      ...nextRouteResult,
+      queryKey: buildRouteQueryKey(assets),
+      updatedAt: new Date().toISOString(),
+    }
+
+    if (resetSelectedPoint) {
+      selectedPointId.value = null
+    }
+
+    showDeviceList.value = false
+
+    emitRouteToMap()
   }
 
   const handleGenerateRoute = () => {
@@ -267,15 +502,19 @@ export function useItineraryRoute({
       return
     }
 
-    const assets = selectedAssets.value.length
-      ? selectedAssets.value
-      : [primarySelectedAsset.value].filter(Boolean)
+    rebuildRouteResult({
+      resetSelectedPoint: true,
+    })
+  }
 
-    routeResult.value = buildMultipleRouteResult(assets)
-    selectedPointId.value = null
-    showDeviceList.value = false
+  const handleRefreshRoute = () => {
+    applyDateRange()
 
-    emitRouteToMap()
+    if (!validateSearch()) {
+      return
+    }
+
+    rebuildRouteResult()
   }
 
   const handleSelectPoint = (point) => {
@@ -291,6 +530,7 @@ export function useItineraryRoute({
     routeResult.value = null
     selectedPointId.value = null
     formError.value = ""
+    liveTelemetryPointsByAssetId.clear()
 
     emit("clear-route")
   }
@@ -300,6 +540,7 @@ export function useItineraryRoute({
     selectedPointId,
 
     handleGenerateRoute,
+    handleRefreshRoute,
     handleSelectPoint,
     handleClearRoute,
   }

@@ -1,5 +1,8 @@
-import { computed, ref, watch } from "vue"
+import { computed, ref, shallowRef, unref, watch } from "vue"
 import { normalizeId } from "../../../utils/idUtils.js"
+
+const DEFAULT_TABLE_SYNC_INTERVAL_MS = 2500
+const MIN_TABLE_SYNC_INTERVAL_MS = 500
 
 const cloneFleetSnapshot = (snapshot = []) => {
   return snapshot.map((activo) => {
@@ -25,8 +28,7 @@ export function useActivosTelemetrySync({
   mockTelemetryBatchSize,
   tableSyncIntervalMs,
 }) {
-  const tableActivos = ref([])
-  const mapSnapshotActivos = ref([])
+  const tableActivos = shallowRef([])
   const latestTelemetryBatch = ref([])
 
   let tableSyncTimer = null
@@ -37,12 +39,38 @@ export function useActivosTelemetrySync({
     return telemetryActivos.value
   })
 
-  const mapActivos = computed(() => {
-    return filterActivosByCurrentState(mapSnapshotActivos.value)
+  const resolvedTableSyncIntervalMs = computed(() => {
+    const interval = Number(unref(tableSyncIntervalMs))
+
+    if (!Number.isFinite(interval) || interval <= 0) {
+      return DEFAULT_TABLE_SYNC_INTERVAL_MS
+    }
+
+    return Math.max(interval, MIN_TABLE_SYNC_INTERVAL_MS)
   })
 
+  /*
+    IMPORTANTE:
+    El mapa usa los activos vivos, no el snapshot de tabla.
+    Así puede recibir telemetría frecuente sin obligar a la tabla a rerenderizar.
+  */
+  const mapActivos = computed(() => {
+    return filterActivosByCurrentState(normalizedActivos.value)
+  })
+
+  /*
+    La tabla usa un snapshot controlado.
+    Esto evita que ordenamiento, filtros y filas se recalculen con cada pulso GPS.
+  */
   const filteredActivos = computed(() => {
     return filterActivosByCurrentState(tableActivos.value)
+  })
+
+  const mapActivoIdsSignature = computed(() => {
+    return mapActivos.value
+      .map((activo) => normalizeId(activo?.id))
+      .filter(Boolean)
+      .join("|")
   })
 
   const syncTableActivos = () => {
@@ -129,10 +157,6 @@ export function useActivosTelemetrySync({
     pendingTableUpdateIds = new Set()
   }
 
-  const syncMapSnapshotActivos = (snapshot = normalizedActivos.value) => {
-    mapSnapshotActivos.value = cloneFleetSnapshot(snapshot)
-  }
-
   const scheduleTableActivosSync = ({ immediate = false, full = false, updates = [] } = {}) => {
     if (full) {
       pendingFullTableSync = true
@@ -156,7 +180,7 @@ export function useActivosTelemetrySync({
     tableSyncTimer = window.setTimeout(() => {
       tableSyncTimer = null
       flushTableActivosSync()
-    }, tableSyncIntervalMs)
+    }, resolvedTableSyncIntervalMs.value)
   }
 
   watch(
@@ -164,7 +188,6 @@ export function useActivosTelemetrySync({
     (snapshot) => {
       latestTelemetryBatch.value = []
       replaceFleetSnapshot(snapshot)
-      syncMapSnapshotActivos(snapshot)
       scheduleTableActivosSync({
         immediate: true,
         full: true,
@@ -180,18 +203,34 @@ export function useActivosTelemetrySync({
       scheduleTableActivosSync({
         full: true,
       })
+
+      return
     }
+
+    /*
+      Respaldo para telemetría real o externa:
+      si telemetryActivos cambia fuera de startMockTelemetry/onBatch,
+      la tabla igual se actualiza, pero de forma lenta.
+    */
+    scheduleTableActivosSync()
   })
 
   watch(
     () => [statusFilter.value, sectionSearch.value.activos],
     () => {
-      syncMapSnapshotActivos()
+      scheduleTableActivosSync({
+        full: true,
+      })
     },
   )
 
+  /*
+    Antes esto observaba mapActivos completo.
+    Eso podía ejecutar ensureSelectedActivo() por cada cambio de lat/lng.
+    Ahora se dispara cuando cambia el conjunto de activos visibles.
+  */
   watch(
-    mapActivos,
+    mapActivoIdsSignature,
     () => {
       ensureSelectedActivo()
     },
@@ -221,18 +260,19 @@ export function useActivosTelemetrySync({
       window.clearTimeout(tableSyncTimer)
       tableSyncTimer = null
     }
+
+    pendingFullTableSync = false
+    pendingTableUpdateIds = new Set()
   }
 
   return {
     normalizedActivos,
     tableActivos,
-    mapSnapshotActivos,
     latestTelemetryBatch,
     mapActivos,
     filteredActivos,
 
     syncTableActivos,
-    syncMapSnapshotActivos,
     scheduleTableActivosSync,
     cleanupTelemetrySync,
   }

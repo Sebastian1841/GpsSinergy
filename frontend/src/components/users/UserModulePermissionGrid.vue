@@ -25,9 +25,10 @@
           <button
             v-if="selectedModule"
             type="button"
-            class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition"
+            class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-60"
             :class="selectedModuleAccess?.enabled ? 'bg-[#ff6600]' : 'bg-slate-300'"
             :aria-label="`Cambiar acceso a ${selectedModule.name}`"
+            :disabled="!canManageUserPermissions"
             @click="$emit('toggle-module-access', access.id, selectedModule.id)"
           >
             <span
@@ -103,12 +104,13 @@
                 <td class="px-2 py-2 text-center">
                   <button
                     type="button"
-                    class="relative inline-flex h-5 w-9 rounded-full transition"
+                    class="relative inline-flex h-5 w-9 rounded-full transition disabled:cursor-not-allowed disabled:opacity-60"
                     :class="
                       getFunctionAccess(moduleFunction.id)?.enabled
                         ? 'bg-[#ff6600]'
                         : 'bg-slate-300'
                     "
+                    :disabled="!canManageUserPermissions"
                     @click="$emit('toggle-function-access', access.id, moduleFunction.id)"
                   >
                     <span
@@ -128,7 +130,9 @@
                     class="h-4 w-4 cursor-pointer rounded border-[#d8dee8] accent-[#102372] disabled:cursor-not-allowed disabled:opacity-40"
                     :aria-label="`${moduleFunction.name} ${permission.name}`"
                     :checked="hasPermission(moduleFunction.id, permission.id)"
-                    :disabled="!getFunctionAccess(moduleFunction.id)?.enabled"
+                    :disabled="
+                      !canManageUserPermissions || !getFunctionAccess(moduleFunction.id)?.enabled
+                    "
                     @change="
                       $emit('toggle-permission', access.id, moduleFunction.id, permission.id)
                     "
@@ -178,6 +182,10 @@ const props = defineProps({
   permissions: {
     type: Array,
     default: () => [],
+  },
+  canManageUserPermissions: {
+    type: Boolean,
+    default: false,
   },
 })
 

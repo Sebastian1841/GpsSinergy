@@ -99,12 +99,13 @@
         </div>
 
         <div class="grid grid-cols-2 gap-2 xl:flex xl:justify-end">
-          <RouterLink
-            :to="getCompanyWorkspacePath(company)"
+          <button
+            type="button"
             class="inline-flex h-9 items-center justify-center rounded-lg bg-[#102372] px-3 text-[10px] font-black text-white transition hover:bg-[#0c1b59]"
+            @click="$emit('enter-company', company)"
           >
             Entrar
-          </RouterLink>
+          </button>
 
           <button
             type="button"
@@ -146,11 +147,7 @@
 <script setup>
 import { computed, ref } from "vue"
 
-import {
-  getCompanyStatusClass,
-  getCompanyStatusLabel,
-  getCompanyWorkspacePath,
-} from "../../utils/companies/companyUtils.js"
+import { getCompanyStatusClass, getCompanyStatusLabel } from "../../utils/companies/companyUtils.js"
 
 const props = defineProps({
   companies: {
@@ -171,7 +168,7 @@ const props = defineProps({
   },
 })
 
-defineEmits(["configure-company", "clear-filters", "show-more"])
+defineEmits(["configure-company", "clear-filters", "show-more", "enter-company"])
 
 const sortOptions = [
   { key: "name", label: "Empresa" },

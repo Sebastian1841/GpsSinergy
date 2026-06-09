@@ -1,261 +1,28 @@
 <template>
   <aside class="flex h-full min-h-0 flex-col overflow-hidden bg-white">
-    <!-- Navegación lateral -->
-    <div class="shrink-0 border-b border-[#d8dee8] bg-white px-3 py-3">
-      <div class="grid grid-cols-4 gap-1 rounded-xl border border-[#d8dee8] bg-[#f8fafc] p-1">
-        <button
-          v-for="section in menuSections"
-          :key="section.key"
-          type="button"
-          class="group flex min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[10px] font-black transition"
-          :class="
-            localActiveSection === section.key
-              ? 'bg-[#102372] text-white shadow-sm'
-              : 'text-[#102372] hover:bg-white hover:text-[#FF6600]'
-          "
-          @click="setSection(section.key)"
-        >
-          <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 shrink-0" fill="none" aria-hidden="true">
-            <path
-              v-if="section.key === 'activos'"
-              d="M4.75 16.5h14.5M6.75 16.5l1.15-5.75A2.25 2.25 0 0 1 10.1 9h3.8a2.25 2.25 0 0 1 2.2 1.75l1.15 5.75M7.25 16.5v1.25M16.75 16.5v1.25M9 12.25h6"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-
-            <path
-              v-else-if="section.key === 'itinerarios'"
-              d="M6.5 6.75h.01M17.5 17.25h.01M8.75 6.75h3.1c2.35 0 4.25 1.9 4.25 4.25s-1.9 4.25-4.25 4.25H10.5M6.5 4.5a2.25 2.25 0 1 1 0 4.5 2.25 2.25 0 0 1 0-4.5ZM17.5 15a2.25 2.25 0 1 1 0 4.5 2.25 2.25 0 0 1 0-4.5Z"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-
-            <path
-              v-else-if="section.key === 'geocercas'"
-              d="M12 21s7-4.6 7-11.25A7 7 0 0 0 5 9.75C5 16.4 12 21 12 21ZM12 12.25a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-
-            <path
-              v-else
-              d="M4 20V8l8-4 8 4v12M8 20v-6h8v6M9 10h.01M15 10h.01"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-
-          <span class="truncate">
-            {{ section.label }}
-          </span>
-
-          <span
-            v-if="section.count !== null"
-            class="rounded-md px-1.5 py-0.5 text-[9px] font-black"
-            :class="
-              localActiveSection === section.key
-                ? 'bg-white/15 text-white'
-                : 'bg-[#102372]/10 text-[#102372] group-hover:bg-[#FF6600]/10 group-hover:text-[#FF6600]'
-            "
-          >
-            {{ section.count }}
-          </span>
-        </button>
-      </div>
-
-      <!-- Buscador + acciones -->
-      <div
-        v-if="!['itinerarios', 'sucursales'].includes(localActiveSection)"
-        class="mt-3 flex items-center gap-2"
-      >
-        <div class="relative min-w-0 flex-1">
-          <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-            <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" aria-hidden="true">
-              <path
-                d="m20 20-4.35-4.35M18 10.5a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-              />
-            </svg>
-          </span>
-
-          <input
-            :value="localSearch"
-            type="text"
-            :placeholder="searchPlaceholder"
-            class="h-[36px] w-full rounded-lg border border-[#d8dee8] bg-white pl-9 pr-8 text-[12px] font-semibold text-[#172033] outline-none placeholder:text-slate-400 focus:border-[#FF6600] focus:ring-2 focus:ring-[#FF6600]/10"
-            @input="handleSearchInput"
-          />
-
-          <button
-            v-if="localSearch"
-            type="button"
-            class="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-base leading-none text-slate-400 transition hover:text-[#FF6600]"
-            @click="clearSearch"
-          >
-            ×
-          </button>
-        </div>
-
-        <button
-          v-if="localActiveSection === 'activos' && sortColumnKey"
-          type="button"
-          class="flex h-[36px] shrink-0 cursor-pointer items-center justify-center rounded-lg border border-[#FF6600]/30 bg-[#fff7ed] px-3 text-[10px] font-black text-[#FF6600] transition hover:border-[#FF6600] hover:bg-white"
-          title="Limpiar ordenamiento"
-          @click="clearSort"
-        >
-          Limpiar orden
-        </button>
-
-        <button
-          v-if="localActiveSection === 'activos' && canCreateAssets"
-          type="button"
-          class="flex h-[36px] shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#102372]/20 bg-[#102372] px-3 text-[10px] font-black text-white shadow-sm transition hover:border-[#FF6600] hover:bg-[#0c1b59]"
-          title="Agregar activo"
-          @click="$emit('open-add-activo')"
-        >
-          <svg viewBox="0 0 24 24" class="h-4 w-4 shrink-0" fill="none" aria-hidden="true">
-            <path
-              d="M12 5v14M5 12h14"
-              stroke="currentColor"
-              stroke-width="2.2"
-              stroke-linecap="round"
-            />
-          </svg>
-
-          <span class="whitespace-nowrap"> Agregar activo </span>
-        </button>
-
-        <!-- Dropdown de columnas -->
-        <div v-if="localActiveSection === 'activos'" class="relative shrink-0">
-          <button
-            type="button"
-            class="flex h-[36px] w-[36px] cursor-pointer items-center justify-center rounded-lg border bg-[#f8fafc] text-[#102372] transition hover:bg-white hover:text-[#FF6600]"
-            :class="
-              showColumns ? 'border-[#FF6600] bg-[#fff7ed] text-[#FF6600]' : 'border-[#d8dee8]'
-            "
-            title="Filtrar columnas visibles"
-            @click.stop="toggleColumnsDropdown"
-          >
-            <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" aria-hidden="true">
-              <path
-                d="M4.75 6.75h14.5L14 12.5v4.75l-4 1.75v-6.5L4.75 6.75Z"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linejoin="round"
-              />
-            </svg>
-          </button>
-
-          <div
-            v-if="showColumns"
-            class="absolute right-0 top-[42px] z-50 w-[270px] overflow-hidden rounded-xl border border-[#d8dee8] bg-white shadow-2xl"
-            @click.stop
-            @pointerdown.stop
-          >
-            <div class="border-b border-[#edf1f5] bg-[#f8fafc] px-3 py-2">
-              <div class="flex items-center justify-between gap-2">
-                <div class="min-w-0">
-                  <p
-                    class="truncate text-[10px] font-black uppercase tracking-[0.12em] text-[#102372]"
-                  >
-                    Columnas visibles
-                  </p>
-
-                  <p class="mt-0.5 text-[10px] font-semibold text-slate-500">
-                    {{ visibleColumns.length }} de {{ configurableColumns.length }} activas
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  class="cursor-pointer rounded-md px-2 py-1 text-[10px] font-black text-[#FF6600] transition hover:bg-white hover:text-[#102372]"
-                  @click="resetColumns"
-                >
-                  Restaurar
-                </button>
-              </div>
-
-              <div class="relative mt-2">
-                <span
-                  class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
-                >
-                  <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" aria-hidden="true">
-                    <path
-                      d="m20 20-4.35-4.35M18 10.5a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                    />
-                  </svg>
-                </span>
-
-                <input
-                  v-model="columnSearch"
-                  type="text"
-                  placeholder="Buscar variable o columna..."
-                  class="h-8 w-full rounded-lg border border-[#d8dee8] bg-white pl-8 pr-7 text-[11px] font-semibold text-[#172033] outline-none placeholder:text-slate-400 focus:border-[#FF6600] focus:ring-2 focus:ring-[#FF6600]/10"
-                />
-
-                <button
-                  v-if="columnSearch"
-                  type="button"
-                  class="absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer text-[14px] leading-none text-slate-400 transition hover:text-[#FF6600]"
-                  @click="columnSearch = ''"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            <div class="max-h-[250px] overflow-auto p-2">
-              <label
-                v-for="column in filteredConfigurableColumns"
-                :key="column.key"
-                class="flex cursor-pointer items-center gap-2 rounded-lg border border-transparent px-2 py-1.5 text-[11px] font-bold text-slate-600 transition hover:border-[#FF6600]/30 hover:bg-[#fff7ed] hover:text-[#102372]"
-                :class="column.locked ? 'opacity-80' : ''"
-              >
-                <input
-                  v-model="visibleColumnKeys"
-                  type="checkbox"
-                  :value="column.key"
-                  class="h-3.5 w-3.5 cursor-pointer accent-[#FF6600]"
-                  :disabled="column.locked"
-                />
-
-                <span class="min-w-0 flex-1 truncate">
-                  {{ column.label }}
-                </span>
-
-                <span
-                  v-if="column.locked"
-                  class="shrink-0 rounded-md bg-[#eef3ff] px-1.5 py-0.5 text-[9px] font-black text-[#102372]"
-                >
-                  fija
-                </span>
-              </label>
-
-              <div v-if="!filteredConfigurableColumns.length" class="px-2 py-5 text-center">
-                <p class="text-[11px] font-black text-[#102372]">Sin columnas encontradas</p>
-
-                <p class="mt-1 text-[10px] font-semibold text-slate-500">
-                  Prueba buscando por nombre de variable.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <FleetPanelHeader
+      :active-section="localActiveSection"
+      :sections="menuSections"
+      :search="localSearch"
+      :search-placeholder="searchPlaceholder"
+      :sort-column-key="sortColumnKey"
+      :can-create-assets="canCreateAssets"
+      :show-columns="showColumns"
+      :visible-columns="visibleColumns"
+      :configurable-columns="configurableColumns"
+      :filtered-configurable-columns="filteredConfigurableColumns"
+      :visible-column-keys="visibleColumnKeys"
+      :column-search="columnSearch"
+      @set-section="setSection"
+      @search-input="handleSearchInput"
+      @clear-search="clearSearch"
+      @clear-sort="clearSort"
+      @open-add-activo="$emit('open-add-activo')"
+      @toggle-columns="toggleColumnsDropdown"
+      @reset-columns="resetColumns"
+      @update-column-search="columnSearch = $event"
+      @toggle-column-key="toggleColumnKey"
+    />
 
     <FleetTable
       v-if="localActiveSection === 'activos' && allowedSections.includes('activos')"
@@ -268,6 +35,8 @@
       :get-cell-value="getCellValue"
       @select="handleRowClick"
       @toggle-sort="handleToggleSort"
+      @resize-column="setColumnWidth"
+      @move-column="moveColumn"
       @open-context-menu="handleTableContextMenu"
     />
 
@@ -276,7 +45,7 @@
       class="min-h-0 flex-1 overflow-hidden bg-[#f8fafc]"
     >
       <ItineraryPanel
-        :activos="itineraryActivos"
+        :activos="resolvedItineraryActivos"
         class="h-full min-h-0 rounded-none border-0 shadow-none"
         @route-selected="$emit('route-selected', $event)"
         @point-selected="$emit('point-selected', $event)"
@@ -284,124 +53,15 @@
       />
     </div>
 
-    <div
+    <FleetGeofencePanel
       v-else-if="localActiveSection === 'geocercas'"
-      class="min-h-0 flex-1 overflow-auto bg-[#f8fafc] p-3"
-    >
-      <div class="flex min-h-full flex-col rounded-2xl border border-[#d8dee8] bg-white p-4">
-        <div class="mb-4 flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <p class="text-[10px] font-black uppercase tracking-[0.16em] text-[#FF6600]">
-              Control territorial
-            </p>
-
-            <h3 class="mt-1 truncate text-[14px] font-black text-[#102372]">Geocercas</h3>
-
-            <p class="mt-1 text-[11px] font-semibold leading-relaxed text-slate-500">
-              Zonas y rutas creadas en el mapa. Puedes revisarlas y eliminarlas desde este panel.
-            </p>
-          </div>
-
-          <div
-            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#102372]/10 text-[#102372]"
-          >
-            <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" aria-hidden="true">
-              <path
-                d="M12 21s7-4.6 7-11.25A7 7 0 0 0 5 9.75C5 16.4 12 21 12 21ZM12 12.25a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"
-                stroke="currentColor"
-                stroke-width="1.8"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-          </div>
-        </div>
-
-        <div
-          v-if="!geofenceItems.length"
-          class="flex min-h-[180px] flex-col items-center justify-center rounded-xl border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-4 text-center"
-        >
-          <p class="text-[12px] font-black text-[#102372]">No hay geocercas creadas</p>
-
-          <p class="mt-1 max-w-[280px] text-[11px] font-semibold leading-relaxed text-slate-500">
-            Crea una geocerca desde las herramientas del mapa para verla en esta sección.
-          </p>
-        </div>
-
-        <div
-          v-else-if="!filteredGeofenceItems.length"
-          class="flex min-h-[160px] flex-col items-center justify-center rounded-xl border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-4 text-center"
-        >
-          <p class="text-[12px] font-black text-[#102372]">Sin resultados</p>
-
-          <p class="mt-1 max-w-[280px] text-[11px] font-semibold leading-relaxed text-slate-500">
-            No encontramos geocercas con ese criterio de búsqueda.
-          </p>
-        </div>
-
-        <div v-else class="grid gap-2">
-          <article
-            v-for="geofence in filteredGeofenceItems"
-            :key="geofence.id"
-            class="group rounded-xl border bg-white p-3 shadow-sm transition hover:border-[#FF6600] hover:bg-[#fff7ed]"
-            :class="
-              normalizeId(selectedGeofenceId) === normalizeId(geofence.id)
-                ? 'border-[#FF6600] bg-[#fff7ed]'
-                : 'border-[#d8dee8]'
-            "
-          >
-            <button
-              type="button"
-              class="flex w-full cursor-pointer items-start gap-3 text-left"
-              @click="handleGeofenceSelect(geofence)"
-            >
-              <span
-                class="mt-1 h-3 w-3 shrink-0 rounded-full border border-slate-200"
-                :style="{ backgroundColor: getGeofenceColor(geofence) }"
-              ></span>
-
-              <span class="min-w-0 flex-1">
-                <span class="flex items-start justify-between gap-2">
-                  <span class="min-w-0">
-                    <span class="block truncate text-[12px] font-black text-[#172033]">
-                      {{ geofence.name }}
-                    </span>
-
-                    <span class="mt-1 block text-[10px] font-bold text-slate-500">
-                      {{ getGeofenceMeta(geofence) }}
-                    </span>
-                  </span>
-
-                  <span
-                    class="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black"
-                    :class="getGeofenceBadgeClass(geofence)"
-                  >
-                    {{ getGeofenceBadgeLabel(geofence) }}
-                  </span>
-                </span>
-              </span>
-            </button>
-
-            <div
-              class="mt-3 flex items-center justify-between gap-2 rounded-lg bg-[#f8fafc] px-3 py-2"
-            >
-              <p class="min-w-0 truncate text-[10px] font-bold text-slate-500">
-                {{ getGeofenceDescription(geofence) }}
-              </p>
-
-              <button
-                v-if="canEditGeofences"
-                type="button"
-                class="shrink-0 cursor-pointer rounded-md bg-red-50 px-2 py-1 text-[10px] font-black text-red-600 transition hover:bg-red-100"
-                @click.stop="confirmDeleteGeofence(geofence)"
-              >
-                Eliminar
-              </button>
-            </div>
-          </article>
-        </div>
-      </div>
-    </div>
+      :geofences="geofenceItems"
+      :filtered-geofences="filteredGeofenceItems"
+      :selected-geofence-id="selectedGeofenceId"
+      :can-edit-geofences="canEditGeofences"
+      @select-geofence="handleGeofenceSelect"
+      @delete-geofence="confirmDeleteGeofence"
+    />
 
     <div
       v-else-if="localActiveSection === 'sucursales' && allowedSections.includes('sucursales')"
@@ -412,13 +72,14 @@
         :companies="sucursalCompanies"
         :selected-company-id="selectedSucursalCompanyId"
         :show-company-selector="showSucursalCompanySelector"
+        :can-manage="canManageSucursales"
         @select-company="$emit('select-sucursal-company', $event)"
-        @alternar-sucursales-habilitadas="$emit('alternar-sucursales-habilitadas')"
-        @agregar-sucursal="$emit('agregar-sucursal', $event)"
+        @alternar-sucursales-habilitadas="handleAlternarSucursalesHabilitadas"
+        @agregar-sucursal="handleAgregarSucursal"
         @actualizar-nombre-sucursal="handleActualizarNombreSucursal"
-        @alternar-estado-sucursal="$emit('alternar-estado-sucursal', $event)"
-        @eliminar-sucursal="$emit('eliminar-sucursal', $event)"
-        @actualizar-sucursal-activo="$emit('actualizar-sucursal-activo', $event)"
+        @alternar-estado-sucursal="handleAlternarEstadoSucursal"
+        @eliminar-sucursal="handleEliminarSucursal"
+        @actualizar-sucursal-activo="handleActualizarSucursalActivo"
       />
     </div>
 
@@ -436,7 +97,7 @@
       <button
         type="button"
         class="w-full cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-3 py-2 text-[11px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600]"
-        @click="$emit('select-filter', 'all')"
+        @click="handleShowAllAssets"
       >
         Ver todos los activos →
       </button>
@@ -460,16 +121,11 @@ import GestionSucursalesPanel from "../sucursales/GestionSucursalesPanel.vue"
 import ItineraryPanel from "../itinerarios/ItineraryPanel.vue"
 import FleetTable from "./FleetTable.vue"
 import FleetContextMenu from "./FleetContextMenu.vue"
+import FleetGeofencePanel from "./FleetGeofencePanel.vue"
+import FleetPanelHeader from "./FleetPanelHeader.vue"
 import { useFleetColumns } from "../../../composables/activos/fleet/useFleetColumns"
 import { useFleetSorting } from "../../../composables/activos/fleet/useFleetSorting"
-import {
-  getGeofenceBadgeClass,
-  getGeofenceBadgeLabel,
-  getGeofenceColor,
-  getGeofenceDescription,
-  getGeofenceMeta,
-} from "../../../utils/geofenceUtils.js"
-import { normalizeId } from "../../../utils/idUtils.js"
+import { getGeofenceBadgeLabel, getGeofenceMeta } from "../../../utils/geofenceUtils.js"
 
 const props = defineProps({
   activos: {
@@ -477,6 +133,10 @@ const props = defineProps({
     default: () => [],
   },
   allActivos: {
+    type: Array,
+    default: () => [],
+  },
+  itineraryActivos: {
     type: Array,
     default: () => [],
   },
@@ -541,6 +201,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  canManageSucursales: {
+    type: Boolean,
+    default: false,
+  },
   columns: {
     type: Array,
     default: () => [
@@ -578,6 +242,7 @@ const emit = defineEmits([
   "alternar-estado-sucursal",
   "eliminar-sucursal",
   "actualizar-sucursal-activo",
+  "select-personal-asset-group",
 ])
 
 const showColumns = ref(false)
@@ -628,6 +293,8 @@ const {
   visibleColumns,
   firstVisibleColumnKey,
   resetColumns,
+  setColumnWidth,
+  moveColumn,
 } = useFleetColumns({
   columns: computed(() => props.columns),
   normalizeText,
@@ -667,7 +334,9 @@ const menuSections = computed(() => {
   ].filter((section) => allowedSections.has(section.key))
 })
 
-const itineraryActivos = computed(() => {
+const resolvedItineraryActivos = computed(() => {
+  if (props.itineraryActivos.length) return props.itineraryActivos
+
   return props.allActivos.length ? props.allActivos : props.activos
 })
 
@@ -750,7 +419,33 @@ const handleGeofenceSelect = (geofence) => {
 }
 
 const handleActualizarNombreSucursal = (sucursalId, nombreSucursal) => {
+  if (!props.canManageSucursales) return
   emit("actualizar-nombre-sucursal", sucursalId, nombreSucursal)
+}
+
+const handleAlternarSucursalesHabilitadas = () => {
+  if (!props.canManageSucursales) return
+  emit("alternar-sucursales-habilitadas")
+}
+
+const handleAgregarSucursal = (nombreSucursal) => {
+  if (!props.canManageSucursales) return
+  emit("agregar-sucursal", nombreSucursal)
+}
+
+const handleAlternarEstadoSucursal = (sucursalId) => {
+  if (!props.canManageSucursales) return
+  emit("alternar-estado-sucursal", sucursalId)
+}
+
+const handleEliminarSucursal = (sucursalId) => {
+  if (!props.canManageSucursales) return
+  emit("eliminar-sucursal", sucursalId)
+}
+
+const handleActualizarSucursalActivo = (payload) => {
+  if (!props.canManageSucursales) return
+  emit("actualizar-sucursal-activo", payload)
 }
 
 const closeDeviceContextMenu = () => {
@@ -779,6 +474,19 @@ const setSection = (section) => {
 const toggleColumnsDropdown = () => {
   closeDeviceContextMenu()
   showColumns.value = !showColumns.value
+}
+
+const toggleColumnKey = (columnKey) => {
+  const column = configurableColumns.value.find((item) => item.key === columnKey)
+
+  if (!column || column.locked) return
+
+  if (visibleColumnKeys.value.includes(columnKey)) {
+    visibleColumnKeys.value = visibleColumnKeys.value.filter((key) => key !== columnKey)
+    return
+  }
+
+  visibleColumnKeys.value = [...visibleColumnKeys.value, columnKey]
 }
 
 const handleRowClick = (activo) => {
@@ -831,6 +539,11 @@ const handleDeviceAction = ({ action, activo }) => {
   })
 
   closeDeviceContextMenu()
+}
+
+const handleShowAllAssets = () => {
+  emit("select-personal-asset-group", null)
+  emit("select-filter", "all")
 }
 
 watch(

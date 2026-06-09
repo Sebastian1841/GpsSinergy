@@ -9,8 +9,10 @@
       <span class="text-[10px] font-black uppercase text-slate-400">Vehículos permitidos</span>
       <select
         :value="access.scope?.type"
-        class="mt-1 h-9 w-full cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-2 text-[11px] font-black text-[#102372] outline-none transition focus:border-[#ff6600] focus:ring-2 focus:ring-[#ff6600]/10"
-        @change="$emit('update-operational-scope', access.id, $event.target.value)"
+        :disabled="!canManageUserPermissions"
+        class="mt-1 h-9 w-full rounded-lg border border-[#d8dee8] bg-white px-2 text-[11px] font-black text-[#102372] outline-none transition focus:border-[#ff6600] focus:ring-2 focus:ring-[#ff6600]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+        :class="canManageUserPermissions ? 'cursor-pointer' : 'cursor-not-allowed'"
+        @change="handleUpdateOperationalScope"
       >
         <option v-for="scope in mainScopes" :key="scope.id" :value="scope.id">
           {{ getScopeLabel(scope.id) }}
@@ -18,48 +20,29 @@
       </select>
     </label>
 
-    <UserAssetScopeSelector
-      v-if="access.scope?.type === 'selected-assets'"
-      :assets="scopeAssets"
-      :selected-ids="access.scope?.assetIds || []"
-      @toggle-asset="$emit('toggle-scope-asset', access.id, $event)"
-    />
+    <div :class="canManageUserPermissions ? '' : 'pointer-events-none select-none opacity-60'">
+      <UserAssetScopeSelector
+        v-if="access.scope?.type === 'selected-assets'"
+        :assets="scopeAssets"
+        :selected-ids="access.scope?.assetIds || []"
+        @toggle-asset="handleToggleScopeAsset"
+      />
 
-    <UserSucursalScopeSelector
-      v-if="access.scope?.type === 'sucursal'"
-      :sucursales="sucursales"
-      :assets="scopeAssets"
-      :selected-ids="access.scope?.sucursalIds || []"
-      @toggle-sucursal="$emit('toggle-scope-sucursal', access.id, $event)"
-    />
-
-    <div class="mt-3 grid gap-2">
-      <button
-        type="button"
-        class="flex items-center justify-between gap-3 rounded-lg border bg-white px-3 py-2 text-left transition"
-        :class="access.scope?.criticalAlerts ? 'border-[#102372]' : 'border-[#d8dee8]'"
-        @click="$emit('toggle-scope-option', access.id, 'critical-alerts')"
-      >
-        <span class="text-[11px] font-black text-[#172033]">Puede ver alertas críticas</span>
-        <span
-          class="h-2.5 w-2.5 rounded-full"
-          :class="access.scope?.criticalAlerts ? 'bg-[#ff6600]' : 'bg-slate-300'"
-        ></span>
-      </button>
-
-      <button
-        type="button"
-        class="flex items-center justify-between gap-3 rounded-lg border bg-white px-3 py-2 text-left transition"
-        :class="access.scope?.reports ? 'border-[#102372]' : 'border-[#d8dee8]'"
-        @click="$emit('toggle-scope-option', access.id, 'reports')"
-      >
-        <span class="text-[11px] font-black text-[#172033]">Puede ver reportes</span>
-        <span
-          class="h-2.5 w-2.5 rounded-full"
-          :class="access.scope?.reports ? 'bg-[#ff6600]' : 'bg-slate-300'"
-        ></span>
-      </button>
+      <UserSucursalScopeSelector
+        v-if="access.scope?.type === 'sucursal'"
+        :sucursales="sucursales"
+        :assets="scopeAssets"
+        :selected-ids="access.scope?.sucursalIds || []"
+        @toggle-sucursal="handleToggleScopeSucursal"
+      />
     </div>
+
+    <p
+      v-if="!canManageUserPermissions"
+      class="mt-3 rounded-lg border border-[#d8dee8] bg-white px-3 py-2 text-[10px] font-black text-slate-500"
+    >
+      Alcance en modo solo lectura
+    </p>
   </section>
 </template>
 
@@ -86,11 +69,14 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  canManageUserPermissions: {
+    type: Boolean,
+    default: false,
+  },
 })
 
-defineEmits([
+const emit = defineEmits([
   "update-operational-scope",
-  "toggle-scope-option",
   "toggle-scope-asset",
   "toggle-scope-sucursal",
 ])
@@ -115,5 +101,23 @@ const getScopeLabel = (scopeId) => {
   }
 
   return labels[scopeId] || "Sin definir"
+}
+
+const handleUpdateOperationalScope = (event) => {
+  if (!props.canManageUserPermissions) return
+
+  emit("update-operational-scope", props.access.id, event.target.value)
+}
+
+const handleToggleScopeAsset = (assetId) => {
+  if (!props.canManageUserPermissions) return
+
+  emit("toggle-scope-asset", props.access.id, assetId)
+}
+
+const handleToggleScopeSucursal = (sucursalId) => {
+  if (!props.canManageUserPermissions) return
+
+  emit("toggle-scope-sucursal", props.access.id, sucursalId)
 }
 </script>

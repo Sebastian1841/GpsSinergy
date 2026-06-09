@@ -16,6 +16,7 @@
           :class="company.sucursalesHabilitadas ? 'bg-[#FF6600]' : 'bg-white/25'"
           :aria-checked="company.sucursalesHabilitadas"
           aria-label="Activar sucursales"
+          :disabled="!canManage"
           @click="$emit('alternar-sucursales-habilitadas')"
         >
           <span
@@ -126,6 +127,7 @@
               type="text"
               class="h-9 min-w-0 rounded-lg border border-[#d9d9d9] bg-[#eef2f7] px-2 text-[11px] font-semibold text-[#102372] outline-none transition focus:border-[#FF6600] focus:bg-white focus:ring-2 focus:ring-[#FF6600]/10"
               aria-label="Nombre de sucursal"
+              :disabled="!canManage"
               @input="$emit('actualizar-nombre-sucursal', sucursal.id, $event.target.value)"
             />
 
@@ -151,6 +153,7 @@
                   : 'border-[#d9d9d9] bg-white text-[#102372]'
               "
               :aria-checked="sucursal.active"
+              :disabled="!canManage"
               @click="$emit('alternar-estado-sucursal', sucursal.id)"
             >
               <span>{{ sucursal.active ? "Activa" : "Inactiva" }}</span>
@@ -164,6 +167,7 @@
               type="button"
               class="h-9 w-9 rounded-lg border border-[#d9d9d9] bg-white text-[#102372] transition hover:border-[#FF6600] hover:bg-[#fff3eb] hover:text-[#FF6600]"
               aria-label="Quitar sucursal"
+              :disabled="!canManage"
               @click="$emit('eliminar-sucursal', sucursal.id)"
             >
               <svg viewBox="0 0 24 24" class="mx-auto h-4 w-4" fill="none" aria-hidden="true">
@@ -191,12 +195,13 @@
             type="text"
             placeholder="Nombre de nueva sucursal"
             class="h-9 min-w-0 rounded-lg border border-[#d9d9d9] bg-white px-2 text-[11px] font-semibold text-[#102372] outline-none transition placeholder:text-[#102372]/40 focus:border-[#FF6600] focus:ring-2 focus:ring-[#FF6600]/10"
+            :disabled="!canManage"
           />
 
           <button
             type="submit"
             class="h-9 rounded-lg bg-[#FF6600] px-3 text-[10px] font-black text-white transition hover:bg-[#e65c00] disabled:cursor-not-allowed disabled:opacity-40"
-            :disabled="!nombreSucursal.trim()"
+            :disabled="!canManage || !nombreSucursal.trim()"
           >
             Agregar
           </button>
@@ -301,6 +306,7 @@
               :value="asset.sucursalId || ''"
               class="h-8 min-w-0 cursor-pointer rounded-lg border border-[#d9d9d9] bg-white px-2 text-[10px] font-black text-[#102372] outline-none focus:border-[#FF6600]"
               aria-label="Sucursal del activo"
+              :disabled="!canManage"
               @change="handleCambioSucursalActivo(asset.id, $event.target.value)"
             >
               <option value="">Sin sucursal</option>
@@ -343,6 +349,10 @@ const props = defineProps({
   showCompanySelector: {
     type: Boolean,
     default: false,
+  },
+  canManage: {
+    type: Boolean,
+    default: true,
   },
 })
 
@@ -452,6 +462,8 @@ const toggleAssetManager = () => {
 }
 
 const handleCambioSucursalActivo = (assetId, sucursalId) => {
+  if (!props.canManage) return
+
   emit("actualizar-sucursal-activo", {
     assetId,
     sucursalId: sucursalId || null,
@@ -459,6 +471,7 @@ const handleCambioSucursalActivo = (assetId, sucursalId) => {
 }
 
 const handleAgregarSucursal = () => {
+  if (!props.canManage) return
   if (!nombreSucursal.value.trim()) return
 
   emit("agregar-sucursal", nombreSucursal.value)
