@@ -125,25 +125,19 @@
 </template>
 
 <script setup>
-import {
-  computed,
-  defineAsyncComponent,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  watch,
-} from "vue"
+import { computed, defineAsyncComponent, ref, watch } from "vue"
 import "leaflet/dist/leaflet.css"
 import "../../../assets/styles/activos-map.css"
 
 import MapFloatingTools from "./MapFloatingTools.vue"
 import TopStatsBar from "./TopStatsBar.vue"
 import GeofenceEditorPanel from "../geocercas/GeofenceEditorPanel.vue"
-import { buildMockGeofenceHistory } from "../../../data/mockGeofenceHistoryData.js"
 import { useActivosMap } from "../../../composables/activos/map/useActivosMap.js"
-import { DEFAULT_GEOFENCE_COLOR, normalizeGeofenceColor } from "../../../utils/geofenceUtils.js"
-import { normalizeId } from "../../../utils/idUtils.js"
+import {
+  useMapPanelGeofenceActions,
+  useMapPanelGeofenceState,
+} from "../../../composables/activos/map/useMapPanelGeofences.js"
+import { useMapPanelFullscreen } from "../../../composables/activos/map/useMapPanelFullscreen.js"
 
 const GeofenceSelectorModal = defineAsyncComponent(
   () => import("../geocercas/GeofenceSelectorModal.vue"),
@@ -215,23 +209,32 @@ const emit = defineEmits([
 
 const panelRef = ref(null)
 const mapRef = ref(null)
-const showGeofenceModal = ref(false)
-const showGeofenceHistoryModal = ref(false)
-const activeGeofenceId = ref(null)
-const selectedHistoryGeofence = ref(null)
-const selectedHistoryEvents = ref([])
-const showGeofences = ref(true)
 const showKpis = ref(true)
 const mapType = ref("standard")
-const currentDraftType = ref("circle")
-const isFullscreen = ref(false)
 
 let pendingSidebarBatch = null
 
-const draftGeofenceForm = ref({
-  name: "",
-  color: DEFAULT_GEOFENCE_COLOR,
-})
+const { isFullscreen, toggleFullscreen } = useMapPanelFullscreen(panelRef)
+
+const geofencePanel = useMapPanelGeofenceState({ props, emit })
+
+const {
+  showGeofenceModal,
+  showGeofenceHistoryModal,
+  activeGeofenceId,
+  selectedHistoryGeofence,
+  selectedHistoryEvents,
+  showGeofences,
+  draftGeofenceForm,
+  geofenceItems,
+  visibleGeofences,
+  draftGeofencePreviewName,
+  draftGeofenceOptions,
+  handleDraftGeofenceField,
+  openEditGeofenceModal,
+  openGeofenceHistorySelector,
+  openGeofenceHistory,
+} = geofencePanel
 
 const mapTypeOptions = [
   {
@@ -261,164 +264,12 @@ const mapTypeOptions = [
   },
 ]
 
-const refreshFullscreenLayout = async () => {
-  await nextTick()
-
-  requestAnimationFrame(() => {
-    window.dispatchEvent(new Event("resize"))
-
-    requestAnimationFrame(() => {
-      window.dispatchEvent(new Event("resize"))
-    })
-  })
-
-  setTimeout(() => {
-    window.dispatchEvent(new Event("resize"))
-  }, 220)
-
-  setTimeout(() => {
-    window.dispatchEvent(new Event("resize"))
-  }, 420)
-}
-
-const requestNativeFullscreen = async () => {
-  if (!panelRef.value) return
-
-  if (panelRef.value.requestFullscreen) {
-    await panelRef.value.requestFullscreen({
-      navigationUI: "hide",
-    })
-    return
-  }
-
-  if (panelRef.value.webkitRequestFullscreen) {
-    panelRef.value.webkitRequestFullscreen()
-  }
-}
-
-const exitNativeFullscreen = async () => {
-  if (document.fullscreenElement && document.exitFullscreen) {
-    await document.exitFullscreen()
-    return
-  }
-
-  if (document.webkitFullscreenElement && document.webkitExitFullscreen) {
-    document.webkitExitFullscreen()
-  }
-}
-
-const enterFullscreen = async () => {
-  isFullscreen.value = true
-
-  try {
-    await requestNativeFullscreen()
-  } catch {
-    // Si el navegador bloquea fullscreen nativo, queda el modo visual fixed.
-  }
-
-  await refreshFullscreenLayout()
-}
-
-const exitFullscreen = async () => {
-  try {
-    await exitNativeFullscreen()
-  } catch {
-    // Si el navegador ya salió de fullscreen, solo se sincroniza el estado visual.
-  }
-
-  isFullscreen.value = false
-
-  await refreshFullscreenLayout()
-}
-
-const toggleFullscreen = async () => {
-  if (isFullscreen.value || document.fullscreenElement === panelRef.value) {
-    await exitFullscreen()
-    return
-  }
-
-  await enterFullscreen()
-}
-
-const handleFullscreenChange = async () => {
-  const panelIsFullscreen =
-    document.fullscreenElement === panelRef.value ||
-    document.webkitFullscreenElement === panelRef.value
-
-  isFullscreen.value = panelIsFullscreen
-
-  await refreshFullscreenLayout()
-}
-
-const handleFullscreenKeydown = async (event) => {
-  if (event.key !== "Escape") return
-  if (!isFullscreen.value) return
-
-  await exitFullscreen()
-}
-
 const currentMapTypeOption = computed(() => {
   return mapTypeOptions.find((option) => option.value === mapType.value) || mapTypeOptions[0]
 })
 
 const mapStatsActivos = computed(() => {
   return props.allActivos.length ? props.allActivos : props.activos
-})
-
-const geofenceItems = computed(() => {
-  return props.canViewGeofences ? props.geofences || [] : []
-})
-
-const visibleGeofences = computed(() => {
-  if (!props.canViewGeofences) return []
-
-  const allGeofences = props.geofences || []
-
-  if (showGeofences.value) {
-    return allGeofences
-  }
-
-  if (activeGeofenceId.value) {
-    return allGeofences.filter((geofence) => {
-      return normalizeId(geofence.id) === normalizeId(activeGeofenceId.value)
-    })
-  }
-
-  return []
-})
-
-const getGeofenceById = (geofenceId) => {
-  return geofenceItems.value.find((geofence) => {
-    return normalizeId(geofence.id) === normalizeId(geofenceId)
-  })
-}
-
-const getNextGeofenceName = (type) => {
-  const nextNumber = (props.geofences || []).length + 1
-
-  if (type === "route") return `Ruta ${nextNumber}`
-
-  return `Geocerca ${nextNumber}`
-}
-
-const resetDraftGeofenceForm = (type) => {
-  currentDraftType.value = type
-
-  draftGeofenceForm.value = {
-    name: getNextGeofenceName(type),
-    color: DEFAULT_GEOFENCE_COLOR,
-  }
-}
-
-const draftGeofencePreviewName = computed(() => {
-  return draftGeofenceForm.value.name.trim() || getNextGeofenceName(currentDraftType.value)
-})
-
-const draftGeofenceOptions = computed(() => {
-  return {
-    name: draftGeofencePreviewName.value,
-    color: normalizeGeofenceColor(draftGeofenceForm.value.color),
-  }
 })
 
 const mapProps = {
@@ -487,59 +338,40 @@ const {
   mapRef,
 })
 
-const editingColor = computed(() => {
-  return normalizeGeofenceColor(editingDraft.value?.color)
+const mapController = {
+  drawMode,
+  editingDraft,
+  editAddPoint,
+  startCircleDraw,
+  startPolygonDraw,
+  startRouteDraw,
+  cancelAll,
+  startEditGeofence,
+  stopEditing,
+  deleteGeofence,
+  updateEditingGeofenceMeta,
+}
+
+const {
+  editingColor,
+  editingPreviewName,
+  canRemoveLastEditPoint,
+  handleEditingGeofenceMeta,
+  handleUpdateEditAddPoint,
+  handleToggleGeofenceVisibility,
+  handleCreateCircle,
+  handleCreatePolygon,
+  handleCreateRoute,
+  selectGeofenceToEdit,
+  handleExternalGeofenceSelection,
+  handleStopEditing,
+  handleCancel,
+  handleDeleteGeofence,
+} = useMapPanelGeofenceActions({
+  props,
+  state: geofencePanel,
+  mapController,
 })
-
-const editingPreviewName = computed(() => {
-  return editingDraft.value?.name || "Geocerca sin nombre"
-})
-
-const canRemoveLastEditPoint = computed(() => {
-  if (editingDraft.value?.type === "polygon") {
-    return editingDraft.value.coordinates.length > 3
-  }
-
-  if (editingDraft.value?.type === "route") {
-    return editingDraft.value.coordinates.length > 2
-  }
-
-  return false
-})
-
-const handleDraftGeofenceField = (field, value) => {
-  draftGeofenceForm.value = {
-    ...draftGeofenceForm.value,
-    [field]: value,
-  }
-}
-
-const handleEditingGeofenceMeta = (field, value) => {
-  if (!editingDraft.value) return
-  if (typeof updateEditingGeofenceMeta !== "function") return
-
-  updateEditingGeofenceMeta({
-    [field]: value,
-  })
-}
-
-const handleUpdateEditAddPoint = (value) => {
-  editAddPoint.value = value
-}
-
-const resetHistoryState = () => {
-  showGeofenceHistoryModal.value = false
-  selectedHistoryGeofence.value = null
-  selectedHistoryEvents.value = []
-}
-
-const clearActiveGeofenceSelection = (notifyParent = true) => {
-  activeGeofenceId.value = null
-
-  if (notifyParent) {
-    emit("clear-geofence-selection")
-  }
-}
 
 const handleSelectFilter = (filter) => {
   emit("select-filter", filter)
@@ -555,152 +387,6 @@ const handleChangeMapType = (type) => {
   if (!exists) return
 
   mapType.value = type
-}
-
-const handleToggleGeofenceVisibility = () => {
-  const nextValue = !showGeofences.value
-
-  if (!nextValue) {
-    if (editingDraft.value?.id) {
-      activeGeofenceId.value = editingDraft.value.id
-    } else {
-      clearActiveGeofenceSelection()
-    }
-  }
-
-  showGeofences.value = nextValue
-}
-
-const handleCreateCircle = () => {
-  if (!props.canEditGeofences) return
-
-  showGeofences.value = true
-  showGeofenceModal.value = false
-  clearActiveGeofenceSelection()
-  resetHistoryState()
-  resetDraftGeofenceForm("circle")
-  startCircleDraw()
-}
-
-const handleCreatePolygon = () => {
-  if (!props.canEditGeofences) return
-
-  showGeofences.value = true
-  showGeofenceModal.value = false
-  clearActiveGeofenceSelection()
-  resetHistoryState()
-  resetDraftGeofenceForm("polygon")
-  startPolygonDraw()
-}
-
-const handleCreateRoute = () => {
-  if (!props.canEditGeofences) return
-
-  showGeofences.value = true
-  showGeofenceModal.value = false
-  clearActiveGeofenceSelection()
-  resetHistoryState()
-  resetDraftGeofenceForm("route")
-  startRouteDraw()
-}
-
-const openEditGeofenceModal = () => {
-  if (!props.canEditGeofences) return
-
-  resetHistoryState()
-  showGeofenceModal.value = true
-}
-
-const openGeofenceHistorySelector = () => {
-  if (!props.canViewGeofences) return
-
-  resetHistoryState()
-  showGeofenceModal.value = false
-
-  if (!geofenceItems.value.length) {
-    selectedHistoryGeofence.value = null
-    selectedHistoryEvents.value = []
-    showGeofenceHistoryModal.value = true
-    return
-  }
-
-  showGeofenceModal.value = true
-}
-
-const openGeofenceHistory = (geofence) => {
-  if (!geofence) return
-
-  selectedHistoryGeofence.value = geofence
-  selectedHistoryEvents.value = buildMockGeofenceHistory(geofence, props.allActivos)
-
-  showGeofenceModal.value = false
-  showGeofenceHistoryModal.value = true
-}
-
-const selectGeofenceToEdit = (geofenceId) => {
-  if (!props.canEditGeofences) return
-
-  resetHistoryState()
-  activeGeofenceId.value = geofenceId
-  showGeofenceModal.value = false
-  showGeofences.value = true
-  startEditGeofence(geofenceId)
-}
-
-const handleExternalGeofenceSelection = (geofenceId) => {
-  if (!props.canEditGeofences) return
-
-  if (!geofenceId) {
-    clearActiveGeofenceSelection(false)
-    return
-  }
-
-  const geofence = getGeofenceById(geofenceId)
-
-  if (!geofence) return
-
-  if (
-    normalizeId(activeGeofenceId.value) === normalizeId(geofence.id) &&
-    normalizeId(editingDraft.value?.id) === normalizeId(geofence.id)
-  ) {
-    return
-  }
-
-  if (drawMode.value) {
-    cancelAll()
-  }
-
-  resetHistoryState()
-  activeGeofenceId.value = geofence.id
-  showGeofenceModal.value = false
-  showGeofences.value = true
-
-  startEditGeofence(geofence.id)
-}
-
-const handleStopEditing = () => {
-  clearActiveGeofenceSelection()
-  stopEditing()
-}
-
-const handleCancel = () => {
-  clearActiveGeofenceSelection()
-  resetHistoryState()
-  cancelAll()
-}
-
-const handleDeleteGeofence = (geofenceId) => {
-  if (!props.canEditGeofences) return
-
-  if (normalizeId(activeGeofenceId.value) === normalizeId(geofenceId)) {
-    clearActiveGeofenceSelection()
-  }
-
-  if (normalizeId(selectedHistoryGeofence.value?.id) === normalizeId(geofenceId)) {
-    resetHistoryState()
-  }
-
-  deleteGeofence(geofenceId)
 }
 
 const handleTelemetryBatch = (batch = []) => {
@@ -740,37 +426,4 @@ watch(
     handleExternalGeofenceSelection(geofenceId)
   },
 )
-
-watch(
-  () => showGeofenceHistoryModal.value,
-  (isOpen) => {
-    if (isOpen) return
-
-    selectedHistoryGeofence.value = null
-    selectedHistoryEvents.value = []
-  },
-)
-
-onMounted(() => {
-  showGeofenceModal.value = false
-  resetHistoryState()
-
-  window.addEventListener("keydown", handleFullscreenKeydown)
-  document.addEventListener("fullscreenchange", handleFullscreenChange)
-  document.addEventListener("webkitfullscreenchange", handleFullscreenChange)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener("keydown", handleFullscreenKeydown)
-  document.removeEventListener("fullscreenchange", handleFullscreenChange)
-  document.removeEventListener("webkitfullscreenchange", handleFullscreenChange)
-
-  if (document.fullscreenElement === panelRef.value) {
-    document.exitFullscreen()
-  }
-
-  if (document.webkitFullscreenElement === panelRef.value && document.webkitExitFullscreen) {
-    document.webkitExitFullscreen()
-  }
-})
 </script>

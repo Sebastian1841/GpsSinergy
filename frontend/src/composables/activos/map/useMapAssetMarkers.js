@@ -2,12 +2,21 @@ import { computed } from "vue"
 
 import { normalizeSignatureValue } from "../../../utils/mapSignatureUtils.js"
 import { endDevMeasure, startDevMeasure } from "../../../utils/performanceUtils.js"
-import { formatTelemetryTime } from "../../../utils/telemetryUtils.js"
 import {
   createAssetMarkerClusterController,
   shouldClusterAssetMarkers,
 } from "./assetMarkers/assetMarkerClusters.js"
 import { createClusterIcon, createMarkerIcon } from "./assetMarkers/assetMarkerIcons.js"
+import {
+  getTelemetryUpdateMarkerId,
+  mergeTelemetryUpdateIntoActivo,
+  normalizeTelemetryBatchPayload,
+} from "./assetMarkers/assetMarkerTelemetry.js"
+import {
+  cancelAssetMarkerFrame,
+  createAssetMarkerVisibilityController,
+  requestAssetMarkerFrame,
+} from "./assetMarkers/assetMarkerVisibility.js"
 
 const NORMAL_MARKER_RADIUS = 6
 const NORMAL_MARKER_SELECTED_RADIUS = 8
@@ -39,35 +48,6 @@ const defaultMarkerStyle = {
   color: "#102372",
 }
 
-const isValidNumber = (value) => {
-  return Number.isFinite(Number(value))
-}
-
-const formatTelemetrySpeed = (value) => {
-  if (!isValidNumber(value)) return null
-
-  return `${Number(value).toFixed(1)} km/h`
-}
-
-const requestClusterFrame = (callback) => {
-  if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
-    return window.requestAnimationFrame(callback)
-  }
-
-  return setTimeout(callback, 16)
-}
-
-const cancelClusterFrame = (frameId) => {
-  if (frameId === null || frameId === undefined) return
-
-  if (typeof window !== "undefined" && typeof window.cancelAnimationFrame === "function") {
-    window.cancelAnimationFrame(frameId)
-    return
-  }
-
-  clearTimeout(frameId)
-}
-
 export function createAssetMarkerController({
   L,
   props,
@@ -84,7 +64,6 @@ export function createAssetMarkerController({
   const latestActivosById = new Map()
   const pendingTelemetryUpdatesById = new Map()
 
-  let visibleActivoIds = new Set()
   let clusterRefreshFrame = null
   let pendingTelemetryFrame = null
 
@@ -106,56 +85,6 @@ export function createAssetMarkerController({
 
   const getAllLatestActivos = () => {
     return Array.from(latestActivosById.values())
-  }
-
-  const getUpdateMarkerId = (update = {}) => {
-    return normalizeId(update?.id || update?.activo?.id || update?.assetId)
-  }
-
-  const getChangedIdsFromUpdates = (updates = []) => {
-    return [
-      ...new Set(
-        updates
-          .map((update) => {
-            return getUpdateMarkerId(update)
-          })
-          .filter(Boolean),
-      ),
-    ]
-  }
-
-  const normalizeTelemetryBatchPayload = (payload = []) => {
-    if (Array.isArray(payload)) {
-      return {
-        updates: payload,
-        changedIds: getChangedIdsFromUpdates(payload),
-      }
-    }
-
-    const updates = Array.isArray(payload?.updates)
-      ? payload.updates
-      : Array.isArray(payload?.batch)
-        ? payload.batch
-        : Array.isArray(payload?.appliedUpdates)
-          ? payload.appliedUpdates
-          : []
-
-    const changedIds = Array.isArray(payload?.changedIds)
-      ? [
-          ...new Set(
-            payload.changedIds
-              .map((id) => {
-                return normalizeId(id)
-              })
-              .filter(Boolean),
-          ),
-        ]
-      : getChangedIdsFromUpdates(updates)
-
-    return {
-      updates,
-      changedIds,
-    }
   }
 
   const isActivoSelected = (activo) => {
@@ -213,17 +142,6 @@ export function createAssetMarkerController({
     return [activo.id, activo.vehiculo, activo.patente, activo.name, "selected"]
       .map(normalizeSignatureValue)
       .join(":")
-  }
-
-  const isActivoInsideViewport = (activoLatLng) => {
-    const map = getMap()
-
-    if (!map || !activoLatLng) return true
-
-    const bounds = map.getBounds().pad(0.25)
-    const latLng = L.latLng(activoLatLng[0], activoLatLng[1])
-
-    return bounds.contains(latLng)
   }
 
   const getActivoTooltipLabel = (activo) => {
@@ -317,6 +235,18 @@ export function createAssetMarkerController({
     cachedMarker.isVisible = false
   }
 
+  const { isActivoInsideViewport, getVisibleActivos, hideMarkersOutsideActivos } =
+    createAssetMarkerVisibilityController({
+      L,
+      getMap,
+      getActivoLatLng,
+      normalizeId,
+      latestActivosById,
+      markerCache,
+      isActivoSelected,
+      hideCachedMarker,
+    })
+
   const replaceCachedMarker = ({ markerId, cachedMarker, activo, activoLatLng }) => {
     const wasVisible = cachedMarker.isVisible
 
@@ -340,7 +270,7 @@ export function createAssetMarkerController({
   const cancelClusterRefresh = () => {
     if (clusterRefreshFrame === null || clusterRefreshFrame === undefined) return
 
-    cancelClusterFrame(clusterRefreshFrame)
+    cancelAssetMarkerFrame(clusterRefreshFrame)
     clusterRefreshFrame = null
   }
 
@@ -349,7 +279,7 @@ export function createAssetMarkerController({
 
     if (pendingTelemetryFrame === null || pendingTelemetryFrame === undefined) return
 
-    cancelClusterFrame(pendingTelemetryFrame)
+    cancelAssetMarkerFrame(pendingTelemetryFrame)
     pendingTelemetryFrame = null
   }
 
@@ -359,8 +289,6 @@ export function createAssetMarkerController({
 
     pendingTelemetryUpdatesById.delete(markerId)
     movementTrails.removeMovementTrail(markerId)
-    visibleActivoIds.delete(markerId)
-
     if (!cachedMarker) {
       latestActivosById.delete(markerId)
       return
@@ -477,29 +405,6 @@ export function createAssetMarkerController({
     return nextCachedMarker.marker
   }
 
-  const getVisibleActivos = () => {
-    return Array.from(latestActivosById.values()).filter((activo) => {
-      const activoLatLng = getActivoLatLng(activo)
-
-      if (!activoLatLng) return false
-      if (isActivoSelected(activo)) return true
-
-      return isActivoInsideViewport(activoLatLng)
-    })
-  }
-
-  const hideMarkersOutsideActivos = (activos = []) => {
-    const visibleMarkerIds = new Set(
-      activos.map((activo) => normalizeId(activo?.id)).filter((markerId) => Boolean(markerId)),
-    )
-
-    markerCache.forEach((_cachedMarker, markerId) => {
-      if (visibleMarkerIds.has(markerId)) return
-
-      hideCachedMarker(markerId)
-    })
-  }
-
   const markerClusters = createAssetMarkerClusterController({
     L,
     getMap,
@@ -524,14 +429,13 @@ export function createAssetMarkerController({
 
     markerCache.clear()
     latestActivosById.clear()
-    visibleActivoIds.clear()
     movementTrails.clearMovementTrails()
   }
 
   const scheduleClusterRefresh = () => {
     if (clusterRefreshFrame !== null && clusterRefreshFrame !== undefined) return
 
-    clusterRefreshFrame = requestClusterFrame(() => {
+    clusterRefreshFrame = requestAssetMarkerFrame(() => {
       clusterRefreshFrame = null
       markerClusters.renderMarkerClusters(getVisibleActivos())
     })
@@ -595,50 +499,6 @@ export function createAssetMarkerController({
     return upsertIndividualMarker(activo, {
       trackTrail: false,
     })
-  }
-
-  const mergeTelemetryUpdateIntoActivo = (activo = {}, update = {}) => {
-    const sourceUpdate = update?.activo
-      ? {
-          ...update.activo,
-          id: update.activo.id ?? update.id,
-        }
-      : update
-
-    const timestamp =
-      sourceUpdate.timestamp ||
-      sourceUpdate.updatedAt ||
-      sourceUpdate.updated_at ||
-      sourceUpdate.lastReport ||
-      sourceUpdate.lastTelemetryAt ||
-      activo.timestamp ||
-      activo.lastTelemetryAt
-
-    const speedValue = sourceUpdate.velocidad ?? sourceUpdate.velocidad_kmh ?? sourceUpdate.speed
-    const speedLabel = formatTelemetrySpeed(speedValue)
-    const timeLabel = formatTelemetryTime(timestamp, {
-      fallback: null,
-    })
-
-    return {
-      ...activo,
-      ...sourceUpdate,
-
-      id: activo.id ?? sourceUpdate.id,
-
-      lat: sourceUpdate.lat ?? activo.lat,
-      lng: sourceUpdate.lng ?? activo.lng,
-
-      estado: sourceUpdate.estado || sourceUpdate.status || activo.estado,
-
-      speed: isValidNumber(speedValue) ? Number(speedValue) : activo.speed,
-      velocidad: speedLabel || sourceUpdate.velocidad || activo.velocidad,
-      velocidad_kmh: isValidNumber(speedValue) ? Number(speedValue) : activo.velocidad_kmh,
-
-      timestamp: timestamp || activo.timestamp,
-      lastTelemetryAt: timestamp || activo.lastTelemetryAt,
-      datosUlt: timeLabel || sourceUpdate.datosUlt || activo.datosUlt,
-    }
   }
 
   const getActivoFallbackById = (markerId) => {
@@ -705,14 +565,14 @@ export function createAssetMarkerController({
   const scheduleTelemetryFlush = () => {
     if (pendingTelemetryFrame !== null && pendingTelemetryFrame !== undefined) return
 
-    pendingTelemetryFrame = requestClusterFrame(flushPendingTelemetryUpdates)
+    pendingTelemetryFrame = requestAssetMarkerFrame(flushPendingTelemetryUpdates)
   }
 
   const applyActivoTelemetryBatch = (payload = []) => {
     const measure = startDevMeasure(APPLY_ACTIVO_TELEMETRY_BATCH_MEASURE)
 
     try {
-      const { updates, changedIds } = normalizeTelemetryBatchPayload(payload)
+      const { updates, changedIds } = normalizeTelemetryBatchPayload(payload, normalizeId)
 
       if (!updates.length && !changedIds.length) return []
 
@@ -725,7 +585,7 @@ export function createAssetMarkerController({
       })
 
       updates.forEach((update) => {
-        const markerId = getUpdateMarkerId(update)
+        const markerId = getTelemetryUpdateMarkerId(update, normalizeId)
 
         if (!markerId) return
 
@@ -754,7 +614,6 @@ export function createAssetMarkerController({
       const bounds = []
       const nextMarkerIds = new Set()
       const nextVisibleActivos = []
-      const nextVisibleActivoIds = new Set()
 
       ;(activos || []).forEach((activo) => {
         const markerId = normalizeId(activo?.id)
@@ -780,10 +639,7 @@ export function createAssetMarkerController({
         }
 
         nextVisibleActivos.push(activo)
-        nextVisibleActivoIds.add(markerId)
       })
-
-      visibleActivoIds = nextVisibleActivoIds
 
       const staleMarkerIds = []
 

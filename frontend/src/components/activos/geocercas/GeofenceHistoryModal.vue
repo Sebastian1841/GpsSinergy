@@ -349,11 +349,11 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, watch } from "vue"
 
+import { useGeofenceHistoryRows } from "../../../composables/activos/geocercas/useGeofenceHistoryRows.js"
 import { useFloatingModal } from "../../../composables/ui/useFloatingModal.js"
-
-const DEFAULT_DATE_PRESET = "all"
+import { getGeofenceHistoryEventClass } from "../../../utils/activos/geofenceHistoryUtils.js"
 
 const props = defineProps({
   modelValue: {
@@ -389,20 +389,28 @@ const {
   margin: 12,
 })
 
-const searchTerm = ref("")
-const datePreset = ref(DEFAULT_DATE_PRESET)
-const dateFrom = ref("")
-const dateTo = ref("")
-
-const sortKey = ref("date")
-const sortDirection = ref("desc")
-
-const currentPage = ref(1)
-const pageSize = ref(50)
-const pageSizeOptions = [25, 50, 100, 200]
-
-const safeEvents = computed(() => {
-  return Array.isArray(props.events) ? props.events : []
+const {
+  searchTerm,
+  datePreset,
+  dateFrom,
+  dateTo,
+  currentPage,
+  pageSize,
+  pageSizeOptions,
+  normalizedRows,
+  metrics,
+  hasActiveFilters,
+  totalItems,
+  totalPages,
+  paginationStart,
+  paginationEnd,
+  paginatedRows,
+  toggleSort,
+  getSortIcon,
+  resetFiltersToDefault,
+  clearFilters,
+} = useGeofenceHistoryRows({
+  events: computed(() => props.events),
 })
 
 const hasGeofence = computed(() => {
@@ -418,366 +426,7 @@ const modalDescription = computed(() => {
     return "Consulta los movimientos registrados dentro de la zona seleccionada."
   }
 
-  return "El historial puede abrirse aunque todavía no exista una geocerca seleccionada."
-})
-
-const normalizeText = (value) => {
-  return String(value ?? "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-}
-
-const getEventLabel = (type) => {
-  const labels = {
-    entry: "Entrada",
-    exit: "Salida",
-    pass: "Paso",
-    deviation: "Desvío",
-  }
-
-  return labels[type] || "Evento"
-}
-
-const parseLocalDateInput = (value, endOfDay = false) => {
-  if (!value) return null
-
-  const date = new Date(`${value}T00:00:00`)
-
-  if (Number.isNaN(date.getTime())) return null
-
-  if (endOfDay) {
-    date.setHours(23, 59, 59, 999)
-  }
-
-  return date.getTime()
-}
-
-const parseEventDate = (value) => {
-  if (!value) return null
-
-  const direct = new Date(value)
-
-  if (!Number.isNaN(direct.getTime())) {
-    return direct.getTime()
-  }
-
-  const normalized = String(value).trim()
-  const match = normalized.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?/)
-
-  if (!match) return null
-
-  const [, day, month, year, hour = "0", minute = "0"] = match
-  const fullYear = year.length === 2 ? `20${year}` : year
-
-  const parsed = new Date(
-    Number(fullYear),
-    Number(month) - 1,
-    Number(day),
-    Number(hour),
-    Number(minute),
-  )
-
-  if (Number.isNaN(parsed.getTime())) return null
-
-  return parsed.getTime()
-}
-
-const formatEventDate = (rawDate, time) => {
-  if (!rawDate) return "Sin fecha"
-  if (!time) return rawDate
-
-  return new Intl.DateTimeFormat("es-CL", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(time))
-}
-
-const getEventDateValue = (event) => {
-  return event.date || event.timestamp || event.createdAt || event.created_at || null
-}
-
-const normalizedRows = computed(() => {
-  return safeEvents.value.map((event, index) => {
-    const rawDate = getEventDateValue(event)
-    const time = parseEventDate(rawDate)
-    const eventLabel = getEventLabel(event.eventType)
-    const displayDate = formatEventDate(rawDate, time)
-
-    const searchText = normalizeText(
-      [
-        event.patent,
-        event.vehicle,
-        event.driver,
-        event.eventLabel,
-        eventLabel,
-        displayDate,
-        event.speed,
-        event.duration,
-      ].join(" "),
-    )
-
-    return {
-      key: event.id || `${event.patent || event.vehicle || "event"}-${rawDate || index}`,
-      index,
-      event,
-      eventLabel,
-      displayDate,
-      searchText,
-      time,
-    }
-  })
-})
-
-const activeDateRange = computed(() => {
-  const now = new Date()
-
-  if (datePreset.value === "all") {
-    return {
-      start: null,
-      end: null,
-    }
-  }
-
-  const end = new Date(now)
-  end.setHours(23, 59, 59, 999)
-
-  const start = new Date(now)
-  start.setHours(0, 0, 0, 0)
-
-  if (datePreset.value === "today") {
-    return {
-      start: start.getTime(),
-      end: end.getTime(),
-    }
-  }
-
-  if (datePreset.value === "7d") {
-    start.setDate(start.getDate() - 6)
-
-    return {
-      start: start.getTime(),
-      end: end.getTime(),
-    }
-  }
-
-  if (datePreset.value === "30d") {
-    start.setDate(start.getDate() - 29)
-
-    return {
-      start: start.getTime(),
-      end: end.getTime(),
-    }
-  }
-
-  return {
-    start: parseLocalDateInput(dateFrom.value),
-    end: parseLocalDateInput(dateTo.value, true),
-  }
-})
-
-const searchNeedle = computed(() => {
-  return normalizeText(searchTerm.value)
-})
-
-const filteredRows = computed(() => {
-  const needle = searchNeedle.value
-  const { start, end } = activeDateRange.value
-
-  return normalizedRows.value.filter((row) => {
-    if (needle && !row.searchText.includes(needle)) {
-      return false
-    }
-
-    if (!start && !end) {
-      return true
-    }
-
-    if (!row.time) {
-      return false
-    }
-
-    if (start && row.time < start) {
-      return false
-    }
-
-    if (end && row.time > end) {
-      return false
-    }
-
-    return true
-  })
-})
-
-const getDurationSeconds = (value) => {
-  if (typeof value === "number") return value
-
-  const text = normalizeText(value).replace(",", ".")
-
-  if (!text) return 0
-
-  const clockMatch = text.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/)
-
-  if (clockMatch) {
-    const [, hours, minutes, seconds = "0"] = clockMatch
-
-    return Number(hours) * 3600 + Number(minutes) * 60 + Number(seconds)
-  }
-
-  const hours = Number(text.match(/(\d+(?:\.\d+)?)\s*h/)?.[1] || 0)
-  const minutes = Number(text.match(/(\d+(?:\.\d+)?)\s*m/)?.[1] || 0)
-  const seconds = Number(text.match(/(\d+(?:\.\d+)?)\s*s/)?.[1] || 0)
-
-  if (hours || minutes || seconds) {
-    return hours * 3600 + minutes * 60 + seconds
-  }
-
-  const numericValue = Number.parseFloat(text)
-
-  return Number.isNaN(numericValue) ? 0 : numericValue
-}
-
-const getNumericValue = (value) => {
-  const number = Number(String(value ?? "").replace(",", "."))
-
-  return Number.isNaN(number) ? 0 : number
-}
-
-const getSortValue = (row) => {
-  if (sortKey.value === "vehicle") {
-    return normalizeText(row.event.patent || row.event.vehicle || "")
-  }
-
-  if (sortKey.value === "event") {
-    return normalizeText(row.event.eventLabel || row.eventLabel)
-  }
-
-  if (sortKey.value === "date") {
-    return row.time || 0
-  }
-
-  if (sortKey.value === "speed") {
-    return getNumericValue(row.event.speed)
-  }
-
-  if (sortKey.value === "duration") {
-    return getDurationSeconds(row.event.duration)
-  }
-
-  return ""
-}
-
-const sortedRows = computed(() => {
-  const direction = sortDirection.value === "asc" ? 1 : -1
-
-  return [...filteredRows.value].sort((a, b) => {
-    const firstValue = getSortValue(a)
-    const secondValue = getSortValue(b)
-
-    if (typeof firstValue === "number" && typeof secondValue === "number") {
-      const result = firstValue - secondValue
-
-      return result === 0 ? a.index - b.index : result * direction
-    }
-
-    const result = String(firstValue).localeCompare(String(secondValue), "es", {
-      numeric: true,
-      sensitivity: "base",
-    })
-
-    return result === 0 ? a.index - b.index : result * direction
-  })
-})
-
-const totalItems = computed(() => sortedRows.value.length)
-
-const totalPages = computed(() => {
-  return Math.max(1, Math.ceil(totalItems.value / pageSize.value))
-})
-
-const paginationStart = computed(() => {
-  if (!totalItems.value) return 0
-
-  return (currentPage.value - 1) * pageSize.value + 1
-})
-
-const paginationEnd = computed(() => {
-  return Math.min(currentPage.value * pageSize.value, totalItems.value)
-})
-
-const paginatedRows = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-
-  return sortedRows.value.slice(start, end)
-})
-
-const getDefaultSortDirection = (key) => {
-  if (["date", "speed", "duration"].includes(key)) {
-    return "desc"
-  }
-
-  return "asc"
-}
-
-const toggleSort = (key) => {
-  if (sortKey.value === key) {
-    sortDirection.value = sortDirection.value === "asc" ? "desc" : "asc"
-    return
-  }
-
-  sortKey.value = key
-  sortDirection.value = getDefaultSortDirection(key)
-}
-
-const getSortIcon = (key) => {
-  if (sortKey.value !== key) return "↕"
-
-  return sortDirection.value === "asc" ? "↑" : "↓"
-}
-
-const uniqueVehicles = computed(() => {
-  return new Set(
-    filteredRows.value.map((row) => row.event.patent || row.event.vehicle).filter(Boolean),
-  ).size
-})
-
-const entryCount = computed(() => {
-  return filteredRows.value.filter((row) => row.event.eventType === "entry").length
-})
-
-const exitCount = computed(() => {
-  return filteredRows.value.filter((row) => row.event.eventType === "exit").length
-})
-
-const metrics = computed(() => [
-  {
-    label: "Eventos",
-    value: filteredRows.value.length,
-    orange: false,
-  },
-  {
-    label: "Vehículos",
-    value: uniqueVehicles.value,
-    orange: false,
-  },
-  {
-    label: "Entradas",
-    value: entryCount.value,
-    orange: true,
-  },
-  {
-    label: "Salidas",
-    value: exitCount.value,
-    orange: true,
-  },
-])
-
-const hasActiveFilters = computed(() => {
-  return Boolean(searchTerm.value) || datePreset.value !== DEFAULT_DATE_PRESET
+  return "El historial puede abrirse aunque todavia no exista una geocerca seleccionada."
 })
 
 const emptyTitle = computed(() => {
@@ -794,65 +443,28 @@ const emptyTitle = computed(() => {
 
 const emptyDescription = computed(() => {
   if (normalizedRows.value.length && hasActiveFilters.value) {
-    return "No existen registros que coincidan con la búsqueda o el filtro de fecha actual."
+    return "No existen registros que coincidan con la busqueda o el filtro de fecha actual."
   }
 
   if (hasGeofence.value) {
-    return "Cuando existan eventos asociados a esta geocerca, aparecerán en este panel."
+    return "Cuando existan eventos asociados a esta geocerca, apareceran en este panel."
   }
 
   return "Crea una geocerca o selecciona una existente para revisar su historial."
 })
-
-const resetFiltersToDefault = () => {
-  searchTerm.value = ""
-  datePreset.value = DEFAULT_DATE_PRESET
-  dateFrom.value = ""
-  dateTo.value = ""
-  sortKey.value = "date"
-  sortDirection.value = "desc"
-  currentPage.value = 1
-}
-
-const clearFilters = () => {
-  resetFiltersToDefault()
-}
 
 const closeModal = () => {
   stopInteraction()
   emit("update:modelValue", false)
 }
 
-const getEventClass = (type) => {
-  const classes = {
-    entry: "bg-emerald-50 text-emerald-700",
-    exit: "bg-orange-50 text-[#FF6600]",
-    pass: "bg-blue-50 text-[#102372]",
-    deviation: "bg-red-50 text-red-600",
-  }
-
-  return classes[type] || "bg-slate-100 text-slate-600"
-}
+const getEventClass = getGeofenceHistoryEventClass
 
 const handleKeydown = (event) => {
   if (event.key === "Escape" && props.modelValue) {
     closeModal()
   }
 }
-
-watch([pageSize, totalItems], () => {
-  if (currentPage.value > totalPages.value) {
-    currentPage.value = totalPages.value
-  }
-
-  if (currentPage.value < 1) {
-    currentPage.value = 1
-  }
-})
-
-watch([searchTerm, datePreset, dateFrom, dateTo, sortKey, sortDirection], () => {
-  currentPage.value = 1
-})
 
 watch(
   () => props.modelValue,

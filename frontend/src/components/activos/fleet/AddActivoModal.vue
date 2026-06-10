@@ -396,9 +396,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue"
-
-import { useFleetFormWizard } from "../../../composables/activos/fleet/useFleetFormWizard.js"
+import { useFleetCreateForm } from "../../../composables/activos/fleet/useFleetCreateForm.js"
 
 const props = defineProps({
   modelValue: {
@@ -409,225 +407,22 @@ const props = defineProps({
 
 const emit = defineEmits(["update:modelValue", "add-activo"])
 
-const steps = [
-  {
-    key: "asset",
-    label: "Activo",
-    helper: "Nombre",
-    eyebrow: "Módulo 01",
-    title: "Datos del activo",
-  },
-  {
-    key: "device",
-    label: "Dispositivo",
-    helper: "GPS / IMEI",
-    eyebrow: "Módulo 02",
-    title: "Dispositivo GPS",
-  },
-  {
-    key: "admin",
-    label: "Fechas",
-    helper: "Ciclo",
-    eyebrow: "Módulo 03",
-    title: "Fechas administrativas",
-  },
-  {
-    key: "metrics",
-    label: "Métricas",
-    helper: "Iniciales",
-    eyebrow: "Módulo 04",
-    title: "Métricas iniciales",
-  },
-]
-
 const {
+  steps,
+  trackerModelOptions,
   currentStep,
   currentStepConfig,
   progressWidth,
   goToStep,
   nextStep,
   previousStep,
-  resetWizard,
-} = useFleetFormWizard(steps)
-
-const trackerModelOptions = [
-  {
-    value: "teltonika-fmb920",
-    manufacturer: "Teltonika",
-    label: "FMB920",
-    description: "Equipo compacto para vehículos livianos.",
-  },
-  {
-    value: "teltonika-fmc130",
-    manufacturer: "Teltonika",
-    label: "FMC130",
-    description: "GPS LTE con entradas/salidas vehiculares.",
-  },
-  {
-    value: "concox-gt06n",
-    manufacturer: "Concox",
-    label: "GT06N",
-    description: "Rastreador estándar para monitoreo vehicular.",
-  },
-  {
-    value: "queclink-gv300",
-    manufacturer: "Queclink",
-    label: "GV300",
-    description: "Equipo profesional para flota y telemetría básica.",
-  },
-  {
-    value: "ruptela-eco5",
-    manufacturer: "Ruptela",
-    label: "Eco5",
-    description: "Dispositivo GPS para gestión de flota.",
-  },
-]
-
-const createEmptyForm = () => ({
-  trackerModel: "",
-  imei: "",
-  protocol: "tcp",
-  name: "",
-  displayName: "",
-  description: "",
-  entryDate: new Date().toISOString().slice(0, 10),
-  deactivationDate: "",
-  suspensionDate: "",
-  dailyHourmeter: "",
-  totalHourmeter: "",
-  odometer: "",
-})
-
-const form = ref(createEmptyForm())
-
-const selectedTrackerModel = computed(() => {
-  return trackerModelOptions.find((option) => option.value === form.value.trackerModel) || null
-})
-
-const selectedTrackerModelLabel = computed(() => {
-  if (!selectedTrackerModel.value) return ""
-
-  return `${selectedTrackerModel.value.manufacturer} ${selectedTrackerModel.value.label}`
-})
-
-const isAssetStepValid = computed(() => {
-  return Boolean(form.value.name.trim() && form.value.displayName.trim())
-})
-
-const isDeviceStepValid = computed(() => {
-  return Boolean(form.value.trackerModel && form.value.imei.trim())
-})
-
-const canSaveActivo = computed(() => {
-  return Boolean(isAssetStepValid.value && isDeviceStepValid.value)
-})
-
-const requiredStatus = computed(() => [
-  {
-    label: "Activo",
-    done: isAssetStepValid.value,
-  },
-  {
-    label: "Dispositivo",
-    done: isDeviceStepValid.value,
-  },
-])
-
-const summaryItems = computed(() => [
-  {
-    label: "Activo",
-    value: form.value.displayName,
-  },
-  {
-    label: "Modelo",
-    value: selectedTrackerModelLabel.value,
-  },
-  {
-    label: "IMEI",
-    value: form.value.imei,
-  },
-  {
-    label: "Protocolo",
-    value: form.value.protocol.toUpperCase(),
-  },
-  {
-    label: "Ingreso",
-    value: form.value.entryDate,
-  },
-  {
-    label: "Odómetro",
-    value: form.value.odometer,
-  },
-])
-
-const resetModal = () => {
-  resetWizard()
-  form.value = createEmptyForm()
-}
-
-watch(
-  () => props.modelValue,
-  (isOpen) => {
-    if (isOpen) resetModal()
-  },
-)
-
-watch(
-  () => form.value.trackerModel,
-  (trackerModel) => {
-    if (!trackerModel) {
-      form.value.imei = ""
-    }
-  },
-)
-
-const isStepCompleted = (index) => {
-  if (index === 0) return isAssetStepValid.value
-  if (index === 1) return isDeviceStepValid.value
-  if (index === 2)
-    return Boolean(form.value.entryDate || form.value.deactivationDate || form.value.suspensionDate)
-  if (index === 3)
-    return Boolean(form.value.dailyHourmeter || form.value.totalHourmeter || form.value.odometer)
-
-  return false
-}
-
-const closeModal = () => {
-  emit("update:modelValue", false)
-}
-
-const toNumberOrEmpty = (value) => {
-  if (value === "" || value === null || value === undefined) return ""
-
-  const numberValue = Number(value)
-
-  return Number.isFinite(numberValue) ? numberValue : ""
-}
-
-const buildPayload = () => {
-  return {
-    trackerModel: form.value.trackerModel,
-    trackerModelLabel: selectedTrackerModelLabel.value,
-    trackerManufacturer: selectedTrackerModel.value?.manufacturer || "",
-    imei: form.value.imei.trim(),
-    protocol: form.value.protocol || "tcp",
-    name: form.value.name.trim(),
-    displayName: form.value.displayName.trim(),
-    description: form.value.description.trim(),
-    entryDate: form.value.entryDate,
-    deactivationDate: form.value.deactivationDate,
-    suspensionDate: form.value.suspensionDate,
-    dailyHourmeter: toNumberOrEmpty(form.value.dailyHourmeter),
-    totalHourmeter: toNumberOrEmpty(form.value.totalHourmeter),
-    odometer: toNumberOrEmpty(form.value.odometer),
-    connectionStatus: "pending",
-  }
-}
-
-const submitForm = () => {
-  if (!canSaveActivo.value) return
-
-  emit("add-activo", buildPayload())
-  closeModal()
-}
+  form,
+  selectedTrackerModel,
+  canSaveActivo,
+  requiredStatus,
+  summaryItems,
+  isStepCompleted,
+  closeModal,
+  submitForm,
+} = useFleetCreateForm({ props, emit })
 </script>

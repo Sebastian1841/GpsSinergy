@@ -229,11 +229,14 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from "vue"
+import { computed, onBeforeUnmount, ref } from "vue"
 import ColumnVisibilityMenu from "../../ui/ColumnVisibilityMenu.vue"
 import { useFleetColumns } from "../../../composables/activos/fleet/useFleetColumns"
-
-const HEAVY_ITINERARY_ROWS_THRESHOLD = 5000
+import { useItineraryTableRows } from "../../../composables/activos/itinerarios/useItineraryTableRows.js"
+import {
+  itineraryTableColumns,
+  normalizeItineraryTableText,
+} from "../../../utils/activos/itineraryTableColumns.js"
 
 const props = defineProps({
   rows: {
@@ -252,103 +255,10 @@ const props = defineProps({
 
 defineEmits(["select-point"])
 
-const textCollator = new Intl.Collator("es", {
-  numeric: true,
-  sensitivity: "base",
-})
-
-const itineraryColumns = [
-  {
-    key: "timestamp",
-    label: "Hora",
-    width: "104px",
-    locked: true,
-  },
-  {
-    key: "status",
-    label: "Estado",
-    width: "118px",
-  },
-  {
-    key: "speed",
-    label: "Vel.",
-    width: "92px",
-    align: "right",
-  },
-  {
-    key: "address",
-    label: "Direccion",
-    width: "260px",
-  },
-  {
-    key: "accumulatedDistanceKm",
-    label: "Km acum.",
-    width: "110px",
-    align: "right",
-  },
-  {
-    key: "assetDisplayName",
-    label: "Activo",
-    width: "150px",
-    defaultVisible: false,
-  },
-  {
-    key: "assetPatente",
-    label: "Patente",
-    width: "115px",
-    defaultVisible: false,
-  },
-  {
-    key: "assetDeviceId",
-    label: "Dispositivo",
-    width: "130px",
-    defaultVisible: false,
-  },
-  {
-    key: "dateLabel",
-    label: "Fecha",
-    width: "115px",
-    defaultVisible: false,
-  },
-  {
-    key: "event",
-    label: "Evento",
-    width: "150px",
-    defaultVisible: false,
-  },
-  {
-    key: "lat",
-    label: "Latitud",
-    width: "110px",
-    align: "right",
-    defaultVisible: false,
-  },
-  {
-    key: "lng",
-    label: "Longitud",
-    width: "110px",
-    align: "right",
-    defaultVisible: false,
-  },
-]
-
 const showColumns = ref(false)
-const sortColumnKey = ref("timestamp")
-const sortDirection = ref("desc")
 const draggedColumnKey = ref("")
-const currentPage = ref(1)
-const pageSize = ref(50)
 
 let resizeState = null
-
-const pageSizeOptions = [25, 50, 100, 200]
-
-const normalizeText = (value) => {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-}
 
 const {
   columnSearch,
@@ -360,308 +270,48 @@ const {
   setColumnWidth,
   moveColumn,
 } = useFleetColumns({
-  columns: itineraryColumns,
-  normalizeText,
+  columns: itineraryTableColumns,
+  normalizeText: normalizeItineraryTableText,
 })
 
 const columnsByKey = computed(() => {
   return new Map(
-    itineraryColumns.map((column) => {
+    itineraryTableColumns.map((column) => {
       return [column.key, column]
     }),
   )
 })
 
-const statusOrder = {
-  moving: 1,
-  stopped: 2,
-  idle: 3,
-  offline: 4,
-}
-
-const statusLabels = {
-  moving: "Movimiento",
-  stopped: "Detenido",
-  idle: "Espera",
-  offline: "Offline",
-}
-
-const hasCustomSort = computed(() => {
-  return sortColumnKey.value !== "timestamp" || sortDirection.value !== "desc"
+const {
+  pageSizeOptions,
+  sortColumnKey,
+  currentPage,
+  pageSize,
+  hasCustomSort,
+  hasHeavyItinerary,
+  totalItems,
+  totalPages,
+  paginationStart,
+  paginationEnd,
+  paginatedRows,
+  statusLabel,
+  toggleSort,
+  resetSort,
+  getSortIcon,
+  getRowKey,
+  getRowTimeLabel,
+  getCellValue,
+  getCellTitle,
+  getCellClass,
+  goToPreviousPage,
+  goToNextPage,
+} = useItineraryTableRows({
+  rows: computed(() => props.rows),
+  route: computed(() => props.route),
+  selectedPointId: computed(() => props.selectedPointId),
+  visibleColumns,
+  columnsByKey,
 })
-
-const hasHeavyItinerary = computed(() => {
-  return props.rows.length > HEAVY_ITINERARY_ROWS_THRESHOLD
-})
-
-const totalItems = computed(() => {
-  return props.rows.length
-})
-
-const totalPages = computed(() => {
-  return Math.max(1, Math.ceil(totalItems.value / pageSize.value))
-})
-
-const paginationStart = computed(() => {
-  if (!totalItems.value) return 0
-
-  return (currentPage.value - 1) * pageSize.value + 1
-})
-
-const paginationEnd = computed(() => {
-  return Math.min(currentPage.value * pageSize.value, totalItems.value)
-})
-
-const parseSortableNumber = (value) => {
-  if (value === null || value === undefined) return null
-
-  const match = String(value)
-    .replace(",", ".")
-    .match(/-?\d+(\.\d+)?/)
-
-  if (!match) return null
-
-  const parsedValue = Number(match[0])
-
-  return Number.isFinite(parsedValue) ? parsedValue : null
-}
-
-const parseSortableDate = (value) => {
-  const timestamp = new Date(value || 0).getTime()
-
-  return Number.isNaN(timestamp) ? null : timestamp
-}
-
-const formatCoordinate = (value) => {
-  const numberValue = Number(value)
-
-  if (!Number.isFinite(numberValue)) return "-"
-
-  return numberValue.toFixed(6)
-}
-
-const statusLabel = (status) => {
-  return statusLabels[status] || "Sin estado"
-}
-
-const getSortableValue = (row, columnKey) => {
-  if (columnKey === "timestamp" || columnKey === "dateLabel") {
-    return parseSortableDate(row.timestamp || row.date || row.fecha)
-  }
-
-  if (columnKey === "status") {
-    return statusOrder[row.status] || 99
-  }
-
-  if (columnKey === "speed") {
-    return parseSortableNumber(row.speed ?? row.speedLabel)
-  }
-
-  if (columnKey === "accumulatedDistanceKm") {
-    return parseSortableNumber(row.accumulatedDistanceKm ?? row.accumulatedDistanceLabel)
-  }
-
-  if (columnKey === "lat" || columnKey === "lng") {
-    return parseSortableNumber(row[columnKey])
-  }
-
-  return normalizeText(getCellValue(row, columnsByKey.value.get(columnKey) || { key: columnKey }))
-}
-
-const compareValues = (valueA, valueB) => {
-  const emptyA = valueA === null || valueA === undefined || valueA === ""
-  const emptyB = valueB === null || valueB === undefined || valueB === ""
-
-  if (emptyA && emptyB) return 0
-  if (emptyA) return 1
-  if (emptyB) return -1
-
-  if (typeof valueA === "number" && typeof valueB === "number") {
-    return valueA - valueB
-  }
-
-  return textCollator.compare(String(valueA), String(valueB))
-}
-
-const toggleSort = (columnKey) => {
-  if (sortColumnKey.value !== columnKey) {
-    sortColumnKey.value = columnKey
-    sortDirection.value = "asc"
-    currentPage.value = 1
-    return
-  }
-
-  sortDirection.value = sortDirection.value === "asc" ? "desc" : "asc"
-  currentPage.value = 1
-}
-
-const resetSort = () => {
-  sortColumnKey.value = "timestamp"
-  sortDirection.value = "desc"
-  currentPage.value = 1
-}
-
-const getSortIcon = (columnKey) => {
-  if (sortColumnKey.value !== columnKey) return "-"
-
-  return sortDirection.value === "asc" ? "^" : "v"
-}
-
-const formatTimeFromTimestamp = (timestamp) => {
-  const date = new Date(timestamp || 0)
-
-  if (Number.isNaN(date.getTime())) return "-"
-
-  return date.toLocaleTimeString("es-CL", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })
-}
-
-const getRowTimeLabel = (row) => {
-  return row.timeLabel || formatTimeFromTimestamp(row.timestamp || row.date || row.fecha)
-}
-
-const getRowKey = (row, index) => {
-  return [row.id, row.assetId, row.timestamp, row.lat, row.lng, row.speed, index]
-    .map((value) => String(value ?? ""))
-    .join("-")
-}
-
-const getCellValue = (row, column) => {
-  if (column.key === "timestamp") return getRowTimeLabel(row)
-  if (column.key === "status") return statusLabel(row.status)
-  if (column.key === "speed") return row.speedLabel || `${row.speed || 0} km/h`
-  if (column.key === "address") return row.address || "Sin direccion"
-  if (column.key === "accumulatedDistanceKm") return row.accumulatedDistanceLabel || "0,0 km"
-  if (column.key === "dateLabel") return row.dateLabel || "-"
-  if (column.key === "assetDisplayName") {
-    return row.assetDisplayName || row.assetPatente || getRouteAssetDisplayName()
-  }
-
-  if (column.key === "assetPatente") {
-    return row.assetPatente || getRouteAssetPatente()
-  }
-
-  if (column.key === "assetDeviceId") {
-    return row.assetDeviceId || getRouteAssetDeviceId()
-  }
-
-  if (column.key === "event") return row.event || "Reporte GPS"
-  if (column.key === "lat" || column.key === "lng") return formatCoordinate(row[column.key])
-
-  return row[column.key] ?? "-"
-}
-
-const getCellTitle = (row, column) => {
-  if (column.key === "address") {
-    return [row.address || "Sin direccion", row.event || "Reporte GPS"].join(" - ")
-  }
-
-  return getCellValue(row, column)
-}
-
-const getCellClass = (row, column) => {
-  return [
-    column.align === "right" ? "text-right" : "text-left",
-    selectedPointIdString.value === String(row.id) && column.key === visibleColumns.value[0]?.key
-      ? "shadow-[inset_3px_0_0_#FF6600]"
-      : "",
-  ]
-}
-
-const selectedPointIdString = computed(() => {
-  if (props.selectedPointId === null || props.selectedPointId === undefined) return ""
-
-  return String(props.selectedPointId)
-})
-
-const routeAsset = computed(() => {
-  return props.route?.asset || null
-})
-
-const getRouteAssetDisplayName = () => {
-  return (
-    routeAsset.value?.displayName ||
-    routeAsset.value?.vehiculo ||
-    routeAsset.value?.patente ||
-    routeAsset.value?.name ||
-    "-"
-  )
-}
-
-const getRouteAssetPatente = () => {
-  return routeAsset.value?.patente || routeAsset.value?.patent || routeAsset.value?.vehiculo || "-"
-}
-
-const getRouteAssetDeviceId = () => {
-  return (
-    routeAsset.value?.deviceId || routeAsset.value?.imei || routeAsset.value?.identificador || "-"
-  )
-}
-
-const isTimestampSort = computed(() => {
-  return sortColumnKey.value === "timestamp"
-})
-
-const customSortedRowIndexes = computed(() => {
-  if (isTimestampSort.value) return []
-
-  const directionMultiplier = sortDirection.value === "asc" ? 1 : -1
-  const columnKey = sortColumnKey.value
-  const sortValues = props.rows.map((row) => getSortableValue(row, columnKey))
-  const rowIndexes = props.rows.map((_, index) => index)
-
-  rowIndexes.sort((indexA, indexB) => {
-    const result = compareValues(sortValues[indexA], sortValues[indexB])
-
-    if (result !== 0) {
-      return result * directionMultiplier
-    }
-
-    return indexA - indexB
-  })
-
-  return rowIndexes
-})
-
-const paginatedRows = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-
-  if (isTimestampSort.value) {
-    if (sortDirection.value === "asc") {
-      return props.rows.slice(start, end)
-    }
-
-    const sourceLength = props.rows.length
-    const reversedStart = Math.max(sourceLength - end, 0)
-    const reversedEnd = Math.max(sourceLength - start, 0)
-
-    return props.rows.slice(reversedStart, reversedEnd).reverse()
-  }
-
-  return customSortedRowIndexes.value.slice(start, end).map((index) => props.rows[index])
-})
-
-const clampCurrentPage = () => {
-  if (currentPage.value > totalPages.value) {
-    currentPage.value = totalPages.value
-  }
-
-  if (currentPage.value < 1) {
-    currentPage.value = 1
-  }
-}
-
-const goToPreviousPage = () => {
-  currentPage.value = Math.max(1, currentPage.value - 1)
-}
-
-const goToNextPage = () => {
-  currentPage.value = Math.min(totalPages.value, currentPage.value + 1)
-}
 
 const toggleColumnKey = (columnKey) => {
   const column = columnsByKey.value.get(columnKey)
@@ -730,17 +380,6 @@ const startColumnResize = (event, column) => {
   window.addEventListener("mousemove", handleColumnResize)
   window.addEventListener("mouseup", stopColumnResize)
 }
-
-watch(
-  () => props.rows,
-  () => {
-    currentPage.value = 1
-  },
-)
-
-watch([pageSize, totalItems], () => {
-  clampCurrentPage()
-})
 
 onBeforeUnmount(() => {
   stopColumnResize()
