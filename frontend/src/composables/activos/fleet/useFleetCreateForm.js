@@ -3,14 +3,17 @@ import { computed, ref, watch } from "vue"
 import {
   buildFleetCreatePayload,
   createEmptyFleetCreateForm,
+  fleetAssetTypeOptions,
   fleetCreateFormSteps,
   fleetTrackerModelOptions,
 } from "../../../utils/activos/fleetAssetFormUtils.js"
+import { getAssetTypeMapIcon, getAssetTypeOption } from "../../../utils/activos/assetTypeOptions.js"
 import { useFleetFormWizard } from "./useFleetFormWizard.js"
 
 export function useFleetCreateForm({ props, emit }) {
   const steps = fleetCreateFormSteps
   const trackerModelOptions = fleetTrackerModelOptions
+  const assetTypeOptions = fleetAssetTypeOptions
 
   const {
     currentStep,
@@ -32,6 +35,23 @@ export function useFleetCreateForm({ props, emit }) {
     if (!selectedTrackerModel.value) return ""
 
     return `${selectedTrackerModel.value.manufacturer} ${selectedTrackerModel.value.label}`
+  })
+
+  const selectedAssetType = computed(() => {
+    return getAssetTypeOption(form.value.assetType || form.value.mapIcon)
+  })
+
+  const activeGroupOptions = computed(() => {
+    return (props.groups || []).filter((group) => group.active !== false)
+  })
+
+  const selectedGroupLabel = computed(() => {
+    if (!form.value.sucursalId) return "Sin grupo"
+
+    return (
+      activeGroupOptions.value.find((group) => String(group.id) === String(form.value.sucursalId))
+        ?.name || "Sin grupo"
+    )
   })
 
   const isAssetStepValid = computed(() => {
@@ -61,6 +81,14 @@ export function useFleetCreateForm({ props, emit }) {
     {
       label: "Activo",
       value: form.value.displayName,
+    },
+    {
+      label: "Tipo",
+      value: selectedAssetType.value?.label,
+    },
+    {
+      label: "Grupo",
+      value: selectedGroupLabel.value,
     },
     {
       label: "Modelo",
@@ -105,6 +133,16 @@ export function useFleetCreateForm({ props, emit }) {
     },
   )
 
+  watch(activeGroupOptions, (groups) => {
+    if (!form.value.sucursalId) return
+
+    const groupExists = groups.some((group) => String(group.id) === String(form.value.sucursalId))
+
+    if (!groupExists) {
+      form.value.sucursalId = ""
+    }
+  })
+
   const isStepCompleted = (index) => {
     if (index === 0) return isAssetStepValid.value
     if (index === 1) return isDeviceStepValid.value
@@ -122,6 +160,14 @@ export function useFleetCreateForm({ props, emit }) {
 
   const closeModal = () => {
     emit("update:modelValue", false)
+  }
+
+  const selectAssetType = (assetType) => {
+    const assetTypeOption = getAssetTypeOption(assetType)
+
+    form.value.assetType = assetTypeOption.value
+    form.value.assetTypeLabel = assetTypeOption.label
+    form.value.mapIcon = getAssetTypeMapIcon(assetTypeOption.value)
   }
 
   const buildPayload = () => {
@@ -142,6 +188,7 @@ export function useFleetCreateForm({ props, emit }) {
   return {
     steps,
     trackerModelOptions,
+    assetTypeOptions,
     currentStep,
     currentStepConfig,
     progressWidth,
@@ -151,11 +198,15 @@ export function useFleetCreateForm({ props, emit }) {
     form,
     selectedTrackerModel,
     selectedTrackerModelLabel,
+    selectedAssetType,
+    activeGroupOptions,
+    selectedGroupLabel,
     canSaveActivo,
     requiredStatus,
     summaryItems,
     isStepCompleted,
     closeModal,
+    selectAssetType,
     submitForm,
   }
 }

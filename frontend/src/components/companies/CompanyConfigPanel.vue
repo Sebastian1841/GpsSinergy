@@ -5,7 +5,7 @@
     @click.self="$emit('close')"
   >
     <section
-      class="flex h-[calc(100%-16px)] max-h-[680px] w-full max-w-[920px] flex-col overflow-hidden rounded-lg border border-[#102372] bg-white shadow-2xl sm:h-[calc(100%-32px)]"
+      class="flex h-[calc(100%-16px)] max-h-[680px] w-full max-w-[920px] flex-col overflow-hidden rounded-lg bg-white shadow-[0_24px_80px_rgba(15,23,42,0.34)] sm:h-[calc(100%-32px)]"
     >
       <header class="shrink-0 bg-[#102372] px-4 py-3">
         <div class="flex items-start justify-between gap-3">
@@ -197,7 +197,6 @@
             v-if="activeTab === 'reports'"
             :company="company"
             :report-types="reportTypes"
-            @toggle-report="$emit('toggle-company-report', $event)"
           />
 
           <GestionSucursalesPanel
@@ -208,7 +207,6 @@
             @actualizar-nombre-sucursal="handleActualizarNombreSucursal"
             @alternar-estado-sucursal="$emit('alternar-estado-sucursal', $event)"
             @eliminar-sucursal="$emit('eliminar-sucursal', $event)"
-            @actualizar-sucursal-activo="$emit('actualizar-sucursal-activo', $event)"
           />
         </main>
       </div>
@@ -251,13 +249,11 @@ const emit = defineEmits([
   "close",
   "edit-company",
   "toggle-company-status",
-  "toggle-company-report",
   "alternar-sucursales-habilitadas",
   "agregar-sucursal",
   "actualizar-nombre-sucursal",
   "alternar-estado-sucursal",
   "eliminar-sucursal",
-  "actualizar-sucursal-activo",
   "enter-company",
 ])
 
@@ -276,7 +272,7 @@ const tabs = [
   },
   {
     id: "sucursales",
-    label: "Sucursales",
+    label: "Grupos",
     icon: "M4 20V8l8-4 8 4v12M8 20v-6h8v6M9 10h.01M15 10h.01",
   },
 ]
@@ -331,7 +327,7 @@ const companyDetails = computed(() => [
     label: "Cuenta",
     value: `${props.company?.usersCount || 0} usuarios - ${
       props.company?.sucursales?.length || 0
-    } sucursales`,
+    } grupos`,
   },
   {
     label: "Reportes",

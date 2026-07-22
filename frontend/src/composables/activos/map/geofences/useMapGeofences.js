@@ -1,31 +1,18 @@
 import { computed } from "vue"
-import L from "leaflet"
 
-import {
-  cloneGeofence,
-  makeGeofenceId,
-  normalizePoint,
-} from "../../../../utils/geofenceMapUtils.js"
-
-import { getFallbackGeofenceName } from "../../../../utils/geofenceUtils.js"
+import { cloneGeofence } from "../../../../utils/geofenceMapUtils.js"
 import { normalizeId } from "../../../../utils/idUtils.js"
 
 import { createGeofenceDrawingController } from "./useGeofenceDrawing.js"
 import { createGeofenceEditingController } from "./useGeofenceEditing.js"
 import { createGeofenceRendererController } from "./useGeofenceRenderer.js"
 
-import { geofenceStyle, getGeofenceMapColor } from "./geofenceMapStyles.js"
-
-const getDraftGeofenceOptions = (props, type) => {
-  const options = props.draftGeofenceOptions || {}
-  const fallbackName = getFallbackGeofenceName(props.geofences || [], type)
-  const color = getGeofenceMapColor(options, geofenceStyle.color)
-
-  return {
-    name: String(options.name || fallbackName).trim() || fallbackName,
-    color,
-  }
-}
+import {
+  createCircleGeofence,
+  createPolygonGeofence,
+  createRouteGeofence,
+} from "./geofenceCreation.js"
+import { focusGeofenceOnMap } from "./geofenceFocus.js"
 
 export function createGeofenceMapController({ props, emit, getMap, layers, state }) {
   const {
@@ -204,16 +191,13 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
   const finishPolygon = () => {
     if (draftPolygonPoints.value.length < 3) return
 
-    const options = getDraftGeofenceOptions(props, "polygon")
-
-    emit("geofence-created", {
-      id: makeGeofenceId(),
-      name: options.name,
-      type: "polygon",
-      color: options.color,
-      coordinates: draftPolygonPoints.value.map((point) => normalizePoint(point)),
-      createdAt: new Date().toISOString(),
-    })
+    emit(
+      "geofence-created",
+      createPolygonGeofence({
+        props,
+        points: draftPolygonPoints.value,
+      }),
+    )
 
     cancelDraw()
   }
@@ -221,45 +205,39 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
   const finishRoute = () => {
     if (draftRoutePoints.value.length < 2) return
 
-    const options = getDraftGeofenceOptions(props, "route")
-
-    emit("geofence-created", {
-      id: makeGeofenceId(),
-      name: options.name,
-      type: "route",
-      color: options.color,
-      toleranceMeters: 100,
-      coordinates: draftRoutePoints.value.map((point) => normalizePoint(point)),
-      createdAt: new Date().toISOString(),
-    })
+    emit(
+      "geofence-created",
+      createRouteGeofence({
+        props,
+        points: draftRoutePoints.value,
+      }),
+    )
 
     cancelDraw()
   }
 
   const finishCircle = (center, edge) => {
-    const radius = Math.round(center.distanceTo(edge))
-
-    if (radius < 10) return
-
-    const options = getDraftGeofenceOptions(props, "circle")
-
-    emit("geofence-created", {
-      id: makeGeofenceId(),
-      name: options.name,
-      type: "circle",
-      color: options.color,
-      center: normalizePoint(center),
-      radius,
-      createdAt: new Date().toISOString(),
+    const geofence = createCircleGeofence({
+      props,
+      center,
+      edge,
     })
 
+    if (!geofence) return
+
+    emit("geofence-created", geofence)
     cancelDraw()
+  }
+
+  const focusGeofence = (geofence) => {
+    focusGeofenceOnMap({
+      map: getMap(),
+      geofence,
+    })
   }
 
   const startEditGeofence = (geofenceId) => {
     if (props.canEditGeofences === false) return
-
-    const map = getMap()
 
     cancelDraw()
 
@@ -274,23 +252,23 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
 
     renderer.renderGeofences()
     editing.redrawEditLayer()
+    focusGeofence(geofence)
+  }
 
-    if (geofence.type === "circle") {
-      map?.flyTo([geofence.center.lat, geofence.center.lng], map.getZoom(), {
-        duration: 0.35,
-      })
-    }
+  const resolveGeofence = (geofenceOrId) => {
+    if (geofenceOrId && typeof geofenceOrId === "object") return geofenceOrId
 
-    if (geofence.type === "polygon" || geofence.type === "route") {
-      const bounds = L.latLngBounds(geofence.coordinates.map((point) => [point.lat, point.lng]))
+    return (props.geofences || []).find((item) => {
+      return normalizeId(item.id) === normalizeId(geofenceOrId)
+    })
+  }
 
-      if (bounds.isValid()) {
-        map?.fitBounds(bounds, {
-          padding: [40, 40],
-          maxZoom: 16,
-        })
-      }
-    }
+  const focusGeofenceById = (geofenceOrId) => {
+    const geofence = resolveGeofence(geofenceOrId)
+
+    if (!geofence) return
+
+    focusGeofence(geofence)
   }
 
   const deleteGeofence = (id) => {
@@ -394,6 +372,7 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
     clearGeofenceCache: renderer.clearGeofenceCache,
 
     startEditGeofence,
+    focusGeofence: focusGeofenceById,
     stopEditing,
     removeLastEditPoint: editing.removeLastEditPoint,
     deleteGeofence,

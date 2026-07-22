@@ -8,8 +8,13 @@ import {
   createTerminalLog,
   getTerminalEventBadgeClass,
   getTerminalStateBadgeClass,
+  isTerminalTelemetryLog,
   updateTerminalLogPayload,
 } from "../../../utils/activos/fleetTerminalRows.js"
+
+const MAX_TELEMETRY_LOGS = 5
+const MAX_COMMAND_LOGS = 50
+const HISTORY_SYNC_DELAY_MS = 250
 
 export function useFleetTerminalModal({ props, emit }) {
   const activeTerminalModule = ref("telemetry")
@@ -18,6 +23,8 @@ export function useFleetTerminalModal({ props, emit }) {
   const terminalCommand = ref("")
   const terminalLogs = ref([])
   const isSending = ref(false)
+
+  let historySyncTimer = null
 
   const {
     modalRef,
@@ -40,12 +47,12 @@ export function useFleetTerminalModal({ props, emit }) {
     return props.activo?.vehiculo || props.activo?.name || "activo"
   })
 
-  const visibleTerminalLogs = computed(() => {
-    return [...terminalLogs.value].reverse()
-  })
-
+  /*
+   * terminalLogs ya está limitado, por lo que estas operaciones
+   * trabajan con un máximo aproximado de 55 registros.
+   */
   const terminalRows = computed(() => {
-    return visibleTerminalLogs.value.map(buildTerminalRow)
+    return terminalLogs.value.slice().reverse().map(buildTerminalRow)
   })
 
   const telemetryRows = computed(() => {
@@ -60,55 +67,169 @@ export function useFleetTerminalModal({ props, emit }) {
     return telemetryRows.value.length
   })
 
-  const refreshTerminalView = async () => {
-    await nextTick()
+  const isTelemetryLog = (log) => {
+    return isTerminalTelemetryLog(log)
+  }
 
-    if (terminalTableRef.value) {
-      terminalTableRef.value.scrollTop = 0
+  /*
+   * Conserva físicamente:
+   * - Las últimas 5 telemetrías.
+   * - Los últimos 50 registros relacionados con comandos.
+   *
+   * Esto evita que terminalLogs crezca indefinidamente.
+   */
+  const limitTerminalLogs = (logs = []) => {
+    if (!Array.isArray(logs)) return []
+
+    const limitedLogs = []
+    let telemetryCount = 0
+    let commandCount = 0
+
+    for (let index = logs.length - 1; index >= 0; index -= 1) {
+      const log = logs[index]
+
+      if (!log) continue
+
+      if (isTelemetryLog(log)) {
+        if (telemetryCount >= MAX_TELEMETRY_LOGS) continue
+
+        telemetryCount += 1
+      } else {
+        if (commandCount >= MAX_COMMAND_LOGS) continue
+
+        commandCount += 1
+      }
+
+      limitedLogs.unshift(log)
     }
 
-    if (commandPanelRef.value) {
+    return limitedLogs
+  }
+
+  /*
+   * Solo entrega los últimos 5 elementos al constructor.
+   * Así createInitialTerminalLogs no procesa miles de registros.
+   *
+   * Este código asume que el historial se agrega al final del arreglo.
+   */
+  const getRecentHistory = () => {
+    if (!Array.isArray(props.history)) return []
+
+    return props.history.slice(-MAX_TELEMETRY_LOGS)
+  }
+
+  const getCurrentCommandLogs = () => {
+    return terminalLogs.value.filter((log) => {
+      return !isTelemetryLog(log)
+    })
+  }
+
+  const scrollActiveModuleToTop = async () => {
+    await nextTick()
+
+    if (activeTerminalModule.value === "telemetry" && terminalTableRef.value) {
+      terminalTableRef.value.scrollTop = 0
+      return
+    }
+
+    if (activeTerminalModule.value === "commands" && commandPanelRef.value) {
       commandPanelRef.value.scrollTop = 0
     }
   }
 
   const focusInput = async () => {
     await nextTick()
+
     document.querySelector("[data-terminal-input]")?.focus()
   }
 
-  const setInitialHistory = async () => {
-    terminalLogs.value = createInitialTerminalLogs({
-      history: props.history,
+  /*
+   * Reconstruye únicamente las últimas 5 telemetrías.
+   *
+   * preserveCommands evita borrar el historial de comandos cuando
+   * llega una nueva actualización de telemetría.
+   */
+  const setInitialHistory = ({ preserveCommands = false, focus = false, scroll = false } = {}) => {
+    const currentCommandLogs = preserveCommands ? getCurrentCommandLogs() : []
+
+    const initialLogs = createInitialTerminalLogs({
+      history: getRecentHistory(),
       simulateHistory: props.simulateHistory,
       activo: props.activo,
     })
 
-    await refreshTerminalView()
-    await focusInput()
+    const telemetryLogs = initialLogs.filter((log) => {
+      return isTelemetryLog(log)
+    })
+
+    terminalLogs.value = limitTerminalLogs([...telemetryLogs, ...currentCommandLogs])
+
+    if (scroll) {
+      scrollActiveModuleToTop()
+    }
+
+    if (focus) {
+      focusInput()
+    }
+  }
+
+  /*
+   * Agrupa actualizaciones rápidas del historial.
+   * Si llegan muchos pulsos seguidos, solo procesa el último.
+   */
+  const scheduleHistorySync = () => {
+    if (historySyncTimer !== null) {
+      window.clearTimeout(historySyncTimer)
+    }
+
+    historySyncTimer = window.setTimeout(() => {
+      historySyncTimer = null
+
+      if (!props.modelValue || !props.activo) return
+
+      setInitialHistory({
+        preserveCommands: true,
+        focus: false,
+        scroll: false,
+      })
+    }, HISTORY_SYNC_DELAY_MS)
   }
 
   const addLog = async (payload) => {
-    terminalLogs.value = [...terminalLogs.value, createTerminalLog(payload)]
+    const newLog = createTerminalLog(payload)
 
-    await refreshTerminalView()
+    terminalLogs.value = limitTerminalLogs([...terminalLogs.value, newLog])
+
+    if (activeTerminalModule.value === "commands") {
+      await scrollActiveModuleToTop()
+    }
   }
 
   const updateLog = async (id, payload) => {
-    terminalLogs.value = terminalLogs.value.map((log) => {
-      if (log.id !== id) return log
+    terminalLogs.value = limitTerminalLogs(
+      terminalLogs.value.map((log) => {
+        if (log.id !== id) return log
 
-      return updateTerminalLogPayload({
-        log,
-        payload,
-      })
-    })
+        return updateTerminalLogPayload({
+          log,
+          payload,
+        })
+      }),
+    )
 
-    await refreshTerminalView()
+    if (activeTerminalModule.value === "commands") {
+      await scrollActiveModuleToTop()
+    }
   }
 
   const closeModal = () => {
     stopInteraction()
+
+    if (historySyncTimer !== null) {
+      window.clearTimeout(historySyncTimer)
+      historySyncTimer = null
+    }
+
     emit("update:modelValue", false)
   }
 
@@ -172,7 +293,14 @@ export function useFleetTerminalModal({ props, emit }) {
     async () => {
       if (!props.modelValue || !props.activo) {
         stopInteraction()
+
+        if (historySyncTimer !== null) {
+          window.clearTimeout(historySyncTimer)
+          historySyncTimer = null
+        }
+
         window.removeEventListener("resize", keepFrameInsideViewport)
+
         return
       }
 
@@ -183,9 +311,15 @@ export function useFleetTerminalModal({ props, emit }) {
       await nextTick()
 
       resetFrame()
-      setInitialHistory()
+
+      setInitialHistory({
+        preserveCommands: false,
+        focus: true,
+        scroll: true,
+      })
 
       window.removeEventListener("resize", keepFrameInsideViewport)
+
       window.addEventListener("resize", keepFrameInsideViewport)
     },
     {
@@ -196,14 +330,20 @@ export function useFleetTerminalModal({ props, emit }) {
   watch(
     () => props.history,
     () => {
-      if (props.modelValue && props.activo) {
-        setInitialHistory()
-      }
+      if (!props.modelValue || !props.activo) return
+
+      scheduleHistorySync()
     },
   )
 
   onBeforeUnmount(() => {
     stopInteraction()
+
+    if (historySyncTimer !== null) {
+      window.clearTimeout(historySyncTimer)
+      historySyncTimer = null
+    }
+
     window.removeEventListener("resize", keepFrameInsideViewport)
   })
 

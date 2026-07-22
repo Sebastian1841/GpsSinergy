@@ -1,10 +1,13 @@
 import { computed, ref } from "vue"
 
 import { mockDatabaseSeed } from "../../data/mockDatabase.js"
+import { readJsonStorage, writeJsonStorage } from "../../services/storage/browserStorage.js"
+import { getAssetTypeOption } from "../../utils/activos/assetTypeOptions.js"
 
 const STORAGE_KEY = "sinergy-mock-database"
 const STORAGE_VERSION = 1
 const PERSIST_DEBOUNCE_MS = 250
+const BEFORE_UNLOAD_HANDLER_KEY = "__sinergyMockDatabaseBeforeUnloadHandler"
 
 let persistTimeout = null
 
@@ -29,36 +32,268 @@ const emptyCompanyAssetStats = Object.freeze({
   alertsCount: 0,
 })
 
-const normalizeUsers = (items = []) => {
-  return items.map((user) => ({
-    ...user,
-    isPlatformAdmin: Boolean(user.isPlatformAdmin || user.id === "user-001"),
+const mergeSeedById = (items = [], seedItems = []) => {
+  const itemIds = new Set(items.map((item) => normalizeKey(item.id)))
+  const missingSeedItems = seedItems.filter((item) => !itemIds.has(normalizeKey(item.id)))
+
+  return [...items, ...cloneData(missingSeedItems)]
+}
+
+const buildCompanyReports = (enabled = true) => {
+  return mockDatabaseSeed.reportTypes.map((reportType) => ({
+    reportId: reportType.id,
+    enabled,
   }))
 }
 
-const readPersistedDatabase = () => {
-  if (typeof window === "undefined") return null
+const normalizeCompanyReports = () => buildCompanyReports(true)
 
-  try {
-    const payload = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "null")
+const normalizeCompany = (company) => {
+  const companyId = normalizeKey(company?.id)
 
-    if (payload?.version !== STORAGE_VERSION || !payload.data) return null
-
-    return payload.data
-  } catch {
-    return null
+  return {
+    ...company,
+    applicationId: company?.applicationId || `app-${companyId}`,
+    reports: normalizeCompanyReports(company),
+    sucursales: Array.isArray(company?.sucursales) ? company.sucursales : [],
+    sucursalesHabilitadas:
+      typeof company?.sucursalesHabilitadas === "boolean" ? company.sucursalesHabilitadas : true,
   }
+}
+
+const normalizeCompanies = (items = []) => {
+  return items.map(normalizeCompany)
+}
+
+const normalizeApplicationDefinition = (application) => {
+  const companyId = normalizeKey(application?.companyId)
+  const applicationId = normalizeKey(application?.id || application?.applicationId)
+
+  return {
+    ...application,
+    id: applicationId || `app-${companyId}`,
+    companyId,
+    shortName: application?.shortName || "APP",
+    type: application?.type || "Empresa cliente",
+  }
+}
+
+const normalizeApplicationDefinitions = (items = []) => {
+  return mergeSeedById(items, mockDatabaseSeed.applicationDefinitions).map(
+    normalizeApplicationDefinition,
+  )
+}
+
+const findSeedApplicationByCompanyId = (companyId) => {
+  return mockDatabaseSeed.applicationDefinitions.find((application) => {
+    return normalizeKey(application.companyId) === normalizeKey(companyId)
+  })
+}
+
+const findSeedApplicationById = (applicationId) => {
+  return mockDatabaseSeed.applicationDefinitions.find((application) => {
+    return normalizeKey(application.id) === normalizeKey(applicationId)
+  })
+}
+
+const resolveAssetTypeOption = (asset, seedAsset) => {
+  return getAssetTypeOption(
+    asset?.assetType ||
+      asset?.tipoActivo ||
+      asset?.mapIcon ||
+      asset?.markerIcon ||
+      asset?.iconType ||
+      seedAsset?.assetType ||
+      seedAsset?.tipoActivo ||
+      seedAsset?.mapIcon,
+  )
+}
+
+const resolveAssetMapIcon = (asset, seedAsset, assetTypeOption) => {
+  if (Object.hasOwn(asset || {}, "mapIcon")) {
+    return asset.mapIcon || assetTypeOption?.mapIcon || "vehicle-3d"
+  }
+
+  if (seedAsset) return seedAsset.mapIcon || assetTypeOption?.mapIcon || "vehicle-3d"
+
+  return assetTypeOption?.mapIcon || "vehicle-3d"
+}
+
+const normalizeAsset = (asset) => {
+  const seedAsset = mockDatabaseSeed.assets.find((item) => {
+    return normalizeKey(item.id) === normalizeKey(asset?.id)
+  })
+
+  const seedApplicationByAssetApplication = findSeedApplicationById(
+    asset?.applicationId || seedAsset?.applicationId,
+  )
+  const seedApplicationByAssetCompany = findSeedApplicationByCompanyId(
+    asset?.companyId || seedAsset?.companyId,
+  )
+
+  const applicationId =
+    asset?.applicationId || seedAsset?.applicationId || seedApplicationByAssetCompany?.id || ""
+
+  const companyId =
+    asset?.companyId ||
+    seedAsset?.companyId ||
+    seedApplicationByAssetApplication?.companyId ||
+    seedApplicationByAssetCompany?.companyId ||
+    ""
+
+  const patente = asset?.patente || asset?.patent || seedAsset?.patente || seedAsset?.patent || ""
+
+  const nombrePantalla =
+    asset?.nombrePantalla ||
+    asset?.nombre ||
+    asset?.name ||
+    asset?.vehiculo ||
+    seedAsset?.nombrePantalla ||
+    seedAsset?.nombre ||
+    seedAsset?.name ||
+    seedAsset?.vehiculo ||
+    patente ||
+    "Activo"
+  const assetTypeOption = resolveAssetTypeOption(asset, seedAsset)
+  const mapIcon = resolveAssetMapIcon(asset, seedAsset, assetTypeOption)
+
+  return {
+    ...asset,
+    applicationId,
+    companyId,
+    patente,
+    nombrePantalla,
+    assetType:
+      asset?.assetType || asset?.tipoActivo || seedAsset?.assetType || assetTypeOption.value,
+    assetTypeLabel:
+      asset?.assetTypeLabel ||
+      asset?.tipoActivoLabel ||
+      seedAsset?.assetTypeLabel ||
+      assetTypeOption.label,
+    tipoActivo:
+      asset?.tipoActivo || asset?.assetType || seedAsset?.tipoActivo || assetTypeOption.value,
+    tipoActivoLabel:
+      asset?.tipoActivoLabel ||
+      asset?.assetTypeLabel ||
+      seedAsset?.tipoActivoLabel ||
+      assetTypeOption.label,
+    mapIcon,
+    markerIcon: asset?.markerIcon || mapIcon,
+    iconType: asset?.iconType || mapIcon,
+    estado: asset?.estado || asset?.status || seedAsset?.estado || "offline",
+  }
+}
+
+const normalizeAssets = (items = []) => {
+  return mergeSeedById(items, mockDatabaseSeed.assets).map(normalizeAsset)
+}
+
+const normalizeUser = (user) => {
+  return {
+    ...user,
+    isPlatformAdmin: Boolean(user.isPlatformAdmin || user.id === "user-001"),
+  }
+}
+
+const normalizeUsers = (items = []) => {
+  return mergeSeedById(items, mockDatabaseSeed.users).map(normalizeUser)
+}
+
+const normalizeAccessScope = (scope = {}) => {
+  return {
+    ...scope,
+    type: scope?.type || "all",
+    assetIds: Array.isArray(scope?.assetIds) ? scope.assetIds : [],
+    sucursalIds: Array.isArray(scope?.sucursalIds) ? scope.sucursalIds : [],
+  }
+}
+
+const createDisabledModuleAccess = (moduleId) => ({
+  moduleId,
+  enabled: false,
+})
+
+const createDisabledFunctionAccess = (functionId) => ({
+  functionId,
+  enabled: false,
+  permissions: {
+    view: false,
+    edit: false,
+    admin: false,
+  },
+})
+
+const normalizeAccessModules = (items = []) => {
+  const modulesById = new Map(
+    items.map((moduleAccess) => [normalizeKey(moduleAccess.moduleId), moduleAccess]),
+  )
+  const seedModuleIds = new Set(mockDatabaseSeed.modules.map((module) => normalizeKey(module.id)))
+  const normalizedSeedModules = mockDatabaseSeed.modules.map((module) => {
+    return modulesById.get(normalizeKey(module.id)) || createDisabledModuleAccess(module.id)
+  })
+  const extraModules = items.filter((moduleAccess) => {
+    return !seedModuleIds.has(normalizeKey(moduleAccess.moduleId))
+  })
+
+  return [...normalizedSeedModules, ...extraModules]
+}
+
+const normalizeAccessFunctions = (items = []) => {
+  const functionsById = new Map(
+    items.map((functionAccess) => [normalizeKey(functionAccess.functionId), functionAccess]),
+  )
+  const seedFunctionIds = new Set(
+    mockDatabaseSeed.moduleFunctions.map((moduleFunction) => normalizeKey(moduleFunction.id)),
+  )
+  const normalizedSeedFunctions = mockDatabaseSeed.moduleFunctions.map((moduleFunction) => {
+    return (
+      functionsById.get(normalizeKey(moduleFunction.id)) ||
+      createDisabledFunctionAccess(moduleFunction.id)
+    )
+  })
+  const extraFunctions = items.filter((functionAccess) => {
+    return !seedFunctionIds.has(normalizeKey(functionAccess.functionId))
+  })
+
+  return [...normalizedSeedFunctions, ...extraFunctions]
+}
+
+const normalizeAccess = (access) => {
+  return {
+    ...access,
+    modules: normalizeAccessModules(Array.isArray(access?.modules) ? access.modules : []),
+    functions: normalizeAccessFunctions(Array.isArray(access?.functions) ? access.functions : []),
+    scope: normalizeAccessScope(access?.scope),
+  }
+}
+
+const normalizeAccesses = (items = []) => {
+  return mergeSeedById(items, mockDatabaseSeed.accesses).map(normalizeAccess)
+}
+
+const readPersistedDatabase = () => {
+  const payload = readJsonStorage(STORAGE_KEY, null)
+
+  if (payload?.version !== STORAGE_VERSION || !payload.data) return null
+
+  return payload.data
 }
 
 const persistedDatabase = readPersistedDatabase()
 
-const companies = ref(cloneData(persistedDatabase?.companies || mockDatabaseSeed.companies))
-const applicationDefinitions = ref(
-  cloneData(persistedDatabase?.applicationDefinitions || mockDatabaseSeed.applicationDefinitions),
+const companies = ref(
+  normalizeCompanies(cloneData(persistedDatabase?.companies || mockDatabaseSeed.companies)),
 )
-const assets = ref(cloneData(persistedDatabase?.assets || mockDatabaseSeed.assets))
+const applicationDefinitions = ref(
+  normalizeApplicationDefinitions(
+    cloneData(persistedDatabase?.applicationDefinitions || mockDatabaseSeed.applicationDefinitions),
+  ),
+)
+const assets = ref(normalizeAssets(cloneData(persistedDatabase?.assets || mockDatabaseSeed.assets)))
 const users = ref(normalizeUsers(cloneData(persistedDatabase?.users || mockDatabaseSeed.users)))
-const accesses = ref(cloneData(persistedDatabase?.accesses || mockDatabaseSeed.accesses))
+const accesses = ref(
+  normalizeAccesses(cloneData(persistedDatabase?.accesses || mockDatabaseSeed.accesses)),
+)
 
 const reportTypes = ref(cloneData(mockDatabaseSeed.reportTypes))
 const modules = ref(cloneData(mockDatabaseSeed.modules))
@@ -67,27 +302,38 @@ const permissions = ref(cloneData(mockDatabaseSeed.permissions))
 const scopes = ref(cloneData(mockDatabaseSeed.scopes))
 const roles = ref(cloneData(mockDatabaseSeed.roles))
 
-const persistDatabase = () => {
-  if (typeof window === "undefined") return
+const getCompanyReportsSignature = (items = []) => {
+  return JSON.stringify(
+    items.map((company) => ({
+      id: company.id,
+      reports: company.reports,
+      sucursalesHabilitadas: company.sucursalesHabilitadas,
+    })),
+  )
+}
 
-  try {
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        version: STORAGE_VERSION,
-        data: {
-          companies: companies.value,
-          applicationDefinitions: applicationDefinitions.value,
-          assets: assets.value,
-          users: users.value,
-          accesses: accesses.value,
-        },
-        updatedAt: new Date().toISOString(),
-      }),
-    )
-  } catch {
-    // Persistence is optional for the frontend-only mock database.
+const syncCompaniesWithSeed = () => {
+  const previousSignature = getCompanyReportsSignature(companies.value)
+
+  companies.value = normalizeCompanies(companies.value)
+
+  if (previousSignature !== getCompanyReportsSignature(companies.value)) {
+    schedulePersistDatabase()
   }
+}
+
+const persistDatabase = () => {
+  writeJsonStorage(STORAGE_KEY, {
+    version: STORAGE_VERSION,
+    data: {
+      companies: companies.value,
+      applicationDefinitions: applicationDefinitions.value,
+      assets: assets.value,
+      users: users.value,
+      accesses: accesses.value,
+    },
+    updatedAt: new Date().toISOString(),
+  })
 }
 
 const schedulePersistDatabase = () => {
@@ -103,15 +349,24 @@ const schedulePersistDatabase = () => {
   }, PERSIST_DEBOUNCE_MS)
 }
 
-if (typeof window !== "undefined") {
-  window.addEventListener("beforeunload", () => {
-    if (persistTimeout !== null) {
-      window.clearTimeout(persistTimeout)
-      persistTimeout = null
-    }
+const handleBeforeUnloadPersist = () => {
+  if (persistTimeout !== null) {
+    window.clearTimeout(persistTimeout)
+    persistTimeout = null
+  }
 
-    persistDatabase()
-  })
+  persistDatabase()
+}
+
+if (typeof window !== "undefined") {
+  const previousHandler = window[BEFORE_UNLOAD_HANDLER_KEY]
+
+  if (typeof previousHandler === "function") {
+    window.removeEventListener("beforeunload", previousHandler)
+  }
+
+  window[BEFORE_UNLOAD_HANDLER_KEY] = handleBeforeUnloadPersist
+  window.addEventListener("beforeunload", handleBeforeUnloadPersist)
 }
 
 const companiesById = computed(() => {
@@ -351,17 +606,22 @@ const createCompany = (company) => {
   const applicationId = company.applicationId || `app-${companyId}`
   const companyName = String(company.name || "Empresa")
 
-  companies.value.unshift({
-    ...company,
-    applicationId,
-  })
+  companies.value.unshift(
+    normalizeCompany({
+      ...company,
+      applicationId,
+      reports: company.reports || buildCompanyReports(true),
+    }),
+  )
 
-  applicationDefinitions.value.unshift({
-    id: applicationId,
-    companyId,
-    shortName: company.shortName || companyName.slice(0, 3).toUpperCase(),
-    type: company.status === "internal" ? "Administracion interna" : "Empresa cliente",
-  })
+  applicationDefinitions.value.unshift(
+    normalizeApplicationDefinition({
+      id: applicationId,
+      companyId,
+      shortName: company.shortName || companyName.slice(0, 3).toUpperCase(),
+      type: company.status === "internal" ? "Administracion interna" : "Empresa cliente",
+    }),
+  )
 
   schedulePersistDatabase()
 
@@ -377,10 +637,7 @@ const createUser = (user) => {
 
   if (identityExists) return null
 
-  const nextUser = {
-    ...user,
-    isPlatformAdmin: Boolean(user.isPlatformAdmin),
-  }
+  const nextUser = normalizeUser(user)
 
   users.value.unshift(nextUser)
   schedulePersistDatabase()
@@ -393,20 +650,23 @@ const updateUser = (userId, changes) => {
 
   if (!user) return null
 
-  Object.assign(user, changes)
+  Object.assign(user, normalizeUser({ ...user, ...changes }))
   schedulePersistDatabase()
 
   return user
 }
 
 const createAccess = (access) => {
-  const userExists = usersById.value.has(normalizeKey(access.userId))
-  const applicationExists = applicationDefinitionsById.value.has(normalizeKey(access.applicationId))
-  const accessIdExists = accessesById.value.has(normalizeKey(access.id))
+  const nextAccess = normalizeAccess(access)
+  const userExists = usersById.value.has(normalizeKey(nextAccess.userId))
+  const applicationExists = applicationDefinitionsById.value.has(
+    normalizeKey(nextAccess.applicationId),
+  )
+  const accessIdExists = accessesById.value.has(normalizeKey(nextAccess.id))
   const userApplicationAccessExists = accessesByUserApplicationKey.value.has(
     buildAccessUniqueKey({
-      userId: access.userId,
-      applicationId: access.applicationId,
+      userId: nextAccess.userId,
+      applicationId: nextAccess.applicationId,
     }),
   )
 
@@ -414,10 +674,10 @@ const createAccess = (access) => {
     return null
   }
 
-  accesses.value.unshift(access)
+  accesses.value.unshift(nextAccess)
   schedulePersistDatabase()
 
-  return access
+  return nextAccess
 }
 
 const deleteAccess = (accessId) => {
@@ -438,17 +698,19 @@ const updateCompany = (companyId, changes) => {
 
   if (!company) return null
 
-  Object.assign(company, changes)
+  Object.assign(company, normalizeCompany({ ...company, ...changes }))
   schedulePersistDatabase()
 
   return company
 }
 
 const createAsset = (asset) => {
-  assets.value.unshift(asset)
+  const nextAsset = normalizeAsset(asset)
+
+  assets.value.unshift(nextAsset)
   schedulePersistDatabase()
 
-  return asset
+  return nextAsset
 }
 
 const updateAsset = (assetId, changes) => {
@@ -458,10 +720,10 @@ const updateAsset = (assetId, changes) => {
   assets.value = assets.value.map((asset) => {
     if (normalizeKey(asset.id) !== normalizedAssetId) return asset
 
-    updatedAsset = {
+    updatedAsset = normalizeAsset({
       ...asset,
       ...changes,
-    }
+    })
 
     return updatedAsset
   })
@@ -548,6 +810,8 @@ const deleteSucursal = (sucursalId) => {
 }
 
 export function useMockDatabase() {
+  syncCompaniesWithSeed()
+
   return {
     companies,
     companyRecords,

@@ -1,65 +1,24 @@
 import { ref } from "vue"
 
 import { endDevMeasure, startDevMeasure } from "../../../utils/performanceUtils.js"
-
-const MOVEMENT_TRAIL_PANE = "movementTrailPane"
-
-const MOVEMENT_TRAIL_MAX_BACKGROUND_RAW_POINTS = 140
-const MOVEMENT_TRAIL_MAX_SELECTED_RAW_POINTS = 900
-const MOVEMENT_TRAIL_MAX_RENDER_POINTS = 55
-const MOVEMENT_TRAIL_MAX_VIEWPORT_ENTRIES = 350
-
-const MOVEMENT_TRAIL_MIN_RENDER_ZOOM = 13
-const MOVEMENT_TRAIL_MIN_START_MARKER_ZOOM = 15
-const MOVEMENT_TRAIL_MAX_START_MARKERS = 80
-const MOVEMENT_TRAIL_MIN_DISTANCE_METERS = 14
-const MOVEMENT_TRAIL_MAX_JUMP_METERS = 5000
-const MOVEMENT_TRAIL_VIEWPORT_PADDING = 0.18
-
-const MOVEMENT_TRAIL_COLOR = "#FF6600"
-const MOVEMENT_TRAIL_HALO_COLOR = "#102372"
-const MOVEMENT_TRAIL_WEIGHT = 3
-const MOVEMENT_TRAIL_HALO_WEIGHT = 7
-
-const MOVEMENT_TRAIL_SATELLITE_HALO_COLOR = "#ffffff"
-const MOVEMENT_TRAIL_SATELLITE_CORE_COLOR = "#FF7A1A"
-
-const RENDER_MOVEMENT_TRAILS_MEASURE = "renderMovementTrails"
-
-const buildRenderableTrailPoints = (points = []) => {
-  if (!Array.isArray(points)) return []
-
-  if (points.length <= MOVEMENT_TRAIL_MAX_RENDER_POINTS) {
-    return [...points]
-  }
-
-  const renderPoints = []
-  const lastIndex = points.length - 1
-  const step = lastIndex / (MOVEMENT_TRAIL_MAX_RENDER_POINTS - 1)
-
-  for (let index = 0; index < MOVEMENT_TRAIL_MAX_RENDER_POINTS; index += 1) {
-    const pointIndex = Math.round(index * step)
-    const point = points[pointIndex]
-
-    if (point) {
-      renderPoints.push(point)
-    }
-  }
-
-  return renderPoints
-}
-
-const trimRawTrailPoints = (points = [], maxPoints = MOVEMENT_TRAIL_MAX_BACKGROUND_RAW_POINTS) => {
-  if (!Array.isArray(points)) return []
-
-  if (points.length <= maxPoints) {
-    return points
-  }
-
-  points.splice(0, points.length - maxPoints)
-
-  return points
-}
+import {
+  MOVEMENT_TRAIL_MAX_BACKGROUND_RAW_POINTS,
+  MOVEMENT_TRAIL_MAX_JUMP_METERS,
+  MOVEMENT_TRAIL_MAX_SELECTED_RAW_POINTS,
+  MOVEMENT_TRAIL_MAX_START_MARKERS,
+  MOVEMENT_TRAIL_MAX_VIEWPORT_ENTRIES,
+  MOVEMENT_TRAIL_MIN_DISTANCE_METERS,
+  MOVEMENT_TRAIL_MIN_RENDER_ZOOM,
+  MOVEMENT_TRAIL_MIN_START_MARKER_ZOOM,
+  MOVEMENT_TRAIL_PANE,
+  RENDER_MOVEMENT_TRAILS_MEASURE,
+} from "./movementTrails/movementTrailConstants.js"
+import {
+  buildRenderableTrailPoints,
+  trimRawTrailPoints,
+} from "./movementTrails/movementTrailData.js"
+import { createMovementTrailStyleController } from "./movementTrails/movementTrailStyles.js"
+import { createMovementTrailViewportController } from "./movementTrails/movementTrailViewport.js"
 
 export function createMovementTrailController({
   L,
@@ -69,6 +28,7 @@ export function createMovementTrailController({
   getActivoLatLng,
   normalizeId,
   getSelectedActivoId = () => null,
+  getFocusedActivoIds = () => [],
 }) {
   const showMovementTrails = ref(true)
   const movementTrailCache = new Map()
@@ -78,9 +38,24 @@ export function createMovementTrailController({
   let sharedHaloLine = null
   let sharedCoreLine = null
   let sharedStyleSignature = ""
-  let cachedStartIcon = null
-  let cachedStartIconSignature = ""
-  let boundViewportMap = null
+  let focusedActivoIdSetCache = new Set()
+  let focusedActivoSignatureCache = ""
+
+  const { getMovementTrailStyle, getTrailStartIcon, getTrailStyleSignature } =
+    createMovementTrailStyleController({
+      L,
+      getMapType,
+    })
+
+  const {
+    bindMovementTrailViewportEvents,
+    getViewportBounds,
+    trailHasPointInsideViewport,
+    unbindMovementTrailViewportEvents,
+  } = createMovementTrailViewportController({
+    getMap,
+    scheduleRender: scheduleMovementTrailRender,
+  })
 
   const requestTrailFrame = (callback) => {
     if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
@@ -109,57 +84,34 @@ export function createMovementTrailController({
     return Boolean(selectedActivoId && selectedActivoId === normalizeId(activoId))
   }
 
+  const getFocusedActivoIdSet = () => {
+    const focusedIds = getFocusedActivoIds?.() || []
+    const nextSignature = focusedIds
+      .map((activoId) => normalizeId(activoId))
+      .filter((activoId) => Boolean(activoId))
+      .sort()
+      .join("|")
+
+    if (nextSignature !== focusedActivoSignatureCache) {
+      focusedActivoSignatureCache = nextSignature
+      focusedActivoIdSetCache = new Set(nextSignature ? nextSignature.split("|") : [])
+    }
+
+    return focusedActivoIdSetCache
+  }
+
+  const isTrailAllowedByFocus = (activoId) => {
+    const focusedActivoIds = getFocusedActivoIdSet()
+
+    if (!focusedActivoIds.size) return true
+
+    return focusedActivoIds.has(normalizeId(activoId))
+  }
+
   const getMaxRawPointsForTrail = (activoId) => {
     return isSelectedTrail(activoId)
       ? MOVEMENT_TRAIL_MAX_SELECTED_RAW_POINTS
       : MOVEMENT_TRAIL_MAX_BACKGROUND_RAW_POINTS
-  }
-
-  const getViewportBounds = () => {
-    const map = getMap()
-    const bounds = map?.getBounds?.()
-
-    if (!bounds) return null
-
-    if (typeof bounds.pad === "function") {
-      return bounds.pad(MOVEMENT_TRAIL_VIEWPORT_PADDING)
-    }
-
-    return bounds
-  }
-
-  const trailHasPointInsideViewport = (trail, viewportBounds) => {
-    if (!trail || !viewportBounds) return true
-
-    const points = trail.renderPoints?.length ? trail.renderPoints : trail.rawPoints
-
-    if (!points?.length) return false
-
-    const lastPoint = points[points.length - 1]
-
-    if (lastPoint && viewportBounds.contains(lastPoint)) {
-      return true
-    }
-
-    return points.some((point) => viewportBounds.contains(point))
-  }
-
-  const bindMovementTrailViewportEvents = (map) => {
-    if (!map || boundViewportMap === map) return
-
-    if (boundViewportMap) {
-      boundViewportMap.off("moveend zoomend resize", scheduleMovementTrailRender)
-    }
-
-    boundViewportMap = map
-    boundViewportMap.on("moveend zoomend resize", scheduleMovementTrailRender)
-  }
-
-  const unbindMovementTrailViewportEvents = () => {
-    if (!boundViewportMap) return
-
-    boundViewportMap.off("moveend zoomend resize", scheduleMovementTrailRender)
-    boundViewportMap = null
   }
 
   const ensureMovementTrailPane = () => {
@@ -212,86 +164,10 @@ export function createMovementTrailController({
     )
   }
 
-  const getMovementTrailStyle = () => {
-    const isSatellite = getMapType() === "satellite"
-
-    if (isSatellite) {
-      return {
-        haloColor: MOVEMENT_TRAIL_SATELLITE_HALO_COLOR,
-        haloWeight: 9,
-        haloOpacity: 0.72,
-        coreColor: MOVEMENT_TRAIL_SATELLITE_CORE_COLOR,
-        coreWeight: 4,
-        coreOpacity: 0.95,
-        startBorderColor: MOVEMENT_TRAIL_SATELLITE_CORE_COLOR,
-        startBackground: "#ffffff",
-        startShadow: "0 2px 8px rgba(0, 0, 0, 0.45)",
-      }
-    }
-
-    return {
-      haloColor: MOVEMENT_TRAIL_HALO_COLOR,
-      haloWeight: MOVEMENT_TRAIL_HALO_WEIGHT,
-      haloOpacity: 0.1,
-      coreColor: MOVEMENT_TRAIL_COLOR,
-      coreWeight: MOVEMENT_TRAIL_WEIGHT,
-      coreOpacity: 0.68,
-      startBorderColor: MOVEMENT_TRAIL_COLOR,
-      startBackground: "#ffffff",
-      startShadow: "0 2px 6px rgba(16, 35, 114, 0.22)",
-    }
-  }
-
-  const getTrailStyleSignature = (trailStyle) => {
-    return [
-      trailStyle.haloColor,
-      trailStyle.haloWeight,
-      trailStyle.haloOpacity,
-      trailStyle.coreColor,
-      trailStyle.coreWeight,
-      trailStyle.coreOpacity,
-      trailStyle.startBorderColor,
-      trailStyle.startBackground,
-      trailStyle.startShadow,
-      getMapType(),
-    ].join(":")
-  }
-
   const getLatLngSignature = (latLng) => {
     if (!latLng) return ""
 
     return `${latLng.lat}:${latLng.lng}`
-  }
-
-  const getTrailStartIcon = (trailStyle, styleSignature) => {
-    if (cachedStartIcon && cachedStartIconSignature === styleSignature) {
-      return cachedStartIcon
-    }
-
-    const size = getMapType() === "satellite" ? 12 : 10
-    const half = size / 2
-
-    cachedStartIcon = L.divIcon({
-      className: "",
-      html: `
-        <div
-          style="
-            width: ${size}px;
-            height: ${size}px;
-            border-radius: 999px;
-            background: ${trailStyle.startBackground};
-            border: 2px solid ${trailStyle.startBorderColor};
-            box-shadow: ${trailStyle.startShadow};
-          "
-        ></div>
-      `,
-      iconSize: [size, size],
-      iconAnchor: [half, half],
-    })
-
-    cachedStartIconSignature = styleSignature
-
-    return cachedStartIcon
   }
 
   const toLeafletLatLng = (activoLatLng) => {
@@ -308,6 +184,7 @@ export function createMovementTrailController({
 
     movementTrailCache.forEach((trail, activoId) => {
       if ((trail.renderPoints || []).length < 2) return
+      if (!isTrailAllowedByFocus(activoId)) return
 
       const entry = {
         activoId,
@@ -561,6 +438,40 @@ export function createMovementTrailController({
     })
   }
 
+  const rebuildMovementTrail = (activoId) => {
+    const normalizedActivoId = normalizeId(activoId)
+    const trail = movementTrailCache.get(normalizedActivoId)
+
+    if (!trail) return
+
+    trimRawTrailPoints(trail.rawPoints, getMaxRawPointsForTrail(normalizedActivoId))
+    trail.renderPoints = buildRenderableTrailPoints(trail.rawPoints)
+  }
+
+  const refreshMovementTrailSelection = ({ previousId = "", nextId = "" } = {}) => {
+    clearPendingMovementTrailUpdates()
+
+    const changedIds = new Set([normalizeId(previousId), normalizeId(nextId)].filter(Boolean))
+
+    changedIds.forEach((activoId) => {
+      rebuildMovementTrail(activoId)
+    })
+
+    renderMovementTrails()
+  }
+
+  const refreshMovementTrailVisibility = () => {
+    scheduleMovementTrailRender()
+  }
+
+  const refreshMovementTrailStyle = () => {
+    clearPendingMovementTrailUpdates()
+
+    renderMovementTrails({
+      forceStyle: true,
+    })
+  }
+
   const registerMovementTrailPoint = (activo) => {
     if (!activo) return
 
@@ -647,5 +558,8 @@ export function createMovementTrailController({
     cleanupMovementTrails,
     toggleMovementTrails,
     redrawAllMovementTrails,
+    refreshMovementTrailSelection,
+    refreshMovementTrailStyle,
+    refreshMovementTrailVisibility,
   }
 }

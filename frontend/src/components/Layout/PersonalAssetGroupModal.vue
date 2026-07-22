@@ -5,7 +5,7 @@
     @click.self="closeModal"
   >
     <section
-      class="flex max-h-[calc(100%-16px)] w-full max-w-[480px] flex-col overflow-hidden rounded-xl border border-[#d8dee8] bg-white shadow-2xl"
+      class="flex max-h-[calc(100%-16px)] w-full max-w-[480px] flex-col overflow-hidden rounded-xl bg-white shadow-[0_24px_80px_rgba(15,23,42,0.34)]"
     >
       <header class="shrink-0 border-b border-[#edf1f5] px-4 py-3">
         <div class="flex items-center justify-between gap-3">

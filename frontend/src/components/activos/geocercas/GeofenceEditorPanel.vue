@@ -25,6 +25,20 @@
         />
       </label>
 
+      <label class="block">
+        <span class="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+          Grupo
+        </span>
+
+        <input
+          :value="draftGeofenceForm.groupName"
+          type="text"
+          placeholder="Ej: PEAJE"
+          class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#102372]"
+          @input="$emit('update-draft-field', 'groupName', $event.target.value)"
+        />
+      </label>
+
       <div class="grid grid-cols-2 gap-2">
         <label class="block">
           <span
@@ -85,6 +99,21 @@
           placeholder="Nombre de la geocerca"
           class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#102372]"
           @change="$emit('update-editing-meta', 'name', $event.target.value)"
+          @keydown.enter.prevent="$event.target.blur()"
+        />
+      </label>
+
+      <label class="block">
+        <span class="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+          Grupo
+        </span>
+
+        <input
+          :value="editingDraft.groupName"
+          type="text"
+          placeholder="Ej: PEAJE"
+          class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#102372]"
+          @change="$emit('update-editing-meta', 'groupName', $event.target.value)"
           @keydown.enter.prevent="$event.target.blur()"
         />
       </label>

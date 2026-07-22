@@ -1,0 +1,5 @@
+export const ITINERARY_MAX_RENDER_POINTS = 800
+export const ITINERARY_MIN_DETAIL_ZOOM = 14
+export const ITINERARY_MAX_STOP_MARKERS = 120
+export const ITINERARY_MAX_ROUTE_ARROWS = 4
+export const RENDER_ITINERARY_ROUTE_MEASURE = "renderItineraryRoute"

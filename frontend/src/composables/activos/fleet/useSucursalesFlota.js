@@ -1,7 +1,7 @@
 import { computed, unref } from "vue"
 
 import { useCompanyBranches } from "../../companies/useCompanyBranches.js"
-import { useMockDatabase } from "../../mock/useMockDatabase.js"
+import { useCompaniesService } from "../../../services/companies/useCompaniesService.js"
 
 const getPatent = (activo) => {
   return activo.patente || activo.patent || activo.vehiculo || `Activo ${activo.id}`
@@ -12,11 +12,10 @@ export function useSucursalesFlota({ activos, companyId = "general" }) {
     companyRecords,
     getCompany,
     updateCompany,
-    updateAsset,
     addSucursal: addDatabaseSucursal,
     updateSucursal,
     deleteSucursal: deleteDatabaseSucursal,
-  } = useMockDatabase()
+  } = useCompaniesService()
 
   const {
     alternarSucursalesHabilitadas: toggleCompanyBranchesEnabled,
@@ -24,11 +23,9 @@ export function useSucursalesFlota({ activos, companyId = "general" }) {
     actualizarNombreSucursal: updateCompanyBranchName,
     alternarEstadoSucursal: toggleCompanyBranchStatus,
     eliminarSucursal: deleteCompanyBranch,
-    actualizarSucursalActivo: updateAssetBranch,
   } = useCompanyBranches({
     getCompany,
     updateCompany,
-    updateAsset,
     addSucursal: addDatabaseSucursal,
     updateSucursal,
     deleteSucursal: deleteDatabaseSucursal,
@@ -68,7 +65,10 @@ export function useSucursalesFlota({ activos, companyId = "general" }) {
       assets: fleetAssets.map((activo) => ({
         id: String(activo.id),
         patent: getPatent(activo),
-        sucursalId: activo.sucursalId || null,
+        vehicle: activo.vehiculo || activo.name || "",
+        conductor: activo.conductor || activo.driver || "",
+        deviceId: activo.deviceId || activo.imei || "",
+        sucursalId: activo.sucursalId ? String(activo.sucursalId) : null,
       })),
     }
   })
@@ -100,20 +100,6 @@ export function useSucursalesFlota({ activos, companyId = "general" }) {
     deleteCompanyBranch(sucursalId, empresaSucursales.value.sucursales)
   }
 
-  const actualizarSucursalActivo = ({ assetId, sucursalId }) => {
-    const asset = selectedCompanyAssets.value.find((item) => {
-      return String(item.id) === String(assetId)
-    })
-
-    if (!asset) return
-
-    updateAssetBranch({
-      asset,
-      sucursalId,
-      sucursales: empresaSucursales.value.sucursales,
-    })
-  }
-
   return {
     empresaSucursales,
     alternarSucursalesHabilitadas,
@@ -121,6 +107,5 @@ export function useSucursalesFlota({ activos, companyId = "general" }) {
     actualizarNombreSucursal,
     alternarEstadoSucursal,
     eliminarSucursal,
-    actualizarSucursalActivo,
   }
 }

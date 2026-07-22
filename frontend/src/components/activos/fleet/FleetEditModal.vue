@@ -6,7 +6,7 @@
       @click.self="closeModal"
     >
       <section
-        class="flex max-h-[calc(100%-16px)] w-full max-w-[920px] flex-col overflow-hidden rounded-t-2xl border border-[#d8dee8] bg-white shadow-2xl sm:max-h-[calc(100%-32px)] sm:rounded-2xl"
+        class="flex max-h-[calc(100%-16px)] w-full max-w-[920px] flex-col overflow-hidden rounded-t-2xl bg-white shadow-[0_24px_80px_rgba(15,23,42,0.34)] sm:max-h-[calc(100%-32px)] sm:rounded-2xl"
       >
         <header class="shrink-0 bg-[#102372] px-4 py-3 sm:px-5">
           <div class="flex items-center justify-between gap-3">
@@ -177,34 +177,59 @@
                     />
                   </label>
 
-                  <label class="flex flex-col gap-1">
+                  <label class="flex flex-col gap-1 sm:col-span-2">
                     <span class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
-                      Estado
+                      Grupo
                     </span>
 
                     <select
-                      v-model="form.estado"
+                      v-model="form.sucursalId"
                       class="h-10 cursor-pointer rounded-lg border border-[#cbd5e1] bg-white px-3 text-[12px] font-black text-[#172033] outline-none transition focus:border-[#FF6600] focus:ring-2 focus:ring-[#FF6600]/10"
                     >
-                      <option value="moving">Ruta</option>
-                      <option value="idle">Espera</option>
-                      <option value="stopped">Alerta</option>
-                      <option value="offline">Offline</option>
+                      <option value="">Sin grupo</option>
+                      <option v-for="group in groupOptions" :key="group.id" :value="group.id">
+                        {{ group.name }}{{ group.active === false ? " (inactivo)" : "" }}
+                      </option>
                     </select>
                   </label>
 
-                  <label class="flex flex-col gap-1">
+                  <div class="flex flex-col gap-1 sm:col-span-2">
                     <span class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
-                      Dirección
+                      Tipo de activo en mapa
                     </span>
 
-                    <input
-                      v-model="form.direccion"
-                      type="text"
-                      class="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-[12px] font-semibold text-[#172033] outline-none transition placeholder:text-slate-400 focus:border-[#FF6600] focus:ring-2 focus:ring-[#FF6600]/10"
-                      placeholder="Última ubicación registrada"
-                    />
-                  </label>
+                    <div class="grid grid-cols-2 gap-2 md:grid-cols-4">
+                      <button
+                        v-for="option in assetTypeOptions"
+                        :key="option.value"
+                        type="button"
+                        class="min-h-[62px] cursor-pointer rounded-lg border px-3 py-2 text-left transition"
+                        :class="
+                          selectedAssetType?.value === option.value
+                            ? 'border-[#FF6600] bg-[#fff7ed] shadow-sm'
+                            : 'border-[#d8dee8] bg-white hover:border-[#102372]/35 hover:bg-[#f8fafc]'
+                        "
+                        @click="selectAssetType(option.value)"
+                      >
+                        <span
+                          class="block truncate text-[11px] font-black"
+                          :class="
+                            selectedAssetType?.value === option.value
+                              ? 'text-[#FF6600]'
+                              : 'text-[#102372]'
+                          "
+                        >
+                          {{ option.label }}
+                        </span>
+
+                        <span
+                          class="mt-1 line-clamp-2 block text-[9px] font-semibold text-slate-500"
+                        >
+                          {{ option.description }}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
 
                   <label class="flex flex-col gap-1 sm:col-span-2">
                     <span class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
@@ -462,6 +487,10 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  groups: {
+    type: Array,
+    default: () => [],
+  },
 })
 
 const emit = defineEmits(["update:modelValue", "update-activo"])
@@ -469,6 +498,7 @@ const emit = defineEmits(["update:modelValue", "update-activo"])
 const {
   steps,
   trackerModelOptions,
+  assetTypeOptions,
   currentStep,
   currentStepConfig,
   progressWidth,
@@ -478,11 +508,14 @@ const {
   form,
   selectedTrackerModel,
   selectedTrackerModelLabel,
+  selectedAssetType,
+  groupOptions,
   canSaveActivo,
   requiredStatus,
   summaryItems,
   isStepCompleted,
   closeModal,
+  selectAssetType,
   submitForm,
 } = useFleetEditForm({ props, emit })
 </script>

@@ -1,192 +1,21 @@
 import { endDevMeasure, startDevMeasure } from "../../../../utils/performanceUtils.js"
+import {
+  RENDER_MARKER_CLUSTERS_MEASURE,
+  shouldClusterAssetMarkers,
+} from "./assetMarkerClusterConfig.js"
+import { getClusteredActivos } from "./assetMarkerClusterData.js"
+import {
+  getClusterLatLngs,
+  getNearestClusterLatLng,
+  resolveClusterClickZoom,
+} from "./assetMarkerClusterFocus.js"
+import {
+  buildClusterInputSignature,
+  buildClusterSignature,
+} from "./assetMarkerClusterSignatures.js"
+import { normalizeActivoId } from "./assetMarkerClusterUtils.js"
 
-const ASSET_CLUSTER_DEFAULT_MAX_ZOOM = 12
-const ASSET_CLUSTER_DENSE_MAX_ZOOM = 14
-const ASSET_CLUSTER_DENSE_MIN_ACTIVOS = 250
-
-const ASSET_CLUSTER_BASE_GRID_SIZE = 76
-const ASSET_CLUSTER_MIN_GRID_SIZE = 44
-const ASSET_CLUSTER_VIEWPORT_PRECISION = 3
-
-const RENDER_MARKER_CLUSTERS_MEASURE = "renderMarkerClusters"
-
-const normalizeClusterValue = (value) => {
-  if (value === null || value === undefined) return ""
-
-  return String(value)
-}
-
-const normalizeActivoId = (activo) => {
-  return String(activo?.id ?? "")
-}
-
-const roundMapValue = (value, precision = ASSET_CLUSTER_VIEWPORT_PRECISION) => {
-  const numberValue = Number(value)
-
-  if (!Number.isFinite(numberValue)) return ""
-
-  return numberValue.toFixed(precision)
-}
-
-const resolveAssetClusterMaxZoom = (activos = []) => {
-  return activos.length >= ASSET_CLUSTER_DENSE_MIN_ACTIVOS
-    ? ASSET_CLUSTER_DENSE_MAX_ZOOM
-    : ASSET_CLUSTER_DEFAULT_MAX_ZOOM
-}
-
-const resolveAssetClusterGridSize = ({ zoom, activos = [] }) => {
-  if (activos.length >= ASSET_CLUSTER_DENSE_MIN_ACTIVOS) {
-    if (zoom >= 14) return ASSET_CLUSTER_MIN_GRID_SIZE
-    if (zoom >= 13) return 54
-    return ASSET_CLUSTER_BASE_GRID_SIZE
-  }
-
-  if (zoom >= 12) return 58
-
-  return ASSET_CLUSTER_BASE_GRID_SIZE
-}
-
-export const shouldClusterAssetMarkers = (map, activos = []) => {
-  const zoom = map?.getZoom?.() ?? 0
-  const maxClusterZoom = resolveAssetClusterMaxZoom(activos)
-
-  return zoom <= maxClusterZoom
-}
-
-const buildViewportSignature = (map) => {
-  const bounds = map?.getBounds?.()
-
-  if (!bounds) return "no-bounds"
-
-  const north = bounds.getNorth?.()
-  const south = bounds.getSouth?.()
-  const east = bounds.getEast?.()
-  const west = bounds.getWest?.()
-
-  return [north, south, east, west].map((value) => roundMapValue(value)).join(":")
-}
-
-const buildClusterSignature = (cluster) => {
-  return [
-    cluster.id,
-    cluster.count,
-    cluster.latLng?.[0]?.toFixed(5),
-    cluster.latLng?.[1]?.toFixed(5),
-  ]
-    .map(normalizeClusterValue)
-    .join(":")
-}
-
-const buildClusterInputSignature = ({ map, activos = [], getActivoLatLng, isActivoSelected }) => {
-  if (!map) return ""
-
-  const zoom = map.getZoom()
-  const gridSize = resolveAssetClusterGridSize({
-    zoom,
-    activos,
-  })
-
-  const viewportSignature = buildViewportSignature(map)
-
-  const assetCellSignature = activos
-    .map((activo) => {
-      const activoId = normalizeActivoId(activo)
-      const activoLatLng = getActivoLatLng(activo)
-
-      if (!activoId || !activoLatLng) return ""
-
-      if (isActivoSelected(activo)) {
-        return `${activoId}:selected`
-      }
-
-      const point = map.project(activoLatLng, zoom)
-      const cellX = Math.floor(point.x / gridSize)
-      const cellY = Math.floor(point.y / gridSize)
-
-      return `${activoId}:${cellX}:${cellY}`
-    })
-    .filter(Boolean)
-    .join("|")
-
-  return [zoom, gridSize, activos.length, viewportSignature, assetCellSignature].join("::")
-}
-
-const getClusteredActivos = ({ map, activos = [], getActivoLatLng, isActivoSelected }) => {
-  if (!map) {
-    return {
-      clusters: [],
-      singletons: [],
-    }
-  }
-
-  const zoom = map.getZoom()
-  const gridSize = resolveAssetClusterGridSize({
-    zoom,
-    activos,
-  })
-
-  const clustersByKey = new Map()
-  const singletons = []
-
-  activos.forEach((activo) => {
-    const activoLatLng = getActivoLatLng(activo)
-
-    if (!activoLatLng) return
-
-    if (isActivoSelected(activo)) {
-      singletons.push({
-        activo,
-      })
-      return
-    }
-
-    const point = map.project(activoLatLng, zoom)
-    const key = [
-      zoom,
-      gridSize,
-      Math.floor(point.x / gridSize),
-      Math.floor(point.y / gridSize),
-    ].join(":")
-
-    if (!clustersByKey.has(key)) {
-      clustersByKey.set(key, {
-        key,
-        activos: [],
-        latSum: 0,
-        lngSum: 0,
-      })
-    }
-
-    const cluster = clustersByKey.get(key)
-
-    cluster.activos.push(activo)
-    cluster.latSum += Number(activoLatLng[0])
-    cluster.lngSum += Number(activoLatLng[1])
-  })
-
-  const clusters = []
-
-  clustersByKey.forEach((cluster) => {
-    if (cluster.activos.length <= 1) {
-      singletons.push({
-        activo: cluster.activos[0],
-      })
-      return
-    }
-
-    clusters.push({
-      id: cluster.key,
-      count: cluster.activos.length,
-      activos: cluster.activos,
-      latLng: [cluster.latSum / cluster.activos.length, cluster.lngSum / cluster.activos.length],
-    })
-  })
-
-  return {
-    clusters,
-    singletons,
-  }
-}
+export { shouldClusterAssetMarkers } from "./assetMarkerClusterConfig.js"
 
 export const createAssetMarkerClusterController = ({
   L,
@@ -204,10 +33,71 @@ export const createAssetMarkerClusterController = ({
 
   let cachedClusterInputSignature = ""
   let cachedClusterResult = null
+  let expandedClusterActivoIds = new Set()
+  let expandedClusterActivosById = new Map()
+  let expandedClusterMinZoom = null
 
   const resetClusterResultCache = () => {
     cachedClusterInputSignature = ""
     cachedClusterResult = null
+  }
+
+  const isActivoExpanded = (activo) => {
+    return expandedClusterActivoIds.has(normalizeActivoId(activo))
+  }
+
+  const clearExpandedCluster = () => {
+    if (!expandedClusterActivoIds.size && expandedClusterMinZoom === null) return
+
+    expandedClusterActivoIds = new Set()
+    expandedClusterActivosById = new Map()
+    expandedClusterMinZoom = null
+    resetClusterResultCache()
+  }
+
+  const setExpandedCluster = ({ activos = [], minZoom }) => {
+    expandedClusterActivoIds = new Set(
+      activos.map((activo) => normalizeActivoId(activo)).filter((activoId) => Boolean(activoId)),
+    )
+    expandedClusterActivosById = new Map(
+      activos
+        .map((activo) => {
+          return [normalizeActivoId(activo), activo]
+        })
+        .filter(([activoId]) => Boolean(activoId)),
+    )
+    expandedClusterMinZoom = Number.isFinite(Number(minZoom)) ? Number(minZoom) : null
+    resetClusterResultCache()
+  }
+
+  const includeExpandedClusterActivos = (activos = []) => {
+    if (!expandedClusterActivosById.size) return activos
+
+    const nextActivos = [...activos]
+    const nextActivoIds = new Set(
+      nextActivos
+        .map((activo) => normalizeActivoId(activo))
+        .filter((activoId) => Boolean(activoId)),
+    )
+
+    expandedClusterActivosById.forEach((activo, activoId) => {
+      if (nextActivoIds.has(activoId)) return
+
+      nextActivos.push(activo)
+      nextActivoIds.add(activoId)
+    })
+
+    return nextActivos
+  }
+
+  const maybeClearExpandedCluster = (map) => {
+    if (!expandedClusterActivoIds.size || expandedClusterMinZoom === null) return
+
+    const zoom = map?.getZoom?.()
+
+    if (!Number.isFinite(Number(zoom)) || Number(zoom) >= expandedClusterMinZoom) return
+
+    clearExpandedCluster()
   }
 
   const getCachedClusteredActivos = ({ map, activos = [] }) => {
@@ -216,6 +106,7 @@ export const createAssetMarkerClusterController = ({
       activos,
       getActivoLatLng,
       isActivoSelected,
+      isActivoExpanded,
     })
 
     if (cachedClusterResult && cachedClusterInputSignature === nextSignature) {
@@ -249,29 +140,95 @@ export const createAssetMarkerClusterController = ({
     })
   }
 
-  const createClusterMarker = (cluster, activos = []) => {
-    const marker = L.marker(cluster.latLng, {
+  const focusCluster = (cachedCluster) => {
+    if (drawMode.value || editingDraft.value) return
+
+    const map = getMap()
+
+    if (!map) return
+
+    const clusterLatLngs = getClusterLatLngs({
+      cluster: cachedCluster?.cluster,
+      getActivoLatLng,
+    })
+    const clusterActivos = cachedCluster?.cluster?.activos || cachedCluster?.activos || []
+    const currentZoom = map.getZoom?.() ?? 0
+    const targetZoom = resolveClusterClickZoom({
+      map,
+      activos: cachedCluster?.renderActivos || clusterActivos,
+    })
+
+    setExpandedCluster({
+      activos: clusterActivos,
+      minZoom: Math.max(0, currentZoom - 0.25),
+    })
+
+    renderMarkerClusters(cachedCluster?.renderActivos || clusterActivos)
+
+    if (!clusterLatLngs.length) {
+      map.invalidateSize({
+        pan: false,
+      })
+
+      map.flyTo(cachedCluster.marker.getLatLng(), targetZoom, {
+        duration: 0.35,
+      })
+      return
+    }
+
+    const bounds = L.latLngBounds(clusterLatLngs)
+
+    if (!bounds.isValid()) {
+      map.invalidateSize({
+        pan: false,
+      })
+
+      map.flyTo(cachedCluster.marker.getLatLng(), targetZoom, {
+        duration: 0.35,
+      })
+      return
+    }
+
+    const targetLatLng = getNearestClusterLatLng({
+      L,
+      targetLatLng: bounds.getCenter(),
+      clusterLatLngs,
+    })
+
+    map.invalidateSize({
+      pan: false,
+    })
+
+    if (clusterLatLngs.length > 1 && typeof map.flyToBounds === "function") {
+      map.flyToBounds(bounds, {
+        padding: [84, 84],
+        maxZoom: targetZoom,
+        duration: 0.35,
+      })
+      return
+    }
+
+    map.flyTo(targetLatLng, targetZoom, {
+      duration: 0.35,
+    })
+  }
+
+  const createClusterMarker = (cachedCluster) => {
+    const marker = L.marker(cachedCluster.cluster.latLng, {
       icon: createClusterIcon({
         L,
-        count: cluster.count,
+        count: cachedCluster.cluster.count,
       }),
     })
 
-    bindClusterTooltip(marker, cluster.count)
+    bindClusterTooltip(marker, cachedCluster.cluster.count)
 
-    marker.on("click", () => {
-      if (drawMode.value || editingDraft.value) return
+    marker.on("click", (event) => {
+      if (event?.originalEvent) {
+        L.DomEvent.stopPropagation(event.originalEvent)
+      }
 
-      const map = getMap()
-
-      if (!map) return
-
-      const maxClusterZoom = resolveAssetClusterMaxZoom(activos)
-      const targetZoom = Math.min(maxClusterZoom + 1, map.getMaxZoom?.() ?? maxClusterZoom + 1)
-
-      map.flyTo(marker.getLatLng(), targetZoom, {
-        duration: 0.35,
-      })
+      focusCluster(cachedCluster)
     })
 
     return marker
@@ -331,10 +288,17 @@ export const createAssetMarkerClusterController = ({
 
       if (!map || !layers.markerLayer) return
 
-      if (!shouldClusterAssetMarkers(map, activos)) {
+      maybeClearExpandedCluster(map)
+
+      const renderActivos = includeExpandedClusterActivos(activos)
+
+      const shouldRenderClusters =
+        shouldClusterAssetMarkers(map, renderActivos) || expandedClusterActivoIds.size > 0
+
+      if (!shouldRenderClusters) {
         clearClusterMarkers()
 
-        activos.forEach((activo) => {
+        renderActivos.forEach((activo) => {
           upsertIndividualMarker(activo, {
             trackTrail: false,
           })
@@ -345,7 +309,7 @@ export const createAssetMarkerClusterController = ({
 
       const { clusters, singletons } = getCachedClusteredActivos({
         map,
-        activos,
+        activos: renderActivos,
       })
 
       const singletonActivoIds = new Set()
@@ -363,7 +327,7 @@ export const createAssetMarkerClusterController = ({
         })
       })
 
-      activos.forEach((activo) => {
+      renderActivos.forEach((activo) => {
         const markerId = normalizeActivoId(activo)
 
         if (!markerId || singletonActivoIds.has(markerId)) return
@@ -379,10 +343,17 @@ export const createAssetMarkerClusterController = ({
         nextClusterIds.add(clusterId)
 
         if (cachedCluster?.signature === signature) {
+          cachedCluster.cluster = cluster
+          cachedCluster.activos = cluster.activos
+          cachedCluster.renderActivos = renderActivos
           return
         }
 
         if (cachedCluster) {
+          cachedCluster.cluster = cluster
+          cachedCluster.activos = cluster.activos
+          cachedCluster.renderActivos = renderActivos
+
           updateClusterMarker({
             cachedCluster,
             cluster,
@@ -392,15 +363,22 @@ export const createAssetMarkerClusterController = ({
           return
         }
 
-        const marker = createClusterMarker(cluster, activos)
+        const nextCachedCluster = {
+          marker: null,
+          signature,
+          count: cluster.count,
+          cluster,
+          activos: cluster.activos,
+          renderActivos,
+        }
+
+        const marker = createClusterMarker(nextCachedCluster)
+
+        nextCachedCluster.marker = marker
 
         marker.addTo(layers.markerLayer)
 
-        clusterCache.set(clusterId, {
-          marker,
-          signature,
-          count: cluster.count,
-        })
+        clusterCache.set(clusterId, nextCachedCluster)
       })
 
       removeStaleClusterMarkers(nextClusterIds)

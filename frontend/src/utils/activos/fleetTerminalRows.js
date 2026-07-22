@@ -4,6 +4,57 @@ import {
   decorateLog,
   normalizeHistoryLog,
 } from "../terminalUtils.js"
+import { FLEET_TELEMETRY_COLUMNS, getCellValue } from "./fleetTelemetryColumns.js"
+
+const TERMINAL_TELEMETRY_DETAIL_KEYS = [
+  "combustible",
+  "ignition",
+  "gpsSatellites",
+  "gpsSignal",
+  "gpsFix",
+  "odometro",
+  "horometroTotal",
+  "horometroDiario",
+  "canRpm",
+  "canEngineTemp",
+  "canBatteryVoltage",
+  "canEngineLoad",
+  "canThrottle",
+  "canFuelRate",
+  "canFuelUsed",
+  "canOilPressure",
+  "canAdBlueLevel",
+  "canDtcCount",
+  "digitalInput1",
+  "digitalInput2",
+]
+
+const TELEMETRY_DETAIL_ORDER = [
+  ["encendido", "ignicion", "ignition", "contacto"],
+  ["fix gps", "gps fix"],
+  ["satelites", "satelite", "satellites"],
+  ["senal gps", "gps signal"],
+  ["rpm"],
+  ["carga motor", "engine load"],
+  ["temp motor", "temperatura motor", "engine temperature"],
+  ["acelerador", "throttle"],
+  ["pres aceite", "presion aceite", "oil pressure"],
+  ["voltaje", "voltage"],
+  ["dtc"],
+  ["comb usado", "combustible usado", "fuel used"],
+  ["cons l/h", "consumo l/h", "fuel consumption"],
+  ["adblue"],
+  ["entrada 1", "digital input 1", "input1"],
+  ["entrada 2", "digital input 2", "input2"],
+  ["comb.", "combustible", "fuel"],
+  ["odometro", "odometer"],
+  ["horometro", "hourmeter"],
+  ["hor diario", "hor. diario", "horas diarias"],
+]
+
+const terminalTelemetryDetailColumns = TERMINAL_TELEMETRY_DETAIL_KEYS.map((key) => {
+  return FLEET_TELEMETRY_COLUMNS.find((column) => column.key === key)
+}).filter(Boolean)
 
 export const createTerminalLocalId = () => {
   return globalThis.crypto?.randomUUID
@@ -113,16 +164,70 @@ const getLogEvent = (log = {}, isTelemetry = false) => {
   return log.source || "Report"
 }
 
-export const buildTerminalRow = (log = {}) => {
+const normalizeTelemetryText = (value) => {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+}
+
+const hasTelemetryValue = (value) => {
+  if (value === null || value === undefined) return false
+
+  const normalizedValue = normalizeTelemetryText(value)
+
+  return !["", "-", "--", "n/a", "na", "null", "undefined", "sin dato"].includes(normalizedValue)
+}
+
+const getTelemetryDetailOrder = (detail) => {
+  const searchableText = normalizeTelemetryText(`${detail?.key || ""} ${detail?.label || ""}`)
+
+  const orderIndex = TELEMETRY_DETAIL_ORDER.findIndex((terms) => {
+    return terms.some((term) => {
+      return searchableText.includes(normalizeTelemetryText(term))
+    })
+  })
+
+  return orderIndex >= 0 ? orderIndex : TELEMETRY_DETAIL_ORDER.length
+}
+
+const orderTelemetryDetails = (details = []) => {
+  return details
+    .filter((detail) => {
+      return detail && hasTelemetryValue(detail.value)
+    })
+    .map((detail, index) => ({
+      ...detail,
+      originalIndex: index,
+    }))
+    .sort((firstDetail, secondDetail) => {
+      const firstOrder = getTelemetryDetailOrder(firstDetail)
+      const secondOrder = getTelemetryDetailOrder(secondDetail)
+
+      if (firstOrder !== secondOrder) {
+        return firstOrder - secondOrder
+      }
+
+      return firstDetail.originalIndex - secondDetail.originalIndex
+    })
+    .map(({ originalIndex: _originalIndex, ...detail }) => detail)
+}
+
+const getTerminalLogContext = (log = {}) => {
   const payload = log.payload || {}
+  const telemetryPayload = {
+    ...(payload.activo || {}),
+    ...payload,
+  }
   const message = getLogMessage(log)
   const parsedPulse = parsePulseMessage(message)
 
   const hasTelemetryPayload =
-    getPayloadValue(payload, ["lat", "latitude"]) !== "" ||
-    getPayloadValue(payload, ["lng", "lon", "longitude"]) !== "" ||
-    getPayloadValue(payload, ["estado", "status"]) !== "" ||
-    getPayloadValue(payload, ["velocidad", "speed"]) !== ""
+    getPayloadValue(telemetryPayload, ["lat", "latitude"]) !== "" ||
+    getPayloadValue(telemetryPayload, ["lng", "lon", "longitude"]) !== "" ||
+    getPayloadValue(telemetryPayload, ["estado", "status"]) !== "" ||
+    getPayloadValue(telemetryPayload, ["velocidad", "speed"]) !== ""
 
   const isTelemetry =
     hasTelemetryPayload ||
@@ -133,14 +238,39 @@ export const buildTerminalRow = (log = {}) => {
       .toUpperCase()
       .startsWith("PULSE")
 
+  return {
+    telemetryPayload,
+    message,
+    parsedPulse,
+    isTelemetry,
+  }
+}
+
+export const isTerminalTelemetryLog = (log = {}) => {
+  return getTerminalLogContext(log).isTelemetry
+}
+
+export const buildTerminalRow = (log = {}) => {
+  const { telemetryPayload, message, parsedPulse, isTelemetry } = getTerminalLogContext(log)
+
   const estado =
-    getPayloadValue(payload, ["estado", "status"]) ||
+    getPayloadValue(telemetryPayload, ["estado", "status"]) ||
     parsedPulse.estado ||
     (log.type === "error" ? "error" : log.type === "pending" ? "pending" : "-")
 
-  const velocidad = getPayloadValue(payload, ["velocidad", "speed"]) || parsedPulse.velocidad
-  const lat = getPayloadValue(payload, ["lat", "latitude"]) || parsedPulse.lat
-  const lng = getPayloadValue(payload, ["lng", "lon", "longitude"]) || parsedPulse.lng
+  const velocidad =
+    getPayloadValue(telemetryPayload, ["velocidad", "speed"]) || parsedPulse.velocidad
+  const lat = getPayloadValue(telemetryPayload, ["lat", "latitude"]) || parsedPulse.lat
+  const lng = getPayloadValue(telemetryPayload, ["lng", "lon", "longitude"]) || parsedPulse.lng
+  const telemetryDetails = isTelemetry
+    ? orderTelemetryDetails(
+        terminalTelemetryDetailColumns.map((column) => ({
+          key: column.key,
+          label: column.label,
+          value: getCellValue(telemetryPayload, column),
+        })),
+      )
+    : []
 
   return {
     id: log.id,
@@ -152,6 +282,7 @@ export const buildTerminalRow = (log = {}) => {
     lat: formatCoordinate(lat),
     lng: formatCoordinate(lng),
     message: message || "-",
+    telemetryDetails,
     type: log.type || "report",
     isTelemetry,
   }

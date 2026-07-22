@@ -1,7 +1,7 @@
 import { computed } from "vue"
 
 import { useAuthSession } from "./useAuthSession.js"
-import { useMockDatabase } from "../mock/useMockDatabase.js"
+import { useAccessService } from "../../services/access/useAccessService.js"
 
 const normalizeKey = (value) => String(value ?? "")
 
@@ -18,7 +18,7 @@ const isCompanyAvailable = (company) => {
 
 export function useAccessControl() {
   const { currentAccesses, isPlatformAdmin } = useAuthSession()
-  const { companies, applications, assets, moduleFunctions } = useMockDatabase()
+  const { companies, applications, assets, moduleFunctions } = useAccessService()
 
   const applicationsById = computed(() => {
     return new Map(
@@ -126,6 +126,12 @@ export function useAccessControl() {
     })
   }
 
+  const accessHasAnyEnabledModule = (access) => {
+    if (access?.modules?.some((moduleAccess) => moduleAccess.enabled)) return true
+
+    return (access?.functions || []).some((functionAccess) => functionAccess.enabled)
+  }
+
   const canViewUsers = computed(() => {
     return canAccessFunction(USER_FUNCTIONS.view, null, "view")
   })
@@ -149,7 +155,7 @@ export function useAccessControl() {
 
     return new Set(
       activeAccesses.value
-        .filter((access) => accessHasModule(access, "assets"))
+        .filter(accessHasAnyEnabledModule)
         .map((access) => normalizeKey(getAccessCompanyId(access)))
         .filter(Boolean),
     )

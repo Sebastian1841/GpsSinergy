@@ -25,23 +25,32 @@ export const removeLegacyGeofenceColorFields = (geofence = {}) => {
   return cleanGeofence
 }
 
+const getGroupText = (geofence = {}) => {
+  const sourceGeofence = geofence || {}
+  const groupName = String(sourceGeofence.groupName || "").trim()
+
+  return groupName ? `Grupo ${groupName} - ` : ""
+}
+
 export const getGeofenceMeta = (geofence) => {
+  const groupText = getGroupText(geofence)
+
   if (geofence?.type === "circle") {
-    return `Circular · ${geofence.radius || 0} m`
+    return `${groupText}Circular - ${geofence.radius || 0} m`
   }
 
   if (geofence?.type === "route") {
-    return `Ruta · ${geofence.coordinates?.length || 0} puntos`
+    return `${groupText}Ruta - ${geofence.coordinates?.length || 0} puntos`
   }
 
-  return `Poligonal · ${geofence?.coordinates?.length || 0} puntos`
+  return `${groupText}Poligonal - ${geofence?.coordinates?.length || 0} puntos`
 }
 
 export const getGeofenceBadgeLabel = (geofence) => {
   if (geofence?.type === "circle") return "Radio"
   if (geofence?.type === "route") return "Ruta"
 
-  return "Polígono"
+  return "Poligono"
 }
 
 export const getGeofenceBadgeClass = (geofence) => {
@@ -57,6 +66,12 @@ export const getGeofenceBadgeClass = (geofence) => {
 }
 
 export const getGeofenceDescription = (geofence) => {
+  const groupName = String(geofence?.groupName || "").trim()
+
+  if (groupName) {
+    return `Los activos dentro de esta geocerca mostraran "${groupName}" como ubicacion.`
+  }
+
   if (geofence?.type === "circle") {
     return "Permite editar centro, radio, nombre y color."
   }
@@ -65,7 +80,7 @@ export const getGeofenceDescription = (geofence) => {
     return "Permite editar puntos del recorrido, nombre y color."
   }
 
-  return "Permite editar puntos del perímetro, nombre y color."
+  return "Permite editar puntos del perimetro, nombre y color."
 }
 
 export const getFallbackGeofenceName = (geofences = [], type = "polygon") => {

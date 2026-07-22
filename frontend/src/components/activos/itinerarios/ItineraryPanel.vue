@@ -69,7 +69,7 @@
       <div class="space-y-2">
         <!-- Buscador + selector de dispositivos + acciones -->
         <section class="relative">
-          <div class="grid grid-cols-[minmax(0,1fr)_auto_auto_auto_auto] items-center gap-1.5">
+          <div class="grid grid-cols-[minmax(0,1fr)_auto_auto_auto_auto_auto] items-center gap-1.5">
             <div
               class="flex h-8 min-w-0 overflow-hidden rounded-lg border border-[#d8dee8] bg-white transition focus-within:border-[#FF6600] focus-within:ring-2 focus-within:ring-[#FF6600]/15"
             >
@@ -143,11 +143,55 @@
             <button
               type="button"
               class="h-8 shrink-0 cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[#d8dee8] disabled:hover:text-[#102372]"
-              :disabled="!canExportItinerary"
-              @click="exportItinerary"
+              :disabled="!canCompareRoute"
+              @click="isRouteComparisonOpen = true"
             >
-              Exportar
+              Comparar
             </button>
+
+            <div class="relative">
+              <button
+                type="button"
+                class="flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[#d8dee8] disabled:hover:text-[#102372]"
+                :disabled="!canExportItinerary"
+                @click="toggleExportMenu"
+              >
+                Exportar
+                <span class="text-[9px]" :class="showExportMenu ? 'rotate-180' : ''">v</span>
+              </button>
+
+              <div
+                v-if="showExportMenu"
+                class="absolute right-0 top-[36px] z-40 w-40 overflow-hidden rounded-lg border border-[#d8dee8] bg-white shadow-xl"
+              >
+                <button
+                  type="button"
+                  class="flex h-9 w-full cursor-pointer items-center justify-between px-3 text-left text-[10px] font-black text-[#102372] transition hover:bg-[#fff7ed] hover:text-[#FF6600]"
+                  @click="exportItinerary('pdf')"
+                >
+                  PDF
+                  <span class="text-[9px] text-slate-400">print</span>
+                </button>
+
+                <button
+                  type="button"
+                  class="flex h-9 w-full cursor-pointer items-center justify-between border-t border-[#edf1f5] px-3 text-left text-[10px] font-black text-[#102372] transition hover:bg-[#fff7ed] hover:text-[#FF6600]"
+                  @click="exportItinerary('excel')"
+                >
+                  Excel
+                  <span class="text-[9px] text-slate-400">.xlsx</span>
+                </button>
+
+                <button
+                  type="button"
+                  class="flex h-9 w-full cursor-pointer items-center justify-between border-t border-[#edf1f5] px-3 text-left text-[10px] font-black text-[#102372] transition hover:bg-[#fff7ed] hover:text-[#FF6600]"
+                  @click="exportItinerary('csv')"
+                >
+                  CSV
+                  <span class="text-[9px] text-slate-400">datos</span>
+                </button>
+              </div>
+            </div>
 
             <button
               type="button"
@@ -288,6 +332,13 @@
       <div v-if="routeResult && activePanelView === 'itinerarios'" class="space-y-2">
         <ItinerarySummary :summary="routeResult.summary" />
 
+        <ItineraryCharts
+          v-if="routeResult.rows.length"
+          ref="itineraryChartsRef"
+          :rows="routeResult.rows"
+          :summary="routeResult.summary"
+        />
+
         <div
           v-if="!routeResult.rows.length"
           class="rounded-lg border border-dashed border-[#cbd5e1] bg-white px-3 py-4 text-center"
@@ -338,11 +389,33 @@
         </button>
       </div>
     </main>
+
+    <RoutePlanConfiguratorModal
+      v-if="isRoutePlanConfiguratorOpen"
+      v-model="isRoutePlanConfiguratorOpen"
+      :routes="plannedRoutes"
+      :selected-route-id="selectedPlannedRouteId"
+      :current-route-points="routePlanCurrentRoutePoints"
+      :current-route-asset="routePlanCurrentAsset"
+      :current-route-label="activeRangeLabel"
+      @save="handleSavePlannedRoutes"
+      @select-route="handleSelectPlannedRoute"
+    />
+
+    <RouteComparisonModal
+      v-if="isRouteComparisonOpen"
+      v-model="isRouteComparisonOpen"
+      :assets="routeComparisonAssets"
+      :route-result="routeResult"
+      :range-label="activeRangeLabel"
+      :selected-route-id="selectedPlannedRouteId"
+      @open-route-configurator="openRoutePlanConfigurator"
+    />
   </section>
 </template>
 
 <script setup>
-import { computed } from "vue"
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref, watch } from "vue"
 
 import ItineraryDaySummary from "./ItineraryDaySummary.vue"
 import ItinerarySummary from "./ItinerarySummary.vue"
@@ -351,6 +424,8 @@ import ItineraryTable from "./ItineraryTable.vue"
 import { useItineraryAssets } from "../../../composables/activos/itinerarios/useItineraryAssets.js"
 import { useItineraryFilters } from "../../../composables/activos/itinerarios/useItineraryFilters.js"
 import { useItineraryRoute } from "../../../composables/activos/itinerarios/useItineraryRoute.js"
+import { usePlannedRouteCatalog } from "../../../composables/activos/routes/usePlannedRouteCatalog.js"
+import { useRouteComparisonUiState } from "../../../composables/activos/routes/useRouteComparisonUiState.js"
 
 import {
   addDays,
@@ -358,6 +433,23 @@ import {
   filterItineraryPoints,
   mockItineraryAssets,
 } from "../../../data/mockItineraryData"
+
+const ItineraryCharts = defineAsyncComponent(() => import("./ItineraryCharts.vue"))
+const RouteComparisonModal = defineAsyncComponent(
+  () => import("../routes/RouteComparisonModal.vue"),
+)
+const RoutePlanConfiguratorModal = defineAsyncComponent(
+  () => import("../routes/RoutePlanConfiguratorModal.vue"),
+)
+
+const itineraryChartsRef = ref(null)
+const showExportMenu = ref(false)
+const isRouteComparisonOpen = ref(false)
+const isRoutePlanConfiguratorOpen = ref(false)
+const { plannedRoutes, savePlannedRoutes } = usePlannedRouteCatalog()
+const { setRouteComparisonModalOpen } = useRouteComparisonUiState()
+const selectedPlannedRouteId = ref("")
+const routePlanAssetId = ref("")
 
 const props = defineProps({
   activos: {
@@ -403,6 +495,14 @@ const normalizeText = (value) => {
     .trim()
     .toLowerCase()
     .replace(/\s+/g, " ")
+}
+
+const normalizeAssetId = (value) => {
+  if (value && typeof value === "object") {
+    return String(value.id || value.activoId || value.deviceId || value.patente || "").trim()
+  }
+
+  return String(value ?? "").trim()
 }
 
 const {
@@ -481,94 +581,261 @@ const canExportItinerary = computed(() => {
   return Boolean(routeResult.value?.rows?.length)
 })
 
-const escapeCsvValue = (value) => {
-  const text = String(value ?? "")
+const routeComparisonAssets = computed(() => {
+  return selectedAssets.value.length ? selectedAssets.value : filteredAssets.value
+})
 
-  if (!/[",\n\r;]/.test(text)) return text
+const canCompareRoute = computed(() => {
+  return Boolean(routeComparisonAssets.value.length || routeResult.value?.rows?.length)
+})
 
-  return `"${text.replace(/"/g, '""')}"`
-}
+const routePlanAssetOptions = computed(() => {
+  const options = [
+    ...routeComparisonAssets.value,
+    ...(Array.isArray(routeResult.value?.assets) ? routeResult.value.assets : []),
+    routeResult.value?.asset,
+    primarySelectedAsset.value,
+  ].filter(Boolean)
 
-const getRouteAssetLabel = (row) => {
+  const seenIds = new Set()
+
+  return options.filter((asset) => {
+    const assetId = normalizeAssetId(asset)
+
+    if (!assetId || seenIds.has(assetId)) return false
+
+    seenIds.add(assetId)
+    return true
+  })
+})
+
+const routePlanCurrentAsset = computed(() => {
+  const currentAssetId = normalizeAssetId(routePlanAssetId.value)
+
   return (
-    row.assetDisplayName ||
-    row.assetPatente ||
-    routeResult.value?.asset?.displayName ||
-    routeResult.value?.asset?.patente ||
-    "-"
+    routePlanAssetOptions.value.find((asset) => normalizeAssetId(asset) === currentAssetId) ||
+    routeResult.value?.asset ||
+    primarySelectedAsset.value ||
+    routeComparisonAssets.value[0] ||
+    null
   )
-}
+})
 
-const buildItineraryCsv = () => {
-  const headers = [
-    "Activo",
-    "Patente",
-    "Dispositivo",
-    "Fecha",
-    "Hora",
-    "Estado",
-    "Velocidad",
-    "Direccion",
-    "Evento",
-    "Km acumulado",
-    "Latitud",
-    "Longitud",
-  ]
+const getRouteRowsForAsset = (assetId) => {
+  const result = routeResult.value
+  const normalizedAssetId = normalizeAssetId(assetId)
 
-  const rows = (routeResult.value?.rows || []).map((row) => [
-    getRouteAssetLabel(row),
-    row.assetPatente || routeResult.value?.asset?.patente || "",
-    row.assetDeviceId || routeResult.value?.asset?.deviceId || "",
-    row.dateLabel || "",
-    row.timeLabel || "",
-    row.status === "moving" ? "Movimiento" : "Detenido",
-    row.speedLabel || row.speed || "",
-    row.address || "",
-    row.event || "",
-    row.accumulatedDistanceLabel || "",
-    row.lat ?? "",
-    row.lng ?? "",
-  ])
+  if (!result) return []
 
-  return [headers, ...rows]
-    .map((row) => {
-      return row.map(escapeCsvValue).join(";")
+  const routes = Array.isArray(result.routes) ? result.routes : []
+  const selectedRoute = routes.find((route) => {
+    return normalizeAssetId(route.asset) === normalizedAssetId
+  })
+
+  if (selectedRoute?.rows?.length) {
+    return selectedRoute.rows
+  }
+
+  const rows = Array.isArray(result.rows) ? result.rows : []
+
+  if (!normalizedAssetId) return rows
+
+  const rowsHaveAssetIds = rows.some((row) => normalizeAssetId(row.assetId || row.asset))
+
+  if (rowsHaveAssetIds) {
+    return rows.filter((row) => {
+      return normalizeAssetId(row.assetId || row.asset) === normalizedAssetId
     })
-    .join("\n")
+  }
+
+  return normalizeAssetId(result.asset) === normalizedAssetId ? rows : []
 }
 
-const buildExportFilename = () => {
-  const assetLabel =
-    routeResult.value?.asset?.displayName ||
-    routeResult.value?.asset?.patente ||
-    routeResult.value?.asset?.id ||
-    "itinerario"
+const routePlanCurrentRoutePoints = computed(() => {
+  const currentAssetId = normalizeAssetId(routePlanCurrentAsset.value)
+  const routeRows = getRouteRowsForAsset(currentAssetId)
 
-  const normalizedAssetLabel = String(assetLabel)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9_-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .toLowerCase()
+  return routeRows.length ? routeRows : routeResult.value?.rows || []
+})
 
-  return `itinerario-${normalizedAssetLabel || "activos"}-${fromDate.value}-${toDate.value}.csv`
+const openRoutePlanConfigurator = (payload = "") => {
+  const options = payload && typeof payload === "object" ? payload : { routeId: payload }
+  const routeId = String(options.routeId || "").trim()
+
+  routePlanAssetId.value = normalizeAssetId(
+    options.assetId || options.asset || routePlanCurrentAsset.value,
+  )
+  selectedPlannedRouteId.value = routeId
+  isRouteComparisonOpen.value = false
+  isRoutePlanConfiguratorOpen.value = true
 }
 
-const exportItinerary = () => {
+const handleSavePlannedRoutes = (routes) => {
+  savePlannedRoutes(routes)
+}
+
+const handleSelectPlannedRoute = (routeId) => {
+  selectedPlannedRouteId.value = routeId || ""
+}
+
+const toggleExportMenu = () => {
   if (!canExportItinerary.value) return
 
-  const csv = `\uFEFF${buildItineraryCsv()}`
-  const blob = new Blob([csv], {
+  showExportMenu.value = !showExportMenu.value
+}
+
+const getItineraryPanelExportService = () => {
+  return import("../../../services/itinerarios/itineraryPanelExportService.js")
+}
+
+const getItineraryExportContextInput = (exportRows = null) => {
+  return {
+    routeResult: routeResult.value,
+    fromDate: fromDate.value,
+    toDate: toDate.value,
+    selectedAssetsSummary: selectedAssetsSummary.value,
+    activeRangeLabel: activeRangeLabel.value,
+    exportRows,
+  }
+}
+
+const waitForAnimationFrame = () => {
+  return new Promise((resolve) => {
+    window.requestAnimationFrame(resolve)
+  })
+}
+
+const wait = (milliseconds) => {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, milliseconds)
+  })
+}
+
+const getExportCharts = async ({ requireImages = true } = {}) => {
+  const previousPanelView = activePanelView.value
+
+  if (previousPanelView !== "itinerarios") {
+    activePanelView.value = "itinerarios"
+    await nextTick()
+  }
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    await nextTick()
+    await waitForAnimationFrame()
+
+    const charts = await itineraryChartsRef.value?.getExportCharts?.({
+      includeImages: requireImages,
+    })
+
+    const chartItems = charts?.items || []
+    const chartsAreDisabled = charts?.enabled === false || chartItems.length === 0
+    const hasImages = chartItems.length > 0 && chartItems.every((chart) => chart.image)
+    const hasNativeChartData =
+      chartItems.length > 0 &&
+      chartItems.every((chart) => Array.isArray(chart.values) && chart.values.length > 0)
+
+    if (
+      chartsAreDisabled ||
+      (requireImages && hasImages) ||
+      (!requireImages && hasNativeChartData)
+    ) {
+      if (previousPanelView !== "itinerarios") {
+        activePanelView.value = previousPanelView
+        await nextTick()
+      }
+
+      return charts
+    }
+
+    await wait(60)
+  }
+
+  if (previousPanelView !== "itinerarios") {
+    activePanelView.value = previousPanelView
+    await nextTick()
+  }
+
+  return {}
+}
+
+const getResolvedItineraryExportContext = async (exportService) => {
+  const exportRows = await exportService.resolveItineraryExportRows(routeResult.value?.rows || [])
+
+  return exportService.createItineraryExportContext(getItineraryExportContextInput(exportRows))
+}
+
+const exportItineraryPdf = async () => {
+  const [exportService, charts] = await Promise.all([
+    getItineraryPanelExportService(),
+    getExportCharts(),
+  ])
+  const context = await getResolvedItineraryExportContext(exportService)
+  const report = exportService.buildItineraryExportReportData(context, charts)
+
+  try {
+    const { exportItineraryPdfReport } =
+      await import("../../../services/itinerarios/itineraryExportService.js")
+
+    await exportItineraryPdfReport(report)
+  } catch {
+    formError.value = "No se pudo crear el PDF nativo. Se abrio la version imprimible."
+    exportService.openPrintableItineraryReport({
+      html: exportService.buildItineraryPrintableHtml(context, charts),
+      fallbackFilename: exportService.buildItineraryExportFilename(context, "html"),
+    })
+  }
+}
+
+const exportItineraryExcel = async () => {
+  const [exportService, charts] = await Promise.all([
+    getItineraryPanelExportService(),
+    getExportCharts({ requireImages: false }),
+  ])
+  const context = await getResolvedItineraryExportContext(exportService)
+  const report = exportService.buildItineraryExportReportData(context, charts)
+
+  try {
+    const { exportItineraryExcelWorkbook } =
+      await import("../../../services/itinerarios/itineraryExportService.js")
+
+    await exportItineraryExcelWorkbook(report)
+  } catch {
+    formError.value = "No se pudo crear el XLSX. Se descargo el reporte en formato HTML."
+    exportService.downloadTextFile({
+      content: exportService.buildItineraryExcelFallbackHtml(context, charts),
+      filename: exportService.buildItineraryExportFilename(context, "html"),
+      type: "text/html;charset=utf-8;",
+    })
+  }
+}
+
+const exportItineraryCsv = async () => {
+  const exportService = await getItineraryPanelExportService()
+  const context = await getResolvedItineraryExportContext(exportService)
+
+  exportService.downloadTextFile({
+    content: exportService.buildItineraryCsvContent(context),
+    filename: exportService.buildItineraryExportFilename(context, "csv"),
     type: "text/csv;charset=utf-8;",
   })
-  const url = window.URL.createObjectURL(blob)
-  const link = document.createElement("a")
+}
 
-  link.href = url
-  link.download = buildExportFilename()
-  link.click()
+const exportItinerary = async (format) => {
+  if (!canExportItinerary.value) return
 
-  window.URL.revokeObjectURL(url)
+  showExportMenu.value = false
+
+  if (format === "csv") {
+    await exportItineraryCsv()
+    return
+  }
+
+  if (format === "excel") {
+    await exportItineraryExcel()
+    return
+  }
+
+  await exportItineraryPdf()
 }
 
 const statusLabel = (estado) => {
@@ -603,4 +870,16 @@ const statusChipClass = (estado) => {
 
   return classes[estado] || "bg-slate-100 text-slate-500 ring-slate-200"
 }
+
+watch(
+  isRouteComparisonOpen,
+  (isOpen) => {
+    setRouteComparisonModalOpen(isOpen)
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => {
+  setRouteComparisonModalOpen(false)
+})
 </script>

@@ -6,6 +6,7 @@ export function useActivosFilters({ onLeaveItinerarios, onFilterChanged, refresh
 
   const sectionSearch = ref({
     activos: "",
+    reportes: "",
     itinerarios: "",
     geocercas: "",
     sucursales: "",
@@ -60,9 +61,27 @@ export function useActivosFilters({ onLeaveItinerarios, onFilterChanged, refresh
     }
   }
 
-  const setSidebarSection = async (section) => {
-    const allowedSections = ["activos", "itinerarios", "geocercas", "sucursales"]
+  const scheduleMapLayoutRefresh = () => {
+    if (typeof window === "undefined") return
+
+    if (typeof window.requestAnimationFrame !== "function") {
+      void refreshMapLayout?.()
+      return
+    }
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        void refreshMapLayout?.()
+      })
+    })
+  }
+
+  const setSidebarSection = (section) => {
+    const allowedSections = ["activos", "reportes", "itinerarios", "geocercas", "sucursales"]
     const nextSection = allowedSections.includes(section) ? section : "activos"
+    const previousSection = activeSidebarSection.value
+
+    if (previousSection === nextSection) return
 
     activeSidebarSection.value = nextSection
 
@@ -70,7 +89,9 @@ export function useActivosFilters({ onLeaveItinerarios, onFilterChanged, refresh
       onLeaveItinerarios?.()
     }
 
-    await refreshMapLayout(true)
+    if (previousSection === "itinerarios" || nextSection === "itinerarios") {
+      scheduleMapLayoutRefresh()
+    }
   }
 
   const setStatusFilter = async (filter) => {

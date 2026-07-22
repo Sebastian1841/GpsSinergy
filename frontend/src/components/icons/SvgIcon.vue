@@ -43,7 +43,7 @@
   <svg
     v-else-if="name === 'lock'"
     xmlns="http://www.w3.org/2000/svg"
-    class="w-20 h-20"
+    class="w-5 h-5"
     fill="none"
     viewBox="0 0 24 24"
     stroke="currentColor"
@@ -56,6 +56,38 @@
     />
   </svg>
 
+  <!-- Shield -->
+  <svg
+    v-else-if="name === 'shield'"
+    xmlns="http://www.w3.org/2000/svg"
+    class="w-5 h-5"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    stroke-width="2"
+  >
+    <path
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      d="M12 21s7-3.5 7-10V5l-7-3-7 3v6c0 6.5 7 10 7 10z"
+    />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M9.5 12l1.7 1.7 3.8-4" />
+  </svg>
+
+  <!-- Arrow Right -->
+  <svg
+    v-else-if="name === 'arrow-right'"
+    xmlns="http://www.w3.org/2000/svg"
+    class="w-5 h-5"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    stroke-width="2"
+  >
+    <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M13 6l6 6-6 6" />
+  </svg>
+
   <!-- Check -->
   <svg
     v-else-if="name === 'check'"
@@ -63,7 +95,7 @@
     class="w-16 h-16"
     fill="none"
     viewBox="0 0 24 24"
-    stroke="c   urrentColor"
+    stroke="currentColor"
     stroke-width="2"
   >
     <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />

@@ -25,6 +25,7 @@ export const createAssetMarkerVisibilityController = ({
   latestActivosById,
   markerCache,
   isActivoSelected,
+  isActivoAllowedByFocus = () => true,
   hideCachedMarker,
 }) => {
   const isActivoInsideViewport = (activoLatLng) => {
@@ -43,6 +44,7 @@ export const createAssetMarkerVisibilityController = ({
       const activoLatLng = getActivoLatLng(activo)
 
       if (!activoLatLng) return false
+      if (!isActivoAllowedByFocus(activo)) return false
       if (isActivoSelected(activo)) return true
 
       return isActivoInsideViewport(activoLatLng)

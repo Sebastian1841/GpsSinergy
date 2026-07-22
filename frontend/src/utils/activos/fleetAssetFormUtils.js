@@ -1,3 +1,11 @@
+import {
+  DEFAULT_ASSET_TYPE,
+  assetTypeOptions,
+  getAssetTypeLabel,
+  getAssetTypeMapIcon,
+  getAssetTypeOption,
+} from "./assetTypeOptions.js"
+
 export const fleetAssetFormSteps = [
   {
     key: "asset",
@@ -71,8 +79,13 @@ export const fleetTrackerModelOptions = [
   },
 ]
 
+export const fleetAssetTypeOptions = assetTypeOptions
+
 export const createEmptyFleetEditForm = () => ({
-  estado: "offline",
+  assetType: DEFAULT_ASSET_TYPE,
+  assetTypeLabel: getAssetTypeLabel(DEFAULT_ASSET_TYPE),
+  mapIcon: getAssetTypeMapIcon(DEFAULT_ASSET_TYPE),
+  sucursalId: "",
   trackerModel: "",
   trackerModelLabel: "",
   trackerManufacturer: "",
@@ -81,7 +94,6 @@ export const createEmptyFleetEditForm = () => ({
   name: "",
   displayName: "",
   description: "",
-  direccion: "",
   entryDate: "",
   deactivationDate: "",
   suspensionDate: "",
@@ -91,6 +103,10 @@ export const createEmptyFleetEditForm = () => ({
 })
 
 export const createEmptyFleetCreateForm = () => ({
+  assetType: DEFAULT_ASSET_TYPE,
+  assetTypeLabel: getAssetTypeLabel(DEFAULT_ASSET_TYPE),
+  mapIcon: getAssetTypeMapIcon(DEFAULT_ASSET_TYPE),
+  sucursalId: "",
   trackerModel: "",
   imei: "",
   protocol: "tcp",
@@ -160,51 +176,55 @@ export const findFleetTrackerModel = (activo, trackerModelOptions = fleetTracker
 export const createFleetEditFormFromActivo = (
   activo = {},
   trackerModelOptions = fleetTrackerModelOptions,
-) => ({
-  estado: activo.estado || "offline",
+) => {
+  const assetTypeOption = getAssetTypeOption(
+    activo.assetType || activo.tipoActivo || activo.mapIcon || activo.markerIcon || activo.iconType,
+  )
 
-  trackerModel: findFleetTrackerModel(activo, trackerModelOptions),
-  trackerModelLabel:
-    activo.trackerModelLabel && activo.trackerModelLabel !== "-"
-      ? String(activo.trackerModelLabel)
-      : "",
-  trackerManufacturer:
-    activo.trackerManufacturer && activo.trackerManufacturer !== "-"
-      ? String(activo.trackerManufacturer)
-      : "",
+  return {
+    assetType: assetTypeOption.value,
+    assetTypeLabel: activo.assetTypeLabel || activo.tipoActivoLabel || assetTypeOption.label,
+    mapIcon: activo.mapIcon || activo.markerIcon || activo.iconType || assetTypeOption.mapIcon,
+    sucursalId: activo.sucursalId || "",
 
-  imei: activo.imei && activo.imei !== "-" ? String(activo.imei) : "",
-  protocol:
-    activo.protocol && activo.protocol !== "-" ? String(activo.protocol).toLowerCase() : "tcp",
+    trackerModel: findFleetTrackerModel(activo, trackerModelOptions),
+    trackerModelLabel:
+      activo.trackerModelLabel && activo.trackerModelLabel !== "-"
+        ? String(activo.trackerModelLabel)
+        : "",
+    trackerManufacturer:
+      activo.trackerManufacturer && activo.trackerManufacturer !== "-"
+        ? String(activo.trackerManufacturer)
+        : "",
 
-  name:
-    activo.name && activo.name !== "-"
-      ? String(activo.name)
-      : String(activo.vehiculo || activo.nombrePantalla || ""),
+    imei: activo.imei && activo.imei !== "-" ? String(activo.imei) : "",
+    protocol:
+      activo.protocol && activo.protocol !== "-" ? String(activo.protocol).toLowerCase() : "tcp",
 
-  displayName:
-    activo.nombrePantalla && activo.nombrePantalla !== "-"
-      ? String(activo.nombrePantalla)
-      : String(activo.vehiculo || activo.displayName || activo.name || ""),
+    name:
+      activo.name && activo.name !== "-"
+        ? String(activo.name)
+        : String(activo.vehiculo || activo.nombrePantalla || ""),
 
-  description:
-    activo.descripcion && activo.descripcion !== "-"
-      ? String(activo.descripcion)
-      : String(activo.description || ""),
+    displayName:
+      activo.nombrePantalla && activo.nombrePantalla !== "-"
+        ? String(activo.nombrePantalla)
+        : String(activo.vehiculo || activo.displayName || activo.name || ""),
 
-  direccion:
-    activo.direccion && activo.direccion !== "-"
-      ? String(activo.direccion)
-      : String(activo.ubicacion || ""),
+    description:
+      activo.descripcion && activo.descripcion !== "-"
+        ? String(activo.descripcion)
+        : String(activo.description || ""),
 
-  entryDate: normalizeFleetAssetDate(activo.fechaIngreso || activo.entryDate),
-  deactivationDate: normalizeFleetAssetDate(activo.fechaBaja || activo.deactivationDate),
-  suspensionDate: normalizeFleetAssetDate(activo.fechaSuspension || activo.suspensionDate),
+    entryDate: normalizeFleetAssetDate(activo.fechaIngreso || activo.entryDate),
+    deactivationDate: normalizeFleetAssetDate(activo.fechaBaja || activo.deactivationDate),
+    suspensionDate: normalizeFleetAssetDate(activo.fechaSuspension || activo.suspensionDate),
 
-  dailyHourmeter: extractFleetAssetNumber(activo.horometroDiario ?? activo.dailyHourmeter),
-  totalHourmeter: extractFleetAssetNumber(activo.horometroTotal ?? activo.totalHourmeter),
-  odometer: extractFleetAssetNumber(activo.odometro ?? activo.odometer),
-})
+    dailyHourmeter: extractFleetAssetNumber(activo.horometroDiario ?? activo.dailyHourmeter),
+    totalHourmeter: extractFleetAssetNumber(activo.horometroTotal ?? activo.totalHourmeter),
+    odometer: extractFleetAssetNumber(activo.odometro ?? activo.odometer),
+  }
+}
 
 export const buildFleetEditPayload = ({
   form,
@@ -215,9 +235,17 @@ export const buildFleetEditPayload = ({
   const displayName = form.displayName.trim()
   const name = form.name.trim() || displayName
   const description = form.description.trim()
+  const assetTypeOption = getAssetTypeOption(form.assetType || form.mapIcon)
 
   return {
-    estado: form.estado || "offline",
+    assetType: assetTypeOption.value,
+    assetTypeLabel: assetTypeOption.label,
+    tipoActivo: assetTypeOption.value,
+    tipoActivoLabel: assetTypeOption.label,
+    mapIcon: assetTypeOption.mapIcon,
+    markerIcon: assetTypeOption.mapIcon,
+    iconType: assetTypeOption.mapIcon,
+    sucursalId: form.sucursalId || null,
 
     vehiculo: displayName || "Activo sin nombre",
     name: name || "Activo sin nombre",
@@ -238,8 +266,6 @@ export const buildFleetEditPayload = ({
 
     descripcion: description || "-",
     description,
-
-    direccion: form.direccion.trim() || "Última ubicación registrada",
 
     fechaIngreso: form.entryDate || "-",
     entryDate: form.entryDate,
@@ -268,7 +294,17 @@ export const buildFleetCreatePayload = ({
   selectedTrackerModel,
   selectedTrackerModelLabel,
 }) => {
+  const assetTypeOption = getAssetTypeOption(form.assetType || form.mapIcon)
+
   return {
+    assetType: assetTypeOption.value,
+    assetTypeLabel: assetTypeOption.label,
+    tipoActivo: assetTypeOption.value,
+    tipoActivoLabel: assetTypeOption.label,
+    mapIcon: assetTypeOption.mapIcon,
+    markerIcon: assetTypeOption.mapIcon,
+    iconType: assetTypeOption.mapIcon,
+    sucursalId: form.sucursalId || null,
     trackerModel: form.trackerModel,
     trackerModelLabel: selectedTrackerModelLabel,
     trackerManufacturer: selectedTrackerModel?.manufacturer || "",

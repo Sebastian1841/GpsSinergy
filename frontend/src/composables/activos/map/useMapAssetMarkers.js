@@ -1,52 +1,27 @@
 import { computed } from "vue"
 
-import { normalizeSignatureValue } from "../../../utils/mapSignatureUtils.js"
 import { endDevMeasure, startDevMeasure } from "../../../utils/performanceUtils.js"
+import { createAssetMarkerAppearanceController } from "./assetMarkers/assetMarkerAppearance.js"
+import { createAssetMarkerCacheController } from "./assetMarkers/assetMarkerCache.js"
 import {
   createAssetMarkerClusterController,
   shouldClusterAssetMarkers,
 } from "./assetMarkers/assetMarkerClusters.js"
-import { createClusterIcon, createMarkerIcon } from "./assetMarkers/assetMarkerIcons.js"
+import { createClusterIcon } from "./assetMarkers/assetMarkerIcons.js"
 import {
   getTelemetryUpdateMarkerId,
   mergeTelemetryUpdateIntoActivo,
   normalizeTelemetryBatchPayload,
 } from "./assetMarkers/assetMarkerTelemetry.js"
+import { createAssetMarkerTooltipController } from "./assetMarkers/assetMarkerTooltips.js"
 import {
   cancelAssetMarkerFrame,
   createAssetMarkerVisibilityController,
   requestAssetMarkerFrame,
 } from "./assetMarkers/assetMarkerVisibility.js"
 
-const NORMAL_MARKER_RADIUS = 6
-const NORMAL_MARKER_SELECTED_RADIUS = 8
-const NORMAL_MARKER_STROKE_COLOR = "#ffffff"
 const SYNC_ACTIVO_MARKERS_MEASURE = "syncActivoMarkers"
 const APPLY_ACTIVO_TELEMETRY_BATCH_MEASURE = "applyActivoTelemetryBatch"
-
-const statusMarkerStyles = {
-  moving: {
-    fillColor: "#10b981",
-    color: "#047857",
-  },
-  idle: {
-    fillColor: "#0ea5e9",
-    color: "#0369a1",
-  },
-  stopped: {
-    fillColor: "#ef4444",
-    color: "#b91c1c",
-  },
-  offline: {
-    fillColor: "#94a3b8",
-    color: "#64748b",
-  },
-}
-
-const defaultMarkerStyle = {
-  fillColor: "#FF6600",
-  color: "#102372",
-}
 
 export function createAssetMarkerController({
   L,
@@ -59,6 +34,7 @@ export function createAssetMarkerController({
   movementTrails,
   drawMode,
   editingDraft,
+  getFocusedActivoIds = () => [],
 }) {
   const markerCache = new Map()
   const latestActivosById = new Map()
@@ -66,6 +42,8 @@ export function createAssetMarkerController({
 
   let clusterRefreshFrame = null
   let pendingTelemetryFrame = null
+  let focusedActivoIdSetCache = new Set()
+  let focusedActivoSignatureCache = ""
 
   const selectedActivo = computed(() => {
     const selectedId = normalizeId(props.selectedId)
@@ -91,149 +69,107 @@ export function createAssetMarkerController({
     return normalizeId(activo?.id) === normalizeId(props.selectedId)
   }
 
-  const getMarkerKind = (activo) => {
-    return isActivoSelected(activo) ? "selected" : "normal"
-  }
+  const getFocusedActivoIdSet = () => {
+    const focusedIds = getFocusedActivoIds?.() || []
+    const nextSignature = focusedIds
+      .map((activoId) => normalizeId(activoId))
+      .filter((activoId) => Boolean(activoId))
+      .sort()
+      .join("|")
 
-  const getNormalMarkerStyle = (activo) => {
-    const statusStyle = statusMarkerStyles[activo?.estado] || defaultMarkerStyle
-    const selected = isActivoSelected(activo)
-
-    return {
-      radius: selected ? NORMAL_MARKER_SELECTED_RADIUS : NORMAL_MARKER_RADIUS,
-      color: NORMAL_MARKER_STROKE_COLOR,
-      weight: selected ? 3 : 2,
-      opacity: 1,
-      fillColor: statusStyle.fillColor,
-      fillOpacity: selected ? 1 : 0.9,
-      interactive: true,
+    if (nextSignature !== focusedActivoSignatureCache) {
+      focusedActivoSignatureCache = nextSignature
+      focusedActivoIdSetCache = new Set(nextSignature ? nextSignature.split("|") : [])
     }
+
+    return focusedActivoIdSetCache
   }
 
-  const buildMarkerPositionSignature = (activoLatLng) => {
-    return [activoLatLng?.[0], activoLatLng?.[1]].map(normalizeSignatureValue).join(":")
+  const isActivoAllowedByFocus = (activo) => {
+    const focusedActivoIds = getFocusedActivoIdSet()
+
+    if (!focusedActivoIds.size) return true
+
+    return focusedActivoIds.has(normalizeId(activo?.id))
   }
 
-  const buildMarkerIconSignature = (activo) => {
-    return [getMarkerKind(activo), activo.id, activo.estado, isActivoSelected(activo)]
-      .map(normalizeSignatureValue)
-      .join(":")
-  }
+  const getRenderableLatestActivos = () => {
+    const focusedActivoIds = getFocusedActivoIdSet()
+    const latestActivos = getAllLatestActivos()
 
-  const buildMarkerStyleSignature = (activo) => {
-    const style = getNormalMarkerStyle(activo)
+    if (!focusedActivoIds.size) return latestActivos
 
-    return [
-      getMarkerKind(activo),
-      activo?.estado,
-      style.radius,
-      style.color,
-      style.weight,
-      style.fillColor,
-      style.fillOpacity,
-    ]
-      .map(normalizeSignatureValue)
-      .join(":")
-  }
-
-  const buildMarkerTooltipSignature = (activo) => {
-    if (!isActivoSelected(activo)) return ""
-
-    return [activo.id, activo.vehiculo, activo.patente, activo.name, "selected"]
-      .map(normalizeSignatureValue)
-      .join(":")
-  }
-
-  const getActivoTooltipLabel = (activo) => {
-    return activo.vehiculo || activo.patente || activo.name || "Activo"
-  }
-
-  const bindSelectedActivoTooltip = (marker, activo) => {
-    marker.unbindTooltip()
-
-    marker.bindTooltip(getActivoTooltipLabel(activo), {
-      permanent: true,
-      direction: "top",
-      offset: [0, -12],
-      className: "sinergy-tooltip",
+    return latestActivos.filter((activo) => {
+      return focusedActivoIds.has(normalizeId(activo?.id))
     })
   }
 
-  const bindMarkerClick = (marker, activo) => {
-    marker.on("click", () => {
-      if (drawMode.value || editingDraft.value) return
+  const centerMapOnLatLng = (activoLatLng, { minZoom = 15, duration = 0.32 } = {}) => {
+    const map = getMap()
 
-      emit("select", activo.id)
+    if (!map || !activoLatLng) return
+
+    const currentZoom = map.getZoom()
+    const targetZoom = Math.max(currentZoom, minZoom)
+
+    if (targetZoom > currentZoom && typeof map.flyTo === "function") {
+      map.flyTo(activoLatLng, targetZoom, {
+        duration,
+      })
+      return
+    }
+
+    map.panTo(activoLatLng, {
+      animate: true,
+      duration,
     })
   }
 
-  const createSelectedActivoMarker = (activo, activoLatLng) => {
-    const marker = L.marker(activoLatLng, {
-      icon: createMarkerIcon({
-        L,
-        activo,
-        isSelected: true,
-      }),
-      zIndexOffset: 1000,
+  const {
+    getMarkerKind,
+    getMarkerRenderMode,
+    getNormalMarkerStyle,
+    buildMarkerPositionSignature,
+    buildMarkerIconSignature,
+    buildMarkerStyleSignature,
+  } = createAssetMarkerAppearanceController({
+    isActivoSelected,
+  })
+
+  const {
+    buildMarkerTooltipSignature,
+    bindActivoTooltip,
+    bindActivoTooltipOpenRefresh,
+    bindLazyActivoTooltip,
+    bindSelectedActivoTooltip,
+  } = createAssetMarkerTooltipController({
+    normalizeId,
+    latestActivosById,
+    getMarkerKind,
+    getGeofences: () => props.geofences || [],
+    getUseGeofenceLocationAddress: () => props.useGeofenceLocationAddress !== false,
+  })
+
+  const { addCachedMarkerToLayer, createMarkerCacheRecord, hideCachedMarker, updateCachedMarker } =
+    createAssetMarkerCacheController({
+      L,
+      layers,
+      emit,
+      markerCache,
+      drawMode,
+      editingDraft,
+      getMarkerKind,
+      getMarkerRenderMode,
+      getNormalMarkerStyle,
+      buildMarkerPositionSignature,
+      buildMarkerIconSignature,
+      buildMarkerStyleSignature,
+      buildMarkerTooltipSignature,
+      bindActivoTooltip,
+      bindActivoTooltipOpenRefresh,
+      bindLazyActivoTooltip,
+      bindSelectedActivoTooltip,
     })
-
-    bindMarkerClick(marker, activo)
-    bindSelectedActivoTooltip(marker, activo)
-
-    return marker
-  }
-
-  const createNormalActivoMarker = (activo, activoLatLng) => {
-    const marker = L.circleMarker(activoLatLng, getNormalMarkerStyle(activo))
-
-    bindMarkerClick(marker, activo)
-
-    return marker
-  }
-
-  const createActivoMarker = (activo, activoLatLng) => {
-    const markerKind = getMarkerKind(activo)
-    const marker =
-      markerKind === "selected"
-        ? createSelectedActivoMarker(activo, activoLatLng)
-        : createNormalActivoMarker(activo, activoLatLng)
-
-    return {
-      marker,
-      markerKind,
-    }
-  }
-
-  const createMarkerCacheRecord = ({ activo, activoLatLng, isVisible = false }) => {
-    const { marker, markerKind } = createActivoMarker(activo, activoLatLng)
-
-    return {
-      marker,
-      markerKind,
-      activo,
-      isVisible,
-      positionSignature: buildMarkerPositionSignature(activoLatLng),
-      iconSignature: buildMarkerIconSignature(activo),
-      styleSignature: buildMarkerStyleSignature(activo),
-      tooltipSignature: buildMarkerTooltipSignature(activo),
-    }
-  }
-
-  const addCachedMarkerToLayer = (cachedMarker) => {
-    if (!layers.markerLayer || !cachedMarker || cachedMarker.isVisible) return
-
-    cachedMarker.marker.addTo(layers.markerLayer)
-    cachedMarker.isVisible = true
-  }
-
-  const hideCachedMarker = (markerId) => {
-    const cachedMarker = markerCache.get(markerId)
-
-    if (!cachedMarker || !cachedMarker.isVisible) return
-
-    layers.markerLayer?.removeLayer(cachedMarker.marker)
-    cachedMarker.isVisible = false
-  }
 
   const { isActivoInsideViewport, getVisibleActivos, hideMarkersOutsideActivos } =
     createAssetMarkerVisibilityController({
@@ -244,28 +180,9 @@ export function createAssetMarkerController({
       latestActivosById,
       markerCache,
       isActivoSelected,
+      isActivoAllowedByFocus,
       hideCachedMarker,
     })
-
-  const replaceCachedMarker = ({ markerId, cachedMarker, activo, activoLatLng }) => {
-    const wasVisible = cachedMarker.isVisible
-
-    layers.markerLayer?.removeLayer(cachedMarker.marker)
-
-    const nextCachedMarker = createMarkerCacheRecord({
-      activo,
-      activoLatLng,
-      isVisible: false,
-    })
-
-    markerCache.set(markerId, nextCachedMarker)
-
-    if (wasVisible) {
-      addCachedMarkerToLayer(nextCachedMarker)
-    }
-
-    return nextCachedMarker
-  }
 
   const cancelClusterRefresh = () => {
     if (clusterRefreshFrame === null || clusterRefreshFrame === undefined) return
@@ -299,58 +216,6 @@ export function createAssetMarkerController({
     latestActivosById.delete(markerId)
   }
 
-  const updateCachedMarker = ({ markerId, cachedMarker, activo, activoLatLng }) => {
-    const markerKind = getMarkerKind(activo)
-
-    if (cachedMarker.markerKind !== markerKind) {
-      return replaceCachedMarker({
-        markerId,
-        cachedMarker,
-        activo,
-        activoLatLng,
-      })
-    }
-
-    const positionSignature = buildMarkerPositionSignature(activoLatLng)
-    const iconSignature = buildMarkerIconSignature(activo)
-    const styleSignature = buildMarkerStyleSignature(activo)
-    const tooltipSignature = buildMarkerTooltipSignature(activo)
-
-    if (cachedMarker.positionSignature !== positionSignature) {
-      cachedMarker.marker.setLatLng(activoLatLng)
-      cachedMarker.positionSignature = positionSignature
-    }
-
-    if (cachedMarker.markerKind === "selected" && cachedMarker.iconSignature !== iconSignature) {
-      cachedMarker.marker.setIcon(
-        createMarkerIcon({
-          L,
-          activo,
-          isSelected: true,
-        }),
-      )
-
-      cachedMarker.iconSignature = iconSignature
-    }
-
-    if (cachedMarker.markerKind === "normal" && cachedMarker.styleSignature !== styleSignature) {
-      cachedMarker.marker.setStyle(getNormalMarkerStyle(activo))
-      cachedMarker.styleSignature = styleSignature
-    }
-
-    if (
-      cachedMarker.markerKind === "selected" &&
-      cachedMarker.tooltipSignature !== tooltipSignature
-    ) {
-      bindSelectedActivoTooltip(cachedMarker.marker, activo)
-      cachedMarker.tooltipSignature = tooltipSignature
-    }
-
-    cachedMarker.activo = activo
-
-    return cachedMarker
-  }
-
   const upsertIndividualMarker = (activo, { trackTrail = true } = {}) => {
     const map = getMap()
 
@@ -366,6 +231,11 @@ export function createAssetMarkerController({
 
     if (!activoLatLng) {
       removeActivoMarker(markerId)
+      return null
+    }
+
+    if (!isActivoAllowedByFocus(activo)) {
+      hideCachedMarker(markerId)
       return null
     }
 
@@ -437,7 +307,10 @@ export function createAssetMarkerController({
 
     clusterRefreshFrame = requestAssetMarkerFrame(() => {
       clusterRefreshFrame = null
-      markerClusters.renderMarkerClusters(getVisibleActivos())
+      const visibleActivos = getVisibleActivos()
+
+      hideMarkersOutsideActivos(visibleActivos)
+      markerClusters.renderMarkerClusters(visibleActivos)
     })
   }
 
@@ -470,11 +343,21 @@ export function createAssetMarkerController({
       return null
     }
 
+    const shouldCluster = shouldClusterAssetMarkers(map, getRenderableLatestActivos())
+
+    if (!isActivoAllowedByFocus(activo)) {
+      hideCachedMarker(markerId)
+
+      if (shouldCluster) {
+        scheduleClusterRefresh()
+      }
+
+      return null
+    }
+
     if (trackTrail) {
       movementTrails.registerMovementTrailPoint(activo)
     }
-
-    const shouldCluster = shouldClusterAssetMarkers(map, getAllLatestActivos())
 
     if (!isActivoInsideViewport(activoLatLng) && !isActivoSelected(activo)) {
       hideCachedMarker(markerId)
@@ -487,9 +370,8 @@ export function createAssetMarkerController({
     }
 
     if (shouldCluster && !isActivoSelected(activo)) {
-      hideCachedMarker(markerId)
       scheduleClusterRefresh()
-      return null
+      return markerCache.get(markerId)?.marker || null
     }
 
     if (!shouldCluster) {
@@ -524,7 +406,7 @@ export function createAssetMarkerController({
 
     if (!map || !layers.markerLayer) return
 
-    const shouldCluster = shouldClusterAssetMarkers(map, getAllLatestActivos())
+    const shouldCluster = shouldClusterAssetMarkers(map, getRenderableLatestActivos())
 
     if (!shouldCluster) {
       markerClusters.clearClusterMarkers()
@@ -544,10 +426,27 @@ export function createAssetMarkerController({
       })
 
       latestActivosById.set(markerId, nextActivo)
+
+      if (!isActivoAllowedByFocus(nextActivo)) {
+        hideCachedMarker(markerId)
+        shouldRefreshClusters = true
+        return
+      }
+
       movementTrails.registerMovementTrailPoint(nextActivo)
 
       if (shouldCluster && !isActivoSelected(nextActivo)) {
-        hideCachedMarker(markerId)
+        const nextActivoLatLng = getActivoLatLng(nextActivo)
+
+        if (!nextActivoLatLng) {
+          removeActivoMarker(markerId)
+          return
+        }
+
+        if (!isActivoInsideViewport(nextActivoLatLng)) {
+          hideCachedMarker(markerId)
+        }
+
         shouldRefreshClusters = true
         return
       }
@@ -603,7 +502,7 @@ export function createAssetMarkerController({
     }
   }
 
-  const syncActivoMarkers = (activos = [], { fit = false } = {}) => {
+  const syncActivoMarkers = (activos = [], { fit = false, trackTrail = true } = {}) => {
     const measure = startDevMeasure(SYNC_ACTIVO_MARKERS_MEASURE)
 
     try {
@@ -629,9 +528,17 @@ export function createAssetMarkerController({
 
         latestActivosById.set(markerId, activo)
         nextMarkerIds.add(markerId)
+
+        if (!isActivoAllowedByFocus(activo)) {
+          hideCachedMarker(markerId)
+          return
+        }
+
         bounds.push(activoLatLng)
 
-        movementTrails.registerMovementTrailPoint(activo)
+        if (trackTrail) {
+          movementTrails.registerMovementTrailPoint(activo)
+        }
 
         if (!isActivoInsideViewport(activoLatLng) && !isActivoSelected(activo)) {
           hideCachedMarker(markerId)
@@ -666,16 +573,10 @@ export function createAssetMarkerController({
         movementTrails.removeMovementTrail(activoId)
       })
 
-      if (shouldClusterAssetMarkers(map, activos)) {
+      if (shouldClusterAssetMarkers(map, nextVisibleActivos)) {
         markerClusters.renderMarkerClusters(getVisibleActivos())
       } else {
-        markerClusters.clearClusterMarkers()
-
-        nextVisibleActivos.forEach((activo) => {
-          upsertIndividualMarker(activo, {
-            trackTrail: false,
-          })
-        })
+        markerClusters.renderMarkerClusters(nextVisibleActivos)
       }
 
       if (fit && bounds.length && !props.selectedId && !props.itineraryRoute) {
@@ -698,10 +599,13 @@ export function createAssetMarkerController({
 
     if (!activoLatLng) return
 
-    map.invalidateSize()
+    map.invalidateSize({
+      pan: false,
+    })
 
-    map.flyTo(activoLatLng, 15, {
-      duration: 0.45,
+    centerMapOnLatLng(activoLatLng, {
+      minZoom: 15,
+      duration: 0.32,
     })
   }
 

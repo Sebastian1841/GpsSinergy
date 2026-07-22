@@ -1,33 +1,36 @@
 import { createRouter, createWebHistory } from "vue-router"
 import { useAccessControl } from "../composables/auth/useAccessControl.js"
 import { useAuthSession } from "../composables/auth/useAuthSession.js"
+import {
+  readStorageValue,
+  removeStorageValue,
+  writeStorageValue,
+} from "../services/storage/browserStorage.js"
 
 // ==================
 // VISTAS
 // ==================
 const ActivosView = () => import("../views/ActivosView.vue")
+const AuditView = () => import("../views/AuditView.vue")
 const CompanyManagementView = () => import("../views/CompanyManagementView.vue")
 const UserManagementView = () => import("../views/UserManagementView.vue")
+const ReportsView = () => import("../views/ReportsView.vue")
 const LoginView = () => import("../views/LoginView.vue")
 const NoAccessView = () => import("../views/NoAccessView.vue")
 
 const LAST_COMPANY_CACHE_KEY = "sinergy-last-company-id"
 
 const readLastCompanyId = () => {
-  if (typeof window === "undefined") return null
-
-  return window.localStorage.getItem(LAST_COMPANY_CACHE_KEY)
+  return readStorageValue(LAST_COMPANY_CACHE_KEY)
 }
 
 const persistLastCompanyId = (companyId) => {
-  if (typeof window === "undefined") return
-
   if (companyId) {
-    window.localStorage.setItem(LAST_COMPANY_CACHE_KEY, String(companyId))
+    writeStorageValue(LAST_COMPANY_CACHE_KEY, companyId)
     return
   }
 
-  window.localStorage.removeItem(LAST_COMPANY_CACHE_KEY)
+  removeStorageValue(LAST_COMPANY_CACHE_KEY)
 }
 
 const getLastAccessibleAssetsCompany = ({ accessibleCompanies, canAccessModule }) => {
@@ -86,6 +89,30 @@ const routes = [
   },
 
   // ==================
+  // REPORTES GENERAL
+  // ==================
+  {
+    path: "/reportes",
+    name: "Reports",
+    component: ReportsView,
+    meta: {
+      requiresPlatformAdmin: true,
+    },
+  },
+
+  // ==================
+  // AUDITORIA GENERAL
+  // ==================
+  {
+    path: "/auditoria",
+    name: "Audit",
+    component: AuditView,
+    meta: {
+      requiresPlatformAdmin: true,
+    },
+  },
+
+  // ==================
   // GESTION DE USUARIOS
   // ==================
   {
@@ -118,6 +145,36 @@ const routes = [
     component: ActivosView,
     meta: {
       requiresModule: "assets",
+    },
+  },
+
+  // ==================
+  // REPORTES EMPRESA
+  // ==================
+  {
+    path: "/app/:empresaId/reportes",
+    name: "AppReports",
+    component: ReportsView,
+    meta: {
+      requiresFunction: {
+        id: "reports",
+        permission: "view",
+      },
+    },
+  },
+
+  // ==================
+  // AUDITORIA EMPRESA
+  // ==================
+  {
+    path: "/app/:empresaId/auditoria",
+    name: "AppAudit",
+    component: AuditView,
+    meta: {
+      requiresFunction: {
+        id: "audit-view",
+        permission: "view",
+      },
     },
   },
 

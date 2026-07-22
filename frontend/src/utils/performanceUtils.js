@@ -1,7 +1,7 @@
 const DEFAULT_MEASURE_THRESHOLD_MS = 16
 
 export const startDevMeasure = (label) => {
-  if (!import.meta.env.DEV || typeof performance === "undefined") return null
+  if (!import.meta.env?.DEV || typeof performance === "undefined") return null
 
   return {
     label,
@@ -10,7 +10,7 @@ export const startDevMeasure = (label) => {
 }
 
 export const endDevMeasure = (measure, thresholdMs = DEFAULT_MEASURE_THRESHOLD_MS) => {
-  if (!measure || !import.meta.env.DEV || typeof performance === "undefined") return
+  if (!measure || !import.meta.env?.DEV || typeof performance === "undefined") return
 
   const duration = performance.now() - measure.startedAt
 

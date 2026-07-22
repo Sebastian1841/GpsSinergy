@@ -101,6 +101,7 @@ const buildGeofencesSignature = (geofences = []) => {
         geofence.id,
         geofence.type,
         geofence.name,
+        geofence.groupName,
         geofence.color,
         geofence.radius,
         geofence.center?.lat,

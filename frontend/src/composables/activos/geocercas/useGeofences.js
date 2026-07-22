@@ -1,5 +1,6 @@
 import { computed, ref, unref, watch } from "vue"
 
+import { readJsonStorage, writeJsonStorage } from "../../../services/storage/browserStorage.js"
 import { getGeofenceColor, removeLegacyGeofenceColorFields } from "../../../utils/geofenceUtils.js"
 
 const STORAGE_KEY = "sinergy-activos-geofences"
@@ -7,12 +8,14 @@ const STORAGE_VERSION = 1
 
 const VALID_GEOFENCE_TYPES = new Set(["circle", "polygon", "route"])
 
-const canUseLocalStorage = () => {
-  return typeof window !== "undefined" && typeof window.localStorage !== "undefined"
-}
-
 const normalizeGeofenceId = (id) => {
   return String(id ?? "")
+}
+
+const normalizeGeofenceGroupName = (geofence = {}) => {
+  return String(
+    geofence.groupName || geofence.group || geofence.grupo || geofence.groupLabel || "",
+  ).trim()
 }
 
 const isFiniteNumber = (value) => {
@@ -62,6 +65,7 @@ const normalizeGeofence = (geofence) => {
     id,
     type,
     name: String(geofence.name || "Geocerca sin nombre").trim() || "Geocerca sin nombre",
+    groupName: normalizeGeofenceGroupName(geofence),
     color,
   }
 
@@ -105,24 +109,89 @@ const normalizeGeofence = (geofence) => {
   return null
 }
 
+const buildPointKey = (point) => {
+  return `${Number(point?.lat || 0).toFixed(7)},${Number(point?.lng || 0).toFixed(7)}`
+}
+
+const buildCoordinatesKey = (coordinates = []) => {
+  if (!Array.isArray(coordinates)) return ""
+
+  return coordinates.map((point) => buildPointKey(point)).join("|")
+}
+
+const buildGeofenceDuplicateKey = (geofence) => {
+  const baseKey = [
+    String(geofence.companyId || ""),
+    String(geofence.type || ""),
+    String(geofence.name || "")
+      .trim()
+      .toLowerCase(),
+  ]
+
+  if (geofence.type === "circle") {
+    return [
+      ...baseKey,
+      buildPointKey(geofence.center),
+      Math.round(Number(geofence.radius) || 0),
+    ].join("::")
+  }
+
+  return [...baseKey, buildCoordinatesKey(geofence.coordinates)].join("::")
+}
+
+const preferCompanyScopedGeofence = (currentGeofence, nextGeofence) => {
+  const currentHasCompany = Boolean(currentGeofence?.companyId)
+  const nextHasCompany = Boolean(nextGeofence?.companyId)
+
+  if (nextHasCompany || !currentHasCompany) return nextGeofence
+
+  return currentGeofence
+}
+
 const normalizeGeofences = (geofences) => {
   if (!Array.isArray(geofences)) return []
 
-  return geofences.map((geofence) => normalizeGeofence(geofence)).filter(Boolean)
+  const geofencesById = new Map()
+  const geofencesByContent = new Map()
+
+  geofences
+    .map((geofence) => normalizeGeofence(geofence))
+    .filter(Boolean)
+    .forEach((geofence) => {
+      const geofenceId = normalizeGeofenceId(geofence.id)
+      const duplicateKey = buildGeofenceDuplicateKey(geofence)
+      const previousGeofence = geofencesById.get(geofenceId)
+      const previousDuplicateGeofence = geofencesByContent.get(duplicateKey)
+
+      if (
+        previousDuplicateGeofence &&
+        normalizeGeofenceId(previousDuplicateGeofence.id) !== geofenceId
+      ) {
+        const nextGeofence = preferCompanyScopedGeofence(previousDuplicateGeofence, geofence)
+
+        geofencesById.delete(normalizeGeofenceId(previousDuplicateGeofence.id))
+        geofencesById.set(normalizeGeofenceId(nextGeofence.id), nextGeofence)
+        geofencesByContent.set(duplicateKey, nextGeofence)
+        return
+      }
+
+      if (!previousGeofence) {
+        geofencesById.set(geofenceId, geofence)
+        geofencesByContent.set(duplicateKey, geofence)
+        return
+      }
+
+      const nextGeofence = preferCompanyScopedGeofence(previousGeofence, geofence)
+
+      geofencesById.set(geofenceId, nextGeofence)
+      geofencesByContent.set(duplicateKey, nextGeofence)
+    })
+
+  return Array.from(geofencesById.values())
 }
 
 const readStoredPayload = () => {
-  if (!canUseLocalStorage()) return null
-
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-
-    if (!raw) return null
-
-    return JSON.parse(raw)
-  } catch {
-    return null
-  }
+  return readJsonStorage(STORAGE_KEY, null)
 }
 
 const readStoredGeofences = () => {
@@ -151,23 +220,44 @@ const readStoredGeofences = () => {
 }
 
 const persistGeofences = (geofences) => {
-  if (!canUseLocalStorage()) return
-
-  try {
-    const payload = {
-      version: STORAGE_VERSION,
-      geofences: normalizeGeofences(geofences),
-    }
-
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
-  } catch {
-    // Mantiene la app funcionando aunque localStorage falle.
-  }
+  writeJsonStorage(STORAGE_KEY, {
+    version: STORAGE_VERSION,
+    geofences: normalizeGeofences(geofences),
+  })
 }
 
 export function useGeofences({ companyId = "general" } = {}) {
   const allGeofences = ref(readStoredGeofences())
   const resolvedCompanyId = computed(() => String(unref(companyId) || "general"))
+
+  persistGeofences(allGeofences.value)
+
+  const migrateLegacyGeofencesToCompany = () => {
+    const currentCompanyId = resolvedCompanyId.value
+
+    if (!currentCompanyId || currentCompanyId === "general") return
+
+    let migrated = false
+
+    const nextGeofences = normalizeGeofences(
+      allGeofences.value.map((geofence) => {
+        if (String(geofence.companyId || "")) return geofence
+
+        migrated = true
+
+        return (
+          normalizeGeofence({
+            ...geofence,
+            companyId: currentCompanyId,
+          }) || geofence
+        )
+      }),
+    )
+
+    if (migrated || nextGeofences.length !== allGeofences.value.length) {
+      allGeofences.value = nextGeofences
+    }
+  }
 
   const geofences = computed(() => {
     if (resolvedCompanyId.value === "general") return allGeofences.value
@@ -178,26 +268,34 @@ export function useGeofences({ companyId = "general" } = {}) {
   })
 
   const updateGeofence = (updatedGeofence) => {
-    if (!updatedGeofence?.id) return
+    if (!updatedGeofence?.id) return null
 
     const visibleGeofenceExists = geofences.value.some((geofence) => {
       return normalizeGeofenceId(geofence.id) === normalizeGeofenceId(updatedGeofence.id)
     })
 
-    if (!visibleGeofenceExists) return
+    if (!visibleGeofenceExists) return null
 
-    allGeofences.value = allGeofences.value.map((geofence) => {
-      if (normalizeGeofenceId(geofence.id) !== normalizeGeofenceId(updatedGeofence.id)) {
-        return geofence
-      }
+    allGeofences.value = normalizeGeofences(
+      allGeofences.value.map((geofence) => {
+        if (normalizeGeofenceId(geofence.id) !== normalizeGeofenceId(updatedGeofence.id)) {
+          return geofence
+        }
 
-      const mergedGeofence = {
-        ...geofence,
-        ...updatedGeofence,
-      }
+        const mergedGeofence = {
+          ...geofence,
+          ...updatedGeofence,
+        }
 
-      return normalizeGeofence(mergedGeofence) || geofence
-    })
+        return normalizeGeofence(mergedGeofence) || geofence
+      }),
+    )
+
+    return (
+      geofences.value.find((geofence) => {
+        return normalizeGeofenceId(geofence.id) === normalizeGeofenceId(updatedGeofence.id)
+      }) || null
+    )
   }
 
   const createGeofence = (geofence) => {
@@ -206,18 +304,23 @@ export function useGeofences({ companyId = "general" } = {}) {
       companyId: resolvedCompanyId.value,
     })
 
-    if (!normalizedGeofence) return
+    if (!normalizedGeofence) return null
 
     const exists = geofences.value.some((item) => {
       return normalizeGeofenceId(item.id) === normalizeGeofenceId(normalizedGeofence.id)
     })
 
     if (exists) {
-      updateGeofence(normalizedGeofence)
-      return
+      return updateGeofence(normalizedGeofence)
     }
 
-    allGeofences.value = [...allGeofences.value, normalizedGeofence]
+    allGeofences.value = normalizeGeofences([...allGeofences.value, normalizedGeofence])
+
+    return (
+      geofences.value.find((item) => {
+        return normalizeGeofenceId(item.id) === normalizeGeofenceId(normalizedGeofence.id)
+      }) || null
+    )
   }
 
   const deleteGeofence = (geofenceId) => {
@@ -245,6 +348,10 @@ export function useGeofences({ companyId = "general" } = {}) {
 
   watch(allGeofences, (nextGeofences) => {
     persistGeofences(nextGeofences)
+  })
+
+  watch(resolvedCompanyId, migrateLegacyGeofencesToCompany, {
+    immediate: true,
   })
 
   return {

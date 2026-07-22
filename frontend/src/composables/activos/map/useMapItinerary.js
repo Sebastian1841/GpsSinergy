@@ -1,177 +1,24 @@
 import L from "leaflet"
 
 import { endDevMeasure, startDevMeasure } from "../../../utils/performanceUtils.js"
-
-const ITINERARY_MAX_RENDER_POINTS = 800
-const ITINERARY_MIN_DETAIL_ZOOM = 14
-const ITINERARY_MAX_STOP_MARKERS = 120
-const ITINERARY_MAX_ROUTE_ARROWS = 4
-const RENDER_ITINERARY_ROUTE_MEASURE = "renderItineraryRoute"
-
-const itineraryRoutePalette = [
-  {
-    main: "#102372",
-    flow: "#FF6600",
-  },
-  {
-    main: "#1e3a8a",
-    flow: "#FF6600",
-  },
-  {
-    main: "#334155",
-    flow: "#FF6600",
-  },
-  {
-    main: "#475569",
-    flow: "#FF6600",
-  },
-  {
-    main: "#0f172a",
-    flow: "#FF6600",
-  },
-  {
-    main: "#1d4ed8",
-    flow: "#FF6600",
-  },
-]
-
-const toRad = (value) => (value * Math.PI) / 180
-const toDeg = (value) => (value * 180) / Math.PI
-
-const isValidLatLng = (point) => {
-  if (!point) return false
-
-  const lat = Number(point.lat)
-  const lng = Number(point.lng)
-
-  return Number.isFinite(lat) && Number.isFinite(lng)
-}
-
-const toLatLng = (point) => {
-  return [Number(point.lat), Number(point.lng)]
-}
-
-const buildRenderableItineraryPoints = (points = []) => {
-  if (!Array.isArray(points)) return []
-
-  if (points.length <= ITINERARY_MAX_RENDER_POINTS) {
-    return [...points]
-  }
-
-  const renderPoints = []
-  const lastIndex = points.length - 1
-  const step = lastIndex / (ITINERARY_MAX_RENDER_POINTS - 1)
-
-  for (let index = 0; index < ITINERARY_MAX_RENDER_POINTS; index += 1) {
-    const point = points[Math.round(index * step)]
-
-    if (point) {
-      renderPoints.push(point)
-    }
-  }
-
-  return renderPoints
-}
-
-const getBearing = (fromPoint, toPoint) => {
-  const lat1 = toRad(Number(fromPoint.lat))
-  const lat2 = toRad(Number(toPoint.lat))
-  const deltaLng = toRad(Number(toPoint.lng) - Number(fromPoint.lng))
-
-  const y = Math.sin(deltaLng) * Math.cos(lat2)
-  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLng)
-
-  return (toDeg(Math.atan2(y, x)) + 360) % 360
-}
-
-const getItineraryRoutePalette = (index = 0) => {
-  return itineraryRoutePalette[index % itineraryRoutePalette.length]
-}
-
-const createItineraryIcon = ({ type = "point", label = "", selected = false } = {}) => {
-  const styles = {
-    start: {
-      bg: "#16a34a",
-      color: "#ffffff",
-      border: "#ffffff",
-      shadow: "rgba(22, 163, 74, 0.35)",
-    },
-    end: {
-      bg: "#ef4444",
-      color: "#ffffff",
-      border: "#ffffff",
-      shadow: "rgba(239, 68, 68, 0.35)",
-    },
-    stop: {
-      bg: "#FF6600",
-      color: "#ffffff",
-      border: "#ffffff",
-      shadow: "rgba(255, 102, 0, 0.28)",
-    },
-    point: {
-      bg: "#102372",
-      color: "#ffffff",
-      border: "#ffffff",
-      shadow: "rgba(16, 35, 114, 0.35)",
-    },
-    selected: {
-      bg: "#ffffff",
-      color: "#102372",
-      border: "#FF6600",
-      shadow: "rgba(255, 102, 0, 0.5)",
-    },
-  }
-
-  const current = selected ? styles.selected : styles[type] || styles.point
-  const size = selected ? 30 : type === "stop" ? 16 : 26
-  const fontSize = selected ? 12 : type === "stop" ? 0 : 11
-  const pulseClass = selected ? "sinergy-itinerary-selected-point" : ""
-
-  return L.divIcon({
-    className: "",
-    html: `
-      <div
-        class="${pulseClass}"
-        style="
-          width:${size}px;
-          height:${size}px;
-          border-radius:999px;
-          background:${current.bg};
-          color:${current.color};
-          border:${type === "stop" ? 2 : 3}px solid ${current.border};
-          box-shadow:0 8px 20px ${current.shadow};
-          display:flex;
-          align-items:center;
-          justify-content:center;
-          font-size:${fontSize}px;
-          font-weight:900;
-          line-height:1;
-        "
-      >
-        ${label}
-      </div>
-    `,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-  })
-}
-
-const createRouteArrowIcon = (color, angle) => {
-  return L.divIcon({
-    className: "",
-    html: `
-      <div
-        class="sinergy-route-arrow"
-        style="
-          --route-color:${color};
-          transform:rotate(${angle}deg);
-        "
-      ></div>
-    `,
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
-  })
-}
+import {
+  ITINERARY_MAX_ROUTE_ARROWS,
+  ITINERARY_MAX_STOP_MARKERS,
+  ITINERARY_MIN_DETAIL_ZOOM,
+  RENDER_ITINERARY_ROUTE_MEASURE,
+} from "./itinerary/itineraryConstants.js"
+import {
+  buildRenderableItineraryPoints,
+  getBearing,
+  isValidLatLng,
+  toLatLng,
+} from "./itinerary/itineraryGeometry.js"
+import { createItineraryIcon, createRouteArrowIcon } from "./itinerary/itineraryIcons.js"
+import {
+  createItineraryRouteStyles,
+  ensureItineraryMapStyles,
+  getItineraryRoutePalette,
+} from "./itinerary/itineraryStyles.js"
 
 const buildItineraryTooltip = (point, label = "Punto") => {
   const time = point.timeLabel || "-"
@@ -190,116 +37,6 @@ const buildItineraryTooltip = (point, label = "Punto") => {
 export function createItineraryMapController({ props, getMap, getRenderer, layers }) {
   const routeLayers = []
   let selectedItineraryPointLayer = null
-
-  const createItineraryRouteStyles = (index = 0) => {
-    const palette = getItineraryRoutePalette(index)
-    const renderer = getRenderer()
-
-    return {
-      halo: {
-        color: "#0f172a",
-        weight: 11,
-        opacity: 0.11,
-        lineCap: "round",
-        lineJoin: "round",
-        smoothFactor: 1.4,
-        interactive: false,
-        renderer,
-      },
-      base: {
-        color: "#ffffff",
-        weight: 8,
-        opacity: 0.95,
-        lineCap: "round",
-        lineJoin: "round",
-        smoothFactor: 1.4,
-        interactive: false,
-        renderer,
-      },
-      main: {
-        color: palette.main,
-        weight: 4.8,
-        opacity: 0.96,
-        lineCap: "round",
-        lineJoin: "round",
-        smoothFactor: 1.4,
-        interactive: false,
-        className: "sinergy-itinerary-route-main",
-        renderer,
-      },
-      flow: {
-        color: palette.flow,
-        weight: 2.25,
-        opacity: 0.9,
-        dashArray: "2 15",
-        lineCap: "round",
-        lineJoin: "round",
-        smoothFactor: 1.4,
-        interactive: false,
-        className: "sinergy-itinerary-route-flow",
-        renderer,
-      },
-    }
-  }
-
-  const ensureItineraryMapStyles = () => {
-    const styleId = "sinergy-itinerary-map-styles"
-    let style = document.getElementById(styleId)
-
-    if (!style) {
-      style = document.createElement("style")
-      style.id = styleId
-      document.head.appendChild(style)
-    }
-
-    style.textContent = `
-      @keyframes sinergyRouteFlow {
-        from { stroke-dashoffset: 0; }
-        to { stroke-dashoffset: -52; }
-      }
-
-      @keyframes sinergySelectedPulse {
-        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 102, 0, 0.42); }
-        70% { transform: scale(1.04); box-shadow: 0 0 0 10px rgba(255, 102, 0, 0); }
-        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 102, 0, 0); }
-      }
-
-      .sinergy-itinerary-route-main {
-        filter: drop-shadow(0 2px 5px rgba(15, 23, 42, 0.18));
-        pointer-events: none;
-      }
-
-      .sinergy-itinerary-route-flow {
-        animation: sinergyRouteFlow 1.15s linear infinite;
-        pointer-events: none;
-      }
-
-      .sinergy-route-arrow {
-        width: 16px;
-        height: 16px;
-        border-radius: 999px;
-        background: #ffffff;
-        box-shadow: 0 6px 14px rgba(15, 23, 42, 0.18);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .sinergy-route-arrow::before {
-        content: "";
-        width: 0;
-        height: 0;
-        margin-left: 2px;
-        border-left: 7px solid var(--route-color);
-        border-top: 4px solid transparent;
-        border-bottom: 4px solid transparent;
-      }
-
-      .sinergy-itinerary-selected-point {
-        animation: sinergySelectedPulse 1.35s ease-out infinite;
-      }
-    `
-  }
 
   const getItineraryRoutes = () => {
     const route = props.itineraryRoute
@@ -378,7 +115,11 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
 
       addRouteLayer(
         L.marker(toLatLng(currentPoint), {
-          icon: createRouteArrowIcon(routeColor, angle),
+          icon: createRouteArrowIcon({
+            L,
+            color: routeColor,
+            angle,
+          }),
           interactive: false,
           zIndexOffset: 760,
         }),
@@ -397,6 +138,7 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
 
     selectedItineraryPointLayer = L.marker(toLatLng(selectedPoint), {
       icon: createItineraryIcon({
+        L,
         type: "selected",
         label: selectedPoint.index ?? "•",
         selected: true,
@@ -451,6 +193,7 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
         addRouteLayer(
           L.marker(toLatLng(point), {
             icon: createItineraryIcon({
+              L,
               type: "stop",
               label: "",
             }),
@@ -468,6 +211,7 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
       addRouteLayer(
         L.marker(toLatLng(firstPoint), {
           icon: createItineraryIcon({
+            L,
             type: "start",
             label: "I",
           }),
@@ -483,6 +227,7 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
       addRouteLayer(
         L.marker(toLatLng(lastPoint), {
           icon: createItineraryIcon({
+            L,
             type: "end",
             label: "F",
           }),
@@ -527,7 +272,10 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
         allLatLngs.push(...latLngs)
 
         if (latLngs.length >= 2) {
-          const styles = createItineraryRouteStyles(routeIndex)
+          const styles = createItineraryRouteStyles({
+            index: routeIndex,
+            renderer: getRenderer(),
+          })
 
           addRouteLayer(L.polyline(latLngs, styles.halo))
           addRouteLayer(L.polyline(latLngs, styles.base))

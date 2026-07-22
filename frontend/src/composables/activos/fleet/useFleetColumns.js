@@ -43,6 +43,33 @@ const parseColumnWidth = (value, fallback = 110) => {
   return clampColumnWidth(parsedValue, fallback)
 }
 
+const normalizeColumnKeys = (keys = [], allowedKeys = []) => {
+  if (!Array.isArray(keys)) return []
+
+  const allowedKeySet = new Set(allowedKeys)
+
+  return Array.from(
+    new Set(
+      keys.map((key) => String(key || "").trim()).filter((key) => key && allowedKeySet.has(key)),
+    ),
+  )
+}
+
+const normalizeColumnWidths = (widthsByKey = {}, columns = []) => {
+  if (!widthsByKey || typeof widthsByKey !== "object" || Array.isArray(widthsByKey)) {
+    return {}
+  }
+
+  return columns.reduce((normalizedWidths, column) => {
+    if (widthsByKey[column.key] === undefined) return normalizedWidths
+
+    return {
+      ...normalizedWidths,
+      [column.key]: clampColumnWidth(widthsByKey[column.key], parseColumnWidth(column.width)),
+    }
+  }, {})
+}
+
 export function useFleetColumns({ columns, normalizeText = defaultNormalizeText } = {}) {
   const columnSearch = ref("")
   const visibleColumnKeys = ref([])
@@ -111,6 +138,54 @@ export function useFleetColumns({ columns, normalizeText = defaultNormalizeText 
     columnSearch.value = ""
   }
 
+  const getColumnPreferences = () => {
+    return {
+      visibleColumnKeys: [...visibleColumnKeys.value],
+      columnOrderKeys: [...columnOrderKeys.value],
+      columnWidthsByKey: {
+        ...columnWidthsByKey.value,
+      },
+    }
+  }
+
+  const applyColumnPreferences = (preferences = {}) => {
+    if (!preferences || typeof preferences !== "object") return
+
+    const safeKeys = safeColumns.value.map((column) => column.key)
+    const lockedKeys = safeColumns.value
+      .filter((column) => column.locked)
+      .map((column) => column.key)
+    const hasVisibleColumnKeys = Array.isArray(preferences.visibleColumnKeys)
+    const hasColumnWidths = Boolean(
+      preferences.columnWidthsByKey &&
+      typeof preferences.columnWidthsByKey === "object" &&
+      !Array.isArray(preferences.columnWidthsByKey),
+    )
+    const nextVisibleKeys = normalizeColumnKeys(preferences.visibleColumnKeys, safeKeys)
+    const nextOrderKeys = normalizeColumnKeys(
+      preferences.columnOrderKeys || preferences.order || preferences.columnOrder,
+      safeKeys,
+    )
+
+    if (hasVisibleColumnKeys) {
+      visibleColumnKeys.value = Array.from(new Set([...lockedKeys, ...nextVisibleKeys]))
+    }
+
+    if (nextOrderKeys.length) {
+      columnOrderKeys.value = [
+        ...nextOrderKeys,
+        ...safeKeys.filter((key) => !nextOrderKeys.includes(key)),
+      ]
+    }
+
+    if (hasColumnWidths) {
+      columnWidthsByKey.value = normalizeColumnWidths(
+        preferences.columnWidthsByKey,
+        safeColumns.value,
+      )
+    }
+  }
+
   const setColumnWidth = (columnKey, width) => {
     const column = safeColumns.value.find((item) => item.key === columnKey)
 
@@ -161,11 +236,15 @@ export function useFleetColumns({ columns, normalizeText = defaultNormalizeText 
     columnSearch,
     visibleColumnKeys,
     defaultColumnKeys,
+    columnOrderKeys,
+    columnWidthsByKey,
     configurableColumns,
     filteredConfigurableColumns,
     visibleColumns,
     firstVisibleColumnKey,
     resetColumns,
+    getColumnPreferences,
+    applyColumnPreferences,
     setColumnWidth,
     moveColumn,
   }

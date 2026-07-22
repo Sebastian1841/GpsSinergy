@@ -1,5 +1,7 @@
 import { ref } from "vue"
 
+import { readJsonStorage, writeJsonStorage } from "../../../services/storage/browserStorage.js"
+
 const STORAGE_KEY = "sinergy-fleet-layout"
 const LEGACY_STORAGE_KEY = "sinergy-activos-fleet-state"
 const DEFAULT_PANEL_WIDTH = 380
@@ -13,16 +15,10 @@ const normalizePanelWidth = (value) => {
 }
 
 const readPanelWidth = () => {
-  if (typeof window === "undefined") return DEFAULT_PANEL_WIDTH
+  const currentState = readJsonStorage(STORAGE_KEY, null)
+  const legacyState = readJsonStorage(LEGACY_STORAGE_KEY, null)
 
-  try {
-    const currentState = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "null")
-    const legacyState = JSON.parse(window.localStorage.getItem(LEGACY_STORAGE_KEY) || "null")
-
-    return normalizePanelWidth(currentState?.leftPanelWidth ?? legacyState?.leftPanelWidth)
-  } catch {
-    return DEFAULT_PANEL_WIDTH
-  }
+  return normalizePanelWidth(currentState?.leftPanelWidth ?? legacyState?.leftPanelWidth)
 }
 
 export function usePersistedFleetLayout() {
@@ -33,19 +29,10 @@ export function usePersistedFleetLayout() {
 
     leftPanelWidth.value = normalizedWidth
 
-    if (typeof window === "undefined") return
-
-    try {
-      window.localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({
-          leftPanelWidth: normalizedWidth,
-          updatedAt: new Date().toISOString(),
-        }),
-      )
-    } catch {
-      // Layout persistence is optional.
-    }
+    writeJsonStorage(STORAGE_KEY, {
+      leftPanelWidth: normalizedWidth,
+      updatedAt: new Date().toISOString(),
+    })
   }
 
   return {

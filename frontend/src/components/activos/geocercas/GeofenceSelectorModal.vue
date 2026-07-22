@@ -77,8 +77,8 @@
 
           <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <article
-              v-for="geofence in geofenceItems"
-              :key="geofence.id"
+              v-for="(geofence, index) in geofenceItems"
+              :key="getGeofenceRenderKey(geofence, index)"
               class="flex min-h-0 flex-col justify-between rounded-xl border border-[#d8dee8] bg-white p-3 shadow-sm transition hover:border-[#FF6600] sm:p-4"
               :class="
                 selectedGeofenceId === geofence.id || editingDraft?.id === geofence.id
@@ -247,6 +247,7 @@ import {
   getGeofenceDescription,
   getGeofenceMeta,
 } from "../../../utils/geofenceUtils.js"
+import { normalizeId } from "../../../utils/idUtils.js"
 
 const props = defineProps({
   modelValue: {
@@ -295,6 +296,10 @@ const {
 const closeModal = () => {
   stopInteraction()
   emit("update:modelValue", false)
+}
+
+const getGeofenceRenderKey = (geofence, index) => {
+  return normalizeId(geofence?.id) || `geofence-${index}`
 }
 
 const confirmDeleteGeofence = async (geofence) => {

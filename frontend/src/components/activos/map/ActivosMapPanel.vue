@@ -84,6 +84,49 @@
       </div>
     </div>
 
+    <div
+      v-if="plannedRouteMapDraft"
+      class="pointer-events-none absolute left-3 right-3 top-3 z-[540] flex justify-center"
+    >
+      <div
+        class="pointer-events-auto flex max-w-[560px] flex-wrap items-center justify-between gap-2 rounded-xl border border-white/70 bg-white/95 px-3 py-2 text-[10px] shadow-xl backdrop-blur-md"
+      >
+        <div class="min-w-0">
+          <p class="font-black uppercase tracking-[0.12em] text-slate-400">Editando ruta</p>
+          <p class="mt-0.5 truncate font-black text-[#102372]">
+            {{ plannedRouteMapDraft.routeName }}
+          </p>
+          <p
+            class="mt-0.5 font-semibold"
+            :class="plannedRouteMapNotice ? 'text-[#ff6600]' : 'text-slate-500'"
+          >
+            {{
+              plannedRouteMapNotice ||
+              "Click en una calle habilitada para agregar paradas. Arrastra los puntos para moverlos."
+            }}
+          </p>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          <button
+            type="button"
+            class="h-8 rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black uppercase tracking-[0.08em] text-[#102372] transition hover:border-[#ff6600] hover:text-[#ff6600]"
+            @click="togglePlannedRoutePanelHidden"
+          >
+            {{ isPlannedRoutePanelHidden ? "Mostrar panel" : "Ocultar panel" }}
+          </button>
+
+          <button
+            type="button"
+            class="h-8 rounded-lg bg-[#ff6600] px-3 text-[10px] font-black uppercase tracking-[0.08em] text-white transition hover:bg-[#e65c00]"
+            @click="stopPlannedRouteMapEditing"
+          >
+            Terminar
+          </button>
+        </div>
+      </div>
+    </div>
+
     <GeofenceEditorPanel
       v-if="drawMode || editingDraft"
       :draw-mode="drawMode"
@@ -104,7 +147,7 @@
     />
 
     <GeofenceSelectorModal
-      v-if="showGeofenceModal"
+      v-if="showGeofenceModal || hasMountedGeofenceModal"
       v-model="showGeofenceModal"
       :geofence-items="geofenceItems"
       :selected-geofence-id="activeGeofenceId"
@@ -116,7 +159,7 @@
     />
 
     <GeofenceHistoryModal
-      v-if="showGeofenceHistoryModal"
+      v-if="showGeofenceHistoryModal || hasMountedGeofenceHistoryModal"
       v-model="showGeofenceHistoryModal"
       :geofence="selectedHistoryGeofence"
       :events="selectedHistoryEvents"
@@ -125,7 +168,7 @@
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, ref, watch } from "vue"
+import { computed, onMounted, ref, watch } from "vue"
 import "leaflet/dist/leaflet.css"
 import "../../../assets/styles/activos-map.css"
 
@@ -135,17 +178,12 @@ import GeofenceEditorPanel from "../geocercas/GeofenceEditorPanel.vue"
 import { useActivosMap } from "../../../composables/activos/map/useActivosMap.js"
 import {
   useMapPanelGeofenceActions,
+  useMapPanelGeofenceModals,
   useMapPanelGeofenceState,
 } from "../../../composables/activos/map/useMapPanelGeofences.js"
 import { useMapPanelFullscreen } from "../../../composables/activos/map/useMapPanelFullscreen.js"
-
-const GeofenceSelectorModal = defineAsyncComponent(
-  () => import("../geocercas/GeofenceSelectorModal.vue"),
-)
-
-const GeofenceHistoryModal = defineAsyncComponent(
-  () => import("../geocercas/GeofenceHistoryModal.vue"),
-)
+import { normalizeId } from "../../../utils/idUtils.js"
+import { usePlannedRouteMapEditor } from "../../../composables/activos/routes/usePlannedRouteMapEditor.js"
 
 const props = defineProps({
   activos: {
@@ -188,6 +226,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  backgroundPaused: {
+    type: Boolean,
+    default: false,
+  },
   canViewGeofences: {
     type: Boolean,
     default: false,
@@ -195,6 +237,10 @@ const props = defineProps({
   canEditGeofences: {
     type: Boolean,
     default: false,
+  },
+  useGeofenceLocationAddress: {
+    type: Boolean,
+    default: true,
   },
 })
 
@@ -211,8 +257,16 @@ const panelRef = ref(null)
 const mapRef = ref(null)
 const showKpis = ref(true)
 const mapType = ref("standard")
+const {
+  plannedRouteMapDraft,
+  isPlannedRoutePanelHidden,
+  plannedRouteMapNotice,
+  stopPlannedRouteMapEditing,
+  togglePlannedRoutePanelHidden,
+} = usePlannedRouteMapEditor()
 
 let pendingSidebarBatch = null
+let skipNextSelectedGeofenceFocusId = null
 
 const { isFullscreen, toggleFullscreen } = useMapPanelFullscreen(panelRef)
 
@@ -235,6 +289,17 @@ const {
   openGeofenceHistorySelector,
   openGeofenceHistory,
 } = geofencePanel
+
+const {
+  GeofenceHistoryModal,
+  GeofenceSelectorModal,
+  hasMountedGeofenceHistoryModal,
+  hasMountedGeofenceModal,
+  preloadGeofenceModals,
+} = useMapPanelGeofenceModals({
+  showGeofenceModal,
+  showGeofenceHistoryModal,
+})
 
 const mapTypeOptions = [
   {
@@ -291,11 +356,17 @@ const mapProps = {
   get mapType() {
     return mapType.value
   },
+  get backgroundPaused() {
+    return props.backgroundPaused
+  },
   get draftGeofenceOptions() {
     return draftGeofenceOptions.value
   },
   get canEditGeofences() {
     return props.canEditGeofences
+  },
+  get useGeofenceLocationAddress() {
+    return props.useGeofenceLocationAddress
   },
 }
 
@@ -322,6 +393,7 @@ const {
   cancelAll,
 
   startEditGeofence,
+  focusGeofence,
   stopEditing,
   removeLastEditPoint,
   deleteGeofence,
@@ -347,6 +419,7 @@ const mapController = {
   startRouteDraw,
   cancelAll,
   startEditGeofence,
+  focusGeofence,
   stopEditing,
   deleteGeofence,
   updateEditingGeofenceMeta,
@@ -395,15 +468,46 @@ const handleTelemetryBatch = (batch = []) => {
   return applyActivoTelemetryBatch(batch)
 }
 
+const shouldQueueMapTelemetry = () => {
+  return props.appSidebarOpen || props.backgroundPaused
+}
+
+const flushPendingTelemetryBatch = () => {
+  if (shouldQueueMapTelemetry() || !pendingSidebarBatch) return
+
+  handleTelemetryBatch(pendingSidebarBatch)
+  pendingSidebarBatch = null
+}
+
+const applyTelemetryBatchFromOutside = (batch = []) => {
+  if (shouldQueueMapTelemetry()) {
+    pendingSidebarBatch = batch
+    return []
+  }
+
+  return handleTelemetryBatch(batch)
+}
+
+const focusGeofenceSelection = (geofenceSelection) => {
+  handleExternalGeofenceSelection(geofenceSelection)
+}
+
+const editGeofenceSelection = (geofenceSelection) => {
+  const geofenceId =
+    geofenceSelection && typeof geofenceSelection === "object"
+      ? geofenceSelection.id
+      : geofenceSelection
+
+  if (!geofenceId) return
+
+  skipNextSelectedGeofenceFocusId = normalizeId(geofenceId)
+  selectGeofenceToEdit(geofenceId)
+}
+
 watch(
   () => props.telemetryBatch,
   (batch) => {
-    if (props.appSidebarOpen) {
-      pendingSidebarBatch = batch
-      return
-    }
-
-    handleTelemetryBatch(batch)
+    applyTelemetryBatchFromOutside(batch)
   },
   {
     deep: false,
@@ -412,18 +516,48 @@ watch(
 
 watch(
   () => props.appSidebarOpen,
-  (isOpen) => {
-    if (isOpen || !pendingSidebarBatch) return
+  () => {
+    flushPendingTelemetryBatch()
+  },
+)
 
-    handleTelemetryBatch(pendingSidebarBatch)
-    pendingSidebarBatch = null
+watch(
+  () => props.backgroundPaused,
+  () => {
+    flushPendingTelemetryBatch()
   },
 )
 
 watch(
   () => props.selectedGeofenceId,
   (geofenceId) => {
+    if (
+      geofenceId &&
+      skipNextSelectedGeofenceFocusId &&
+      normalizeId(geofenceId) === skipNextSelectedGeofenceFocusId
+    ) {
+      skipNextSelectedGeofenceFocusId = null
+      return
+    }
+
+    skipNextSelectedGeofenceFocusId = null
     handleExternalGeofenceSelection(geofenceId)
   },
 )
+
+onMounted(() => {
+  preloadGeofenceModals()
+
+  if (!props.selectedGeofenceId) return
+
+  window.setTimeout(() => {
+    handleExternalGeofenceSelection(props.selectedGeofenceId)
+  }, 0)
+})
+
+defineExpose({
+  applyTelemetryBatch: applyTelemetryBatchFromOutside,
+  editGeofenceSelection,
+  focusGeofenceSelection,
+})
 </script>

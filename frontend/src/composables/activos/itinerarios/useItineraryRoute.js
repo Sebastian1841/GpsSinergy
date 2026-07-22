@@ -315,6 +315,7 @@ export function useItineraryRoute({
     const cleanTimestamp = timestamp.replace(/\D/g, "")
 
     return {
+      ...asset,
       id: `${assetId}-live-current-${cleanTimestamp}`,
       assetId,
       timestamp,
@@ -324,6 +325,12 @@ export function useItineraryRoute({
       address: asset.direccion || asset.address || "Ubicacion actual",
       event: "Reporte GPS",
       odometer: asset.odometer || asset.odometro || null,
+      ignition: asset.ignition ?? asset.ignicion ?? asset.contacto ?? null,
+      ignicion: asset.ignicion ?? asset.ignition ?? asset.contacto ?? null,
+      contacto: asset.contacto ?? asset.ignition ?? asset.ignicion ?? null,
+      digitalInput1: asset.digitalInput1 ?? asset.input1 ?? asset.di1 ?? null,
+      digitalInput2: asset.digitalInput2 ?? asset.input2 ?? asset.di2 ?? null,
+      gpsSatellites: asset.gpsSatellites ?? asset.satellites ?? asset.satelites ?? null,
       isCurrentLocation: true,
       isLiveTelemetry: true,
     }
@@ -346,6 +353,7 @@ export function useItineraryRoute({
     const cleanTimestamp = String(timestamp).replace(/\D/g, "")
 
     return {
+      ...report,
       id: report.id || `${assetId}-live-history-${cleanTimestamp}-${index}`,
       assetId,
       timestamp,
@@ -357,6 +365,21 @@ export function useItineraryRoute({
       address: report.address || report.direccion || asset.direccion || "Ubicacion actual",
       event: report.event || "Reporte GPS",
       odometer: report.odometer || report.odometro || asset.odometer || asset.odometro || null,
+      ignition: report.ignition ?? report.ignicion ?? report.contacto ?? asset.ignition ?? null,
+      ignicion: report.ignicion ?? report.ignition ?? report.contacto ?? asset.ignicion ?? null,
+      contacto: report.contacto ?? report.ignition ?? report.ignicion ?? asset.contacto ?? null,
+      digitalInput1:
+        report.digitalInput1 ?? report.input1 ?? report.di1 ?? asset.digitalInput1 ?? null,
+      digitalInput2:
+        report.digitalInput2 ?? report.input2 ?? report.di2 ?? asset.digitalInput2 ?? null,
+      gpsSatellites:
+        report.gpsSatellites ??
+        report.satellites ??
+        report.satelites ??
+        asset.gpsSatellites ??
+        asset.satellites ??
+        asset.satelites ??
+        null,
       isCurrentLocation: Boolean(report.isCurrentLocation),
       isLiveTelemetry: report.isLiveTelemetry ?? true,
     }
@@ -408,16 +431,18 @@ export function useItineraryRoute({
       Itinerarios lee el historial GPS separado solo cuando presionas Buscar o Actualizar.
       Esto evita que la tabla se actualice automáticamente en cada pulso GPS.
     */
-    if (telemetryReports.length || currentLocationPoints.length) {
+    if (telemetryReports.length) {
       return mergeRoutePoints(telemetryReports, currentLocationPoints)
     }
 
-    return filterItineraryPoints({
-      assetId: asset.id,
+    const fallbackPoints = filterItineraryPoints({
+      assetId: normalizeAssetId(asset),
       asset,
       fromDate: fromDate.value,
       toDate: toDate.value,
     })
+
+    return mergeRoutePoints(fallbackPoints, currentLocationPoints)
   }
 
   const buildMultipleRouteResult = (assets) => {

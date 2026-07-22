@@ -1,4 +1,5 @@
 import { computed, ref, watch } from "vue"
+import { useDebouncedValue } from "../../ui/useDebouncedValue.js"
 import { parseNumberFromLabel } from "../../../utils/numberUtils.js"
 import { normalizeTelemetryReports } from "../../../utils/telemetryUtils.js"
 
@@ -65,6 +66,7 @@ export function useItineraryAssets({
   mockItineraryAssets,
 }) {
   const selectedAssetIds = ref([])
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 120)
 
   const normalizedAssets = computed(() => {
     const sourceAssets = props.activos?.length ? props.activos : mockItineraryAssets
@@ -193,7 +195,7 @@ export function useItineraryAssets({
   })
 
   const filteredAssets = computed(() => {
-    const term = normalizeText(searchTerm.value)
+    const term = normalizeText(debouncedSearchTerm.value)
 
     if (!term) return normalizedAssets.value
 

@@ -1,5 +1,7 @@
 import { computed, ref, unref } from "vue"
 
+import { getAssetTypeOption } from "../../../utils/activos/assetTypeOptions.js"
+
 const fallbackDrivers = [
   "Carlos Ramírez",
   "María Gómez",
@@ -123,7 +125,31 @@ export function useActivosCrud({
         direccion: activo.direccion || activo.ubicacion || "Última ubicación registrada",
 
         ignicion:
-          activo.ignicion || (estado === "moving" || estado === "idle" ? "Encendida" : "Apagada"),
+          activo.ignicion ??
+          activo.ignition ??
+          activo.contacto ??
+          (estado === "moving" || estado === "idle"),
+
+        ignition:
+          activo.ignition ??
+          activo.ignicion ??
+          activo.contacto ??
+          (estado === "moving" || estado === "idle"),
+        contacto:
+          activo.contacto ??
+          activo.ignition ??
+          activo.ignicion ??
+          (estado === "moving" || estado === "idle"),
+        digitalInput1:
+          activo.digitalInput1 ??
+          activo.input1 ??
+          (estado === "moving" || estado === "idle" ? 1 : 0),
+        digitalInput2: activo.digitalInput2 ?? activo.input2 ?? 0,
+        input1:
+          activo.input1 ??
+          activo.digitalInput1 ??
+          (estado === "moving" || estado === "idle" ? 1 : 0),
+        input2: activo.input2 ?? activo.digitalInput2 ?? 0,
 
         ibutton: isCustomAsset
           ? emptyValue(activo.ibutton)
@@ -180,8 +206,35 @@ export function useActivosCrud({
     const name = form.name || fallbackActivo.name || displayName
 
     const odometerFromForm = form.odometer ?? form.odometro
+    const assetTypeOption = getAssetTypeOption(
+      form.assetType ||
+        form.tipoActivo ||
+        form.mapIcon ||
+        form.markerIcon ||
+        form.iconType ||
+        fallbackActivo.assetType ||
+        fallbackActivo.tipoActivo ||
+        fallbackActivo.mapIcon,
+    )
+    const mapIcon =
+      form.mapIcon ||
+      form.markerIcon ||
+      form.iconType ||
+      fallbackActivo.mapIcon ||
+      fallbackActivo.markerIcon ||
+      fallbackActivo.iconType ||
+      assetTypeOption.mapIcon
 
     return {
+      assetType: assetTypeOption.value,
+      assetTypeLabel: assetTypeOption.label,
+      tipoActivo: assetTypeOption.value,
+      tipoActivoLabel: assetTypeOption.label,
+      mapIcon,
+      markerIcon: mapIcon,
+      iconType: mapIcon,
+      sucursalId: form.sucursalId || fallbackActivo.sucursalId || null,
+
       estado: form.estado || fallbackActivo.estado || "offline",
 
       vehiculo: displayName,
@@ -309,6 +362,9 @@ export function useActivosCrud({
     const form = payload?.data || payload?.form || payload || {}
 
     const data = buildActivoDataFromForm(form, baseActivo)
+
+    delete data.estado
+    delete data.direccion
 
     if (updateActivo) {
       updateActivo(id, data)

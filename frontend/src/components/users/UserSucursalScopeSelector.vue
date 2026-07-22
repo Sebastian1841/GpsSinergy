@@ -2,9 +2,9 @@
   <section class="mt-3 overflow-hidden rounded-lg border border-[#d8dee8] bg-white">
     <header class="border-b border-[#edf1f5] bg-[#f8fafc] px-3 py-2">
       <div class="flex items-center justify-between gap-2">
-        <p class="text-[10px] font-black uppercase text-slate-500">Sucursales autorizadas</p>
+        <p class="text-[10px] font-black uppercase text-slate-500">Grupos autorizados</p>
         <span class="text-[10px] font-black text-[#ff6600]">
-          {{ selectedSucursalIds.size }} seleccionadas
+          {{ selectedSucursalIds.size }} seleccionados
         </span>
       </div>
     </header>
@@ -36,9 +36,9 @@
       </label>
 
       <div v-if="!sucursales.length" class="px-3 py-5 text-center">
-        <p class="text-[11px] font-black text-[#102372]">Sin sucursales disponibles</p>
+        <p class="text-[11px] font-black text-[#102372]">Sin grupos disponibles</p>
         <p class="mt-1 text-[9px] font-semibold text-slate-500">
-          Crea sucursales desde la empresa o desde la vista de activos.
+          Crea grupos desde la empresa o desde la vista de activos.
         </p>
       </div>
     </div>
@@ -47,7 +47,7 @@
       v-if="sucursales.length && !selectedSucursalIds.size"
       class="border-t border-[#edf1f5] px-3 py-2 text-[9px] font-semibold text-[#ff6600]"
     >
-      Selecciona al menos una sucursal para aplicar este alcance.
+      Selecciona al menos un grupo para aplicar este alcance.
     </p>
   </section>
 </template>

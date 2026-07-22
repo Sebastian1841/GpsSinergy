@@ -9,8 +9,12 @@
 }
 
 .leaflet-dragging .sinergy-marker,
-.leaflet-dragging .sinergy-marker-cluster {
+.leaflet-dragging .sinergy-vehicle-marker-image,
+.leaflet-dragging .sinergy-vehicle-marker,
+.leaflet-dragging .sinergy-marker-cluster,
+.leaflet-dragging .planned-route-stop {
   box-shadow: none !important;
+  filter: none !important;
 }
 
 .leaflet-dragging .sinergy-itinerary-route-flow {
@@ -73,6 +77,113 @@
     0 14px 28px rgba(15, 23, 42, 0.45);
 }
 
+.sinergy-vehicle-marker-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  object-fit: contain;
+  user-select: none;
+}
+
+.sinergy-vehicle-marker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: auto;
+}
+
+.sinergy-vehicle-marker__plate {
+  position: relative;
+  z-index: 3;
+  display: block;
+  max-width: 100%;
+  height: 17px;
+  margin-bottom: 3px;
+  padding: 2px 7px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 4px;
+  background: rgba(16, 35, 114, 0.95);
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.24);
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 11px;
+  pointer-events: none;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sinergy-vehicle-marker.selected .sinergy-vehicle-marker__plate {
+  height: 18px;
+  background: #ff6600;
+}
+
+.sinergy-vehicle-marker__image {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: var(--vehicle-image-width, 100%);
+  height: var(--vehicle-image-height, 100%);
+  flex: 0 0 auto;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  pointer-events: none;
+}
+
+.sinergy-vehicle-marker.marker-moving,
+.sinergy-vehicle-marker.marker-idle,
+.sinergy-vehicle-marker.marker-stopped,
+.sinergy-vehicle-marker.marker-offline {
+  background: transparent;
+}
+
+.sinergy-vehicle-marker::after {
+  position: absolute;
+  right: calc((100% - var(--vehicle-image-width, 100%)) / 2 + 1px);
+  bottom: 1px;
+  z-index: 2;
+  width: 8px;
+  height: 8px;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.24);
+  content: "";
+}
+
+.sinergy-vehicle-marker.marker-moving::after {
+  background: #10b981;
+}
+
+.sinergy-vehicle-marker.marker-idle::after {
+  background: #0ea5e9;
+}
+
+.sinergy-vehicle-marker.marker-stopped::after {
+  background: #ef4444;
+}
+
+.sinergy-vehicle-marker.marker-offline::after {
+  background: #94a3b8;
+}
+
+.sinergy-vehicle-marker.selected::after {
+  right: calc((100% - var(--vehicle-image-width, 100%)) / 2 + 2px);
+  bottom: 2px;
+  width: 9px;
+  height: 9px;
+}
+
 .sinergy-marker-cluster {
   display: grid;
   place-items: center;
@@ -129,6 +240,33 @@
   box-shadow:
     0 0 0 5px rgba(255, 102, 0, 0.25),
     0 8px 18px rgba(15, 23, 42, 0.4);
+}
+
+.planned-route-stop {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 3px solid #ffffff;
+  border-radius: 999px;
+  background: #102372;
+  box-shadow:
+    0 0 0 4px rgba(16, 35, 114, 0.22),
+    0 10px 22px rgba(15, 23, 42, 0.35);
+  color: #ffffff;
+  cursor: grab;
+  font-size: 10px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.planned-route-stop.selected {
+  width: 30px;
+  height: 30px;
+  background: #ff6600;
+  box-shadow:
+    0 0 0 6px rgba(255, 102, 0, 0.28),
+    0 14px 28px rgba(15, 23, 42, 0.42);
 }
 
 .sinergy-tooltip,

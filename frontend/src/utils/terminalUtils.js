@@ -189,7 +189,7 @@ const buildGpsGateReportMessage = (activo = {}) => {
     `(Speed=${formatValue(activo.speed || activo.velocidad, "0")})`,
     "(Heading=-)",
     "(Altitude=-)",
-    `(Ignition=${formatValue(activo.ignicion)})`,
+    `(Ignition=${formatValue(activo.ignicion ?? activo.ignition ?? activo.contacto)})`,
     "(InputVoltage=-)",
     "(BatteryVoltage=-)",
     `(Fuel=${formatValue(activo.combustible || activo.fuel)})`,

@@ -16,7 +16,21 @@ const statusOrder = {
 
 const numericColumnKeys = new Set([
   "velocidad",
+  "gpsSignal",
+  "gpsSatellites",
+  "lat",
+  "lng",
   "combustible",
+  "canRpm",
+  "canEngineTemp",
+  "canBatteryVoltage",
+  "canEngineLoad",
+  "canThrottle",
+  "canFuelRate",
+  "canFuelUsed",
+  "canOilPressure",
+  "canAdBlueLevel",
+  "canDtcCount",
   "odometro",
   "horometroDiario",
   "horometroTotal",
@@ -67,14 +81,22 @@ export function useFleetSorting({
   const parseSortableNumber = (value) => {
     if (value === null || value === undefined) return null
 
-    const match = String(value)
-      .replace(/\./g, "")
-      .replace(",", ".")
-      .match(/-?\d+(\.\d+)?/)
+    const match = String(value).match(/-?\d[\d.,]*/)
 
     if (!match) return null
 
-    const parsedValue = Number(match[0])
+    const rawNumber = match[0]
+    const hasComma = rawNumber.includes(",")
+    const hasDot = rawNumber.includes(".")
+    const normalizedNumber =
+      hasComma && hasDot
+        ? rawNumber.replace(/\./g, "").replace(",", ".")
+        : hasComma
+          ? rawNumber.replace(",", ".")
+          : hasDot && (rawNumber.split(".").length > 2 || rawNumber.split(".").at(-1)?.length === 3)
+            ? rawNumber.replace(/\./g, "")
+            : rawNumber
+    const parsedValue = Number(normalizedNumber)
 
     return Number.isFinite(parsedValue) ? parsedValue : null
   }

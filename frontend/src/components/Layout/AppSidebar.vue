@@ -53,7 +53,7 @@
       </header>
 
       <!-- Menú -->
-      <nav class="relative z-10 flex-1 overflow-y-auto px-3 py-4 custom-scrollbar">
+      <nav class="custom-scrollbar relative z-10 flex-1 overflow-y-auto px-3 py-4">
         <div class="mb-2 px-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/35">
           Navegación
         </div>
@@ -88,6 +88,80 @@
 
               <span class="min-w-0 flex-1 truncate">
                 {{ item.label }}
+              </span>
+
+              <span
+                class="h-2 w-2 rounded-full bg-transparent transition-colors duration-100 group-hover:bg-[#ff6600]"
+              ></span>
+            </RouterLink>
+          </li>
+
+          <li v-if="reportsNavigationItem">
+            <RouterLink
+              :to="reportsNavigationItem.to"
+              class="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-white/75 transition-colors duration-100 hover:bg-white/[0.08] hover:text-white"
+              :class="isReportsRouteActive ? 'sidebar-link-active' : ''"
+              active-class="sidebar-link-active"
+              @click="$emit('update:isOpen', false)"
+            >
+              <div
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/70 transition-colors duration-100 group-hover:bg-[#ff6600] group-hover:text-white"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M4 19V5m0 14h16M8 15v-4m4 4V7m4 8V9"
+                  />
+                </svg>
+              </div>
+
+              <span class="min-w-0 flex-1 truncate">
+                {{ reportsNavigationItem.label }}
+              </span>
+
+              <span
+                class="h-2 w-2 rounded-full bg-transparent transition-colors duration-100 group-hover:bg-[#ff6600]"
+              ></span>
+            </RouterLink>
+          </li>
+
+          <li v-if="auditNavigationItem">
+            <RouterLink
+              :to="auditNavigationItem.to"
+              class="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-white/75 transition-colors duration-100 hover:bg-white/[0.08] hover:text-white"
+              :class="isAuditRouteActive ? 'sidebar-link-active' : ''"
+              active-class="sidebar-link-active"
+              @click="$emit('update:isOpen', false)"
+            >
+              <div
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/70 transition-colors duration-100 group-hover:bg-[#ff6600] group-hover:text-white"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M9 12l2 2 4-4M12 3l7 4v5c0 5-3 8-7 9-4-1-7-4-7-9V7l7-4Z"
+                  />
+                </svg>
+              </div>
+
+              <span class="min-w-0 flex-1 truncate">
+                {{ auditNavigationItem.label }}
               </span>
 
               <span
@@ -188,7 +262,8 @@ import { useRoute } from "vue-router"
 import { useAccessControl } from "../../composables/auth/useAccessControl.js"
 
 const route = useRoute()
-const { isPlatformAdmin, accessibleCompanies } = useAccessControl()
+const { isPlatformAdmin, accessibleCompanies, canAccessModule, canAccessFunction } =
+  useAccessControl()
 
 const assetNavigationItems = computed(() => {
   if (isPlatformAdmin.value) {
@@ -200,10 +275,76 @@ const assetNavigationItems = computed(() => {
     ]
   }
 
-  return accessibleCompanies.value.map((company) => ({
-    to: `/app/${company.id}/activos`,
-    label: company.name,
-  }))
+  return accessibleCompanies.value
+    .filter((company) => canAccessModule("assets", company.id))
+    .map((company) => ({
+      to: `/app/${company.id}/activos`,
+      label: company.name,
+    }))
+})
+
+const currentRouteCompanyId = computed(() => {
+  return String(route.params.empresaId || "")
+})
+
+const reportsNavigationItem = computed(() => {
+  if (isPlatformAdmin.value) {
+    return {
+      to: "/reportes",
+      label: "Reportes",
+    }
+  }
+
+  const currentCompany = accessibleCompanies.value.find((company) => {
+    return String(company.id) === currentRouteCompanyId.value
+  })
+
+  const fallbackCompany = currentCompany || accessibleCompanies.value[0]
+
+  if (!fallbackCompany) return null
+
+  if (!canAccessFunction("reports", fallbackCompany.id, "view")) {
+    return null
+  }
+
+  return {
+    to: `/app/${fallbackCompany.id}/reportes`,
+    label: "Reportes",
+  }
+})
+
+const auditNavigationItem = computed(() => {
+  if (isPlatformAdmin.value) {
+    return {
+      to: "/auditoria",
+      label: "Auditoria",
+    }
+  }
+
+  const currentCompany = accessibleCompanies.value.find((company) => {
+    return String(company.id) === currentRouteCompanyId.value
+  })
+
+  const fallbackCompany = currentCompany || accessibleCompanies.value[0]
+
+  if (!fallbackCompany) return null
+
+  if (!canAccessFunction("audit-view", fallbackCompany.id, "view")) {
+    return null
+  }
+
+  return {
+    to: `/app/${fallbackCompany.id}/auditoria`,
+    label: "Auditoria",
+  }
+})
+
+const isReportsRouteActive = computed(() => {
+  return route.name === "Reports" || route.name === "AppReports"
+})
+
+const isAuditRouteActive = computed(() => {
+  return route.name === "Audit" || route.name === "AppAudit"
 })
 
 const isNavigationItemActive = (item) => {

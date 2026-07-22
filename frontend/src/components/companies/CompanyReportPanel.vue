@@ -3,9 +3,9 @@
     <header class="border-b border-[#d9d9d9] bg-[#102372] px-3 py-3">
       <div class="flex items-center justify-between gap-3">
         <div class="min-w-0">
-          <h3 class="text-[13px] font-black text-white">Reportes disponibles</h3>
+          <h3 class="text-[13px] font-black text-white">Reportes base</h3>
           <p class="mt-0.5 text-[10px] font-black text-white/60">
-            {{ enabledReportsCount }} de {{ reportTypes.length }} habilitados
+            {{ reportTypes.length }} incluidos para todas las empresas
           </p>
         </div>
       </div>
@@ -20,10 +20,10 @@
         </div>
 
         <div class="grid divide-y divide-[#d9d9d9]">
-          <label
+          <div
             v-for="reportType in group.items"
             :key="reportType.id"
-            class="grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-3 transition hover:bg-[#eef2f7]"
+            class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-3 transition hover:bg-[#eef2f7]"
           >
             <span class="min-w-0">
               <span class="block truncate text-[12px] font-black text-[#102372]">
@@ -34,26 +34,10 @@
               </span>
             </span>
 
-            <span
-              class="flex h-6 w-11 items-center rounded-full p-1 transition"
-              :class="
-                getReportAccess(reportType.id)?.enabled
-                  ? 'bg-[#FF6600]'
-                  : 'bg-[#eef2f7] ring-1 ring-[#102372]/30'
-              "
-            >
-              <span
-                class="h-4 w-4 rounded-full bg-white shadow-sm transition"
-                :class="getReportAccess(reportType.id)?.enabled ? 'translate-x-5' : 'translate-x-0'"
-              ></span>
-              <input
-                type="checkbox"
-                class="sr-only"
-                :checked="getReportAccess(reportType.id)?.enabled"
-                @change="$emit('toggle-report', reportType.id)"
-              />
+            <span class="rounded-md bg-[#fff3eb] px-2 py-1 text-[8px] font-black text-[#FF6600]">
+              Incluido
             </span>
-          </label>
+          </div>
         </div>
       </section>
     </div>
@@ -72,16 +56,6 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
-})
-
-defineEmits(["toggle-report"])
-
-const getReportAccess = (reportId) => {
-  return props.company.reports?.find((reportAccess) => reportAccess.reportId === reportId)
-}
-
-const enabledReportsCount = computed(() => {
-  return (props.company.reports || []).filter((reportAccess) => reportAccess.enabled).length
 })
 
 const groupedReportTypes = computed(() => {

@@ -24,7 +24,7 @@ const buildSucursalPayload = ({ companyId, name, branch = {} }) => {
   return {
     ...branch,
     id: branch.id || createSucursalId(companyId),
-    name: normalizedName || "Nueva sucursal",
+    name: normalizedName || "Nuevo grupo",
     active: branch.active ?? branch.enabled ?? true,
   }
 }

@@ -25,6 +25,7 @@
             >
               <button
                 type="button"
+                draggable="true"
                 class="inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-md px-1 py-1 text-white/90 transition hover:bg-white/10 hover:text-white"
                 :class="[
                   column.align === 'right' ? 'justify-end' : 'justify-start',
@@ -33,6 +34,10 @@
                 :title="`Ordenar por ${column.label}`"
                 @click="$emit('toggle-sort', column.key)"
                 @contextmenu.stop.prevent
+                @dragstart.stop="handleColumnDragStart($event, column.key)"
+                @dragover.prevent
+                @drop.stop="handleColumnDrop(column.key)"
+                @dragend.stop="handleColumnDragEnd"
               >
                 <span class="truncate">
                   {{ column.label }}
@@ -63,7 +68,7 @@
         <tbody>
           <tr
             v-for="row in paginatedTableRows"
-            :key="row.id"
+            :key="row.key"
             :data-activo-id="row.id"
             class="h-[32px] cursor-context-menu border-b border-[#edf1f5] transition hover:bg-[#f6f8fb]"
             :class="row.isSelected ? 'bg-[#fff7ed]' : 'bg-white'"
@@ -164,6 +169,13 @@
         <span class="truncate text-[11px] font-bold text-slate-500">
           {{ paginationStart }}-{{ paginationEnd }} de {{ totalItems }} activos
         </span>
+
+        <span
+          v-if="shouldResolveAddresses"
+          class="hidden text-[10px] font-bold text-slate-400 lg:inline"
+        >
+          {{ reverseGeocodingAttribution }}
+        </span>
       </div>
 
       <div class="flex items-center justify-between gap-2 sm:justify-end">
@@ -212,6 +224,8 @@
 
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from "vue"
+import { useReverseGeocodedRows } from "../../../composables/location/useReverseGeocodedRows.js"
+import { withGeofenceLocationAddress } from "../../../utils/activos/geofenceMembershipUtils.js"
 
 const props = defineProps({
   activos: {
@@ -242,6 +256,14 @@ const props = defineProps({
     type: Function,
     required: true,
   },
+  geofences: {
+    type: Array,
+    default: () => [],
+  },
+  useGeofenceLocationAddress: {
+    type: Boolean,
+    default: true,
+  },
 })
 
 const emit = defineEmits([
@@ -259,7 +281,27 @@ const draggedColumnKey = ref("")
 
 let resizeState = null
 
-const numericDetailColumnKeys = new Set(["horometroDiario", "horometroTotal", "odometro"])
+const numericDetailColumnKeys = new Set([
+  "velocidad",
+  "gpsSignal",
+  "gpsSatellites",
+  "lat",
+  "lng",
+  "combustible",
+  "canRpm",
+  "canEngineTemp",
+  "canBatteryVoltage",
+  "canEngineLoad",
+  "canThrottle",
+  "canFuelRate",
+  "canFuelUsed",
+  "canOilPressure",
+  "canAdBlueLevel",
+  "canDtcCount",
+  "horometroDiario",
+  "horometroTotal",
+  "odometro",
+])
 
 const selectedIdString = computed(() => {
   if (props.selectedId === null || props.selectedId === undefined) return ""
@@ -291,6 +333,31 @@ const paginatedActivos = computed(() => {
 
   return props.activos.slice(start, end)
 })
+
+const paginatedActivosWithGeofenceLocations = computed(() => {
+  if (
+    !shouldResolveAddresses.value ||
+    !props.geofences.length ||
+    !props.useGeofenceLocationAddress
+  ) {
+    return paginatedActivos.value
+  }
+
+  return paginatedActivos.value.map((activo) => {
+    return withGeofenceLocationAddress(activo, props.geofences, {
+      replaceAddress: true,
+    })
+  })
+})
+
+const shouldResolveAddresses = computed(() => {
+  return props.visibleColumns.some((column) => column.key === "lastPosition")
+})
+
+const { rowsWithResolvedAddresses: paginatedActivosWithAddresses, reverseGeocodingAttribution } =
+  useReverseGeocodedRows(paginatedActivosWithGeofenceLocations, {
+    enabled: shouldResolveAddresses,
+  })
 
 const statusLabel = (estado) => {
   const labels = {
@@ -393,11 +460,28 @@ const startColumnResize = (event, column) => {
 }
 
 const paginatedTableRows = computed(() => {
-  return paginatedActivos.value.map((activo) => {
-    const activoId = String(activo.id)
+  const rowKeyOccurrences = new Map()
+
+  return paginatedActivosWithAddresses.value.map((activo, index) => {
+    const activoId =
+      activo.id === null || activo.id === undefined || activo.id === "" ? "" : String(activo.id)
+    const baseRowKey = [
+      activoId || "asset",
+      activo.imei ||
+        activo.deviceId ||
+        activo.patente ||
+        activo.patent ||
+        paginationStart.value + index,
+    ]
+      .map((value) => String(value ?? ""))
+      .join("::")
+    const occurrence = rowKeyOccurrences.get(baseRowKey) || 0
+
+    rowKeyOccurrences.set(baseRowKey, occurrence + 1)
 
     return {
       id: activoId,
+      key: occurrence ? `${baseRowKey}::${occurrence}` : baseRowKey,
       activo,
       isSelected: selectedIdString.value === activoId,
       cells: props.visibleColumns.map((column) => {

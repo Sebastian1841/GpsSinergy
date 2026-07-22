@@ -8,10 +8,10 @@
       :sort-column-key="sortColumnKey"
       :can-create-assets="canCreateAssets"
       :show-columns="showColumns"
-      :visible-columns="visibleColumns"
-      :configurable-columns="configurableColumns"
-      :filtered-configurable-columns="filteredConfigurableColumns"
-      :visible-column-keys="visibleColumnKeys"
+      :visible-columns="activeHeaderVisibleColumns"
+      :configurable-columns="activeHeaderConfigurableColumns"
+      :filtered-configurable-columns="activeHeaderFilteredConfigurableColumns"
+      :visible-column-keys="activeHeaderVisibleColumnKeys"
       :column-search="columnSearch"
       @set-section="setSection"
       @search-input="handleSearchInput"
@@ -19,76 +19,55 @@
       @clear-sort="clearSort"
       @open-add-activo="$emit('open-add-activo')"
       @toggle-columns="toggleColumnsDropdown"
-      @reset-columns="resetColumns"
+      @reset-columns="handleResetColumns"
       @update-column-search="columnSearch = $event"
       @toggle-column-key="toggleColumnKey"
     />
 
-    <FleetTable
-      v-if="localActiveSection === 'activos' && allowedSections.includes('activos')"
-      :activos="sortedActivos"
-      :visible-columns="visibleColumns"
+    <FleetSectionContent
+      :active-section="localActiveSection"
+      :allowed-sections="allowedSections"
+      :sorted-activos="activeSortedActivos"
+      :visible-columns="activeTableVisibleColumns"
       :selected-id="selectedId"
-      :first-visible-column-key="firstVisibleColumnKey"
+      :first-visible-column-key="activeFirstVisibleColumnKey"
       :sort-column-key="sortColumnKey"
       :get-sort-icon="getSortIcon"
       :get-cell-value="getCellValue"
-      @select="handleRowClick"
-      @toggle-sort="handleToggleSort"
-      @resize-column="setColumnWidth"
-      @move-column="moveColumn"
-      @open-context-menu="handleTableContextMenu"
-    />
-
-    <div
-      v-else-if="localActiveSection === 'itinerarios'"
-      class="min-h-0 flex-1 overflow-hidden bg-[#f8fafc]"
-    >
-      <ItineraryPanel
-        :activos="resolvedItineraryActivos"
-        class="h-full min-h-0 rounded-none border-0 shadow-none"
-        @route-selected="$emit('route-selected', $event)"
-        @point-selected="$emit('point-selected', $event)"
-        @clear-route="$emit('clear-route', $event)"
-      />
-    </div>
-
-    <FleetGeofencePanel
-      v-else-if="localActiveSection === 'geocercas'"
-      :geofences="geofenceItems"
-      :filtered-geofences="filteredGeofenceItems"
+      :itinerary-activos="activeItineraryActivos"
+      :activos="activeReportActivos"
+      :all-activos="activeReportAllActivos"
+      :company-id="companyId"
+      :search="localSearch"
+      :geofences="activeSectionGeofences"
+      :filtered-geofences="activeFilteredGeofences"
       :selected-geofence-id="selectedGeofenceId"
       :can-edit-geofences="canEditGeofences"
+      :use-geofence-location-address="useGeofenceLocationAddress"
+      :empresa-sucursales="empresaSucursales"
+      :sucursal-companies="sucursalCompanies"
+      :selected-sucursal-company-id="selectedSucursalCompanyId"
+      :show-sucursal-company-selector="showSucursalCompanySelector"
+      :can-manage-sucursales="canManageSucursales"
+      @select="handleRowClick"
+      @toggle-sort="handleToggleSort"
+      @resize-column="handleSetColumnWidth"
+      @move-column="handleMoveColumn"
+      @open-context-menu="handleTableContextMenu"
+      @route-selected="$emit('route-selected', $event)"
+      @point-selected="$emit('point-selected', $event)"
+      @clear-route="$emit('clear-route', $event)"
       @select-geofence="handleGeofenceSelect"
+      @edit-geofence="handleGeofenceEdit"
       @delete-geofence="confirmDeleteGeofence"
+      @update:use-geofence-location-address="$emit('update:use-geofence-location-address', $event)"
+      @select-sucursal-company="$emit('select-sucursal-company', $event)"
+      @alternar-sucursales-habilitadas="handleAlternarSucursalesHabilitadas"
+      @agregar-sucursal="handleAgregarSucursal"
+      @actualizar-nombre-sucursal="handleActualizarNombreSucursal"
+      @alternar-estado-sucursal="handleAlternarEstadoSucursal"
+      @eliminar-sucursal="handleEliminarSucursal"
     />
-
-    <div
-      v-else-if="localActiveSection === 'sucursales' && allowedSections.includes('sucursales')"
-      class="min-h-0 flex-1 overflow-auto bg-[#eef2f7] p-3"
-    >
-      <GestionSucursalesPanel
-        :company="empresaSucursales"
-        :companies="sucursalCompanies"
-        :selected-company-id="selectedSucursalCompanyId"
-        :show-company-selector="showSucursalCompanySelector"
-        :can-manage="canManageSucursales"
-        @select-company="$emit('select-sucursal-company', $event)"
-        @alternar-sucursales-habilitadas="handleAlternarSucursalesHabilitadas"
-        @agregar-sucursal="handleAgregarSucursal"
-        @actualizar-nombre-sucursal="handleActualizarNombreSucursal"
-        @alternar-estado-sucursal="handleAlternarEstadoSucursal"
-        @eliminar-sucursal="handleEliminarSucursal"
-        @actualizar-sucursal-activo="handleActualizarSucursalActivo"
-      />
-    </div>
-
-    <div
-      v-else
-      class="flex min-h-0 flex-1 items-center justify-center bg-[#eef2f7] p-4 text-center"
-    >
-      <p class="text-[11px] font-black text-[#102372]">Sin funciones habilitadas</p>
-    </div>
 
     <div
       v-if="localActiveSection === 'activos' && allowedSections.includes('activos')"
@@ -116,15 +95,18 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from "vue"
-import GestionSucursalesPanel from "../sucursales/GestionSucursalesPanel.vue"
-import ItineraryPanel from "../itinerarios/ItineraryPanel.vue"
-import FleetTable from "./FleetTable.vue"
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import FleetContextMenu from "./FleetContextMenu.vue"
-import FleetGeofencePanel from "./FleetGeofencePanel.vue"
 import FleetPanelHeader from "./FleetPanelHeader.vue"
+import FleetSectionContent from "./FleetSectionContent.vue"
 import { useFleetColumns } from "../../../composables/activos/fleet/useFleetColumns"
+import { useFleetDeviceContextMenu } from "../../../composables/activos/fleet/useFleetDeviceContextMenu.js"
 import { useFleetSorting } from "../../../composables/activos/fleet/useFleetSorting"
+import {
+  FLEET_TELEMETRY_COLUMNS,
+  getCellValue,
+  normalizeText,
+} from "../../../utils/activos/fleetTelemetryColumns.js"
 import { getGeofenceBadgeLabel, getGeofenceMeta } from "../../../utils/geofenceUtils.js"
 
 const props = defineProps({
@@ -135,6 +117,10 @@ const props = defineProps({
   allActivos: {
     type: Array,
     default: () => [],
+  },
+  companyId: {
+    type: [String, Number],
+    default: "",
   },
   itineraryActivos: {
     type: Array,
@@ -187,7 +173,7 @@ const props = defineProps({
   },
   allowedSections: {
     type: Array,
-    default: () => ["activos", "itinerarios", "geocercas", "sucursales"],
+    default: () => ["activos", "reportes", "itinerarios", "geocercas", "sucursales"],
   },
   canManageAssets: {
     type: Boolean,
@@ -201,24 +187,17 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  useGeofenceLocationAddress: {
+    type: Boolean,
+    default: true,
+  },
   canManageSucursales: {
     type: Boolean,
     default: false,
   },
-  columns: {
-    type: Array,
-    default: () => [
-      { key: "estado", label: "Estado", width: "92px", locked: true },
-      { key: "vehiculo", label: "Activo", width: "160px", locked: true },
-      { key: "datosUlt", label: "Último", width: "92px" },
-      { key: "trackerModelLabel", label: "Modelo GPS", width: "135px" },
-      { key: "imei", label: "IMEI", width: "140px" },
-      { key: "protocol", label: "Protocolo", width: "90px" },
-      { key: "fechaIngreso", label: "Ingreso", width: "105px" },
-      { key: "horometroDiario", label: "Hor. diario", width: "100px", align: "right" },
-      { key: "horometroTotal", label: "Hor. total", width: "100px", align: "right" },
-      { key: "odometro", label: "Odómetro", width: "110px", align: "right" },
-    ],
+  columnPreferences: {
+    type: Object,
+    default: null,
   },
 })
 
@@ -234,15 +213,17 @@ const emit = defineEmits([
   "open-add-activo",
   "device-action",
   "geofence-selected",
+  "geofence-edit",
   "geofence-delete",
+  "update:use-geofence-location-address",
   "select-sucursal-company",
   "alternar-sucursales-habilitadas",
   "agregar-sucursal",
   "actualizar-nombre-sucursal",
   "alternar-estado-sucursal",
   "eliminar-sucursal",
-  "actualizar-sucursal-activo",
   "select-personal-asset-group",
+  "update:column-preferences",
 ])
 
 const showColumns = ref(false)
@@ -253,37 +234,18 @@ const SEARCH_EMIT_DELAY_MS = 220
 
 let searchEmitTimer = null
 
-const deviceContextMenu = ref({
-  isOpen: false,
-  x: 0,
-  y: 0,
-  activo: null,
-})
+const { deviceContextMenu, closeDeviceContextMenu, handleTableContextMenu, handleDeviceAction } =
+  useFleetDeviceContextMenu({
+    canManageAssets: () => props.canManageAssets,
+    closeColumns: () => {
+      showColumns.value = false
+    },
+    onDeviceAction: (payload) => {
+      emit("device-action", payload)
+    },
+  })
 
-const normalizeText = (value) => {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-}
-
-const getNestedValue = (row, path) => {
-  return path.split(".").reduce((value, key) => value?.[key], row)
-}
-
-const getCellValue = (activo, column) => {
-  if (typeof column.formatter === "function") {
-    return column.formatter(activo)
-  }
-
-  const value = getNestedValue(activo, column.key)
-
-  if (value === null || value === undefined || value === "") {
-    return "-"
-  }
-
-  return String(value)
-}
+const fleetColumns = computed(() => FLEET_TELEMETRY_COLUMNS)
 
 const {
   columnSearch,
@@ -293,18 +255,61 @@ const {
   visibleColumns,
   firstVisibleColumnKey,
   resetColumns,
+  getColumnPreferences,
+  applyColumnPreferences,
   setColumnWidth,
   moveColumn,
 } = useFleetColumns({
-  columns: computed(() => props.columns),
+  columns: fleetColumns,
   normalizeText,
 })
 
 const { sortColumnKey, sortedActivos, toggleSort, clearSort, getSortIcon } = useFleetSorting({
   activos: computed(() => props.activos),
-  columns: computed(() => props.columns),
+  columns: fleetColumns,
   getCellValue,
   normalizeText,
+})
+
+const isActivosSection = computed(() => localActiveSection.value === "activos")
+const isReportesSection = computed(() => localActiveSection.value === "reportes")
+const isItinerariosSection = computed(() => localActiveSection.value === "itinerarios")
+const isGeocercasSection = computed(() => localActiveSection.value === "geocercas")
+
+const activeHeaderVisibleColumns = computed(() => {
+  return isActivosSection.value ? visibleColumns.value : []
+})
+
+const activeHeaderConfigurableColumns = computed(() => {
+  return isActivosSection.value ? configurableColumns.value : []
+})
+
+const activeHeaderFilteredConfigurableColumns = computed(() => {
+  return isActivosSection.value ? filteredConfigurableColumns.value : []
+})
+
+const activeHeaderVisibleColumnKeys = computed(() => {
+  return isActivosSection.value ? visibleColumnKeys.value : []
+})
+
+const activeTableVisibleColumns = computed(() => {
+  return isActivosSection.value ? visibleColumns.value : []
+})
+
+const activeFirstVisibleColumnKey = computed(() => {
+  return isActivosSection.value ? firstVisibleColumnKey.value : ""
+})
+
+const activeSortedActivos = computed(() => {
+  return isActivosSection.value ? sortedActivos.value : []
+})
+
+const activeReportActivos = computed(() => {
+  return isReportesSection.value ? props.activos : []
+})
+
+const activeReportAllActivos = computed(() => {
+  return isReportesSection.value ? props.allActivos : []
 })
 
 const menuSections = computed(() => {
@@ -315,6 +320,11 @@ const menuSections = computed(() => {
       key: "activos",
       label: "Activos",
       count: props.allActivos.length || props.activos.length,
+    },
+    {
+      key: "reportes",
+      label: "Reportes",
+      count: null,
     },
     {
       key: "itinerarios",
@@ -328,16 +338,47 @@ const menuSections = computed(() => {
     },
     {
       key: "sucursales",
-      label: "Sucursales",
+      label: "Grupos",
       count: props.empresaSucursales.sucursales?.length || 0,
     },
   ].filter((section) => allowedSections.has(section.key))
 })
 
+const getFirstAvailableSection = () => {
+  return menuSections.value[0]?.key || "activos"
+}
+
+const isSectionAllowed = (sectionKey) => {
+  return menuSections.value.some((section) => section.key === sectionKey)
+}
+
+const applyActiveSection = (sectionKey, shouldEmit = false) => {
+  const nextSection = isSectionAllowed(sectionKey) ? sectionKey : getFirstAvailableSection()
+
+  if (localActiveSection.value === nextSection) return
+
+  localActiveSection.value = nextSection
+
+  if (nextSection !== "activos") {
+    showColumns.value = false
+    columnSearch.value = ""
+    closeDeviceContextMenu()
+  }
+
+  if (shouldEmit) {
+    emit("update:active-section", nextSection)
+    emit("select-section", nextSection)
+  }
+}
+
 const resolvedItineraryActivos = computed(() => {
   if (props.itineraryActivos.length) return props.itineraryActivos
 
   return props.allActivos.length ? props.allActivos : props.activos
+})
+
+const activeItineraryActivos = computed(() => {
+  return isItinerariosSection.value ? resolvedItineraryActivos.value : []
 })
 
 const geofenceItems = computed(() => {
@@ -359,9 +400,18 @@ const filteredGeofenceItems = computed(() => {
   })
 })
 
+const activeSectionGeofences = computed(() => {
+  return isGeocercasSection.value || isReportesSection.value ? geofenceItems.value : []
+})
+
+const activeFilteredGeofences = computed(() => {
+  return isGeocercasSection.value ? filteredGeofenceItems.value : []
+})
+
 const searchPlaceholder = computed(() => {
   const placeholders = {
     activos: "Buscar activo, IMEI, modelo GPS...",
+    reportes: "Buscar reporte o activo...",
     geocercas: "Buscar geocerca o zona...",
   }
 
@@ -413,9 +463,15 @@ const confirmDeleteGeofence = (geofence) => {
 }
 
 const handleGeofenceSelect = (geofence) => {
-  if (!geofence?.id || !props.canEditGeofences) return
+  if (!geofence?.id) return
 
   emit("geofence-selected", geofence)
+}
+
+const handleGeofenceEdit = (geofence) => {
+  if (!geofence?.id) return
+
+  emit("geofence-edit", geofence)
 }
 
 const handleActualizarNombreSucursal = (sucursalId, nombreSucursal) => {
@@ -443,37 +499,23 @@ const handleEliminarSucursal = (sucursalId) => {
   emit("eliminar-sucursal", sucursalId)
 }
 
-const handleActualizarSucursalActivo = (payload) => {
-  if (!props.canManageSucursales) return
-  emit("actualizar-sucursal-activo", payload)
-}
-
-const closeDeviceContextMenu = () => {
-  deviceContextMenu.value = {
-    isOpen: false,
-    x: 0,
-    y: 0,
-    activo: null,
-  }
-}
-
 const setSection = (section) => {
   closeDeviceContextMenu()
-
-  localActiveSection.value = section
-
-  if (section !== "activos") {
-    showColumns.value = false
-    columnSearch.value = ""
-  }
-
-  emit("update:active-section", section)
-  emit("select-section", section)
+  applyActiveSection(section, true)
 }
 
 const toggleColumnsDropdown = () => {
   closeDeviceContextMenu()
   showColumns.value = !showColumns.value
+}
+
+const emitColumnPreferences = () => {
+  emit("update:column-preferences", getColumnPreferences())
+}
+
+const handleResetColumns = () => {
+  resetColumns()
+  emitColumnPreferences()
 }
 
 const toggleColumnKey = (columnKey) => {
@@ -483,10 +525,22 @@ const toggleColumnKey = (columnKey) => {
 
   if (visibleColumnKeys.value.includes(columnKey)) {
     visibleColumnKeys.value = visibleColumnKeys.value.filter((key) => key !== columnKey)
+    emitColumnPreferences()
     return
   }
 
   visibleColumnKeys.value = [...visibleColumnKeys.value, columnKey]
+  emitColumnPreferences()
+}
+
+const handleSetColumnWidth = (columnKey, width) => {
+  setColumnWidth(columnKey, width)
+  emitColumnPreferences()
+}
+
+const handleMoveColumn = (sourceColumnKey, targetColumnKey) => {
+  moveColumn(sourceColumnKey, targetColumnKey)
+  emitColumnPreferences()
 }
 
 const handleRowClick = (activo) => {
@@ -499,64 +553,17 @@ const handleToggleSort = (columnKey) => {
   toggleSort(columnKey)
 }
 
-const openDeviceContextMenu = (event, activo) => {
-  if (!activo || !props.canManageAssets) return
-
-  event.preventDefault?.()
-  event.stopPropagation?.()
-
-  showColumns.value = false
-
-  const menuWidth = 186
-  const menuHeight = 118
-  const padding = 8
-
-  const viewportWidth = window.innerWidth || document.documentElement.clientWidth
-  const viewportHeight = window.innerHeight || document.documentElement.clientHeight
-
-  const rawX = event.clientX || padding
-  const rawY = event.clientY || padding
-
-  const x = Math.min(rawX, viewportWidth - menuWidth - padding)
-  const y = Math.min(rawY, viewportHeight - menuHeight - padding)
-
-  deviceContextMenu.value = {
-    isOpen: true,
-    x: Math.max(padding, x),
-    y: Math.max(padding, y),
-    activo,
-  }
-}
-
-const handleTableContextMenu = ({ event, activo }) => {
-  openDeviceContextMenu(event, activo)
-}
-
-const handleDeviceAction = ({ action, activo }) => {
-  emit("device-action", {
-    action,
-    activo,
-  })
-
-  closeDeviceContextMenu()
-}
-
 const handleShowAllAssets = () => {
   emit("select-personal-asset-group", null)
   emit("select-filter", "all")
 }
 
 watch(
-  [menuSections, () => props.activeSection],
-  ([sections, requestedSection]) => {
-    const availableSection = sections.find((section) => section.key === requestedSection)
-    const nextSection = availableSection?.key || sections[0]?.key || "activos"
+  menuSections,
+  () => {
+    if (isSectionAllowed(localActiveSection.value)) return
 
-    if (localActiveSection.value !== nextSection) {
-      localActiveSection.value = nextSection
-      emit("update:active-section", nextSection)
-      emit("select-section", nextSection)
-    }
+    applyActiveSection(getFirstAvailableSection(), true)
   },
   { immediate: true },
 )
@@ -564,13 +571,9 @@ watch(
 watch(
   () => props.activeSection,
   (nextSection) => {
-    localActiveSection.value = nextSection || "activos"
+    if (!nextSection || nextSection === localActiveSection.value) return
 
-    if (nextSection !== "activos") {
-      showColumns.value = false
-      columnSearch.value = ""
-      closeDeviceContextMenu()
-    }
+    applyActiveSection(nextSection, false)
   },
 )
 
@@ -584,6 +587,21 @@ watch(
     }
   },
 )
+
+watch(
+  () => props.columnPreferences,
+  (preferences) => {
+    applyColumnPreferences(preferences)
+  },
+  {
+    deep: true,
+    immediate: true,
+  },
+)
+
+onMounted(() => {
+  emitColumnPreferences()
+})
 
 onBeforeUnmount(() => {
   clearSearchEmitTimer()

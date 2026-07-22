@@ -96,7 +96,7 @@ const scopeAssets = computed(() => {
 const getScopeLabel = (scopeId) => {
   const labels = {
     "all-assets": "Toda la flota",
-    sucursal: "Sucursales seleccionadas",
+    sucursal: "Grupos seleccionados",
     "selected-assets": "Solo activos seleccionados",
   }
 

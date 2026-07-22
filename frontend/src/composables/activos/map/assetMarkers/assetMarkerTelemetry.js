@@ -93,6 +93,12 @@ export const mergeTelemetryUpdateIntoActivo = (activo = {}, update = {}) => {
     lng: sourceUpdate.lng ?? activo.lng,
 
     estado: sourceUpdate.estado || sourceUpdate.status || activo.estado,
+    heading:
+      sourceUpdate.heading ??
+      sourceUpdate.course ??
+      sourceUpdate.bearing ??
+      sourceUpdate.rumbo ??
+      activo.heading,
 
     speed: isValidTelemetryNumber(speedValue) ? Number(speedValue) : activo.speed,
     velocidad: speedLabel || sourceUpdate.velocidad || activo.velocidad,

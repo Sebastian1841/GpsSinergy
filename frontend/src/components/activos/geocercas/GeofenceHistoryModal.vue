@@ -12,282 +12,46 @@
         :style="modalFrameStyle"
         @click.stop
       >
-        <header
-          class="shrink-0 touch-none cursor-move border-b border-slate-200 bg-white"
-          @pointerdown="startDrag"
-          @dblclick="resetFrame"
-        >
-          <div class="flex h-1">
-            <div class="w-2/3 bg-[#102372]"></div>
-            <div class="w-1/3 bg-[#FF6600]"></div>
-          </div>
+        <GeofenceHistoryHeader
+          :modal-title="modalTitle"
+          :modal-description="modalDescription"
+          @start-drag="startDrag"
+          @reset-frame="resetFrame"
+          @close="closeModal"
+        />
 
-          <div class="flex items-start justify-between gap-4 px-4 py-4 sm:px-5">
-            <div class="min-w-0">
-              <p class="text-[10px] font-black uppercase tracking-[0.18em] text-[#102372]">
-                Historial de geocerca
-              </p>
+        <GeofenceHistoryControls
+          v-model:search-term="searchTerm"
+          v-model:date-preset="datePreset"
+          v-model:date-from="dateFrom"
+          v-model:date-to="dateTo"
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :metrics="metrics"
+          :pagination-start="paginationStart"
+          :pagination-end="paginationEnd"
+          :total-items="totalItems"
+          :total-pages="totalPages"
+          :page-size-options="pageSizeOptions"
+          @clear-filters="clearFilters"
+        />
 
-              <h2 class="mt-1 truncate text-[18px] font-black leading-tight text-slate-900">
-                {{ modalTitle }}
-              </h2>
-
-              <p
-                class="mt-1 max-w-[720px] text-[11px] font-semibold leading-relaxed text-slate-500"
-              >
-                {{ modalDescription }}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              class="grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-lg text-[20px] font-black text-slate-400 transition hover:bg-slate-100 hover:text-[#102372]"
-              @pointerdown.stop
-              @click.stop="closeModal"
-            >
-              ×
-            </button>
-          </div>
-        </header>
-
-        <div class="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
-          <div class="grid grid-cols-2 gap-2 md:grid-cols-4">
-            <div
-              v-for="metric in metrics"
-              :key="metric.label"
-              class="rounded-lg border border-slate-200 bg-white px-3 py-2"
-            >
-              <p class="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
-                {{ metric.label }}
-              </p>
-
-              <p
-                class="mt-1 text-[20px] font-black leading-none"
-                :class="metric.orange ? 'text-[#FF6600]' : 'text-[#102372]'"
-              >
-                {{ metric.value }}
-              </p>
-            </div>
-          </div>
-
-          <div class="mt-3 grid gap-2 lg:grid-cols-[1fr_180px_auto] lg:items-center">
-            <div class="relative">
-              <input
-                v-model.trim="searchTerm"
-                type="search"
-                placeholder="Buscar por patente, vehículo, conductor o evento..."
-                class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#102372]"
-              />
-            </div>
-
-            <select
-              v-model="datePreset"
-              class="h-10 cursor-pointer rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-700 outline-none transition focus:border-[#102372]"
-            >
-              <option value="all">Todas las fechas</option>
-              <option value="today">Hoy</option>
-              <option value="7d">Últimos 7 días</option>
-              <option value="30d">Últimos 30 días</option>
-              <option value="custom">Personalizado</option>
-            </select>
-
-            <div class="flex gap-2">
-              <template v-if="datePreset === 'custom'">
-                <input
-                  v-model="dateFrom"
-                  type="date"
-                  class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-bold text-slate-700 outline-none transition focus:border-[#102372] lg:w-[140px]"
-                />
-
-                <input
-                  v-model="dateTo"
-                  type="date"
-                  class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-bold text-slate-700 outline-none transition focus:border-[#102372] lg:w-[140px]"
-                />
-              </template>
-
-              <button
-                type="button"
-                class="h-10 shrink-0 cursor-pointer rounded-lg border border-slate-200 bg-white px-4 text-[11px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600]"
-                @pointerdown.stop
-                @click.stop="clearFilters"
-              >
-                Limpiar
-              </button>
-            </div>
-          </div>
-
-          <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <p class="text-[10px] font-bold text-slate-400">
-              {{ paginationStart }}-{{ paginationEnd }} de {{ totalItems }} registros
-            </p>
-
-            <div class="flex flex-wrap items-center gap-2">
-              <label
-                class="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.08em] text-slate-400"
-              >
-                Filas
-                <select
-                  v-model.number="pageSize"
-                  class="h-8 cursor-pointer rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-black text-slate-700 outline-none transition focus:border-[#102372]"
-                >
-                  <option v-for="option in pageSizeOptions" :key="option" :value="option">
-                    {{ option }}
-                  </option>
-                </select>
-              </label>
-
-              <div class="flex items-center gap-1">
-                <button
-                  type="button"
-                  class="h-8 cursor-pointer rounded-lg border border-slate-200 bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600] disabled:cursor-not-allowed disabled:opacity-40"
-                  :disabled="currentPage <= 1"
-                  @pointerdown.stop
-                  @click.stop="currentPage -= 1"
-                >
-                  Ant.
-                </button>
-
-                <span class="min-w-[72px] text-center text-[10px] font-black text-slate-500">
-                  {{ currentPage }} / {{ totalPages }}
-                </span>
-
-                <button
-                  type="button"
-                  class="h-8 cursor-pointer rounded-lg border border-slate-200 bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600] disabled:cursor-not-allowed disabled:opacity-40"
-                  :disabled="currentPage >= totalPages"
-                  @pointerdown.stop
-                  @click.stop="currentPage += 1"
-                >
-                  Sig.
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="min-h-0 flex-1 overflow-auto p-4 sm:p-5">
-          <div
-            v-if="!totalItems"
-            class="flex min-h-[230px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center"
-          >
-            <div
-              class="mb-3 grid h-10 w-10 place-items-center rounded-lg bg-[#102372] text-[17px] font-black text-white"
-            >
-              G
-            </div>
-
-            <p class="text-[13px] font-black text-slate-800">
-              {{ emptyTitle }}
-            </p>
-
-            <p class="mt-1 max-w-[430px] text-[11px] font-semibold leading-relaxed text-slate-500">
-              {{ emptyDescription }}
-            </p>
-
-            <button
-              v-if="hasActiveFilters"
-              type="button"
-              class="mt-4 cursor-pointer rounded-lg bg-[#102372] px-4 py-2 text-[11px] font-black text-white transition hover:bg-[#0b1a58]"
-              @pointerdown.stop
-              @click.stop="clearFilters"
-            >
-              Quitar filtros
-            </button>
-          </div>
-
-          <div v-else class="overflow-hidden rounded-xl border border-slate-200">
-            <div
-              class="hidden grid-cols-[1.2fr_0.8fr_0.8fr_0.55fr_0.55fr] gap-3 border-b border-slate-200 bg-[#102372] px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.12em] text-white/70 md:grid"
-            >
-              <button
-                type="button"
-                class="flex cursor-pointer items-center gap-1 text-left transition hover:text-white"
-                @click.stop="toggleSort('vehicle')"
-              >
-                Vehículo
-                <span class="text-[9px]">{{ getSortIcon("vehicle") }}</span>
-              </button>
-
-              <button
-                type="button"
-                class="flex cursor-pointer items-center gap-1 text-left transition hover:text-white"
-                @click.stop="toggleSort('event')"
-              >
-                Evento
-                <span class="text-[9px]">{{ getSortIcon("event") }}</span>
-              </button>
-
-              <button
-                type="button"
-                class="flex cursor-pointer items-center gap-1 text-left transition hover:text-white"
-                @click.stop="toggleSort('date')"
-              >
-                Fecha
-                <span class="text-[9px]">{{ getSortIcon("date") }}</span>
-              </button>
-
-              <button
-                type="button"
-                class="flex cursor-pointer items-center gap-1 text-left transition hover:text-white"
-                @click.stop="toggleSort('speed')"
-              >
-                Velocidad
-                <span class="text-[9px]">{{ getSortIcon("speed") }}</span>
-              </button>
-
-              <button
-                type="button"
-                class="flex cursor-pointer items-center gap-1 text-left transition hover:text-white"
-                @click.stop="toggleSort('duration')"
-              >
-                Tiempo
-                <span class="text-[9px]">{{ getSortIcon("duration") }}</span>
-              </button>
-            </div>
-
-            <div
-              v-for="row in paginatedRows"
-              :key="row.key"
-              class="grid gap-2 border-b border-slate-100 bg-white px-4 py-3 last:border-b-0 hover:bg-slate-50 md:grid-cols-[1.2fr_0.8fr_0.8fr_0.55fr_0.55fr] md:items-center"
-            >
-              <div class="min-w-0">
-                <p class="truncate text-[12px] font-black text-slate-900">
-                  {{ row.event.patent || row.event.vehicle || "Sin patente" }}
-                </p>
-
-                <p class="truncate text-[10px] font-semibold text-slate-500">
-                  {{ row.event.vehicle || "Vehículo" }} · {{ row.event.driver || "Sin conductor" }}
-                </p>
-              </div>
-
-              <div>
-                <span
-                  class="inline-flex rounded-md px-2 py-1 text-[10px] font-black"
-                  :class="getEventClass(row.event.eventType)"
-                >
-                  {{ row.event.eventLabel || row.eventLabel }}
-                </span>
-              </div>
-
-              <p class="text-[11px] font-bold text-slate-600">
-                {{ row.displayDate }}
-              </p>
-
-              <p class="text-[11px] font-bold text-slate-600">{{ row.event.speed ?? "-" }} km/h</p>
-
-              <p class="text-[11px] font-bold text-slate-600">
-                {{ row.event.duration || "-" }}
-              </p>
-            </div>
-          </div>
-        </div>
+        <GeofenceHistoryTable
+          :total-items="totalItems"
+          :paginated-rows="paginatedRows"
+          :empty-title="emptyTitle"
+          :empty-description="emptyDescription"
+          :has-active-filters="hasActiveFilters"
+          :get-sort-icon="getSortIcon"
+          @clear-filters="clearFilters"
+          @toggle-sort="toggleSort"
+        />
 
         <footer
           class="flex shrink-0 items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3 sm:px-5"
         >
           <p class="hidden text-[10px] font-bold text-slate-400 sm:block">
-            Doble clic en el encabezado para restaurar el tamaño.
+            Doble clic en el encabezado para restaurar el tamano.
           </p>
 
           <button
@@ -300,49 +64,7 @@
           </button>
         </footer>
 
-        <div
-          class="absolute left-6 right-6 top-0 z-30 h-3 touch-none cursor-ns-resize"
-          @pointerdown.stop="startResize($event, 'n')"
-        ></div>
-
-        <div
-          class="absolute bottom-0 left-6 right-6 z-30 h-3 touch-none cursor-ns-resize"
-          @pointerdown.stop="startResize($event, 's')"
-        ></div>
-
-        <div
-          class="absolute bottom-6 left-0 top-6 z-30 w-3 touch-none cursor-ew-resize"
-          @pointerdown.stop="startResize($event, 'w')"
-        ></div>
-
-        <div
-          class="absolute bottom-6 right-0 top-6 z-30 w-3 touch-none cursor-ew-resize"
-          @pointerdown.stop="startResize($event, 'e')"
-        ></div>
-
-        <div
-          class="absolute left-0 top-0 z-40 h-7 w-7 touch-none cursor-nwse-resize"
-          @pointerdown.stop="startResize($event, 'nw')"
-        ></div>
-
-        <div
-          class="absolute right-0 top-0 z-40 h-7 w-7 touch-none cursor-nesw-resize"
-          @pointerdown.stop="startResize($event, 'ne')"
-        ></div>
-
-        <div
-          class="absolute bottom-0 left-0 z-40 h-7 w-7 touch-none cursor-nesw-resize"
-          @pointerdown.stop="startResize($event, 'sw')"
-        ></div>
-
-        <div
-          class="absolute bottom-0 right-0 z-40 h-7 w-7 touch-none cursor-nwse-resize"
-          @pointerdown.stop="startResize($event, 'se')"
-        >
-          <div
-            class="absolute bottom-2 right-2 h-3 w-3 rounded-sm border-b-2 border-r-2 border-slate-400"
-          ></div>
-        </div>
+        <FloatingModalResizeHandles @start-resize="startResize" />
       </section>
     </div>
   </Teleport>
@@ -353,7 +75,10 @@ import { computed, nextTick, onBeforeUnmount, watch } from "vue"
 
 import { useGeofenceHistoryRows } from "../../../composables/activos/geocercas/useGeofenceHistoryRows.js"
 import { useFloatingModal } from "../../../composables/ui/useFloatingModal.js"
-import { getGeofenceHistoryEventClass } from "../../../utils/activos/geofenceHistoryUtils.js"
+import FloatingModalResizeHandles from "../../ui/FloatingModalResizeHandles.vue"
+import GeofenceHistoryControls from "./history/GeofenceHistoryControls.vue"
+import GeofenceHistoryHeader from "./history/GeofenceHistoryHeader.vue"
+import GeofenceHistoryTable from "./history/GeofenceHistoryTable.vue"
 
 const props = defineProps({
   modelValue: {
@@ -457,8 +182,6 @@ const closeModal = () => {
   stopInteraction()
   emit("update:modelValue", false)
 }
-
-const getEventClass = getGeofenceHistoryEventClass
 
 const handleKeydown = (event) => {
   if (event.key === "Escape" && props.modelValue) {

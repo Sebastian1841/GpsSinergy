@@ -165,7 +165,7 @@
 
         <tbody>
           <tr
-            v-for="(row, rowIndex) in paginatedRows"
+            v-for="(row, rowIndex) in paginatedRowsWithAddresses"
             :key="getRowKey(row, paginationStart + rowIndex)"
             class="cursor-pointer border-b border-[#edf0f5] transition hover:bg-[#fff7ed]"
             :class="selectedPointId === row.id ? 'bg-[#fff7ed]' : 'bg-white'"
@@ -225,11 +225,19 @@
         </tbody>
       </table>
     </div>
+
+    <div
+      v-if="rows.length && shouldResolveAddresses"
+      class="border-t border-[#edf0f5] bg-[#f8fafc] px-3 py-1.5 text-[9px] font-bold text-slate-400"
+    >
+      {{ reverseGeocodingAttribution }}
+    </div>
   </section>
 </template>
 
 <script setup>
 import { computed, onBeforeUnmount, ref } from "vue"
+import { useReverseGeocodedRows } from "../../../composables/location/useReverseGeocodedRows.js"
 import ColumnVisibilityMenu from "../../ui/ColumnVisibilityMenu.vue"
 import { useFleetColumns } from "../../../composables/activos/fleet/useFleetColumns"
 import { useItineraryTableRows } from "../../../composables/activos/itinerarios/useItineraryTableRows.js"
@@ -312,6 +320,15 @@ const {
   visibleColumns,
   columnsByKey,
 })
+
+const shouldResolveAddresses = computed(() => {
+  return visibleColumns.value.some((column) => column.key === "address")
+})
+
+const { rowsWithResolvedAddresses: paginatedRowsWithAddresses, reverseGeocodingAttribution } =
+  useReverseGeocodedRows(paginatedRows, {
+    enabled: shouldResolveAddresses,
+  })
 
 const toggleColumnKey = (columnKey) => {
   const column = columnsByKey.value.get(columnKey)

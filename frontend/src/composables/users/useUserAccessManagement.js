@@ -1,7 +1,7 @@
 import { computed, ref, watch } from "vue"
 
 import { useAuthSession } from "../auth/useAuthSession.js"
-import { useMockDatabase } from "../mock/useMockDatabase.js"
+import { useUsersService } from "../../services/users/useUsersService.js"
 import { useDebouncedValue } from "../ui/useDebouncedValue.js"
 import { useUserAccessDrafts } from "./useUserAccessDrafts.js"
 
@@ -31,7 +31,7 @@ export function useUserAccessManagement() {
     updateUser: updateDatabaseUser,
     createAccess: createDatabaseAccess,
     deleteAccess: deleteDatabaseAccess,
-  } = useMockDatabase()
+  } = useUsersService()
 
   accesses.value = accesses.value.map((access) => {
     return normalizeAccess({

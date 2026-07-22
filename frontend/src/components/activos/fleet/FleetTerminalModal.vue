@@ -43,8 +43,8 @@
               </p>
 
               <p class="mt-0.5 truncate text-[11px] font-semibold text-white/65">
-                {{ deviceName }} · {{ activo.protocol || "TCP" }} · {{ terminalLogs.length }}
-                registros
+                {{ deviceName }} · {{ activo.protocol || "TCP" }} ·
+                {{ terminalLogs.length }} registros
               </p>
             </div>
           </div>
@@ -72,14 +72,14 @@
 
         <main class="flex min-h-0 flex-1 flex-col bg-[#eef2f7] p-3">
           <div
-            class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#d8dee8] bg-white shadow-sm"
+            class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#d8dee8] bg-white shadow-sm"
           >
             <div
               class="flex shrink-0 flex-col gap-3 border-b border-[#e2e8f0] bg-white px-4 py-3 lg:flex-row lg:items-center lg:justify-between"
             >
               <div class="flex min-w-0 items-center gap-3">
                 <div
-                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#102372]/10 text-[#102372]"
+                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#102372]/10 text-[#102372]"
                 >
                   <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" aria-hidden="true">
                     <path
@@ -101,12 +101,12 @@
               </div>
 
               <div
-                class="flex shrink-0 items-center rounded-2xl border border-[#d8dee8] bg-[#f8fafc] p-1"
+                class="flex shrink-0 items-center rounded-xl border border-[#d8dee8] bg-[#f8fafc] p-1"
                 data-no-drag
               >
                 <button
                   type="button"
-                  class="flex items-center gap-2 rounded-xl px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.08em] transition"
+                  class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.08em] transition"
                   :class="
                     activeTerminalModule === 'telemetry'
                       ? 'bg-[#102372] text-white shadow-sm'
@@ -115,21 +115,22 @@
                   @click="activeTerminalModule = 'telemetry'"
                 >
                   Telemetría
+
                   <span
-                    class="rounded-full px-1.5 py-0.5 font-mono text-[10px]"
+                    class="rounded-full px-1.5 py-0.5 font-mono text-[9px]"
                     :class="
                       activeTerminalModule === 'telemetry'
                         ? 'bg-white/15 text-white'
                         : 'bg-[#eef3ff] text-[#102372]'
                     "
                   >
-                    {{ telemetryRowCount }}
+                    {{ visibleTelemetryRows.length }}/{{ telemetryRowCount }}
                   </span>
                 </button>
 
                 <button
                   type="button"
-                  class="flex items-center gap-2 rounded-xl px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.08em] transition"
+                  class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.08em] transition"
                   :class="
                     activeTerminalModule === 'commands'
                       ? 'bg-[#FF6600] text-white shadow-sm'
@@ -138,8 +139,9 @@
                   @click="activeTerminalModule = 'commands'"
                 >
                   Comandos
+
                   <span
-                    class="rounded-full px-1.5 py-0.5 font-mono text-[10px]"
+                    class="rounded-full px-1.5 py-0.5 font-mono text-[9px]"
                     :class="
                       activeTerminalModule === 'commands'
                         ? 'bg-white/20 text-white'
@@ -152,6 +154,7 @@
               </div>
             </div>
 
+            <!-- TELEMETRÍA -->
             <section
               v-if="activeTerminalModule === 'telemetry'"
               ref="terminalTableRef"
@@ -159,55 +162,59 @@
               @click="focusInput"
             >
               <table
-                class="min-w-full border-separate border-spacing-0 text-left font-mono text-[11px]"
+                class="w-full min-w-[980px] border-separate border-spacing-0 text-left font-mono"
               >
                 <thead
                   class="sticky top-0 z-10 bg-[#f8fafc] text-[10px] font-black uppercase tracking-[0.08em] text-slate-500 shadow-sm"
                 >
                   <tr>
-                    <th class="w-[92px] border-b border-[#e2e8f0] px-3 py-2">Hora</th>
-                    <th class="w-[104px] border-b border-[#e2e8f0] px-3 py-2">Evento</th>
-                    <th class="w-[104px] border-b border-[#e2e8f0] px-3 py-2">Estado</th>
-                    <th class="w-[112px] border-b border-[#e2e8f0] px-3 py-2">Velocidad</th>
-                    <th class="w-[126px] border-b border-[#e2e8f0] px-3 py-2">Latitud</th>
-                    <th class="w-[126px] border-b border-[#e2e8f0] px-3 py-2">Longitud</th>
-                    <th class="min-w-[280px] border-b border-[#e2e8f0] px-3 py-2">Detalle</th>
+                    <th class="w-[82px] border-b border-[#dfe5ed] px-3 py-2">Hora</th>
+
+                    <th class="w-[96px] border-b border-[#dfe5ed] px-3 py-2">Evento</th>
+
+                    <th class="w-[94px] border-b border-[#dfe5ed] px-3 py-2">Estado</th>
+
+                    <th class="w-[94px] border-b border-[#dfe5ed] px-3 py-2">Velocidad</th>
+
+                    <th class="w-[190px] border-b border-[#dfe5ed] px-3 py-2">Posición</th>
+
+                    <th class="border-b border-[#dfe5ed] px-3 py-2">Datos del dispositivo</th>
                   </tr>
                 </thead>
 
                 <tbody>
-                  <tr v-if="!telemetryRows.length">
+                  <tr v-if="!visibleTelemetryRows.length">
                     <td
-                      colspan="7"
-                      class="px-4 py-10 text-center text-xs font-semibold text-slate-400"
+                      colspan="6"
+                      class="px-4 py-12 text-center text-xs font-semibold text-slate-400"
                     >
                       Sin telemetría recibida para este dispositivo.
                     </td>
                   </tr>
 
                   <tr
-                    v-for="row in telemetryRows"
+                    v-for="row in visibleTelemetryRows"
                     :key="row.id"
-                    class="text-slate-700 transition hover:bg-[#f8fafc]"
+                    class="group text-slate-700 transition hover:bg-[#f8fafc]"
                   >
                     <td
-                      class="border-b border-[#edf2f7] px-3 py-2 align-top font-semibold text-slate-500"
+                      class="border-b border-[#e8edf3] px-3 py-2.5 align-top text-[11px] font-black text-slate-500"
                     >
                       {{ row.time }}
                     </td>
 
-                    <td class="border-b border-[#edf2f7] px-3 py-2 align-top">
+                    <td class="border-b border-[#e8edf3] px-3 py-2.5 align-top">
                       <span
-                        class="inline-flex rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em]"
+                        class="inline-flex rounded-md border px-2 py-1 text-[10px] font-black uppercase tracking-[0.06em]"
                         :class="getEventBadgeClass(row)"
                       >
                         {{ row.event }}
                       </span>
                     </td>
 
-                    <td class="border-b border-[#edf2f7] px-3 py-2 align-top">
+                    <td class="border-b border-[#e8edf3] px-3 py-2.5 align-top">
                       <span
-                        class="inline-flex rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em]"
+                        class="inline-flex rounded-md border px-2 py-1 text-[10px] font-black uppercase tracking-[0.06em]"
                         :class="getStateBadgeClass(row.estado)"
                       >
                         {{ row.estadoLabel }}
@@ -215,22 +222,76 @@
                     </td>
 
                     <td
-                      class="border-b border-[#edf2f7] px-3 py-2 align-top font-black text-[#102372]"
+                      class="border-b border-[#e8edf3] px-3 py-2.5 align-top text-[11px] font-black text-[#102372]"
                     >
                       {{ row.velocidad }}
                     </td>
 
-                    <td class="border-b border-[#edf2f7] px-3 py-2 align-top text-slate-600">
-                      {{ row.lat }}
+                    <td class="border-b border-[#e8edf3] px-3 py-2.5 align-top">
+                      <dl class="space-y-1">
+                        <div class="flex items-center justify-between gap-2">
+                          <dt class="text-[9px] font-black uppercase tracking-wide text-slate-400">
+                            Lat.
+                          </dt>
+
+                          <dd
+                            class="truncate text-[10px] font-black text-[#102372]"
+                            :title="String(row.lat || '')"
+                          >
+                            {{ getDisplayValue(row.lat) }}
+                          </dd>
+                        </div>
+
+                        <div class="flex items-center justify-between gap-2">
+                          <dt class="text-[9px] font-black uppercase tracking-wide text-slate-400">
+                            Lng.
+                          </dt>
+
+                          <dd
+                            class="truncate text-[10px] font-black text-[#102372]"
+                            :title="String(row.lng || '')"
+                          >
+                            {{ getDisplayValue(row.lng) }}
+                          </dd>
+                        </div>
+                      </dl>
                     </td>
 
-                    <td class="border-b border-[#edf2f7] px-3 py-2 align-top text-slate-600">
-                      {{ row.lng }}
-                    </td>
+                    <td class="border-b border-[#e8edf3] px-3 py-2 align-top">
+                      <dl
+                        v-if="row.telemetryDetails?.length"
+                        class="grid grid-cols-2 gap-x-4 gap-y-0 xl:grid-cols-4"
+                      >
+                        <div
+                          v-for="detail in row.telemetryDetails"
+                          :key="detail.key"
+                          class="flex min-w-0 items-center justify-between gap-2 border-b border-[#edf1f5] py-1"
+                        >
+                          <dt
+                            class="min-w-0 truncate text-[9px] font-black uppercase tracking-wide text-slate-400"
+                            :title="detail.label"
+                          >
+                            {{ detail.label }}
+                          </dt>
 
-                    <td class="border-b border-[#edf2f7] px-3 py-2 align-top text-slate-600">
-                      <p class="max-w-[420px] truncate">
+                          <dd
+                            class="shrink-0 whitespace-nowrap text-[10px] font-black text-[#102372]"
+                            :title="String(detail.value)"
+                          >
+                            {{ detail.value }}
+                          </dd>
+                        </div>
+                      </dl>
+
+                      <p
+                        v-else-if="row.message"
+                        class="max-w-[680px] break-words text-[11px] font-semibold leading-relaxed text-slate-500"
+                      >
                         {{ row.message }}
+                      </p>
+
+                      <p v-else class="text-[10px] font-semibold text-slate-400">
+                        Sin datos adicionales
                       </p>
                     </td>
                   </tr>
@@ -238,6 +299,7 @@
               </table>
             </section>
 
+            <!-- COMANDOS -->
             <section
               v-else
               ref="commandPanelRef"
@@ -246,7 +308,7 @@
             >
               <div
                 v-if="!commandRows.length"
-                class="flex h-full min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-5 text-center"
+                class="flex h-full min-h-[220px] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-5 text-center"
               >
                 <div>
                   <p class="text-sm font-black text-[#102372]">Sin comandos enviados</p>
@@ -261,7 +323,7 @@
                 <article
                   v-for="row in commandRows"
                   :key="row.id"
-                  class="rounded-2xl border border-[#d8dee8] bg-white p-3 shadow-sm"
+                  class="rounded-xl border border-[#d8dee8] bg-white p-3 shadow-sm"
                   :class="row.type === 'error' ? 'border-red-200 bg-red-50/40' : ''"
                 >
                   <div class="flex items-start justify-between gap-3">
@@ -295,13 +357,11 @@
               </div>
             </section>
 
-            <div class="shrink-0 border-t border-[#e2e8f0] bg-white px-3 py-3">
-              <TerminalInput
-                v-model="terminalCommand"
-                :is-sending="isSending"
-                @submit-command="sendTerminalCommand"
-              />
-            </div>
+            <TerminalInput
+              v-model="terminalCommand"
+              :is-sending="isSending"
+              @submit-command="sendTerminalCommand"
+            />
           </div>
         </main>
 
@@ -350,9 +410,13 @@
 </template>
 
 <script setup>
+import { computed, unref } from "vue"
+
 import TerminalInput from "./terminal/TerminalInput.vue"
 
 import { useFleetTerminalModal } from "../../../composables/activos/fleet/useFleetTerminalModal.js"
+
+const MAX_VISIBLE_TELEMETRY_ROWS = 5
 
 const props = defineProps({
   modelValue: {
@@ -398,4 +462,32 @@ const {
   getStateBadgeClass,
   getEventBadgeClass,
 } = useFleetTerminalModal({ props, emit })
+
+const visibleTelemetryRows = computed(() => {
+  const rows = unref(telemetryRows)
+
+  if (!Array.isArray(rows)) return []
+
+  return rows.slice(0, MAX_VISIBLE_TELEMETRY_ROWS)
+})
+
+const normalizeTelemetryText = (value) => {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+}
+
+const hasTelemetryValue = (value) => {
+  if (value === null || value === undefined) return false
+
+  const normalizedValue = normalizeTelemetryText(value)
+
+  return !["", "-", "--", "n/a", "na", "null", "undefined", "sin dato"].includes(normalizedValue)
+}
+
+const getDisplayValue = (value) => {
+  return hasTelemetryValue(value) ? value : "—"
+}
 </script>

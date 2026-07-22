@@ -15,7 +15,7 @@
           data-terminal-input
           :value="modelValue"
           type="text"
-          class="h-10 w-full rounded-lg border border-[#cbd5e1] bg-[#fbfcfe] pl-7 pr-3 font-mono text-xs font-bold text-[#102372] outline-none transition placeholder:text-slate-400 focus:border-[#FF6600] focus:ring-2 focus:ring-[#FF6600]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+          class="h-10 w-full rounded-lg border border-[#cbd5e1] bg-[#fbfcfe] pl-7 pr-3 font-mono text-sm font-bold text-[#102372] outline-none transition placeholder:text-slate-400 focus:border-[#FF6600] focus:ring-2 focus:ring-[#FF6600]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
           placeholder="Escribe un comando..."
           :disabled="isSending"
           @input="$emit('update:modelValue', $event.target.value)"
@@ -24,7 +24,7 @@
 
       <button
         type="submit"
-        class="h-10 shrink-0 cursor-pointer rounded-lg border border-[#FF6600] bg-[#FF6600] px-5 text-xs font-black text-white transition hover:bg-[#e85d00] disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-300"
+        class="h-10 shrink-0 cursor-pointer rounded-lg border border-[#FF6600] bg-[#FF6600] px-5 text-sm font-black text-white transition hover:bg-[#e85d00] disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-300"
         :disabled="isSending || !modelValue.trim()"
       >
         {{ isSending ? "Enviando" : "Enviar" }}

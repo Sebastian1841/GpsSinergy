@@ -1,32 +1,48 @@
 import { computed, ref, watch } from "vue"
 
-import { useMockDatabase } from "../mock/useMockDatabase.js"
+import { useAuthService } from "../../services/auth/useAuthService.js"
+import { appendAuditLog } from "../../services/audit/useAuditService.js"
+import {
+  readStorageValue,
+  removeStorageValue,
+  writeStorageValue,
+} from "../../services/storage/browserStorage.js"
 
 const SESSION_KEY = "sinergy-auth-user-id"
 const IMPERSONATED_USER_KEY = "sinergy-impersonated-user-id"
 const IMPERSONATION_RETURN_KEY = "sinergy-impersonation-return-path"
 
 const readSessionValue = (key) => {
-  if (typeof window === "undefined") return null
-
-  return window.sessionStorage.getItem(key)
+  return readStorageValue(key, { type: "session" })
 }
 
 const persistSessionValue = (key, value) => {
-  if (typeof window === "undefined") return
-
   if (value) {
-    window.sessionStorage.setItem(key, String(value))
+    writeStorageValue(key, value, { type: "session" })
     return
   }
 
-  window.sessionStorage.removeItem(key)
+  removeStorageValue(key, { type: "session" })
 }
 
 const authenticatedUserId = ref(readSessionValue(SESSION_KEY))
 const impersonatedUserId = ref(readSessionValue(IMPERSONATED_USER_KEY))
 
-const { users, accesses, applications, companies, roles } = useMockDatabase()
+const { users, accesses, applications, companies, roles } = useAuthService()
+
+const getUserAuditName = (user) => {
+  return user?.name || user?.username || user?.email || "Usuario desconocido"
+}
+
+const recordAuthAudit = (entry = {}) => {
+  appendAuditLog({
+    module: "auth",
+    entityType: "sesion",
+    companyId: "",
+    companyName: "Plataforma",
+    ...entry,
+  })
+}
 
 const authenticatedUser = computed(() => {
   return users.value.find((user) => String(user.id) === String(authenticatedUserId.value)) || null
@@ -152,6 +168,16 @@ const login = ({ identifier, password }) => {
   })
 
   if (!user || String(user.password || "") !== normalizedPassword) {
+    recordAuthAudit({
+      actorId: "anonymous",
+      actorName: normalizedIdentifier || "Anonimo",
+      action: "auth:login",
+      entityName: normalizedIdentifier || "Sin usuario",
+      status: "failed",
+      severity: "warning",
+      description: "Intento de inicio de sesion rechazado por credenciales invalidas.",
+    })
+
     return {
       ok: false,
       message: "Usuario o contraseña incorrectos.",
@@ -159,6 +185,16 @@ const login = ({ identifier, password }) => {
   }
 
   if (user.status === "pending") {
+    recordAuthAudit({
+      actorId: user.id,
+      actorName: getUserAuditName(user),
+      action: "auth:login",
+      entityName: getUserAuditName(user),
+      status: "failed",
+      severity: "warning",
+      description: "Intento de inicio de sesion con cuenta pendiente de activacion.",
+    })
+
     return {
       ok: false,
       message: "La cuenta todavía está pendiente de activación.",
@@ -166,6 +202,16 @@ const login = ({ identifier, password }) => {
   }
 
   if (user.status !== "active") {
+    recordAuthAudit({
+      actorId: user.id,
+      actorName: getUserAuditName(user),
+      action: "auth:login",
+      entityName: getUserAuditName(user),
+      status: "failed",
+      severity: "warning",
+      description: "Intento de inicio de sesion con cuenta inactiva.",
+    })
+
     return {
       ok: false,
       message: "La cuenta se encuentra inactiva.",
@@ -176,6 +222,16 @@ const login = ({ identifier, password }) => {
   persistSessionValue(SESSION_KEY, user.id)
   clearImpersonation()
   user.lastAccess = "Ahora"
+
+  recordAuthAudit({
+    actorId: user.id,
+    actorName: getUserAuditName(user),
+    action: "auth:login",
+    entityName: getUserAuditName(user),
+    status: "success",
+    severity: "info",
+    description: "Sesion iniciada correctamente.",
+  })
 
   return {
     ok: true,
@@ -195,6 +251,8 @@ const canImpersonateUser = (userId) => {
 }
 
 const startImpersonation = (userId, returnPath = "/usuarios") => {
+  const target = users.value.find((user) => String(user.id) === String(userId))
+
   if (!canImpersonateUser(userId)) {
     return {
       ok: false,
@@ -206,6 +264,17 @@ const startImpersonation = (userId, returnPath = "/usuarios") => {
   persistSessionValue(IMPERSONATED_USER_KEY, userId)
   persistSessionValue(IMPERSONATION_RETURN_KEY, returnPath)
 
+  recordAuthAudit({
+    actorId: authenticatedUser.value?.id || "system",
+    actorName: getUserAuditName(authenticatedUser.value),
+    action: "auth:impersonation:start",
+    entityType: "usuario",
+    entityName: getUserAuditName(target),
+    status: "success",
+    severity: "warning",
+    description: `Se inicio vista como ${getUserAuditName(target)}.`,
+  })
+
   return {
     ok: true,
     user: impersonatedUser.value,
@@ -214,9 +283,21 @@ const startImpersonation = (userId, returnPath = "/usuarios") => {
 
 const stopImpersonation = () => {
   const returnPath = readSessionValue(IMPERSONATION_RETURN_KEY) || "/usuarios"
+  const target = impersonatedUser.value
 
   clearImpersonation()
   persistSessionValue(IMPERSONATION_RETURN_KEY, null)
+
+  recordAuthAudit({
+    actorId: authenticatedUser.value?.id || "system",
+    actorName: getUserAuditName(authenticatedUser.value),
+    action: "auth:impersonation:stop",
+    entityType: "usuario",
+    entityName: getUserAuditName(target),
+    status: "success",
+    severity: "info",
+    description: `Se cerro la vista como ${getUserAuditName(target)}.`,
+  })
 
   return {
     returnPath,
@@ -224,6 +305,20 @@ const stopImpersonation = () => {
 }
 
 const logout = () => {
+  const user = currentUser.value
+
+  if (user) {
+    recordAuthAudit({
+      actorId: user.id,
+      actorName: getUserAuditName(user),
+      action: "auth:logout",
+      entityName: getUserAuditName(user),
+      status: "success",
+      severity: "info",
+      description: "Sesion cerrada correctamente.",
+    })
+  }
+
   clearSession()
 }
 

@@ -7,6 +7,8 @@ import { createGeofenceMapController } from "./geofences/useMapGeofences.js"
 import { createItineraryMapController } from "./useMapItinerary.js"
 import { createMovementTrailController } from "./useMapMovementTrails.js"
 import { createAssetMarkerController } from "./useMapAssetMarkers.js"
+import { createPlannedRouteMapEditorController } from "./useMapPlannedRouteEditor.js"
+import { usePlannedRouteMapEditor } from "../routes/usePlannedRouteMapEditor.js"
 
 import {
   buildGeofencesSignature,
@@ -68,6 +70,50 @@ const buildItineraryFitKey = (route) => {
     .join(":")
 }
 
+const getItineraryRouteAssetIds = (route) => {
+  if (!route) return []
+
+  const routeItems = Array.isArray(route.routes) ? route.routes : []
+  const routeAssets = Array.isArray(route.assets) ? route.assets : []
+  const assetIds = new Set()
+
+  const addAssetId = (assetId) => {
+    const normalizedAssetId = normalizeId(assetId)
+
+    if (normalizedAssetId) {
+      assetIds.add(normalizedAssetId)
+    }
+  }
+
+  addAssetId(route.asset?.id)
+  addAssetId(route.asset?.activoId)
+
+  routeAssets.forEach((asset) => {
+    addAssetId(asset?.id)
+    addAssetId(asset?.activoId)
+  })
+
+  routeItems.forEach((item) => {
+    addAssetId(item.asset?.id)
+    addAssetId(item.asset?.activoId)
+    addAssetId(item.id)
+  })
+
+  if (assetIds.size) {
+    return Array.from(assetIds)
+  }
+
+  if (Array.isArray(route.rows)) {
+    route.rows.forEach((row) => {
+      addAssetId(row.assetId)
+      addAssetId(row.asset?.id)
+      addAssetId(row.asset?.activoId)
+    })
+  }
+
+  return Array.from(assetIds)
+}
+
 export function useActivosMap({ props, emit, mapRef }) {
   const drawMode = ref(null)
   const draftPolygonPoints = ref([])
@@ -76,11 +122,13 @@ export function useActivosMap({ props, emit, mapRef }) {
   const editingDraft = ref(null)
   const editAddPoint = ref(false)
   const leafletMap = ref(null)
+  const { isEditingPlannedRouteOnMap } = usePlannedRouteMapEditor()
 
   let map = null
   let currentTileLayer = null
   let itineraryRenderer = null
   let lastItineraryFitKey = ""
+  let needsTileLayerRefresh = false
 
   const layers = {
     markerLayer: null,
@@ -89,10 +137,12 @@ export function useActivosMap({ props, emit, mapRef }) {
     itineraryLayer: null,
     draftLayer: null,
     editLayer: null,
+    plannedRouteEditLayer: null,
   }
 
   const activosMarkerMetadataSignature = computed(() => {
-    return (props.activos || [])
+    const geofenceAddressMode = normalizeSignatureValue(props.useGeofenceLocationAddress !== false)
+    const assetSignature = (props.activos || [])
       .map((activo) => {
         return [
           normalizeId(activo?.id),
@@ -109,11 +159,18 @@ export function useActivosMap({ props, emit, mapRef }) {
           activo?.protocol,
           activo?.sucursalId,
           activo?.driver,
+          activo?.assetType,
+          activo?.tipoActivo,
+          activo?.mapIcon,
+          activo?.markerIcon,
+          activo?.iconType,
         ]
           .map(normalizeSignatureValue)
           .join(":")
       })
       .join("|")
+
+    return [geofenceAddressMode, assetSignature].join("|")
   })
 
   const getActivoLatLng = (activo) => {
@@ -127,8 +184,74 @@ export function useActivosMap({ props, emit, mapRef }) {
     return [lat, lng]
   }
 
+  const focusedRouteActivoIds = computed(() => {
+    if (!isEditingPlannedRouteOnMap.value) return []
+
+    const itineraryAssetIds = getItineraryRouteAssetIds(props.itineraryRoute)
+
+    if (itineraryAssetIds.length) return itineraryAssetIds
+    if (props.selectedId) return [props.selectedId]
+
+    return []
+  })
+
+  const focusedRouteActivoSignature = computed(() => {
+    return focusedRouteActivoIds.value.map(normalizeId).sort().join("|")
+  })
+
   const getSafeMapType = () => {
     return MAP_TILE_LAYERS[props.mapType] ? props.mapType : "standard"
+  }
+
+  const isBackgroundPaused = () => {
+    return Boolean(props.backgroundPaused)
+  }
+
+  const setMapInteractionPaused = (paused) => {
+    if (!map) return
+
+    const method = paused ? "disable" : "enable"
+    const handlers = [
+      map.dragging,
+      map.touchZoom,
+      map.doubleClickZoom,
+      map.scrollWheelZoom,
+      map.boxZoom,
+      map.keyboard,
+      map.tap,
+    ]
+
+    handlers.forEach((handler) => {
+      handler?.[method]?.()
+    })
+  }
+
+  const refreshMapAfterBackgroundPause = () => {
+    if (!map || isBackgroundPaused()) return
+
+    if (needsTileLayerRefresh) {
+      applyTileLayer()
+      needsTileLayerRefresh = false
+    }
+
+    map.invalidateSize({
+      pan: false,
+    })
+
+    assetMarkers.syncActivoMarkers(props.activos, {
+      fit: false,
+      trackTrail: false,
+    })
+    movementTrails.redrawAllMovementTrails()
+    geofenceMap.syncAndRenderGeofences()
+
+    const nextItineraryFitKey = buildItineraryFitKey(props.itineraryRoute)
+
+    lastItineraryFitKey = nextItineraryFitKey
+    itineraryMap.renderItineraryRoute({
+      fit: false,
+    })
+    itineraryMap.renderSelectedItineraryPoint()
   }
 
   const createTileLayer = () => {
@@ -186,6 +309,7 @@ export function useActivosMap({ props, emit, mapRef }) {
     getActivoLatLng,
     normalizeId,
     getSelectedActivoId: () => props.selectedId,
+    getFocusedActivoIds: () => focusedRouteActivoIds.value,
   })
 
   const assetMarkers = createAssetMarkerController({
@@ -199,6 +323,7 @@ export function useActivosMap({ props, emit, mapRef }) {
     movementTrails,
     drawMode,
     editingDraft,
+    getFocusedActivoIds: () => focusedRouteActivoIds.value,
   })
 
   const geofenceMap = createGeofenceMapController({
@@ -223,12 +348,22 @@ export function useActivosMap({ props, emit, mapRef }) {
     layers,
   })
 
+  const plannedRouteMapEditor = createPlannedRouteMapEditorController({
+    L,
+    getMap: () => map,
+    layers,
+  })
+
   const handleMapZoomEnd = () => {
+    if (isBackgroundPaused()) return
+
     assetMarkers.refreshActivoMarkers()
     itineraryMap.renderItineraryRoute()
   }
 
   const handleMapMoveEnd = () => {
+    if (isBackgroundPaused()) return
+
     setLayerGroupVisibility(layers.movementTrailLayer, true)
     setLayerGroupVisibility(layers.itineraryLayer, true)
 
@@ -237,6 +372,8 @@ export function useActivosMap({ props, emit, mapRef }) {
   }
 
   const handleMapMoveStart = () => {
+    if (isBackgroundPaused()) return
+
     setLayerGroupVisibility(layers.movementTrailLayer, false)
     setLayerGroupVisibility(layers.itineraryLayer, false)
   }
@@ -279,10 +416,12 @@ export function useActivosMap({ props, emit, mapRef }) {
     layers.itineraryLayer = L.featureGroup().addTo(map)
     layers.draftLayer = L.featureGroup().addTo(map)
     layers.editLayer = L.featureGroup().addTo(map)
+    layers.plannedRouteEditLayer = L.featureGroup().addTo(map)
 
     applyTileLayer()
 
     map.on("click", geofenceMap.handleMapClick)
+    map.on("click", plannedRouteMapEditor.handleMapClick)
     map.on("mousemove", geofenceMap.handleMapMouseMove)
     map.on("dblclick", geofenceMap.handleMapDoubleClick)
     map.on("zoomend", handleMapZoomEnd)
@@ -290,6 +429,7 @@ export function useActivosMap({ props, emit, mapRef }) {
     map.on("moveend", handleMapMoveEnd)
 
     geofenceMap.renderGeofences()
+    plannedRouteMapEditor.renderPlannedRouteEditor()
 
     lastItineraryFitKey = buildItineraryFitKey(props.itineraryRoute)
 
@@ -303,6 +443,8 @@ export function useActivosMap({ props, emit, mapRef }) {
 
     assetMarkers.centerSelected()
 
+    setMapInteractionPaused(isBackgroundPaused())
+
     setTimeout(() => {
       map?.invalidateSize()
     }, 200)
@@ -315,6 +457,7 @@ export function useActivosMap({ props, emit, mapRef }) {
 
     if (map) {
       map.off("click", geofenceMap.handleMapClick)
+      map.off("click", plannedRouteMapEditor.handleMapClick)
       map.off("mousemove", geofenceMap.handleMapMouseMove)
       map.off("dblclick", geofenceMap.handleMapDoubleClick)
       map.off("zoomend", handleMapZoomEnd)
@@ -326,6 +469,7 @@ export function useActivosMap({ props, emit, mapRef }) {
     movementTrails.cleanupMovementTrails()
     geofenceMap.cancelAll()
     geofenceMap.clearGeofenceCache?.()
+    plannedRouteMapEditor.cleanupPlannedRouteEditor()
     itineraryMap.clearItineraryRoute()
 
     if (currentTileLayer) {
@@ -345,8 +489,13 @@ export function useActivosMap({ props, emit, mapRef }) {
   watch(
     () => props.mapType,
     () => {
+      if (isBackgroundPaused()) {
+        needsTileLayerRefresh = true
+        return
+      }
+
       applyTileLayer()
-      movementTrails.redrawAllMovementTrails()
+      movementTrails.refreshMovementTrailStyle()
       itineraryMap.renderItineraryRoute()
     },
   )
@@ -362,30 +511,59 @@ export function useActivosMap({ props, emit, mapRef }) {
     - cambia nombre, patente, dispositivo, modelo o sucursal del activo
   */
   watch(activosMarkerMetadataSignature, () => {
+    if (isBackgroundPaused()) return
+
     assetMarkers.syncActivoMarkers(props.activos, {
       fit: false,
+      trackTrail: false,
     })
+  })
+
+  watch(focusedRouteActivoSignature, () => {
+    if (isBackgroundPaused()) return
+
+    assetMarkers.syncActivoMarkers(props.activos, {
+      fit: false,
+      trackTrail: false,
+    })
+    movementTrails.refreshMovementTrailVisibility()
   })
 
   watch(
     () => props.selectedId,
-    () => {
+    (selectedId, previousSelectedId) => {
+      if (isBackgroundPaused()) return
+
+      const hasSelectedActivo = Boolean(normalizeId(selectedId))
+
       assetMarkers.refreshActivoMarkers()
-      assetMarkers.centerSelected()
-      movementTrails.redrawAllMovementTrails()
+
+      if (hasSelectedActivo) {
+        assetMarkers.centerSelected()
+      }
+
+      movementTrails.refreshMovementTrailSelection({
+        previousId: previousSelectedId,
+        nextId: selectedId,
+      })
     },
   )
 
   watch(
     () => buildGeofencesSignature(props.geofences),
     () => {
+      if (isBackgroundPaused()) return
+
       geofenceMap.syncAndRenderGeofences()
+      assetMarkers.refreshActivoMarkers()
     },
   )
 
   watch(
     () => buildItineraryRouteSignature(props.itineraryRoute),
     () => {
+      if (isBackgroundPaused()) return
+
       const nextItineraryFitKey = buildItineraryFitKey(props.itineraryRoute)
       const shouldFit = Boolean(props.itineraryRoute) && nextItineraryFitKey !== lastItineraryFitKey
 
@@ -400,8 +578,21 @@ export function useActivosMap({ props, emit, mapRef }) {
   watch(
     () => buildSelectedItineraryPointSignature(props.selectedItineraryPoint),
     () => {
+      if (isBackgroundPaused()) return
+
       itineraryMap.renderSelectedItineraryPoint()
       itineraryMap.centerItineraryPoint()
+    },
+  )
+
+  watch(
+    () => props.backgroundPaused,
+    (isPaused) => {
+      setMapInteractionPaused(isPaused)
+
+      if (isPaused) return
+
+      refreshMapAfterBackgroundPause()
     },
   )
 
@@ -432,6 +623,7 @@ export function useActivosMap({ props, emit, mapRef }) {
     cancelAll: geofenceMap.cancelAll,
 
     startEditGeofence: geofenceMap.startEditGeofence,
+    focusGeofence: geofenceMap.focusGeofence,
     stopEditing: geofenceMap.stopEditing,
     removeLastEditPoint: geofenceMap.removeLastEditPoint,
     deleteGeofence: geofenceMap.deleteGeofence,

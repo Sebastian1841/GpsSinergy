@@ -5,7 +5,7 @@
     @click.self="$emit('close')"
   >
     <section
-      class="flex max-h-[calc(100%-16px)] w-full max-w-[760px] flex-col overflow-hidden rounded-lg border border-[#102372] bg-white shadow-2xl sm:max-h-[calc(100%-32px)]"
+      class="flex max-h-[calc(100%-16px)] w-full max-w-[760px] flex-col overflow-hidden rounded-lg bg-white shadow-[0_24px_80px_rgba(15,23,42,0.34)] sm:max-h-[calc(100%-32px)]"
     >
       <header class="shrink-0 bg-[#102372] px-4 py-2.5">
         <div class="flex items-start justify-between gap-3">

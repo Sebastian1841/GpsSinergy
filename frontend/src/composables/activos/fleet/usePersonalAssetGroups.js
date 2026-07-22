@@ -1,5 +1,6 @@
 import { computed, ref, unref, watch } from "vue"
 
+import { readJsonStorage, writeJsonStorage } from "../../../services/storage/browserStorage.js"
 import { normalizeId } from "../../../utils/idUtils.js"
 
 const STORAGE_KEY = "sinergy-personal-asset-groups"
@@ -8,22 +9,6 @@ const PERSIST_DEBOUNCE_MS = 200
 
 let groupsPersistTimer = null
 let selectedPersistTimer = null
-
-const readJsonStorage = (key, fallback) => {
-  if (typeof window === "undefined") return fallback
-
-  try {
-    return JSON.parse(window.localStorage.getItem(key) || "null") || fallback
-  } catch {
-    return fallback
-  }
-}
-
-const writeJsonStorage = (key, value) => {
-  if (typeof window === "undefined") return
-
-  window.localStorage.setItem(key, JSON.stringify(value))
-}
 
 const scheduleGroupsPersist = () => {
   if (typeof window === "undefined") return
@@ -68,7 +53,7 @@ const buildGroupId = ({ userId, companyId }) => {
 const personalAssetGroups = ref(readJsonStorage(STORAGE_KEY, []))
 const selectedPersonalAssetGroupsByScope = ref(readJsonStorage(SELECTED_GROUP_KEY, {}))
 
-export function usePersonalAssetGroups({ userId, companyId, availableActivos }) {
+export function usePersonalAssetGroups({ userId, companyId, availableActivos, dynamicGroups }) {
   const resolvedUserId = computed(() => normalizeId(unref(userId)))
   const resolvedCompanyId = computed(() => normalizeId(unref(companyId)))
 
@@ -114,7 +99,7 @@ export function usePersonalAssetGroups({ userId, companyId, availableActivos }) 
     return Array.from(availableAssetIds.value).sort().join("|")
   })
 
-  const groups = computed(() => {
+  const persistedGroups = computed(() => {
     return personalAssetGroups.value
       .filter((group) => {
         return (
@@ -124,10 +109,31 @@ export function usePersonalAssetGroups({ userId, companyId, availableActivos }) 
       })
       .map((group) => ({
         ...group,
+        type: group.type || "custom",
+        readonly: false,
         assetIds: (group.assetIds || []).filter((assetId) => {
           return availableAssetIds.value.has(normalizeId(assetId))
         }),
       }))
+  })
+
+  const generatedGroups = computed(() => {
+    return (unref(dynamicGroups) || [])
+      .map((group) => ({
+        ...group,
+        type: group.type || "dynamic",
+        readonly: group.readonly !== false,
+        assetIds: (group.assetIds || []).filter((assetId) => {
+          return availableAssetIds.value.has(normalizeId(assetId))
+        }),
+      }))
+      .filter((group) => {
+        return normalizeId(group.id) && group.assetIds.length
+      })
+  })
+
+  const groups = computed(() => {
+    return [...generatedGroups.value, ...persistedGroups.value]
   })
 
   const selectedGroup = computed(() => {

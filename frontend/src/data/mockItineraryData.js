@@ -1,6 +1,7 @@
 import { mockAssets } from "./mockDatabase.js"
 
 export const mockItineraryAssets = mockAssets.map((asset) => ({
+  ...asset,
   id: asset.id,
   activoId: asset.id,
   patente: asset.patente,
@@ -10,6 +11,12 @@ export const mockItineraryAssets = mockAssets.map((asset) => ({
   lat: asset.lat,
   lng: asset.lng,
   speed: Number(asset.speed) || 0,
+  gpsSatellites: asset.gpsSatellites ?? null,
+  ignition: asset.ignition ?? asset.ignicion ?? asset.contacto ?? null,
+  ignicion: asset.ignicion ?? asset.ignition ?? asset.contacto ?? null,
+  contacto: asset.contacto ?? asset.ignition ?? asset.ignicion ?? null,
+  digitalInput1: asset.digitalInput1 ?? asset.input1 ?? asset.di1 ?? null,
+  digitalInput2: asset.digitalInput2 ?? asset.input2 ?? asset.di2 ?? null,
   direccion: asset.direccion,
 }))
 
@@ -199,6 +206,10 @@ const createPoint = ({
   address,
   event,
   odometer,
+  gpsSatellites = null,
+  ignition = null,
+  digitalInput1 = null,
+  digitalInput2 = null,
   isCurrentLocation = false,
 }) => ({
   id,
@@ -210,6 +221,12 @@ const createPoint = ({
   address,
   event,
   odometer,
+  gpsSatellites,
+  ignition,
+  ignicion: ignition,
+  contacto: ignition,
+  digitalInput1,
+  digitalInput2,
   isCurrentLocation,
 })
 
@@ -272,6 +289,10 @@ const generateDailyPointsForAsset = ({ asset, dateString, dayIndex, assetIndex }
         address: profile.addresses[0],
         event: "Sin operación",
         odometer: profile.odometerStart + dayIndex * 42,
+        gpsSatellites: asset.gpsSatellites ?? 0,
+        ignition: false,
+        digitalInput1: 0,
+        digitalInput2: asset.digitalInput2 ?? asset.input2 ?? null,
       }),
     ]
   }
@@ -322,36 +343,60 @@ const generateDailyPointsForAsset = ({ asset, dateString, dayIndex, assetIndex }
       address: profile.addresses[index % profile.addresses.length],
       event,
       odometer: profile.odometerStart + odometerIncrement,
+      gpsSatellites: 7 + ((dayIndex + index + assetIndex) % 10),
+      ignition: !(isStop && !isFirst),
+      digitalInput1: isStop && !isFirst ? 0 : 1,
+      digitalInput2: asset.digitalInput2 ?? asset.input2 ?? null,
     })
   })
 }
 
-const generateMonthlyItineraryPoints = () => {
-  const endDate = new Date(`${CURRENT_MOCK_DATE}T00:00:00`)
-  const days = 30
-
-  return Array.from({ length: days }, (_, dayIndex) => {
-    const date = new Date(endDate)
-    date.setDate(endDate.getDate() - (days - 1 - dayIndex))
-    const dateString = toDateString(date)
-
-    return mockItineraryAssets.flatMap((asset, assetIndex) => {
-      return generateDailyPointsForAsset({
-        asset,
-        dateString,
-        dayIndex,
-        assetIndex,
-      })
-    })
-  }).flat()
-}
-
-const mockItineraryPoints = generateMonthlyItineraryPoints()
+const ITINERARY_POINTS_CACHE_LIMIT = 120
+const itineraryPointsCache = new Map()
 
 const getFallbackAssetIndex = (asset) => {
   return String(asset?.id || asset?.patente || "")
     .split("")
     .reduce((total, character) => total + character.charCodeAt(0), 0)
+}
+
+const findItineraryAssetById = (assetId) => {
+  const normalizedAssetId = String(assetId || "")
+
+  if (!normalizedAssetId) return null
+
+  return (
+    mockItineraryAssets.find((asset) => {
+      return String(asset.id) === normalizedAssetId || String(asset.activoId) === normalizedAssetId
+    }) || null
+  )
+}
+
+const buildItineraryCacheKey = ({ assetId, asset, fromDate, toDate }) => {
+  return [assetId, fromDate, toDate, asset?.lat ?? "", asset?.lng ?? "", asset?.patente ?? ""].join(
+    "|",
+  )
+}
+
+const getCachedItineraryPoints = (cacheKey) => {
+  if (!itineraryPointsCache.has(cacheKey)) return null
+
+  const points = itineraryPointsCache.get(cacheKey)
+
+  itineraryPointsCache.delete(cacheKey)
+  itineraryPointsCache.set(cacheKey, points)
+
+  return points
+}
+
+const setCachedItineraryPoints = (cacheKey, points) => {
+  itineraryPointsCache.set(cacheKey, points)
+
+  if (itineraryPointsCache.size <= ITINERARY_POINTS_CACHE_LIMIT) return
+
+  const oldestCacheKey = itineraryPointsCache.keys().next().value
+
+  itineraryPointsCache.delete(oldestCacheKey)
 }
 
 const buildDateRange = ({ fromDate, toDate }) => {
@@ -389,11 +434,7 @@ const generateFallbackItineraryPoints = ({ asset, fromDate, toDate }) => {
     .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
 }
 
-export const getLatestItineraryDate = () => {
-  const dates = mockItineraryPoints.map((point) => point.timestamp.slice(0, 10)).sort()
-
-  return dates[dates.length - 1] || new Date().toISOString().slice(0, 10)
-}
+export const getLatestItineraryDate = () => CURRENT_MOCK_DATE
 
 export const addDays = (dateString, amount) => {
   const date = new Date(`${dateString}T00:00:00`)
@@ -459,21 +500,31 @@ const haversineDistanceKm = (pointA, pointB) => {
 }
 
 export const filterItineraryPoints = ({ assetId, asset, fromDate, toDate }) => {
-  const historicalPoints = mockItineraryPoints
-    .filter((point) => {
-      const date = point.timestamp.slice(0, 10)
+  const resolvedAsset = asset || findItineraryAssetById(assetId)
+  const resolvedAssetId = String(assetId || resolvedAsset?.id || resolvedAsset?.activoId || "")
 
-      return point.assetId === assetId && date >= fromDate && date <= toDate
-    })
-    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+  if (!resolvedAsset || !resolvedAssetId) return []
 
-  if (historicalPoints.length) return historicalPoints
-
-  return generateFallbackItineraryPoints({
-    asset,
+  const cacheKey = buildItineraryCacheKey({
+    assetId: resolvedAssetId,
+    asset: resolvedAsset,
     fromDate,
     toDate,
   })
+
+  const cachedPoints = getCachedItineraryPoints(cacheKey)
+
+  if (cachedPoints) return cachedPoints
+
+  const points = generateFallbackItineraryPoints({
+    asset: resolvedAsset,
+    fromDate,
+    toDate,
+  })
+
+  setCachedItineraryPoints(cacheKey, points)
+
+  return points
 }
 
 export const buildItineraryResult = ({ asset, points }) => {

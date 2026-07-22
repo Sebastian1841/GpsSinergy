@@ -6,6 +6,7 @@ import {
   itineraryTablePageSizeOptions,
   normalizeItineraryTableText,
 } from "../../../utils/activos/itineraryTableColumns.js"
+import { getCellValue as getFleetTelemetryCellValue } from "../../../utils/activos/fleetTelemetryColumns.js"
 
 const textCollator = new Intl.Collator("es", {
   numeric: true,
@@ -15,13 +16,22 @@ const textCollator = new Intl.Collator("es", {
 const parseSortableNumber = (value) => {
   if (value === null || value === undefined) return null
 
-  const match = String(value)
-    .replace(",", ".")
-    .match(/-?\d+(\.\d+)?/)
+  const match = String(value).match(/-?\d[\d.,]*/)
 
   if (!match) return null
 
-  const parsedValue = Number(match[0])
+  const rawNumber = match[0]
+  const hasComma = rawNumber.includes(",")
+  const hasDot = rawNumber.includes(".")
+  const normalizedNumber =
+    hasComma && hasDot
+      ? rawNumber.replace(/\./g, "").replace(",", ".")
+      : hasComma
+        ? rawNumber.replace(",", ".")
+        : hasDot && (rawNumber.split(".").length > 2 || rawNumber.split(".").at(-1)?.length === 3)
+          ? rawNumber.replace(/\./g, "")
+          : rawNumber
+  const parsedValue = Number(normalizedNumber)
 
   return Number.isFinite(parsedValue) ? parsedValue : null
 }
@@ -162,6 +172,8 @@ export function useItineraryTableRows({
       return row.accumulatedDistanceLabel || "0,0 km"
     }
 
+    if (column.telemetry) return getFleetTelemetryCellValue(row, column)
+
     if (column.key === "dateLabel") return row.dateLabel || "-"
 
     if (column.key === "assetDisplayName") {
@@ -203,9 +215,13 @@ export function useItineraryTableRows({
       return parseSortableNumber(row[columnKey])
     }
 
-    return normalizeItineraryTableText(
-      getCellValue(row, unref(columnsByKey).get(columnKey) || { key: columnKey }),
-    )
+    const column = unref(columnsByKey).get(columnKey)
+
+    if (column?.numeric) {
+      return parseSortableNumber(getCellValue(row, column))
+    }
+
+    return normalizeItineraryTableText(getCellValue(row, column || { key: columnKey }))
   }
 
   const toggleSort = (columnKey) => {

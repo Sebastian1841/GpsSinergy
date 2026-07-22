@@ -1,7 +1,7 @@
 import { computed, ref, watch } from "vue"
 
 import { useCompanyBranches } from "./useCompanyBranches.js"
-import { useMockDatabase } from "../mock/useMockDatabase.js"
+import { useCompaniesService } from "../../services/companies/useCompaniesService.js"
 import { useDebouncedValue } from "../ui/useDebouncedValue.js"
 
 import {
@@ -29,7 +29,7 @@ const createEmptyDraftCompany = () => ({
 const createCompanyReports = (reportTypes = []) => {
   return reportTypes.map((reportType) => ({
     reportId: reportType.id,
-    enabled: false,
+    enabled: true,
   }))
 }
 
@@ -48,11 +48,10 @@ export function useCompanyManagement() {
     getCompany,
     createCompany: createDatabaseCompany,
     updateCompany: updateDatabaseCompany,
-    updateAsset,
     addSucursal: addDatabaseSucursal,
     updateSucursal,
     deleteSucursal: deleteDatabaseSucursal,
-  } = useMockDatabase()
+  } = useCompaniesService()
 
   const {
     alternarSucursalesHabilitadas: toggleCompanyBranchesEnabled,
@@ -60,11 +59,9 @@ export function useCompanyManagement() {
     actualizarNombreSucursal: updateCompanyBranchName,
     alternarEstadoSucursal: toggleCompanyBranchStatus,
     eliminarSucursal: deleteCompanyBranch,
-    actualizarSucursalActivo: updateAssetBranch,
   } = useCompanyBranches({
     getCompany,
     updateCompany: updateDatabaseCompany,
-    updateAsset,
     addSucursal: addDatabaseSucursal,
     updateSucursal,
     deleteSucursal: deleteDatabaseSucursal,
@@ -248,18 +245,6 @@ export function useCompanyManagement() {
     })
   }
 
-  const toggleCompanyReport = (reportId) => {
-    const reportAccess = selectedCompany.value?.reports?.find((item) => item.reportId === reportId)
-
-    if (!reportAccess || !selectedCompany.value) return
-
-    updateDatabaseCompany(selectedCompany.value.id, {
-      reports: selectedCompany.value.reports.map((item) => {
-        return item.reportId === reportId ? { ...item, enabled: !item.enabled } : item
-      }),
-    })
-  }
-
   const alternarSucursalesHabilitadas = () => {
     if (!selectedCompany.value) return
 
@@ -285,22 +270,6 @@ export function useCompanyManagement() {
 
   const eliminarSucursal = (sucursalId) => {
     deleteCompanyBranch(sucursalId, selectedCompany.value?.sucursales || [])
-  }
-
-  const actualizarSucursalActivo = ({ assetId, sucursalId }) => {
-    if (!selectedCompany.value) return
-
-    const asset = selectedCompany.value.assets?.find((item) => {
-      return String(item.id) === String(assetId)
-    })
-
-    if (!asset) return
-
-    updateAssetBranch({
-      asset,
-      sucursalId,
-      sucursales: selectedCompany.value.sucursales || [],
-    })
   }
 
   const getCompanyHealth = (company) => {
@@ -334,13 +303,11 @@ export function useCompanyManagement() {
     closeEditorModal,
     saveCompanyFromModal,
     toggleSelectedCompanyStatus,
-    toggleCompanyReport,
     alternarSucursalesHabilitadas,
     agregarSucursal,
     actualizarNombreSucursal,
     alternarEstadoSucursal,
     eliminarSucursal,
-    actualizarSucursalActivo,
     getCompanyHealth,
   }
 }

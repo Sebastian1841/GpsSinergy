@@ -19,6 +19,17 @@ const createFunctionAccess = (functionId, permissions = {}) => ({
   permissions: createPermissions(permissions),
 })
 
+const systemModuleIds = ["assets", "users", "audit"]
+
+const getModuleIdFromFunctionId = (functionId) => {
+  const normalizedFunctionId = String(functionId || "")
+
+  if (normalizedFunctionId.startsWith("users-")) return "users"
+  if (normalizedFunctionId.startsWith("audit-")) return "audit"
+
+  return "assets"
+}
+
 const createAccessScope = (scope = {}) => {
   const cleanScope = {
     ...scope,
@@ -46,7 +57,7 @@ const createAccess = ({
 }) => {
   const enabledModuleIds = new Set(
     functions.map((functionAccess) => {
-      return functionAccess.functionId.startsWith("users-") ? "users" : "assets"
+      return getModuleIdFromFunctionId(functionAccess.functionId)
     }),
   )
 
@@ -56,7 +67,7 @@ const createAccess = ({
     applicationId,
     role,
     status,
-    modules: ["assets", "users"].map((moduleId) => ({
+    modules: systemModuleIds.map((moduleId) => ({
       moduleId,
       enabled: enabledModuleIds.has(moduleId),
     })),
@@ -81,6 +92,9 @@ const createAsset = ({
   combustible,
   datosUlt,
   imei,
+  mapIcon = "vehicle-3d",
+  assetType,
+  assetTypeLabel,
 }) => ({
   id,
   companyId,
@@ -101,7 +115,10 @@ const createAsset = ({
   speed: velocidad,
   velocidad: `${velocidad} km/h`,
   combustible,
+  fuelPercent: combustible,
+  combustibleNivel: combustible,
   odometro: `${odometro.toLocaleString("es-CL")} km`,
+  odometer: odometro,
   direccion: `Ultima ubicacion registrada de ${vehiculo}`,
   imei,
   deviceId: imei,
@@ -109,21 +126,61 @@ const createAsset = ({
   trackerModel: "teltonika-fmb920",
   trackerModelLabel: "Teltonika FMB920",
   trackerManufacturer: "Teltonika",
+  assetType,
+  assetTypeLabel,
+  tipoActivo: assetType,
+  tipoActivoLabel: assetTypeLabel,
   descripcion: `Activo operativo ${patente}`,
   fechaIngreso: "2026-01-15",
   fechaBaja: "-",
   fechaSuspension: "-",
-  horometroDiario: "-",
-  horometroTotal: "-",
+  horometroDiario: estado === "offline" ? "-" : `${(2 + (odometro % 7)).toFixed(1)} h`,
+  horometroTotal: `${Math.round(odometro / 42).toLocaleString("es-CL")} h`,
+  engineHours: Math.round(odometro / 42),
+  gpsSignal: estado === "offline" ? 0 : 78 + (odometro % 18),
+  gpsSignalLabel: estado === "offline" ? "0%" : `${78 + (odometro % 18)}%`,
+  gpsSatellites: estado === "offline" ? 0 : 8 + (odometro % 9),
+  gpsFix: estado === "offline" ? "Sin fix" : "Fix 3D",
+  canStatus: estado === "offline" ? "Sin datos" : "OK",
+  canRpm: estado === "moving" ? 1100 + (odometro % 1200) : estado === "idle" ? 780 : 0,
+  canEngineTemp: estado === "offline" ? 0 : 78 + (odometro % 19),
+  canBatteryVoltage: estado === "offline" ? 0 : Number((12.5 + (odometro % 18) / 10).toFixed(1)),
+  canEngineLoad: estado === "moving" ? 35 + (odometro % 52) : estado === "idle" ? 18 : 0,
+  canThrottle: estado === "moving" ? 15 + (odometro % 55) : 0,
+  canFuelRate:
+    estado === "moving"
+      ? Number((6 + (odometro % 120) / 10).toFixed(1))
+      : estado === "idle"
+        ? 2.1
+        : 0,
+  canFuelUsed: Number((1000 + odometro / 85).toFixed(1)),
+  canOilPressure: estado === "offline" ? 0 : 25 + (odometro % 24),
+  canAdBlueLevel: estado === "offline" ? 0 : 42 + (odometro % 47),
+  canDtcCount: estado === "offline" ? 0 : odometro % 3,
+  canSummary:
+    estado === "offline"
+      ? "Sin datos"
+      : `RPM ${
+          estado === "moving" ? 1100 + (odometro % 1200) : estado === "idle" ? 780 : 0
+        } / ${78 + (odometro % 19)} C / ${
+          estado === "moving" ? 35 + (odometro % 52) : estado === "idle" ? 18 : 0
+        }%`,
   ibutton: "-",
-  ignicion: estado === "moving" || estado === "idle" ? "Encendida" : "Apagada",
+  ignition: estado === "moving" || estado === "idle",
+  ignicion: estado === "moving" || estado === "idle",
+  contacto: estado === "moving" || estado === "idle",
+  digitalInput1: estado === "moving" || estado === "idle",
+  digitalInput2: odometro % 5 === 0 ? 1 : 0,
+  input1: estado === "moving" || estado === "idle" ? 1 : 0,
+  input2: odometro % 5 === 0 ? 1 : 0,
+  ...(mapIcon ? { mapIcon } : {}),
 })
 
 const mockReportTypes = [
   {
     id: "mileage",
     name: "Kilometraje",
-    description: "Distancia recorrida por activo, periodo y sucursal.",
+    description: "Distancia recorrida por activo, periodo y grupo.",
     category: "Operacion",
   },
   {
@@ -145,15 +202,21 @@ const mockReportTypes = [
     category: "Operacion",
   },
   {
+    id: "idle-time",
+    name: "Ralenti",
+    description: "Tiempo con motor encendido sin movimiento.",
+    category: "Operacion",
+  },
+  {
     id: "geofences",
     name: "Geocercas",
     description: "Entradas, salidas y pasos por zonas configuradas.",
     category: "Control",
   },
   {
-    id: "alerts",
-    name: "Alertas",
-    description: "Alertas operativas, criticidad y estado.",
+    id: "gps-signal",
+    name: "Senal GPS",
+    description: "Perdidas de senal, ultimo reporte y equipos sin datos.",
     category: "Control",
   },
   {
@@ -172,6 +235,12 @@ const mockReportTypes = [
     id: "engine-hours",
     name: "Horas motor",
     description: "Horas de motor, ralenti y actividad operacional.",
+    category: "Telemetria",
+  },
+  {
+    id: "ignition",
+    name: "Encendido",
+    description: "Cambios de contacto, encendido y apagado.",
     category: "Telemetria",
   },
 ]
@@ -200,10 +269,7 @@ const mockCompanies = [
       { id: "sucursal-company-001-002", name: "Base norte", active: true },
       { id: "sucursal-company-001-003", name: "Centro de distribucion", active: true },
     ],
-    reports: buildReportAccess(
-      ["mileage", "speed", "route-history", "stops", "geofences", "alerts", "fuel"],
-      mockReportTypes,
-    ),
+    reports: buildReportAccess(allReportIds, mockReportTypes),
   },
   {
     id: "company-002",
@@ -225,10 +291,7 @@ const mockCompanies = [
       { id: "sucursal-company-002-001", name: "Temuco", active: true },
       { id: "sucursal-company-002-002", name: "Angol", active: true },
     ],
-    reports: buildReportAccess(
-      ["mileage", "route-history", "stops", "geofences", "alerts"],
-      mockReportTypes,
-    ),
+    reports: buildReportAccess(allReportIds, mockReportTypes),
   },
   {
     id: "company-003",
@@ -251,10 +314,7 @@ const mockCompanies = [
       { id: "sucursal-company-003-002", name: "Antofagasta", active: true },
       { id: "sucursal-company-003-003", name: "Faena Sierra", active: true },
     ],
-    reports: buildReportAccess(
-      ["mileage", "route-history", "stops", "speed", "alerts", "engine-hours"],
-      mockReportTypes,
-    ),
+    reports: buildReportAccess(allReportIds, mockReportTypes),
   },
   {
     id: "company-004",
@@ -283,6 +343,78 @@ const mockApplicationDefinitions = mockCompanies.map((company) => ({
   shortName: company.shortName,
   type: company.status === "internal" ? "Administracion interna" : "Empresa cliente",
 }))
+
+const SAN_PEDRO_LOAD_TEST_ASSET_TARGET = 280
+const SAN_PEDRO_LOAD_TEST_EXISTING_ASSETS = 16
+
+const sanPedroLoadTestBranches = [
+  "sucursal-company-001-001",
+  "sucursal-company-001-002",
+  "sucursal-company-001-003",
+]
+
+const sanPedroLoadTestModels = [
+  { label: "Automovil operativo", mapIcon: "vehicle-car", type: "car" },
+  { label: "Camioneta reparto", mapIcon: "vehicle-pickup", type: "pickup" },
+  { label: "Camion urbano", mapIcon: "vehicle-truck", type: "truck" },
+  { label: "Bus traslado", mapIcon: "vehicle-bus", type: "bus" },
+  { label: "Furgon logistico", mapIcon: "vehicle-van", type: "van" },
+  { label: "Moto despacho", mapIcon: "vehicle-motorcycle", type: "motorcycle" },
+  { label: "Maquinaria apoyo", mapIcon: "vehicle-machinery", type: "machinery" },
+  { label: "Remolque carga", mapIcon: "vehicle-trailer", type: "trailer" },
+]
+
+const sanPedroLoadTestCenters = [
+  { lat: -33.4489, lng: -70.6693 },
+  { lat: -33.0472, lng: -71.6127 },
+  { lat: -34.1708, lng: -70.7444 },
+  { lat: -35.4264, lng: -71.6554 },
+  { lat: -36.8201, lng: -73.0444 },
+  { lat: -39.8142, lng: -73.2459 },
+]
+
+const buildSanPedroLoadTestAsset = (index) => {
+  const sequence = index + 1
+  const model = sanPedroLoadTestModels[index % sanPedroLoadTestModels.length]
+  const center = sanPedroLoadTestCenters[index % sanPedroLoadTestCenters.length]
+  const ring = Math.floor(index / sanPedroLoadTestCenters.length)
+  const angle = (index * 137.508 * Math.PI) / 180
+  const radius = 0.008 + (ring % 9) * 0.004
+  const speed = index % 5 === 0 ? 0 : 22 + (index % 58)
+  const estado = index % 13 === 0 ? "offline" : speed > 0 ? "moving" : "idle"
+  const patenteNumber = String(sequence).padStart(3, "0")
+
+  return createAsset({
+    id: `asset-sp-load-${patenteNumber}`,
+    companyId: "company-001",
+    applicationId: "app-001",
+    sucursalId: sanPedroLoadTestBranches[index % sanPedroLoadTestBranches.length],
+    patente: `SP-${patenteNumber}`,
+    vehiculo: `${model.label} ${patenteNumber}`,
+    conductor: `Conductor San Pedro ${patenteNumber}`,
+    estado,
+    lat: Number((center.lat + Math.sin(angle) * radius).toFixed(6)),
+    lng: Number((center.lng + Math.cos(angle) * radius).toFixed(6)),
+    velocidad: estado === "moving" ? speed : 0,
+    odometro: 65000 + sequence * 487,
+    combustible: estado === "offline" ? "-" : `${45 + (index % 48)}%`,
+    datosUlt: `12:${String(10 + (index % 49)).padStart(2, "0")}:${String(index % 60).padStart(
+      2,
+      "0",
+    )}`,
+    imei: `86812346${String(sequence).padStart(6, "0")}`,
+    mapIcon: model.mapIcon,
+    assetType: model.type,
+    assetTypeLabel: model.label,
+  })
+}
+
+const mockSanPedroLoadTestAssets = Array.from(
+  {
+    length: SAN_PEDRO_LOAD_TEST_ASSET_TARGET - SAN_PEDRO_LOAD_TEST_EXISTING_ASSETS,
+  },
+  (_, index) => buildSanPedroLoadTestAsset(index),
+)
 
 export const mockAssets = [
   createAsset({
@@ -382,6 +514,171 @@ export const mockAssets = [
     datosUlt: "12:09:44",
     imei: "868123450006",
   }),
+  createAsset({
+    id: "asset-013",
+    companyId: "company-001",
+    applicationId: "app-001",
+    sucursalId: "sucursal-company-001-002",
+    patente: "ARIC-13",
+    vehiculo: "Camion norte Arica",
+    conductor: "Pedro Salinas",
+    estado: "moving",
+    lat: -18.4783,
+    lng: -70.3126,
+    velocidad: 42,
+    odometro: 154280,
+    combustible: "69%",
+    datosUlt: "12:24:13",
+    imei: "868123450013",
+  }),
+  createAsset({
+    id: "asset-014",
+    companyId: "company-001",
+    applicationId: "app-001",
+    sucursalId: "sucursal-company-001-002",
+    patente: "IQQU-14",
+    vehiculo: "Camion Iquique",
+    conductor: "Ramon Paredes",
+    estado: "idle",
+    lat: -20.2133,
+    lng: -70.1524,
+    odometro: 118430,
+    combustible: "73%",
+    datosUlt: "12:23:44",
+    imei: "868123450014",
+  }),
+  createAsset({
+    id: "asset-015",
+    companyId: "company-001",
+    applicationId: "app-001",
+    sucursalId: "sucursal-company-001-002",
+    patente: "LSER-15",
+    vehiculo: "Furgon La Serena",
+    conductor: "Camila Rojas",
+    estado: "moving",
+    lat: -29.9027,
+    lng: -71.2519,
+    velocidad: 35,
+    odometro: 90410,
+    combustible: "81%",
+    datosUlt: "12:23:12",
+    imei: "868123450015",
+  }),
+  createAsset({
+    id: "asset-016",
+    companyId: "company-001",
+    applicationId: "app-001",
+    sucursalId: "sucursal-company-001-003",
+    patente: "VALP-16",
+    vehiculo: "Camion Valparaiso",
+    conductor: "Ignacio Morales",
+    estado: "stopped",
+    lat: -33.0472,
+    lng: -71.6127,
+    odometro: 130220,
+    combustible: "57%",
+    datosUlt: "12:22:40",
+    imei: "868123450016",
+  }),
+  createAsset({
+    id: "asset-017",
+    companyId: "company-001",
+    applicationId: "app-001",
+    sucursalId: "sucursal-company-001-003",
+    patente: "RANC-17",
+    vehiculo: "Camion Rancagua",
+    conductor: "Elena Fuentes",
+    estado: "idle",
+    lat: -34.1708,
+    lng: -70.7444,
+    odometro: 74120,
+    combustible: "76%",
+    datosUlt: "12:22:01",
+    imei: "868123450017",
+  }),
+  createAsset({
+    id: "asset-018",
+    companyId: "company-001",
+    applicationId: "app-001",
+    sucursalId: "sucursal-company-001-003",
+    patente: "TALC-18",
+    vehiculo: "Camion Talca",
+    conductor: "Victor Campos",
+    estado: "moving",
+    lat: -35.4264,
+    lng: -71.6554,
+    velocidad: 51,
+    odometro: 164730,
+    combustible: "62%",
+    datosUlt: "12:21:35",
+    imei: "868123450018",
+  }),
+  createAsset({
+    id: "asset-019",
+    companyId: "company-001",
+    applicationId: "app-001",
+    sucursalId: "sucursal-company-001-001",
+    patente: "CCPC-19",
+    vehiculo: "Camion Concepcion",
+    conductor: "Sofia Carrasco",
+    estado: "idle",
+    lat: -36.8201,
+    lng: -73.0444,
+    odometro: 101650,
+    combustible: "70%",
+    datosUlt: "12:21:02",
+    imei: "868123450019",
+  }),
+  createAsset({
+    id: "asset-020",
+    companyId: "company-001",
+    applicationId: "app-001",
+    sucursalId: "sucursal-company-001-001",
+    patente: "VDIV-20",
+    vehiculo: "Camion Valdivia",
+    conductor: "Cristobal Vera",
+    estado: "moving",
+    lat: -39.8142,
+    lng: -73.2459,
+    velocidad: 44,
+    odometro: 112870,
+    combustible: "67%",
+    datosUlt: "12:20:31",
+    imei: "868123450020",
+  }),
+  createAsset({
+    id: "asset-021",
+    companyId: "company-001",
+    applicationId: "app-001",
+    sucursalId: "sucursal-company-001-001",
+    patente: "PMNT-21",
+    vehiculo: "Camion Puerto Montt",
+    conductor: "Javiera Lagos",
+    estado: "stopped",
+    lat: -41.4693,
+    lng: -72.9424,
+    odometro: 149530,
+    combustible: "59%",
+    datosUlt: "12:19:58",
+    imei: "868123450021",
+  }),
+  createAsset({
+    id: "asset-022",
+    companyId: "company-001",
+    applicationId: "app-001",
+    sucursalId: "sucursal-company-001-002",
+    patente: "PARN-22",
+    vehiculo: "Camion Punta Arenas",
+    conductor: "Matias Andrade",
+    estado: "offline",
+    lat: -53.1638,
+    lng: -70.9171,
+    odometro: 187340,
+    combustible: "-",
+    datosUlt: "12:18:49",
+    imei: "868123450022",
+  }),
+  ...mockSanPedroLoadTestAssets,
   createAsset({
     id: "asset-007",
     companyId: "company-002",
@@ -493,6 +790,11 @@ const mockSystemModules = [
     name: "Usuarios",
     description: "Administracion de cuentas, empresas asignadas y permisos.",
   },
+  {
+    id: "audit",
+    name: "Auditoria",
+    description: "Trazabilidad de sesiones, permisos, reportes y cambios operativos.",
+  },
 ]
 
 const mockModuleFunctions = [
@@ -507,8 +809,8 @@ const mockModuleFunctions = [
   {
     id: "branches",
     moduleId: "assets",
-    name: "Sucursales",
-    description: "Administracion y asignacion de sucursales.",
+    name: "Grupos",
+    description: "Administracion y asignacion de grupos de activos.",
   },
   { id: "reports", moduleId: "assets", name: "Reportes", description: "Informes operativos." },
   {
@@ -535,6 +837,18 @@ const mockModuleFunctions = [
     name: "Modificar permisos",
     description: "Administrar permisos.",
   },
+  {
+    id: "audit-view",
+    moduleId: "audit",
+    name: "Ver auditoria",
+    description: "Consultar registros de auditoria.",
+  },
+  {
+    id: "audit-export",
+    moduleId: "audit",
+    name: "Exportar auditoria",
+    description: "Descargar registros de auditoria.",
+  },
 ]
 
 const mockPermissions = [
@@ -545,7 +859,7 @@ const mockPermissions = [
 
 const mockOperationalScopes = [
   { id: "all-assets", name: "Todos los activos", description: "Acceso a toda la flota." },
-  { id: "sucursal", name: "Sucursal asignada", description: "Acceso por sucursal." },
+  { id: "sucursal", name: "Grupo asignado", description: "Acceso por grupo." },
   {
     id: "selected-assets",
     name: "Activos especificos",
@@ -603,7 +917,8 @@ const mockUsers = [
     id: "user-005",
     name: "Soporte Tecnico",
     username: "soporte",
-    password: "soporte@sinergy.cl",
+    password: "soporte1234",
+    email: "soporte@sinergy.cl",
     status: "inactive",
     lastAccess: "Lun 18:03",
   },
@@ -617,6 +932,11 @@ const adminAssetFunctions = [
   createFunctionAccess("reports", { view: true }),
 ]
 
+const adminAuditFunctions = [
+  createFunctionAccess("audit-view", { view: true }),
+  createFunctionAccess("audit-export", { view: true }),
+]
+
 const mockUserAccesses = [
   createAccess({
     id: "access-001",
@@ -625,6 +945,7 @@ const mockUserAccesses = [
     role: "admin",
     functions: [
       ...adminAssetFunctions,
+      ...adminAuditFunctions,
       createFunctionAccess("users-view", { view: true, edit: true, admin: true }),
       createFunctionAccess("users-create", { view: true, edit: true, admin: true }),
       createFunctionAccess("users-edit", { view: true, edit: true, admin: true }),
@@ -639,7 +960,7 @@ const mockUserAccesses = [
     userId: "user-001",
     applicationId: "app-002",
     role: "supervisor",
-    functions: adminAssetFunctions,
+    functions: [...adminAssetFunctions, ...adminAuditFunctions],
     scope: {
       type: "all-assets",
     },

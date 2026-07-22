@@ -1,4 +1,4 @@
-import { ref } from "vue"
+import { ref, watch } from "vue"
 
 export function useActivosSelection({
   baseSelectedId,
@@ -10,6 +10,22 @@ export function useActivosSelection({
   const selectedGeofenceId = ref(null)
   const selectedItineraryRoute = ref(null)
   const selectedItineraryPoint = ref(null)
+  const userClearedSelectedActivo = ref(false)
+
+  const normalizeSelectionId = (id) => {
+    if (id === null || id === undefined || String(id).trim() === "") return null
+
+    return id
+  }
+
+  const sameSelectionId = (firstId, secondId) => {
+    const normalizedFirstId = normalizeSelectionId(firstId)
+    const normalizedSecondId = normalizeSelectionId(secondId)
+
+    if (normalizedFirstId === null || normalizedSecondId === null) return false
+
+    return String(normalizedFirstId) === String(normalizedSecondId)
+  }
 
   const resolveMapActivos = () => {
     const activos = getMapActivos?.()
@@ -17,7 +33,7 @@ export function useActivosSelection({
     return Array.isArray(activos) ? activos : []
   }
 
-  const ensureSelectedActivo = () => {
+  const ensureSelectedActivo = ({ force = false } = {}) => {
     const activos = resolveMapActivos()
 
     if (!activos.length) {
@@ -31,13 +47,19 @@ export function useActivosSelection({
 
     if (selectedExists) return
 
+    if (userClearedSelectedActivo.value && !force) return
+
     selectedId.value = activos[0]?.id || null
   }
 
   const selectActivo = async (id) => {
-    selectedId.value = id
+    const isSameSelectedActivo = sameSelectionId(selectedId.value, id)
+    const nextSelectedId = isSameSelectedActivo ? null : normalizeSelectionId(id)
 
-    await refreshMapLayout(true)
+    selectedId.value = nextSelectedId
+    userClearedSelectedActivo.value = nextSelectedId === null
+
+    await refreshMapLayout(!isSameSelectedActivo)
   }
 
   const clearSelectedItinerary = () => {
@@ -50,12 +72,19 @@ export function useActivosSelection({
   }
 
   const handleSidebarGeofenceSelected = async (geofence) => {
-    if (!geofence?.id) return
+    const geofenceId = geofence?.id ?? geofence
 
-    selectedGeofenceId.value = geofence.id
+    if (!geofenceId) return
+
+    const isSameSelectedGeofence = sameSelectionId(selectedGeofenceId.value, geofenceId)
+
     activeSidebarSection.value = "geocercas"
 
-    await refreshMapLayout(true)
+    await refreshMapLayout()
+
+    if (!isSameSelectedGeofence) {
+      selectedGeofenceId.value = geofenceId
+    }
   }
 
   const handleItineraryRouteSelected = async (route) => {
@@ -67,6 +96,7 @@ export function useActivosSelection({
 
     if (routeAssetId) {
       selectedId.value = routeAssetId
+      userClearedSelectedActivo.value = false
     }
 
     await refreshMapLayout(true)
@@ -84,6 +114,12 @@ export function useActivosSelection({
 
     await refreshMapLayout(true)
   }
+
+  watch(selectedId, (id) => {
+    if (normalizeSelectionId(id) !== null) {
+      userClearedSelectedActivo.value = false
+    }
+  })
 
   return {
     selectedId,
