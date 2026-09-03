@@ -8,43 +8,57 @@ El objetivo del proyecto es modelar una operacion real de flota: primero se
 calcula que empresas y vehiculos puede ver el usuario, y despues se aplican
 filtros visuales, vistas guardadas, reportes y acciones de cada modulo.
 
-## Jerarquia funcional
+## Donde esta cada cosa
 
 ```txt
-Sinergy Group Fleet Platform
-|-- Login y sesion
-|-- Layout privado
-|   |-- Header global
-|   |-- Busqueda global por permisos
-|   |-- Selector de empresa / vista
-|   `-- Sidebar de modulos disponibles
-|-- Empresas
-|   |-- Activos / Fleet
-|   |   |-- Mapa GPS
-|   |   |-- Tabla y cards de vehiculos
-|   |   |-- Filtros de ciudad
-|   |   |-- Grupos de vehiculos
-|   |   |-- Etiquetas de acceso
-|   |   |-- Geocercas
-|   |   |-- Itinerarios
-|   |   `-- Rutas planificadas
-|   |-- Reportes
-|   |   |-- Biblioteca de plantillas
-|   |   |-- Reglas de evento
-|   |   |-- Ejecucion y vista previa
-|   |   `-- Exportacion PDF / Excel
-|   |-- Mantenciones
-|   |   |-- Planes de mantencion
-|   |   |-- Ordenes de trabajo
-|   |   |-- Historial
-|   |   `-- Costos
-|   |-- Usuarios y permisos
-|   `-- Auditoria
-`-- Administracion de plataforma
-    |-- Empresas
-    |-- Usuarios globales
-    `-- Accesos por aplicacion
+Emulador/
+|-- README.md                         README general para GitHub
+`-- frontend/
+    |-- README.md                     Guia corta del frontend
+    |-- package.json                  Dependencias y scripts npm
+    |-- package-lock.json             Versiones bloqueadas de dependencias
+    |-- vite.config.js                Configuracion Vite, Vue, Tailwind y chunks
+    |-- public/                       Imagenes/recursos referenciados por URL
+    |-- docs/                         Documentacion tecnica general
+    `-- src/
+        |-- main.js                   Entrada de Vue
+        |-- App.vue                   Contenedor raiz y layout publico/privado
+        |-- style.css                 Estilos globales base
+        |-- router/                   Rutas, redirects y guards de acceso
+        |-- views/                    Pantallas principales por modulo
+        |-- components/               Componentes visuales reutilizables
+        |-- composables/              Estado reactivo y coordinacion de flujos
+        |-- services/                 Storage, mocks y adaptadores de datos
+        |-- utils/                    Funciones puras, calculos y exportadores
+        |-- data/                     Datos mock y configuraciones semilla
+        `-- assets/                   Branding, estilos e imagenes internas
 ```
+
+## Mapa rapido de carpetas
+
+| Necesitas revisar | Ubicacion principal |
+| --- | --- |
+| Rutas y permisos de navegacion | `frontend/src/router/index.js` |
+| Pantallas principales | `frontend/src/views/` |
+| Header, sidebar, buscador global y selector de vistas | `frontend/src/components/Layout/` |
+| Login y sesion | `frontend/src/views/LoginView.vue`, `frontend/src/composables/auth/`, `frontend/src/services/auth/` |
+| Permisos, empresas accesibles y activos visibles | `frontend/src/composables/auth/useAccessControl.js` |
+| Datos mock de empresas, usuarios, activos y permisos | `frontend/src/data/mockDatabase.js` |
+| Activos/Fleet | `frontend/src/views/ActivosView.vue`, `frontend/src/components/activos/`, `frontend/src/composables/activos/` |
+| Mapa GPS | `frontend/src/components/activos/map/`, `frontend/src/composables/activos/map/` |
+| Geocercas | `frontend/src/components/activos/geocercas/`, `frontend/src/composables/activos/geocercas/`, `frontend/src/utils/geofence*.js` |
+| Filtros de ciudad y grupos de vehiculos | `frontend/src/components/Layout/HeaderFleetAssetFilterMenu.vue`, `frontend/src/composables/activos/fleet/`, `frontend/src/utils/activos/assetVehicleGroupUtils.js` |
+| Etiquetas de acceso de activos | `frontend/src/components/activos/fleet/FleetAssetTagsPanel.vue`, `frontend/src/components/users/UserAssetTagScopeSelector.vue`, `frontend/src/utils/users/userAssetTagUtils.js` |
+| Reportes | `frontend/src/views/ReportsView.vue`, `frontend/src/components/reports/`, `frontend/src/composables/reports/`, `frontend/src/utils/reports/` |
+| Reglas de evento de reportes | `frontend/src/components/reports/ReportEventRulesModal.vue`, `frontend/src/utils/reports/event-rules/` |
+| Ejecucion de reportes | `frontend/src/components/reports/ReportExecutionModal.vue`, `frontend/src/composables/reports/useAssetReportExecution.js`, `frontend/src/utils/reports/execution/` |
+| Exportacion PDF/Excel | `frontend/src/utils/reports/export/`, `frontend/src/utils/reports/route-map/` |
+| Mantenciones | `frontend/src/views/MaintenanceView.vue`, `frontend/src/components/maintenance/`, `frontend/src/composables/maintenance/`, `frontend/src/utils/maintenance/` |
+| Usuarios y permisos | `frontend/src/views/UserManagementView.vue`, `frontend/src/components/users/`, `frontend/src/composables/users/`, `frontend/src/utils/users/` |
+| Empresas | `frontend/src/views/CompanyManagementView.vue`, `frontend/src/components/companies/`, `frontend/src/composables/companies/`, `frontend/src/services/companies/` |
+| Auditoria | `frontend/src/views/AuditView.vue`, `frontend/src/components/audit/`, `frontend/src/composables/audit/`, `frontend/src/services/audit/` |
+| Storage/localStorage | `frontend/src/services/storage/browserStorage.js` |
+| Documentacion tecnica | `frontend/docs/` y los `README.md` dentro de `frontend/src/` |
 
 ## Modulos y rutas principales
 
@@ -151,27 +165,7 @@ Versiones segun `frontend/package.json`.
 | `eslint-plugin-vue` | `^10.9.1` | Reglas Vue para ESLint. |
 | `prettier` | `^3.8.3` | Formato de codigo. |
 
-## Estructura tecnica
-
-```txt
-frontend/
-|-- docs/                  Documentacion tecnica y flujos principales
-|-- public/                Recursos publicos usados por URL directa
-|-- src/
-|   |-- assets/            Branding, estilos e imagenes internas
-|   |-- components/        Componentes Vue por dominio
-|   |-- composables/       Estado reactivo y coordinacion de flujos
-|   |-- data/              Datos mock y configuracion estatica
-|   |-- router/            Rutas y guards de acceso
-|   |-- services/          Adaptadores, storage y servicios mock
-|   |-- utils/             Helpers puros, calculos y exportadores
-|   `-- views/             Pantallas principales conectadas al router
-|-- package.json
-|-- package-lock.json
-`-- vite.config.js
-```
-
-Regla de organizacion:
+## Como esta organizado el codigo
 
 - `views` orquesta pantallas completas.
 - `components` renderiza UI y emite eventos.
