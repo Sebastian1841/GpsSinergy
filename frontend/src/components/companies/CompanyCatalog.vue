@@ -234,7 +234,8 @@ const getCompanyMetrics = (company) => {
       value: company.assetsCount || 0,
       valueClass,
       accentClass,
-      iconPath: "M3 17h2l1.6-5.6A2 2 0 0 1 8.5 10h7a2 2 0 0 1 1.9 1.4L19 17h2M7 17a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm10 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM8 10V7a4 4 0 0 1 8 0v3",
+      iconPath:
+        "M3 17h2l1.6-5.6A2 2 0 0 1 8.5 10h7a2 2 0 0 1 1.9 1.4L19 17h2M7 17a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm10 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM8 10V7a4 4 0 0 1 8 0v3",
     },
     {
       label: "Usuarios",

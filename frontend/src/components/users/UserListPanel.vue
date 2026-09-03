@@ -292,10 +292,12 @@ const getAccessCompany = (access = {}) => {
   const application = applicationsById.value.get(String(access.applicationId))
   const companyId = String(application?.companyId || access.companyId || "")
 
-  return companiesById.value.get(companyId) || {
-    id: companyId || "sin-empresa",
-    name: companyId ? `Empresa ${companyId}` : "Sin empresa",
-  }
+  return (
+    companiesById.value.get(companyId) || {
+      id: companyId || "sin-empresa",
+      name: companyId ? `Empresa ${companyId}` : "Sin empresa",
+    }
+  )
 }
 
 const buildRowsForUser = (user) => {

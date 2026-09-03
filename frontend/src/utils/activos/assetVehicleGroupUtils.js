@@ -5,9 +5,7 @@ export const VEHICLE_ASSET_GROUP_ID_PREFIX = "vehicle-group:"
 export const UNASSIGNED_VEHICLE_GROUP_ID = `${VEHICLE_ASSET_GROUP_ID_PREFIX}unassigned`
 
 const firstText = (...values) => {
-  return values
-    .map((value) => String(value ?? "").trim())
-    .find((value) => value && value !== "-")
+  return values.map((value) => String(value ?? "").trim()).find((value) => value && value !== "-")
 }
 
 export const createVehicleAssetGroupId = (groupId) => {
@@ -56,9 +54,7 @@ const normalizeVehicleGroup = (group = {}) => {
 export const createVehicleAssetGroups = ({ assets = [], groups = [] } = {}) => {
   const groupsBySourceId = new Map()
   const availableAssetIds = new Set(
-    (Array.isArray(assets) ? assets : [])
-      .map((asset) => normalizeId(asset?.id))
-      .filter(Boolean),
+    (Array.isArray(assets) ? assets : []).map((asset) => normalizeId(asset?.id)).filter(Boolean),
   )
   const assignedAssetIds = new Set()
   const configuredGroups = Array.isArray(groups) ? groups : []

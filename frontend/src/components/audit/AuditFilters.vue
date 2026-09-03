@@ -54,9 +54,7 @@
           @input="emit('update:start-date', $event.target.value)"
         />
 
-        <span class="shrink-0 text-[12px] font-bold text-slate-300">
-          -
-        </span>
+        <span class="shrink-0 text-[12px] font-bold text-slate-300"> - </span>
 
         <input
           :value="endDate"
@@ -72,19 +70,10 @@
         <button
           type="button"
           class="relative inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-[#d8dee8] bg-white px-4 text-[12px] font-black text-[#102372] shadow-sm transition hover:border-[#102372] hover:bg-[#f8fafc]"
-          :class="
-            showAdvancedFilters
-              ? 'border-[#102372] bg-[#f7f9ff]'
-              : ''
-          "
+          :class="showAdvancedFilters ? 'border-[#102372] bg-[#f7f9ff]' : ''"
           @click="showAdvancedFilters = !showAdvancedFilters"
         >
-          <svg
-            class="h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -108,9 +97,7 @@
         >
           <div class="flex items-center justify-between gap-3">
             <div>
-              <h3 class="text-[14px] font-black text-[#102372]">
-                Filtros
-              </h3>
+              <h3 class="text-[14px] font-black text-[#102372]">Filtros</h3>
 
               <p class="mt-0.5 text-[11px] font-semibold text-slate-400">
                 Refina los eventos mostrados.
@@ -130,24 +117,16 @@
           <div class="mt-4 grid gap-3">
             <!-- ACCIÓN -->
             <label>
-              <span class="filter-label">
-                Acción
-              </span>
+              <span class="filter-label"> Acción </span>
 
               <select
                 :value="selectedAction"
                 class="filter-select"
                 @change="emit('update:selected-action', $event.target.value)"
               >
-                <option value="">
-                  Todas las acciones
-                </option>
+                <option value="">Todas las acciones</option>
 
-                <option
-                  v-for="action in actionOptions"
-                  :key="action"
-                  :value="action"
-                >
+                <option v-for="action in actionOptions" :key="action" :value="action">
                   {{ getActionLabel(action) }}
                 </option>
               </select>
@@ -155,24 +134,16 @@
 
             <!-- MÓDULO -->
             <label>
-              <span class="filter-label">
-                Módulo
-              </span>
+              <span class="filter-label"> Módulo </span>
 
               <select
                 :value="selectedModule"
                 class="filter-select"
                 @change="emit('update:selected-module', $event.target.value)"
               >
-                <option value="">
-                  Todos los módulos
-                </option>
+                <option value="">Todos los módulos</option>
 
-                <option
-                  v-for="module in moduleOptions"
-                  :key="module"
-                  :value="module"
-                >
+                <option v-for="module in moduleOptions" :key="module" :value="module">
                   {{ getModuleLabel(module) }}
                 </option>
               </select>
@@ -180,24 +151,16 @@
 
             <!-- ESTADO -->
             <label>
-              <span class="filter-label">
-                Estado
-              </span>
+              <span class="filter-label"> Estado </span>
 
               <select
                 :value="selectedStatus"
                 class="filter-select"
                 @change="emit('update:selected-status', $event.target.value)"
               >
-                <option value="">
-                  Todos los estados
-                </option>
+                <option value="">Todos los estados</option>
 
-                <option
-                  v-for="status in statusOptions"
-                  :key="status"
-                  :value="status"
-                >
+                <option v-for="status in statusOptions" :key="status" :value="status">
                   {{ getStatusLabel(status) }}
                 </option>
               </select>
@@ -213,12 +176,7 @@
         :disabled="!canExport || !hasRecords"
         @click="emit('export')"
       >
-        <svg
-          class="h-4 w-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -313,11 +271,7 @@ const emit = defineEmits([
 const showAdvancedFilters = ref(false)
 
 const hasAdvancedFilters = computed(() => {
-  return Boolean(
-    props.selectedAction ||
-      props.selectedModule ||
-      props.selectedStatus,
-  )
+  return Boolean(props.selectedAction || props.selectedModule || props.selectedStatus)
 })
 
 const handleClearFilters = () => {

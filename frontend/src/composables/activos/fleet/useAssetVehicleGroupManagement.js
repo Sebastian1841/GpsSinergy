@@ -35,20 +35,12 @@ const normalizeText = (value) => {
 const normalizeAssetIds = (assetIds = []) => {
   if (!Array.isArray(assetIds)) return []
 
-  return [
-    ...new Set(
-      assetIds
-        .map((assetId) => normalizeId(assetId))
-        .filter(Boolean),
-    ),
-  ]
+  return [...new Set(assetIds.map((assetId) => normalizeId(assetId)).filter(Boolean))]
 }
 
 const getAssetIdSet = (assets = []) => {
   return new Set(
-    (Array.isArray(assets) ? assets : [])
-      .map((asset) => normalizeId(asset?.id))
-      .filter(Boolean),
+    (Array.isArray(assets) ? assets : []).map((asset) => normalizeId(asset?.id)).filter(Boolean),
   )
 }
 

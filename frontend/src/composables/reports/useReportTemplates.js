@@ -167,9 +167,7 @@ export const mergeStoredDefaultTemplate = (template, seedTemplate) => {
     filters: shouldRestorePreset
       ? seedTemplate.filters || []
       : getStoredArrayOrSeedArray(template.filters, seedTemplate.filters),
-    columns: shouldRestorePreset
-      ? seedTemplate.columns || []
-      : mergedColumns,
+    columns: shouldRestorePreset ? seedTemplate.columns || [] : mergedColumns,
     widgets: resolveReportTemplateWidgets(template, seedTemplate),
     behaviorOptions: shouldRestorePreset
       ? seedTemplate.behaviorOptions || {}

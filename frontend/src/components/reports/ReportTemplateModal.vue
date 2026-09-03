@@ -606,7 +606,7 @@
                     <tr>
                       <th
                         v-for="column in visiblePreviewColumns"
-                        :key="column.id"
+                        :key="column.key || column.id"
                         class="whitespace-nowrap px-2 py-2 text-[9px] font-black uppercase"
                       >
                         {{ column.label }}
@@ -622,10 +622,10 @@
                     >
                       <td
                         v-for="column in visiblePreviewColumns"
-                        :key="`visual-${row}-${column.id}`"
+                        :key="`visual-${row}-${column.key || column.id}`"
                         class="whitespace-nowrap px-2 py-2 text-[10px] font-bold text-slate-600"
                       >
-                        {{ getPreviewValue(column.id, row) }}
+                        {{ getPreviewValue(column, row) }}
                       </td>
                     </tr>
                   </tbody>
@@ -836,7 +836,7 @@
                     <h4 class="text-[12px] font-black text-[#102372]">Resumen del periodo</h4>
                   </div>
 
-                  <div class="mt-2 grid border border-[#d8dee8] sm:grid-cols-3">
+                  <div class="mt-2 grid border border-[#d8dee8] sm:grid-cols-4">
                     <div
                       v-for="card in previewCards"
                       :key="card.label"
@@ -957,7 +957,7 @@
                         <tr>
                           <th
                             v-for="column in visiblePdfPreviewColumns"
-                            :key="column.id"
+                            :key="column.key || column.id"
                             class="whitespace-nowrap px-3 py-2 font-black"
                           >
                             {{ column.label }}
@@ -973,10 +973,10 @@
                         >
                           <td
                             v-for="column in visiblePdfPreviewColumns"
-                            :key="`${row}-${column.id}`"
+                            :key="`${row}-${column.key || column.id}`"
                             class="whitespace-nowrap px-3 py-2 font-semibold text-slate-700"
                           >
-                            {{ getPreviewValue(column.id, row) }}
+                            {{ getPreviewValue(column, row) }}
                           </td>
                         </tr>
                       </tbody>
@@ -1076,7 +1076,7 @@
                   v-if="reportDraft.widgets.includes(REPORT_WIDGET_IDS.summaryCards)"
                   class="border-b border-[#d8dee8] px-4 py-3"
                 >
-                  <div class="grid grid-cols-3 border border-[#d8dee8] text-center text-[10px]">
+                  <div class="grid grid-cols-4 border border-[#d8dee8] text-center text-[10px]">
                     <div
                       v-for="card in previewCards"
                       :key="card.label"
@@ -1121,8 +1121,8 @@
                       <thead>
                         <tr class="bg-[#102372] text-white">
                           <th
-                            v-for="column in visiblePreviewColumns"
-                            :key="column.id"
+                            v-for="column in exportVisiblePreviewColumns"
+                            :key="column.key || column.id"
                             class="whitespace-nowrap border-r border-white/20 px-3 py-2 font-black last:border-r-0"
                           >
                             {{ column.label }}
@@ -1137,11 +1137,11 @@
                           class="border-b border-[#d8dee8] odd:bg-white even:bg-[#f3f4f6]"
                         >
                           <td
-                            v-for="column in visiblePreviewColumns"
-                            :key="`${row}-${column.id}`"
+                            v-for="column in exportVisiblePreviewColumns"
+                            :key="`${row}-${column.key || column.id}`"
                             class="whitespace-nowrap border-r border-[#d8dee8] px-3 py-2 font-semibold text-slate-700 last:border-r-0"
                           >
-                            {{ getPreviewValue(column.id, row) }}
+                            {{ getPreviewValue(column, row) }}
                           </td>
                         </tr>
                       </tbody>
@@ -1354,7 +1354,11 @@ import {
   normalizeReportBehaviorOptions,
 } from "../../utils/reports/config/reportBehaviorOptions.js"
 import { getReportChartRecommendations } from "../../utils/reports/config/reportChartRecommendations.js"
-import { getPdfVisibleReportColumns } from "../../utils/reports/execution/assetReportColumnUtils.js"
+import {
+  ASSET_REPORT_PREVIEW_FORMAT_IDS,
+  buildAssetReportRenderModel,
+  getReportRenderCellValue,
+} from "../../utils/reports/execution/assetReportRenderModelUtils.js"
 import {
   REPORT_OUTPUT_OPTION_GROUPS,
   REPORT_OUTPUT_OPTION_IDS,
@@ -1362,7 +1366,6 @@ import {
 } from "../../utils/reports/config/reportOutputOptions.js"
 import {
   REPORT_TEMPLATE_MODAL_STEPS,
-  REPORT_TEMPLATE_PREVIEW_CARDS,
   REPORT_TEMPLATE_PREVIEW_ROWS,
   TRIP_REPORT_COLUMN_IDS,
   TRIP_REPORT_RULE_IDS,
@@ -1408,10 +1411,9 @@ const {
 } = useReportBuilder()
 
 const modalSteps = REPORT_TEMPLATE_MODAL_STEPS
-const previewCards = REPORT_TEMPLATE_PREVIEW_CARDS
 const previewRows = REPORT_TEMPLATE_PREVIEW_ROWS
 const activeStep = ref(modalSteps[0].id)
-const activeExportPreview = ref("pdf")
+const activeExportPreview = ref(ASSET_REPORT_PREVIEW_FORMAT_IDS.pdf)
 
 watch(
   () => [props.open, props.template],
@@ -1629,72 +1631,120 @@ const outputPreviewItems = computed(() => {
   return items
 })
 
-const exportPreviewDetails = computed(() => {
-  return [
-    {
-      label: "Tipo",
-      value: reportTypeLabel.value,
-    },
-    {
-      label: "Categoria",
-      value: categoryLabel.value,
-    },
-    {
-      label: "Eventos",
-      value: eventRuleLabel.value,
-    },
-    {
-      label: "Vista",
-      value: selectedWidgetLabels.value.length
-        ? selectedWidgetLabels.value.join(", ")
-        : "Sin bloques visibles",
-    },
-    {
-      label: "Salidas",
-      value: selectedOutputOptionLabels.value.length
-        ? selectedOutputOptionLabels.value.join(", ")
-        : "Sin salidas activas",
-    },
-  ]
-})
-
 const selectedColumns = computed(() => {
   return reportDraft.value.columns
     .map((columnId) => availableColumns.value.find((column) => column.id === columnId))
+    .map((column) => {
+      if (!column) return null
+
+      return {
+        ...column,
+        key: column.key || column.id,
+      }
+    })
     .filter(Boolean)
 })
 
+const previewReportRows = computed(() => {
+  return previewRows.map((rowIndex) => {
+    const values = Object.fromEntries(
+      availableColumns.value.map((column) => {
+        return [column.id, getReportTemplatePreviewValue(column.id, rowIndex)]
+      }),
+    )
+    const time = String(values.ultimoDato || "12:00").trim()
+
+    return {
+      id: `template-preview-${rowIndex}`,
+      timestamp: `2026-06-17T${time.length === 5 ? `${time}:00` : time}`,
+      values,
+      asset: {
+        id: values.deviceId || values.patente || `asset-${rowIndex}`,
+        name: values.vehiculo,
+        patente: values.patente,
+        deviceId: values.deviceId,
+        conductor: values.conductor,
+        estado: values.estado,
+      },
+    }
+  })
+})
+
+const reportPreviewTemplate = computed(() => {
+  return {
+    ...reportDraft.value,
+    name: reportDraft.value.name || reportTypeLabel.value || "Reporte personalizado",
+    description:
+      reportDraft.value.description ||
+      "Vista previa de configuracion del reporte antes de ejecutarlo.",
+  }
+})
+
+const buildDraftPreviewModel = ({ format, rows = previewReportRows.value } = {}) => {
+  return buildAssetReportRenderModel({
+    template: reportPreviewTemplate.value,
+    reportColumns: selectedColumns.value,
+    reportRows: previewReportRows.value,
+    dateFrom: "Al ejecutar",
+    dateTo: "",
+    selectedGroupLabel: "Se elige al ejecutar",
+    format,
+    previewRows: rows,
+    generatedAt: "Al exportar",
+  })
+}
+
+const visualPreviewRenderModel = computed(() => {
+  return buildDraftPreviewModel({
+    format: ASSET_REPORT_PREVIEW_FORMAT_IDS.excel,
+    rows: previewReportRows.value.slice(0, 2),
+  })
+})
+
+const pdfExportPreviewRenderModel = computed(() => {
+  return buildDraftPreviewModel({
+    format: ASSET_REPORT_PREVIEW_FORMAT_IDS.pdf,
+  })
+})
+
+const excelExportPreviewRenderModel = computed(() => {
+  return buildDraftPreviewModel({
+    format: ASSET_REPORT_PREVIEW_FORMAT_IDS.excel,
+  })
+})
+
+const activeExportPreviewRenderModel = computed(() => {
+  return activeExportPreview.value === ASSET_REPORT_PREVIEW_FORMAT_IDS.pdf
+    ? pdfExportPreviewRenderModel.value
+    : excelExportPreviewRenderModel.value
+})
+
+const previewCards = computed(() => {
+  return activeExportPreviewRenderModel.value.metrics
+})
+
+const exportPreviewDetails = computed(() => {
+  return pdfExportPreviewRenderModel.value.details
+})
+
 const excelPreviewDetails = computed(() => {
-  return [
-    {
-      label: "Tipo",
-      value: reportTypeLabel.value,
-    },
-    {
-      label: "Categoria",
-      value: categoryLabel.value,
-    },
-    {
-      label: "Eventos",
-      value: eventRuleLabel.value,
-    },
-    {
-      label: "Columnas",
-      value: `${selectedColumns.value.length} visibles`,
-    },
-  ]
+  return excelExportPreviewRenderModel.value.excelDetails
 })
 
 const visiblePreviewColumns = computed(() => {
-  return selectedColumns.value
+  return visualPreviewRenderModel.value.columns.visible
 })
 
 const visiblePdfPreviewColumns = computed(() => {
-  return getPdfVisibleReportColumns(selectedColumns.value)
+  return pdfExportPreviewRenderModel.value.columns.visible
+})
+
+const exportVisiblePreviewColumns = computed(() => {
+  return activeExportPreviewRenderModel.value.columns.visible
 })
 
 const pdfHiddenColumnsCount = computed(() => {
-  return Math.max(selectedColumns.value.length - visiblePdfPreviewColumns.value.length, 0)
+  return pdfExportPreviewRenderModel.value.hiddenPdfColumnCount
 })
 
 const getSummaryItems = (items, fallback) => {
@@ -2000,7 +2050,11 @@ const goNextStep = () => {
   activeStep.value = modalSteps[nextIndex].id
 }
 
-const getPreviewValue = getReportTemplatePreviewValue
+const getPreviewValue = (column, rowIndex) => {
+  const previewRow = previewReportRows.value[rowIndex - 1]
+
+  return getReportRenderCellValue(previewRow, column, rowIndex - 1)
+}
 
 const saveReport = () => {
   if (!canSaveDraft.value) return

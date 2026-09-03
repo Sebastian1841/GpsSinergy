@@ -1,12 +1,7 @@
 <template>
-  <section
-    class="flex min-h-0 flex-1 flex-col overflow-hidden bg-white"
-  >
+  <section class="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
     <!-- REGISTROS -->
-    <div
-      v-if="filteredCount"
-      class="min-h-0 flex-1 overflow-auto bg-white"
-    >
+    <div v-if="filteredCount" class="min-h-0 flex-1 overflow-auto bg-white">
       <section
         v-for="group in groupedRecords"
         :key="group.dateKey"
@@ -33,9 +28,7 @@
             />
           </svg>
 
-          <span
-            class="min-w-0 flex-1 truncate text-[13px] font-black capitalize text-[#102372]"
-          >
+          <span class="min-w-0 flex-1 truncate text-[13px] font-black capitalize text-[#102372]">
             {{ group.label }}
           </span>
 
@@ -48,10 +41,7 @@
         </button>
 
         <!-- EVENTOS -->
-        <div
-          v-if="isGroupExpanded(group.dateKey)"
-          class="border-t border-[#e8edf3]"
-        >
+        <div v-if="isGroupExpanded(group.dateKey)" class="border-t border-[#e8edf3]">
           <button
             v-for="record in group.records"
             :key="record.id"
@@ -69,25 +59,19 @@
               <span
                 class="h-2 w-2 rounded-full"
                 :class="
-                  String(selectedRecordId) === String(record.id)
-                    ? 'bg-[#102372]'
-                    : 'bg-[#d6dee9]'
+                  String(selectedRecordId) === String(record.id) ? 'bg-[#102372]' : 'bg-[#d6dee9]'
                 "
               ></span>
             </span>
 
             <!-- HORA -->
-            <span
-              class="font-mono text-[11px] font-semibold text-slate-500"
-            >
+            <span class="font-mono text-[11px] font-semibold text-slate-500">
               {{ formatTime(record.timestamp) }}
             </span>
 
             <!-- ACCIÓN / ENTIDAD -->
             <span class="min-w-0">
-              <span
-                class="block truncate text-[13px] font-black text-[#102372]"
-              >
+              <span class="block truncate text-[13px] font-black text-[#102372]">
                 {{ getActionLabel(record.action) }}
               </span>
 
@@ -112,9 +96,7 @@
               </span>
 
               <!-- MOBILE -->
-              <span
-                class="mt-2 flex flex-wrap items-center gap-2 lg:hidden"
-              >
+              <span class="mt-2 flex flex-wrap items-center gap-2 lg:hidden">
                 <span class="text-[10px] font-bold text-slate-500">
                   {{ record.actorName || "Sin usuario" }}
                 </span>
@@ -140,9 +122,7 @@
             </span>
 
             <!-- RESPONSABLE -->
-            <span
-              class="hidden min-w-0 items-center gap-2.5 lg:flex"
-            >
+            <span class="hidden min-w-0 items-center gap-2.5 lg:flex">
               <span
                 class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#eef2f8] text-[10px] font-black text-[#102372]"
               >
@@ -150,15 +130,11 @@
               </span>
 
               <span class="min-w-0">
-                <span
-                  class="block truncate text-[12px] font-black text-[#172033]"
-                >
+                <span class="block truncate text-[12px] font-black text-[#172033]">
                   {{ record.actorName || "Sin usuario" }}
                 </span>
 
-                <span
-                  class="mt-0.5 block truncate text-[10px] font-semibold text-slate-400"
-                >
+                <span class="mt-0.5 block truncate text-[10px] font-semibold text-slate-400">
                   {{ getRecordCompanyName(record) || "Sin empresa" }}
                 </span>
               </span>
@@ -205,9 +181,7 @@
       class="flex min-h-0 flex-1 items-center justify-center bg-white px-6 py-12 text-center"
     >
       <div>
-        <h3 class="text-[14px] font-black text-[#102372]">
-          Sin registros
-        </h3>
+        <h3 class="text-[14px] font-black text-[#102372]">Sin registros</h3>
 
         <p class="mt-1 text-[12px] font-semibold text-slate-500">
           No se encontraron eventos para los filtros seleccionados.
@@ -330,12 +304,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits([
-  "clear-filters",
-  "next-page",
-  "previous-page",
-  "select-record",
-])
+const emit = defineEmits(["clear-filters", "next-page", "previous-page", "select-record"])
 
 const expandedGroups = ref(new Set())
 
@@ -389,11 +358,7 @@ const getInitials = (name) => {
   return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase()
 }
 
-watch(
-  () => props.groupedRecords.map((group) => String(group.dateKey)),
-  syncExpandedGroups,
-  {
-    immediate: true,
-  },
-)
+watch(() => props.groupedRecords.map((group) => String(group.dateKey)), syncExpandedGroups, {
+  immediate: true,
+})
 </script>

@@ -198,7 +198,6 @@
             :company="company"
             :report-types="reportTypes"
           />
-
         </main>
       </div>
     </section>
@@ -235,12 +234,7 @@ const props = defineProps({
   },
 })
 
-defineEmits([
-  "close",
-  "edit-company",
-  "toggle-company-status",
-  "enter-company",
-])
+defineEmits(["close", "edit-company", "toggle-company-status", "enter-company"])
 
 const activeTab = ref("summary")
 

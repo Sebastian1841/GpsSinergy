@@ -20,11 +20,7 @@
     />
 
     <div v-if="filteredTags.length" class="max-h-[220px] overflow-auto px-2 pb-2">
-      <section
-        v-for="group in filteredTagGroups"
-        :key="group.key"
-        class="mb-2.5 last:mb-0"
-      >
+      <section v-for="group in filteredTagGroups" :key="group.key" class="mb-2.5 last:mb-0">
         <div
           v-if="showCompanyGroups"
           class="mb-1.5 flex items-center justify-between rounded-lg bg-[#eef3ff] px-2.5 py-1.5"
@@ -43,9 +39,7 @@
           :key="tag.id"
           class="mb-2 flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 transition last:mb-0 hover:border-[#102372]/35 hover:bg-[#f8fafc]"
           :class="
-            isTagSelected(tag.id)
-              ? 'border-[#102372] bg-[#102372]/5'
-              : 'border-[#edf1f5] bg-white'
+            isTagSelected(tag.id) ? 'border-[#102372] bg-[#102372]/5' : 'border-[#edf1f5] bg-white'
           "
         >
           <input
@@ -90,7 +84,10 @@
 <script setup>
 import { computed, ref } from "vue"
 
-import { groupAssetTagsByCompany, normalizeAssetTagId } from "../../utils/users/userAssetTagUtils.js"
+import {
+  groupAssetTagsByCompany,
+  normalizeAssetTagId,
+} from "../../utils/users/userAssetTagUtils.js"
 
 const props = defineProps({
   tags: {

@@ -74,7 +74,9 @@ const getXmlNodeAttribute = (xml, attributeName) => {
 
 const getExcelColumnPixelWidth = (width = DEFAULT_EXCEL_COLUMN_WIDTH) => {
   const normalizedWidth = Number(width)
-  const safeWidth = Number.isFinite(normalizedWidth) ? Math.max(0, normalizedWidth) : DEFAULT_EXCEL_COLUMN_WIDTH
+  const safeWidth = Number.isFinite(normalizedWidth)
+    ? Math.max(0, normalizedWidth)
+    : DEFAULT_EXCEL_COLUMN_WIDTH
 
   return Math.max(16, Math.floor(safeWidth * 7 + 5))
 }
@@ -427,7 +429,8 @@ const buildChartFrames = (
 
   return items
     .map((item, index) => {
-      const isLastOddStackedChart = items.length > 2 && index === items.length - 1 && index % 2 === 0
+      const isLastOddStackedChart =
+        items.length > 2 && index === items.length - 1 && index % 2 === 0
       const usesSingleChartRow = singleChart || isLastOddStackedChart
       const column = usesSingleChartRow
         ? CHART_LAYOUT.singleColumn

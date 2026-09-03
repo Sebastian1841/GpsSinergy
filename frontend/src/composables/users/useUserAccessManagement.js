@@ -38,6 +38,7 @@ export function useUserAccessManagement({ routeCompanyId = null, assetTags = nul
       access,
       modules: modules.value,
       moduleFunctions: moduleFunctions.value,
+      assets: assets.value,
     })
   })
 

@@ -17,10 +17,7 @@ import {
   getAssetVehicleGroupIds,
   normalizeReportVehicleGroup,
 } from "../../utils/reports/execution/assetReportVehicleGroupUtils.js"
-import {
-  ensureReportEventsForAssets,
-  getReportEventsForAsset,
-} from "./useGeneratedReportEvents.js"
+import { ensureReportEventsForAssets, getReportEventsForAsset } from "./useGeneratedReportEvents.js"
 import { useReportEventRules } from "./useReportEventRules.js"
 import { normalizeReportTemplateEventRuleIds } from "./useReportTemplates.js"
 
@@ -32,13 +29,7 @@ const waitForReportBatch = () => {
   })
 }
 
-export function useAssetReportExecution({
-  template,
-  assets,
-  companies,
-  geofences,
-  groups,
-}) {
+export function useAssetReportExecution({ template, assets, companies, geofences, groups }) {
   const { eventRulesById } = useReportEventRules()
 
   const today = new Date()
@@ -66,10 +57,7 @@ export function useAssetReportExecution({
 
   const companyNameById = computed(() => {
     return new Map(
-      (companies.value || []).map((company) => [
-        normalizeReportId(company.id),
-        company.name,
-      ]),
+      (companies.value || []).map((company) => [normalizeReportId(company.id), company.name]),
     )
   })
 
@@ -87,10 +75,7 @@ export function useAssetReportExecution({
   })
 
   const templateEventRuleIds = computed(() => {
-    return normalizeReportTemplateEventRuleIds(
-      template.value,
-      activeEventRuleIds.value,
-    )
+    return normalizeReportTemplateEventRuleIds(template.value, activeEventRuleIds.value)
   })
 
   /*
@@ -114,13 +99,13 @@ export function useAssetReportExecution({
   const availableGroups = computed(() => {
     const groupsById = new Map()
 
-      ; (groups.value || []).forEach((group) => {
-        const normalizedGroup = normalizeReportVehicleGroup(group)
+    ;(groups.value || []).forEach((group) => {
+      const normalizedGroup = normalizeReportVehicleGroup(group)
 
-        if (!normalizedGroup) return
+      if (!normalizedGroup) return
 
-        groupsById.set(normalizedGroup.id, normalizedGroup)
-      })
+      groupsById.set(normalizedGroup.id, normalizedGroup)
+    })
 
     availableAssets.value.forEach((asset) => {
       getAssetVehicleGroupIds(asset).forEach((vehicleGroupId) => {
@@ -140,10 +125,7 @@ export function useAssetReportExecution({
 
   const groupNameById = computed(() => {
     return new Map(
-      availableGroups.value.map((group) => [
-        normalizeReportId(group.id),
-        group.name || "Grupo",
-      ]),
+      availableGroups.value.map((group) => [normalizeReportId(group.id), group.name || "Grupo"]),
     )
   })
 
@@ -171,19 +153,13 @@ export function useAssetReportExecution({
       const vehicleGroupIds = getAssetVehicleGroupIds(asset)
 
       if (!vehicleGroupIds.length) {
-        countsById.set(
-          "unassigned",
-          (countsById.get("unassigned") || 0) + 1,
-        )
+        countsById.set("unassigned", (countsById.get("unassigned") || 0) + 1)
 
         return
       }
 
       vehicleGroupIds.forEach((vehicleGroupId) => {
-        countsById.set(
-          vehicleGroupId,
-          (countsById.get(vehicleGroupId) || 0) + 1,
-        )
+        countsById.set(vehicleGroupId, (countsById.get(vehicleGroupId) || 0) + 1)
       })
     })
 
@@ -201,8 +177,7 @@ export function useAssetReportExecution({
         .filter((group) => group.active !== false)
         .map((group) => ({
           ...group,
-          assetCount:
-            groupAssetCountById.value.get(normalizeReportId(group.id)) || 0,
+          assetCount: groupAssetCountById.value.get(normalizeReportId(group.id)) || 0,
         })),
       {
         id: "unassigned",
@@ -213,9 +188,7 @@ export function useAssetReportExecution({
   })
 
   const availableAssetIdsSignature = computed(() => {
-    return availableAssets.value
-      .map((asset) => normalizeReportId(asset.id))
-      .join("|")
+    return availableAssets.value.map((asset) => normalizeReportId(asset.id)).join("|")
   })
 
   const selectedAssetIdSet = computed(() => {
@@ -234,10 +207,7 @@ export function useAssetReportExecution({
     }
 
     return availableAssets.value.filter((asset) => {
-      return assetMatchesVehicleGroup(
-        asset,
-        selectedVehicleGroupId.value,
-      )
+      return assetMatchesVehicleGroup(asset, selectedVehicleGroupId.value)
     })
   })
 
@@ -247,10 +217,7 @@ export function useAssetReportExecution({
 
   const selectedGroupLabel = computed(() => {
     const selectedGroup = groupOptions.value.find((group) => {
-      return (
-        normalizeReportId(group.id) ===
-        normalizeReportId(selectedVehicleGroupId.value)
-      )
+      return normalizeReportId(group.id) === normalizeReportId(selectedVehicleGroupId.value)
     })
 
     return selectedGroup?.name || "Grupo"
@@ -264,9 +231,7 @@ export function useAssetReportExecution({
     }
 
     return groupFilteredAssets.value.filter((asset) => {
-      const companyName = companyNameById.value.get(
-        normalizeReportId(asset.companyId),
-      )
+      const companyName = companyNameById.value.get(normalizeReportId(asset.companyId))
 
       return getAssetSearchText(asset, companyName).includes(term)
     })
@@ -278,9 +243,7 @@ export function useAssetReportExecution({
     }
 
     return groupFilteredAssets.value.filter((asset) => {
-      return selectedAssetIdSet.value.has(
-        normalizeReportId(asset.id),
-      )
+      return selectedAssetIdSet.value.has(normalizeReportId(asset.id))
     })
   })
 
@@ -341,9 +304,7 @@ export function useAssetReportExecution({
 
   const canExecuteReport = computed(() => {
     return Boolean(
-      selectedAssets.value.length &&
-      templateEventRuleIds.value.length &&
-      !dateRangeError.value,
+      selectedAssets.value.length && templateEventRuleIds.value.length && !dateRangeError.value,
     )
   })
 
@@ -366,9 +327,7 @@ export function useAssetReportExecution({
 
   const toggleAsset = (assetId) => {
     const normalizedAssetId = normalizeReportId(assetId)
-    const nextIds = new Set(
-      selectedAssetIds.value.map(normalizeReportId),
-    )
+    const nextIds = new Set(selectedAssetIds.value.map(normalizeReportId))
 
     if (nextIds.has(normalizedAssetId)) {
       nextIds.delete(normalizedAssetId)
@@ -380,9 +339,7 @@ export function useAssetReportExecution({
   }
 
   const selectFilteredAssets = () => {
-    const nextIds = new Set(
-      selectedAssetIds.value.map(normalizeReportId),
-    )
+    const nextIds = new Set(selectedAssetIds.value.map(normalizeReportId))
 
     filteredAssets.value.forEach((asset) => {
       nextIds.add(normalizeReportId(asset.id))
@@ -457,10 +414,7 @@ export function useAssetReportExecution({
         }),
       )
 
-      if (
-        assetIndex + REPORT_ASSET_BATCH_SIZE <
-        selectedAssetsSnapshot.length
-      ) {
+      if (assetIndex + REPORT_ASSET_BATCH_SIZE < selectedAssetsSnapshot.length) {
         await waitForReportBatch()
       }
     }
@@ -469,26 +423,20 @@ export function useAssetReportExecution({
       return []
     }
 
-    reportRows.value =
-      sortAssetReportRowsByVehicle(generatedRows)
+    reportRows.value = sortAssetReportRowsByVehicle(generatedRows)
 
     executedAt.value = new Date().toISOString()
 
     return reportRows.value
   }
 
-  const exportExcel = async (
-    charts = {},
-    reportRowsOverride = null,
-  ) => {
+  const exportExcel = async (charts = {}, reportRowsOverride = null) => {
     if (!hasReport.value || dateRangeError.value) {
       return false
     }
 
     const { exportAssetReportExcel } =
-      await import(
-        "../../utils/reports/export/assetReportExportUtils.js"
-      )
+      await import("../../utils/reports/export/assetReportExportUtils.js")
 
     const reportRowsSnapshot = Array.isArray(reportRowsOverride)
       ? reportRowsOverride
@@ -506,18 +454,13 @@ export function useAssetReportExecution({
     return true
   }
 
-  const exportPdf = async (
-    charts = {},
-    reportRowsOverride = null,
-  ) => {
+  const exportPdf = async (charts = {}, reportRowsOverride = null) => {
     if (!hasReport.value || dateRangeError.value) {
       return false
     }
 
     const { exportAssetReportPdf } =
-      await import(
-        "../../utils/reports/export/assetReportExportUtils.js"
-      )
+      await import("../../utils/reports/export/assetReportExportUtils.js")
 
     const reportRowsSnapshot = Array.isArray(reportRowsOverride)
       ? reportRowsOverride
@@ -551,17 +494,9 @@ export function useAssetReportExecution({
    * Cambiar filtros invalida la vista previa existente,
    * pero no genera automáticamente un nuevo reporte.
    */
-  watch(
-    [
-      dateFrom,
-      dateTo,
-      selectedVehicleGroupId,
-      selectedAssetIds,
-    ],
-    () => {
-      clearReportPreview()
-    },
-  )
+  watch([dateFrom, dateTo, selectedVehicleGroupId, selectedAssetIds], () => {
+    clearReportPreview()
+  })
 
   watch(availableAssetIdsSignature, () => {
     const availableAssetIds = new Set(
@@ -570,46 +505,32 @@ export function useAssetReportExecution({
       }),
     )
 
-    const nextSelectedAssetIds =
-      selectedAssetIds.value.filter((assetId) => {
-        return availableAssetIds.has(
-          normalizeReportId(assetId),
-        )
-      })
+    const nextSelectedAssetIds = selectedAssetIds.value.filter((assetId) => {
+      return availableAssetIds.has(normalizeReportId(assetId))
+    })
 
-    if (
-      nextSelectedAssetIds.length !==
-      selectedAssetIds.value.length
-    ) {
+    if (nextSelectedAssetIds.length !== selectedAssetIds.value.length) {
       selectedAssetIds.value = nextSelectedAssetIds
     }
 
-    if (
-      !selectedAssetIds.value.length &&
-      availableAssets.value.length
-    ) {
-      selectedAssetIds.value =
-        groupFilteredAssets.value.map((asset) => {
-          return normalizeReportId(asset.id)
-        })
+    if (!selectedAssetIds.value.length && availableAssets.value.length) {
+      selectedAssetIds.value = groupFilteredAssets.value.map((asset) => {
+        return normalizeReportId(asset.id)
+      })
     }
   })
 
   watch(selectedVehicleGroupId, () => {
-    selectedAssetIds.value =
-      groupFilteredAssets.value.map((asset) => {
-        return normalizeReportId(asset.id)
-      })
+    selectedAssetIds.value = groupFilteredAssets.value.map((asset) => {
+      return normalizeReportId(asset.id)
+    })
   })
 
   watch(
     groupOptions,
     (options) => {
       const selectedGroupExists = options.some((group) => {
-        return (
-          normalizeReportId(group.id) ===
-          normalizeReportId(selectedVehicleGroupId.value)
-        )
+        return normalizeReportId(group.id) === normalizeReportId(selectedVehicleGroupId.value)
       })
 
       if (!selectedGroupExists) {

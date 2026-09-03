@@ -205,7 +205,9 @@ const isRouteHistoryReportTemplate = (template = {}) => {
 const resolveTemplateColumns = (template = {}) => {
   const hasTemplateColumns = Boolean(template?.columns?.length)
   const selectedTemplateColumns = hasTemplateColumns ? template.columns : []
-  const templateColumns = hasTemplateColumns ? selectedTemplateColumns : DEFAULT_ASSET_REPORT_COLUMNS
+  const templateColumns = hasTemplateColumns
+    ? selectedTemplateColumns
+    : DEFAULT_ASSET_REPORT_COLUMNS
 
   if (isRouteHistoryReportTemplate(template)) {
     return template?.columns?.length ? templateColumns : ROUTE_HISTORY_REPORT_COLUMNS

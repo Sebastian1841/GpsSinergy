@@ -4,11 +4,13 @@ import { mockDatabaseSeed } from "../../data/mockDatabase.js"
 import { readJsonStorage, writeJsonStorage } from "../../services/storage/browserStorage.js"
 import { getAssetTypeOption } from "../../utils/activos/assetTypeOptions.js"
 import { normalizeFleetAssetTagIds } from "../../utils/activos/fleetAssetFormUtils.js"
+import { createCleanScope } from "../../utils/users/userAccessStateUtils.js"
 
 const STORAGE_KEY = "sinergy-mock-database"
 const STORAGE_VERSION = 1
 const PERSIST_DEBOUNCE_MS = 250
 const BEFORE_UNLOAD_HANDLER_KEY = "__sinergyMockDatabaseBeforeUnloadHandler"
+const ACTIVE_ACCESS_SCOPE_TYPES = new Set(["all-assets", "selected-assets", "asset-tags"])
 
 let persistTimeout = null
 
@@ -227,19 +229,53 @@ const normalizeUsers = (items = []) => {
   return mergeSeedById(items, mockDatabaseSeed.users).map(normalizeUser)
 }
 
-const normalizeAccessScope = (scope = {}) => {
-  const assetTagIds = Array.isArray(scope?.assetTagIds)
-    ? scope.assetTagIds
-    : Array.isArray(scope?.tagIds)
-      ? scope.tagIds
-      : []
+const hasLegacySucursalScopes = (items = []) => {
+  return Array.isArray(items) && items.some((access) => access?.scope?.type === "sucursal")
+}
+
+const normalizeScopes = (items = []) => {
+  return items.filter((scope) => ACTIVE_ACCESS_SCOPE_TYPES.has(normalizeKey(scope?.id)))
+}
+
+const getValidSucursalIdsForAccess = ({
+  access,
+  companyItems = mockDatabaseSeed.companies,
+  applicationItems = mockDatabaseSeed.applicationDefinitions,
+} = {}) => {
+  const applicationId = normalizeKey(access?.applicationId)
+
+  const application = applicationItems.find((item) => {
+    return normalizeKey(item?.id || item?.applicationId) === applicationId
+  })
+
+  const companyId = normalizeKey(application?.companyId)
+
+  const company = companyItems.find((item) => {
+    return normalizeKey(item?.id) === companyId
+  })
+
+  if (!company || !Array.isArray(company.sucursales)) return null
+
+  return company.sucursales
+    .filter((sucursal) => sucursal.active !== false)
+    .map((sucursal) => normalizeKey(sucursal.id))
+    .filter(Boolean)
+}
+
+const normalizeAccessScope = (
+  scope = {},
+  { applicationId = null, assetItems = [], validSucursalIds = null } = {},
+) => {
+  const normalizedScope = createCleanScope(scope, {
+    assets: assetItems,
+    applicationId,
+    validSucursalIds,
+  })
 
   return {
     ...scope,
-    type: scope?.type || "all-assets",
-    assetIds: Array.isArray(scope?.assetIds) ? scope.assetIds : [],
-    sucursalIds: Array.isArray(scope?.sucursalIds) ? scope.sucursalIds : [],
-    assetTagIds: normalizeFleetAssetTagIds(assetTagIds),
+    ...normalizedScope,
+    assetTagIds: normalizeFleetAssetTagIds(normalizedScope.assetTagIds),
   }
 }
 
@@ -337,22 +373,40 @@ const normalizeAccessFunctions = (items = []) => {
   return [...normalizedSeedFunctions, ...extraFunctions]
 }
 
-const normalizeAccess = (access) => {
+const normalizeAccess = (
+  access,
+  {
+    assetItems = mockDatabaseSeed.assets,
+    companyItems = mockDatabaseSeed.companies,
+    applicationItems = mockDatabaseSeed.applicationDefinitions,
+  } = {},
+) => {
+  const validSucursalIds = getValidSucursalIdsForAccess({
+    access,
+    companyItems,
+    applicationItems,
+  })
+
   return {
     ...access,
     modules: normalizeAccessModules(Array.isArray(access?.modules) ? access.modules : []),
     functions: normalizeAccessFunctions(Array.isArray(access?.functions) ? access.functions : []),
-    scope: normalizeAccessScope(access?.scope),
+    scope: normalizeAccessScope(access?.scope, {
+      applicationId: access?.applicationId,
+      assetItems,
+      validSucursalIds,
+    }),
   }
 }
 
-const normalizePlatformAdminAccess = (access) => {
+const normalizePlatformAdminAccess = (access, options = {}) => {
   return normalizeAccess(
     createPlatformAdminAccess({
       userId: access.userId,
       applicationId: access.applicationId,
       id: access.id,
     }),
+    options,
   )
 }
 
@@ -360,6 +414,8 @@ const ensurePlatformAdminAccesses = ({
   items = [],
   userItems = mockDatabaseSeed.users,
   applicationItems = mockDatabaseSeed.applicationDefinitions,
+  assetItems = mockDatabaseSeed.assets,
+  companyItems = mockDatabaseSeed.companies,
 } = {}) => {
   const usersById = new Map(
     userItems.map((user) => {
@@ -371,9 +427,14 @@ const ensurePlatformAdminAccesses = ({
   const platformAdminUsers = Array.from(usersById.values()).filter((user) => {
     return user.isPlatformAdmin
   })
+  const normalizeOptions = {
+    assetItems,
+    companyItems,
+    applicationItems,
+  }
 
   if (!platformAdminUsers.length) {
-    return items.map(normalizeAccess)
+    return items.map((access) => normalizeAccess(access, normalizeOptions))
   }
 
   const normalizedAccesses = []
@@ -382,8 +443,8 @@ const ensurePlatformAdminAccesses = ({
   items.forEach((access) => {
     const accessUser = usersById.get(normalizeKey(access.userId))
     const normalizedAccess = accessUser?.isPlatformAdmin
-      ? normalizePlatformAdminAccess(access)
-      : normalizeAccess(access)
+      ? normalizePlatformAdminAccess(access, normalizeOptions)
+      : normalizeAccess(access, normalizeOptions)
 
     normalizedAccesses.push(normalizedAccess)
     accessKeys.add(
@@ -413,6 +474,7 @@ const ensurePlatformAdminAccesses = ({
             userId: user.id,
             applicationId,
           }),
+          normalizeOptions,
         ),
       )
       accessKeys.add(accessKey)
@@ -424,12 +486,19 @@ const ensurePlatformAdminAccesses = ({
 
 const normalizeAccesses = (
   items = [],
-  { userItems = mockDatabaseSeed.users, applicationItems = mockDatabaseSeed.applicationDefinitions } = {},
+  {
+    userItems = mockDatabaseSeed.users,
+    applicationItems = mockDatabaseSeed.applicationDefinitions,
+    assetItems = mockDatabaseSeed.assets,
+    companyItems = mockDatabaseSeed.companies,
+  } = {},
 ) => {
   return ensurePlatformAdminAccesses({
     items: mergeSeedById(items, mockDatabaseSeed.accesses),
     userItems,
     applicationItems,
+    assetItems,
+    companyItems,
   })
 }
 
@@ -442,6 +511,13 @@ const readPersistedDatabase = () => {
 }
 
 const persistedDatabase = readPersistedDatabase()
+
+const initialAccessItems = mergeSeedById(
+  cloneData(persistedDatabase?.accesses || mockDatabaseSeed.accesses),
+  mockDatabaseSeed.accesses,
+)
+
+let legacyAccessMigrationPending = hasLegacySucursalScopes(initialAccessItems)
 
 const companies = ref(
   normalizeCompanies(cloneData(persistedDatabase?.companies || mockDatabaseSeed.companies)),
@@ -468,9 +544,11 @@ const assets = ref(normalizeAssets(cloneData(persistedDatabase?.assets || mockDa
 const users = ref(normalizeUsers(cloneData(persistedDatabase?.users || mockDatabaseSeed.users)))
 
 const accesses = ref(
-  normalizeAccesses(cloneData(persistedDatabase?.accesses || mockDatabaseSeed.accesses), {
+  normalizeAccesses(initialAccessItems, {
     userItems: users.value,
     applicationItems: applicationDefinitions.value,
+    assetItems: assets.value,
+    companyItems: companies.value,
   }),
 )
 
@@ -478,7 +556,7 @@ const reportTypes = ref(cloneData(mockDatabaseSeed.reportTypes))
 const modules = ref(cloneData(mockDatabaseSeed.modules))
 const moduleFunctions = ref(cloneData(mockDatabaseSeed.moduleFunctions))
 const permissions = ref(cloneData(mockDatabaseSeed.permissions))
-const scopes = ref(cloneData(mockDatabaseSeed.scopes))
+const scopes = ref(normalizeScopes(cloneData(mockDatabaseSeed.scopes)))
 const roles = ref(cloneData(mockDatabaseSeed.roles))
 
 const getCompanyReportsSignature = (items = []) => {
@@ -550,6 +628,8 @@ const syncPlatformAdminAccesses = () => {
   accesses.value = normalizeAccesses(accesses.value, {
     userItems: users.value,
     applicationItems: applicationDefinitions.value,
+    assetItems: assets.value,
+    companyItems: companies.value,
   })
 
   if (previousSignature !== getAccessesSignature(accesses.value)) {
@@ -860,7 +940,11 @@ const updateUser = (userId, changes) => {
 }
 
 const createAccess = (access) => {
-  const nextAccess = normalizeAccess(access)
+  const nextAccess = normalizeAccess(access, {
+    assetItems: assets.value,
+    companyItems: companies.value,
+    applicationItems: applicationDefinitions.value,
+  })
 
   const userExists = usersById.value.has(normalizeKey(nextAccess.userId))
 
@@ -1050,6 +1134,11 @@ const deleteAsset = (assetId) => {
 export function useMockDatabase() {
   syncCompaniesWithSeed()
   syncPlatformAdminAccesses()
+
+  if (legacyAccessMigrationPending) {
+    legacyAccessMigrationPending = false
+    schedulePersistDatabase()
+  }
 
   return {
     companies,

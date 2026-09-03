@@ -25,6 +25,23 @@ test("asset scope matches assets with selected tag ids", () => {
   assert.equal(assetMatchesTagIds(asset, ["otra-etiqueta"]), false)
 })
 
+test("asset access tags ignore generic visual tag fields", () => {
+  const asset = {
+    assetTagIds: ["acceso-real"],
+    tags: ["faena-norte"],
+    tagIds: ["faena-sur"],
+    labels: ["contratista"],
+    etiquetas: ["zona-norte"],
+  }
+
+  assert.deepEqual(getAssetTagIds(asset), ["acceso-real"])
+  assert.equal(assetMatchesTagIds(asset, ["acceso-real"]), true)
+  assert.equal(assetMatchesTagIds(asset, ["faena-norte"]), false)
+  assert.equal(assetMatchesTagIds(asset, ["faena-sur"]), false)
+  assert.equal(assetMatchesTagIds(asset, ["contratista"]), false)
+  assert.equal(assetMatchesTagIds(asset, ["zona-norte"]), false)
+})
+
 test("asset tag options count tagged assets", () => {
   const options = buildAssetTagOptions([
     {

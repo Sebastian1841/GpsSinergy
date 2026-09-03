@@ -12,7 +12,7 @@ Estado y comportamiento de flota.
   Calcula posicion visible en pantalla, recibe `canOpenDeviceContextMenu` como
   permiso de apertura y reenvia completo el payload de acciones, incluyendo el
   rango seleccionado cuando se usa `Mostrar itinerario` o `Mostrar resumen
-  diario`, la accion de agregar al resumen diario y los datos del activo cuando
+diario`, la accion de agregar al resumen diario y los datos del activo cuando
   se abre `Mantenciones`.
 - `useFleetEditForm.js`: estado del formulario de edicion. Recalcula el perfil
   operativo cuando cambia el tipo de activo.
@@ -41,11 +41,18 @@ Estado y comportamiento de flota.
   tabla sin que una preferencia extrema rompa la vista al recargar.
 - `useAssetCityFilter.js`: conserva el filtro seleccionado de ciudad/activos
   para el header y los espacios de trabajo. No crea grupos operativos; las
-  etiquetas de acceso son el mecanismo para limitar el alcance de usuarios.
+  etiquetas de acceso son el mecanismo para limitar el alcance de usuarios. Es
+  un wrapper de `useScopedAssetGroupFilter.js` y oculta ciudades sin activos
+  disponibles.
 - `useAssetVehicleGroupFilter.js`: conserva el filtro seleccionado de grupo de
   vehiculos para el header y los espacios de trabajo. Usa un contexto de flota
   para persistir la preferencia, trabaja sobre activos ya autorizados y no
-  modifica permisos.
+  modifica permisos. Es un wrapper de `useScopedAssetGroupFilter.js` y mantiene
+  visibles los grupos vacios para poder administrarlos.
+- `useScopedAssetGroupFilter.js`: mecanica compartida para filtros persistidos
+  por `userId::contextId`. Recorta siempre contra `availableActivos`, limpia
+  selecciones invalidas, persiste la preferencia local y no aplica permisos.
+- `useScopedAssetGroupFilter.test.js`: pruebas del filtro compartido.
 - `useAssetVehicleGroupManagement.js`: administra la definicion local de grupos
   de vehiculos por contexto de Activos. Permite crear, editar asignaciones y
   eliminar grupos como organizacion visual. Sus `assetIds` se recortan contra

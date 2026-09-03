@@ -4,25 +4,24 @@ Componentes Vue del area de reportes.
 
 ## Archivos principales
 
-- `ReportExecutionModal.vue`: ejecuta reportes, muestra preview y dispara exportaciones. La vista previa usa formato de hoja corporativa con logo, datos generales, resumen, mapa, graficos y tabla; diferencia el modo `PDF` compacto del modo `Excel` completo antes de descargar. El preview de mapa soporta viajes y detenciones.
+- `ReportExecutionModal.vue`: ejecuta reportes, muestra preview y dispara exportaciones. La vista previa usa el modelo comun de render de reportes para compartir con PDF/Excel los mismos titulos, datos generales, metricas, activos, columnas y filas base. Usa formato de hoja corporativa con logo, datos generales, resumen, mapa, graficos y tabla; diferencia el modo `PDF` compacto del modo `Excel` completo antes de descargar. El preview de mapa soporta viajes y detenciones.
 - `ReportTemplateModal.vue`: crea y modifica plantillas con un flujo guiado:
   `Tipo`, `Datos`, `Eventos`, `Vista`, `Exportacion` y `Resumen`. El tipo de
   reporte aplica presets recomendados de reglas, columnas, widgets,
   comportamiento y exportacion; despues cada parte puede ajustarse sin tocar
   codigo. Las opciones avanzadas de comportamiento viven en `Eventos` para no
   mezclar configuracion especial con la vista. `Vista` define filtros
-  disponibles, bloques visibles y columnas del reporte; ahora muestra un resumen
-  inmediato de lo que quedara activo. `Exportacion` define descargas disponibles
-  y mapas incrustados en pantalla, PDF o Excel; debe verse como una mini vista
-  de ejecucion del reporte, usando la hoja corporativa con logo, datos
-  generales, resumen, mapa, graficos, tabla y salidas habilitadas. La opcion
-  visual de mapa aplica a viajes y detenciones. Las tablas de vista previa y
-  ejecucion deben respetar todas las columnas seleccionadas por la plantilla
-  cuando hay espacio de pantalla; la mini hoja de `Exportacion` debe simular el
-  formato elegido por el usuario. `PDF` muestra el informe paginado compacto,
-  con tabla principal legible y, si faltan columnas, una seccion `Detalle
-  adicional` dentro del mismo PDF. `Excel` debe abrir en una hoja principal
-  visual con la misma lectura del preview y dejar el detalle completo en hojas
+  disponibles, bloques visibles y columnas del reporte; usa el mismo modelo de
+  render que ejecucion/exportacion para resolver columnas y valores de ejemplo.
+  `Exportacion` define descargas disponibles y mapas incrustados en pantalla,
+  PDF o Excel; debe verse como una mini vista de ejecucion del reporte, usando
+  la hoja corporativa con logo, datos generales, resumen, mapa, graficos, tabla
+  y salidas habilitadas. La opcion visual de mapa aplica a viajes y detenciones.
+  Las tablas de vista previa, ejecucion y exportacion deben respetar el mismo
+  criterio de columnas de `assetReportRenderModelUtils.js`: `PDF` muestra el
+  informe paginado compacto, con tabla principal legible y, si faltan columnas,
+  una seccion `Detalle adicional` dentro del mismo PDF. `Excel` debe abrir en
+  una hoja principal visual con la misma lectura del preview y dejar el detalle completo en hojas
   auxiliares (`Detalle GPS`, `Activos` y `Datos reporte` cuando corresponda).
   `Resumen` es solo revision final: debe mostrar nombre,
   descripcion, estado y cards agrupadas de `Datos generales`, `Eventos`,

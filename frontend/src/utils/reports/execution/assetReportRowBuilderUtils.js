@@ -200,9 +200,7 @@ const getReportDateLabel = (timestamp) => {
 }
 
 const getFirstText = (...values) => {
-  return values
-    .map((value) => String(value ?? "").trim())
-    .find((value) => value && value !== "-")
+  return values.map((value) => String(value ?? "").trim()).find((value) => value && value !== "-")
 }
 
 const normalizeReportStatusKey = (value) => {

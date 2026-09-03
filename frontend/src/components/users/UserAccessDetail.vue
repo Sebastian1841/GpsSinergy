@@ -91,9 +91,7 @@
               v-if="isPlatformAdminUser"
               class="rounded-xl border border-[#ff6600]/20 bg-[#fff7ed] px-4 py-3"
             >
-              <h3 class="text-[12px] font-black text-[#102372]">
-                Administrador de plataforma
-              </h3>
+              <h3 class="text-[12px] font-black text-[#102372]">Administrador de plataforma</h3>
 
               <p class="mt-1 text-[11px] font-semibold leading-5 text-slate-600">
                 Este usuario mantiene acceso activo a todas las empresas, modulos, funciones y
@@ -347,7 +345,9 @@
                     v-if="showAccessCompanyGroups"
                     class="flex items-center justify-between gap-3 border-b border-[#edf1f5] bg-[#f8fafc] px-4 py-2"
                   >
-                    <p class="truncate text-[10px] font-black uppercase tracking-[0.08em] text-[#102372]">
+                    <p
+                      class="truncate text-[10px] font-black uppercase tracking-[0.08em] text-[#102372]"
+                    >
                       {{ group.label }}
                     </p>
 

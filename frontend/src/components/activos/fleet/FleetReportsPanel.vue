@@ -128,9 +128,7 @@
           <button
             type="button"
             class="flex h-6 w-8 cursor-pointer items-center justify-center rounded-md transition"
-            :class="
-              viewMode === 'cards' ? 'bg-[#102372] text-white shadow-sm' : 'text-slate-500'
-            "
+            :class="viewMode === 'cards' ? 'bg-[#102372] text-white shadow-sm' : 'text-slate-500'"
             title="Vista en tarjetas"
             aria-label="Vista en tarjetas"
             @click="viewMode = 'cards'"
@@ -143,9 +141,7 @@
           <button
             type="button"
             class="flex h-6 w-8 cursor-pointer items-center justify-center rounded-md transition"
-            :class="
-              viewMode === 'rows' ? 'bg-[#102372] text-white shadow-sm' : 'text-slate-500'
-            "
+            :class="viewMode === 'rows' ? 'bg-[#102372] text-white shadow-sm' : 'text-slate-500'"
             title="Vista en filas"
             aria-label="Vista en filas"
             @click="viewMode = 'rows'"

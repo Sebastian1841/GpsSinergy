@@ -8,10 +8,7 @@
     <header
       class="flex shrink-0 items-center justify-between gap-4 border-b border-[#e6ebf2] px-5 py-4"
     >
-      <h2
-        id="audit-detail-title"
-        class="text-[16px] font-black text-[#102372]"
-      >
+      <h2 id="audit-detail-title" class="text-[16px] font-black text-[#102372]">
         Detalle del evento
       </h2>
 
@@ -21,12 +18,7 @@
         aria-label="Cerrar detalle"
         @click="emit('close')"
       >
-        <svg
-          class="h-4 w-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -42,9 +34,7 @@
       <dl class="grid gap-4">
         <!-- ACCIÓN -->
         <div class="detail-row">
-          <dt class="detail-label">
-            Acción
-          </dt>
+          <dt class="detail-label">Acción</dt>
 
           <dd class="detail-value font-black text-[#102372]">
             {{ getActionLabel(record.action) }}
@@ -53,9 +43,7 @@
 
         <!-- DESCRIPCIÓN -->
         <div class="detail-row">
-          <dt class="detail-label">
-            Descripción
-          </dt>
+          <dt class="detail-label">Descripción</dt>
 
           <dd class="detail-value leading-5">
             {{ record.description || "Sin descripción disponible." }}
@@ -64,9 +52,7 @@
 
         <!-- RESPONSABLE -->
         <div class="detail-row">
-          <dt class="detail-label">
-            Usuario responsable
-          </dt>
+          <dt class="detail-label">Usuario responsable</dt>
 
           <dd class="min-w-0">
             <div class="flex min-w-0 items-center gap-2.5">
@@ -77,15 +63,11 @@
               </span>
 
               <span class="min-w-0">
-                <span
-                  class="block truncate text-[12px] font-black text-[#172033]"
-                >
+                <span class="block truncate text-[12px] font-black text-[#172033]">
                   {{ record.actorName || "Sin usuario" }}
                 </span>
 
-                <span
-                  class="mt-0.5 block truncate text-[11px] font-semibold text-slate-400"
-                >
+                <span class="mt-0.5 block truncate text-[11px] font-semibold text-slate-400">
                   {{ getRecordCompanyName(record) || "Sin empresa" }}
                 </span>
               </span>
@@ -95,34 +77,24 @@
 
         <!-- ENTIDAD -->
         <div class="detail-row">
-          <dt class="detail-label">
-            Entidad
-          </dt>
+          <dt class="detail-label">Entidad</dt>
 
           <dd class="min-w-0">
             <p class="truncate text-[12px] font-black text-[#172033]">
               {{ record.entityName || "Sin entidad" }}
             </p>
 
-            <p
-              class="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[10px] font-semibold text-slate-400"
-            >
-              <span v-if="record.entityId">
-                ID: {{ record.entityId }}
-              </span>
+            <p class="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[10px] font-semibold text-slate-400">
+              <span v-if="record.entityId"> ID: {{ record.entityId }} </span>
 
-              <span v-if="record.entityType">
-                Tipo: {{ record.entityType }}
-              </span>
+              <span v-if="record.entityType"> Tipo: {{ record.entityType }} </span>
             </p>
           </dd>
         </div>
 
         <!-- MÓDULO -->
         <div class="detail-row">
-          <dt class="detail-label">
-            Módulo
-          </dt>
+          <dt class="detail-label">Módulo</dt>
 
           <dd>
             <span
@@ -135,9 +107,7 @@
 
         <!-- IP -->
         <div class="detail-row">
-          <dt class="detail-label">
-            IP
-          </dt>
+          <dt class="detail-label">IP</dt>
 
           <dd class="detail-value">
             {{ recordIp }}
@@ -146,9 +116,7 @@
 
         <!-- FECHA -->
         <div class="detail-row">
-          <dt class="detail-label">
-            Fecha y hora
-          </dt>
+          <dt class="detail-label">Fecha y hora</dt>
 
           <dd class="detail-value">
             {{ formatDateTime(record.timestamp) }}
@@ -157,9 +125,7 @@
 
         <!-- RESULTADO -->
         <div class="detail-row">
-          <dt class="detail-label">
-            Resultado
-          </dt>
+          <dt class="detail-label">Resultado</dt>
 
           <dd>
             <span
@@ -178,32 +144,16 @@
       </dl>
 
       <!-- ANTES / DESPUÉS -->
-      <section
-        v-if="beforeEntries.length || afterEntries.length"
-        class="mt-6"
-      >
-        <h3 class="text-[14px] font-black text-[#102372]">
-          Antes / Después
-        </h3>
+      <section v-if="beforeEntries.length || afterEntries.length" class="mt-6">
+        <h3 class="text-[14px] font-black text-[#102372]">Antes / Después</h3>
 
         <div class="mt-3 grid grid-cols-2 gap-3">
           <!-- ANTES -->
-          <article
-            class="min-w-0 rounded-xl border border-[#dfe5ed] bg-[#fafbfc] p-3"
-          >
-            <p class="text-[11px] font-black text-[#ff6600]">
-              Antes
-            </p>
+          <article class="min-w-0 rounded-xl border border-[#dfe5ed] bg-[#fafbfc] p-3">
+            <p class="text-[11px] font-black text-[#ff6600]">Antes</p>
 
-            <dl
-              v-if="beforeEntries.length"
-              class="mt-3 grid gap-3"
-            >
-              <div
-                v-for="entry in beforeEntries"
-                :key="`before-${entry.label}`"
-                class="min-w-0"
-              >
+            <dl v-if="beforeEntries.length" class="mt-3 grid gap-3">
+              <div v-for="entry in beforeEntries" :key="`before-${entry.label}`" class="min-w-0">
                 <dt class="change-label">
                   {{ entry.label }}
                 </dt>
@@ -214,31 +164,15 @@
               </div>
             </dl>
 
-            <p
-              v-else
-              class="mt-3 text-[11px] font-semibold text-slate-400"
-            >
-              —
-            </p>
+            <p v-else class="mt-3 text-[11px] font-semibold text-slate-400">—</p>
           </article>
 
           <!-- DESPUÉS -->
-          <article
-            class="min-w-0 rounded-xl border border-[#dfe5ed] bg-[#fafbfc] p-3"
-          >
-            <p class="text-[11px] font-black text-emerald-600">
-              Después
-            </p>
+          <article class="min-w-0 rounded-xl border border-[#dfe5ed] bg-[#fafbfc] p-3">
+            <p class="text-[11px] font-black text-emerald-600">Después</p>
 
-            <dl
-              v-if="afterEntries.length"
-              class="mt-3 grid gap-3"
-            >
-              <div
-                v-for="entry in afterEntries"
-                :key="`after-${entry.label}`"
-                class="min-w-0"
-              >
+            <dl v-if="afterEntries.length" class="mt-3 grid gap-3">
+              <div v-for="entry in afterEntries" :key="`after-${entry.label}`" class="min-w-0">
                 <dt class="change-label">
                   {{ entry.label }}
                 </dt>
@@ -249,24 +183,14 @@
               </div>
             </dl>
 
-            <p
-              v-else
-              class="mt-3 text-[11px] font-semibold text-slate-400"
-            >
-              —
-            </p>
+            <p v-else class="mt-3 text-[11px] font-semibold text-slate-400">—</p>
           </article>
         </div>
       </section>
 
       <!-- DATOS ADICIONALES -->
-      <section
-        v-if="additionalDetails.length"
-        class="mt-6 border-t border-[#edf1f5] pt-4"
-      >
-        <h3 class="text-[13px] font-black text-[#102372]">
-          Información adicional
-        </h3>
+      <section v-if="additionalDetails.length" class="mt-6 border-t border-[#edf1f5] pt-4">
+        <h3 class="text-[13px] font-black text-[#102372]">Información adicional</h3>
 
         <dl class="mt-3 grid gap-3">
           <div
@@ -372,11 +296,7 @@ const afterEntries = computed(() => {
 })
 
 const additionalDetails = computed(() => {
-  const excludedLabels = new Set([
-    "Usuario",
-    "Empresa",
-    "Tipo",
-  ])
+  const excludedLabels = new Set(["Usuario", "Empresa", "Tipo"])
 
   return props.detailSections.flatMap((section) => {
     return section.details
@@ -454,10 +374,7 @@ const formatLabel = (value) => {
 
   if (!normalized) return "Dato"
 
-  return (
-    normalized.charAt(0).toUpperCase() +
-    normalized.slice(1)
-  )
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1)
 }
 
 const formatValue = (value) => {
@@ -470,9 +387,7 @@ const formatValue = (value) => {
   }
 
   if (Array.isArray(value)) {
-    return value.length
-      ? value.map(formatValue).join(", ")
-      : "—"
+    return value.length ? value.map(formatValue).join(", ") : "—"
   }
 
   if (typeof value === "object") {

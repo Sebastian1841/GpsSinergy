@@ -39,3 +39,19 @@ test("useMockDatabase gives platform admins access to every application", () => 
     })
   })
 })
+
+test("useMockDatabase does not expose legacy sucursal scopes as editable access scopes", () => {
+  const { accesses, scopes } = useMockDatabase()
+
+  assert.ok(
+    scopes.value.every((scope) => {
+      return scope.id !== "sucursal"
+    }),
+  )
+
+  assert.ok(
+    accesses.value.every((access) => {
+      return access.scope?.type !== "sucursal"
+    }),
+  )
+})

@@ -200,12 +200,7 @@ const { currentUser } = useAuthSession()
 const { visibleAssets, canAccessFunction } = useAccessControl()
 const { isRouteComparisonModalOpen } = useRouteComparisonUiState()
 
-const {
-  assetTags,
-  createAssetTag,
-  updateAssetTag,
-  deleteAssetTag,
-} = useMockDatabase()
+const { assetTags, createAssetTag, updateAssetTag, deleteAssetTag } = useMockDatabase()
 
 const MOCK_TELEMETRY_ENABLED =
   import.meta.env.DEV && import.meta.env.VITE_MOCK_TELEMETRY !== "false"
@@ -845,7 +840,9 @@ personalMapActivos = computed(() => {
 })
 
 const personalFilteredActivos = computed(() => {
-  return filterActivosBySelectedCityGroup(filterActivosBySelectedVehicleGroup(filteredActivos.value))
+  return filterActivosBySelectedCityGroup(
+    filterActivosBySelectedVehicleGroup(filteredActivos.value),
+  )
 })
 
 const personalTableActivos = computed(() => {

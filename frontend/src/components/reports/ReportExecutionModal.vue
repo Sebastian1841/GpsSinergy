@@ -327,11 +327,17 @@
                       :key="card.label"
                       class="border-b border-r border-[#d8dee8] last:border-r-0 md:border-b-0"
                     >
-                      <p class="px-2 py-2 text-[10px] font-black text-white" :class="card.labelClass">
+                      <p
+                        class="px-2 py-2 text-[10px] font-black text-white"
+                        :class="card.labelClass"
+                      >
                         {{ card.label }}
                       </p>
 
-                      <p class="bg-[#eff6ff] px-2 py-3 text-[15px] font-black" :class="card.valueClass">
+                      <p
+                        class="bg-[#eff6ff] px-2 py-3 text-[15px] font-black"
+                        :class="card.valueClass"
+                      >
                         {{ card.value }}
                       </p>
                     </div>
@@ -524,7 +530,9 @@
                         <td class="whitespace-nowrap px-3 py-2 font-black text-[#102372]">
                           {{ asset.name }}
                         </td>
-                        <td class="whitespace-nowrap bg-[#fff7ed] px-3 py-2 font-black text-[#ff6600]">
+                        <td
+                          class="whitespace-nowrap bg-[#fff7ed] px-3 py-2 font-black text-[#ff6600]"
+                        >
                           {{ asset.patent }}
                         </td>
                         <td class="whitespace-nowrap px-3 py-2 font-semibold text-slate-700">
@@ -737,20 +745,19 @@ import {
   normalizeReportOutputOptions,
 } from "../../utils/reports/config/reportOutputOptions.js"
 import {
-  getPdfHiddenReportColumns,
-  getPdfVisibleReportColumns,
-} from "../../utils/reports/execution/assetReportColumnUtils.js"
+  ASSET_REPORT_PREVIEW_FORMAT_IDS,
+  buildAssetReportRenderModel,
+  getReportRenderCellValue,
+} from "../../utils/reports/execution/assetReportRenderModelUtils.js"
 import {
   REPORT_ADDRESS_PREVIEW_RESOLVE_LIMIT,
   REPORT_CHART_LIMIT,
   REPORT_PREVIEW_LIMIT,
-  buildTripPreviewSummary,
   getEmptyExportCharts,
   getEmptyReportContext,
   getReportBusyDetail,
   getReportBusyTitle,
   isRouteMapReport,
-  isRouteHistoryReport,
   isStopsReport,
 } from "../../utils/reports/views/reportExecutionModalUtils.js"
 import {
@@ -798,17 +805,34 @@ const reportChartCount = ref(0)
 const isExecutingReport = ref(false)
 const isExportingExcel = ref(false)
 const isExportingPdf = ref(false)
-const PREVIEW_FORMAT_IDS = {
-  pdf: "pdf",
-  excel: "excel",
+const PREVIEW_FORMAT_IDS = ASSET_REPORT_PREVIEW_FORMAT_IDS
+const PREVIEW_METRIC_VALUE_CLASSES = {
+  navy: "text-[#102372]",
+  teal: "text-[#14b8a6]",
+  orange: "text-[#ff6600]",
+  blue: "text-[#2563eb]",
 }
-const EXCEL_PREVIEW_METRIC_LABEL_CLASSES = [
-  "bg-[#102372]",
-  "bg-[#14b8a6]",
-  "bg-[#ff6600]",
-  "bg-[#2563eb]",
-]
+const EXCEL_PREVIEW_METRIC_LABEL_CLASSES = {
+  navy: "bg-[#102372]",
+  teal: "bg-[#14b8a6]",
+  orange: "bg-[#ff6600]",
+  blue: "bg-[#2563eb]",
+}
 const activePreviewFormat = ref(PREVIEW_FORMAT_IDS.pdf)
+
+const withPreviewMetricClasses = (metrics = [], { includeLabelClass = false } = {}) => {
+  return metrics.map((metric) => ({
+    ...metric,
+    valueClass: PREVIEW_METRIC_VALUE_CLASSES[metric.colorKey] || PREVIEW_METRIC_VALUE_CLASSES.navy,
+    ...(includeLabelClass
+      ? {
+          labelClass:
+            EXCEL_PREVIEW_METRIC_LABEL_CLASSES[metric.colorKey] ||
+            EXCEL_PREVIEW_METRIC_LABEL_CLASSES.navy,
+        }
+      : {}),
+  }))
+}
 
 const templateWidgets = computed(() => {
   return new Set(normalizeReportWidgets(props.template?.widgets))
@@ -987,10 +1011,6 @@ const previewReportRows = computed(() => {
   return reportRows.value.slice(0, REPORT_PREVIEW_LIMIT)
 })
 
-const isTripReport = computed(() => {
-  return isRouteHistoryReport(props.template)
-})
-
 const isStopsReportTemplate = computed(() => {
   return isStopsReport(props.template)
 })
@@ -1034,195 +1054,72 @@ const { tripMapImageDataUrl, isBuildingTripMap, resetTripMapPreview } = useRoute
   shouldShowTripMap,
 })
 
-const tripPreviewSummary = computed(() => {
-  return buildTripPreviewSummary(reportRows.value)
+const reportRenderModel = computed(() => {
+  return buildAssetReportRenderModel({
+    template: props.template,
+    reportColumns: reportColumns.value,
+    reportRows: reportRows.value,
+    dateFrom: dateFrom.value,
+    dateTo: dateTo.value,
+    selectedGroupLabel: selectedGroupLabel.value,
+    selectedAssetCount: selectedAssetCount.value,
+    format: activePreviewMode.value,
+    previewRows: previewReportRows.value,
+    routeMapImageDataUrl: tripMapImageDataUrl.value,
+    generatedAt: "Al exportar",
+  })
 })
 
 const reportPreviewTitle = computed(() => {
-  if (isStopsReportTemplate.value) return "Informe de detenciones"
-  if (isTripReport.value) return "Informe de viajes"
-
-  return props.template?.name || "Informe operativo"
+  return reportRenderModel.value.previewTitle
 })
 
 const activePreviewHeaderTitle = computed(() => {
-  if (isExcelPreview.value) return props.template?.name || "Reporte de activos"
-
-  return reportPreviewTitle.value
+  return reportRenderModel.value.headerTitle
 })
 
 const reportPreviewRangeLabel = computed(() => {
-  if (dateFrom.value && dateTo.value && dateFrom.value !== dateTo.value) {
-    return `${dateFrom.value} a ${dateTo.value}`
-  }
-
-  return dateFrom.value || dateTo.value || "-"
+  return reportRenderModel.value.rangeLabel
 })
-
-const getPreviewRowText = (row = {}, keys = [], fallback = "-") => {
-  const sources = [row.values, row.itineraryRow, row.report, row.asset, row]
-
-  for (const key of keys) {
-    for (const source of sources) {
-      const value = source?.[key]
-      const text = String(value ?? "").trim()
-
-      if (text && text !== "-") return text
-    }
-  }
-
-  return fallback
-}
-
-const getPreviewAssetKey = (row = {}, index = 0) => {
-  return (
-    getPreviewRowText(row, ["deviceId", "dispositivo", "imei"], "") ||
-    getPreviewRowText(row, ["patente", "patent"], "") ||
-    getPreviewRowText(row, ["vehiculo", "vehicle", "asset", "activo", "name", "nombre"], "") ||
-    `asset-${index}`
-  )
-}
 
 const excelPreviewAssetRows = computed(() => {
-  const assetsByKey = new Map()
-
-  reportRows.value.forEach((row, index) => {
-    const key = getPreviewAssetKey(row, index)
-
-    if (assetsByKey.has(key)) return
-
-    assetsByKey.set(key, {
-      key,
-      name: getPreviewRowText(row, ["vehiculo", "vehicle", "asset", "activo", "name", "nombre"]),
-      patent: getPreviewRowText(row, ["patente", "patent"]),
-      deviceId: getPreviewRowText(row, ["deviceId", "dispositivo", "imei"]),
-      driver: getPreviewRowText(row, ["conductor", "driver"], "Sin conductor"),
-    })
-  })
-
-  return Array.from(assetsByKey.values()).sort((firstAsset, secondAsset) => {
-    return (
-      firstAsset.deviceId.localeCompare(secondAsset.deviceId, "es") ||
-      firstAsset.name.localeCompare(secondAsset.name, "es")
-    )
-  })
-})
-
-const excelPreviewAssetSummary = computed(() => {
-  const assetCount = excelPreviewAssetRows.value.length
-
-  if (isTripReport.value) return `${assetCount} activos con viajes`
-  if (isStopsReportTemplate.value) return `${assetCount} activos con detenciones`
-
-  return `${assetCount} activos con reglas de evento`
+  return reportRenderModel.value.assets
 })
 
 const reportPreviewDetails = computed(() => {
-  return [
-    {
-      label: "Reporte",
-      value: props.template?.name || "Reporte de activos",
-    },
-    {
-      label: "Periodo",
-      value: reportPreviewRangeLabel.value,
-    },
-    {
-      label: "Grupo",
-      value: selectedGroupLabel.value,
-    },
-    {
-      label: "Activos",
-      value: `${selectedAssetCount.value} patentes seleccionadas`,
-    },
-  ]
+  return reportRenderModel.value.details
 })
 
 const excelPreviewDetails = computed(() => {
-  return [
-    {
-      label: "Reporte",
-      value: props.template?.name || "Reporte de activos",
-    },
-    {
-      label: "Periodo",
-      value: reportPreviewRangeLabel.value,
-    },
-    {
-      label: "Activos",
-      value: excelPreviewAssetSummary.value,
-    },
-    {
-      label: "Generado",
-      value: "Al exportar",
-    },
-  ]
-})
-
-const pdfPreviewColumns = computed(() => {
-  return getPdfVisibleReportColumns(reportColumns.value)
-})
-
-const hiddenPdfPreviewColumns = computed(() => {
-  return getPdfHiddenReportColumns(reportColumns.value)
+  return reportRenderModel.value.excelDetails
 })
 
 const hiddenPdfPreviewColumnsCount = computed(() => {
-  return hiddenPdfPreviewColumns.value.length
+  return reportRenderModel.value.hiddenPdfColumnCount
 })
 
 const previewTableColumns = computed(() => {
-  if (isPdfPreview.value) return pdfPreviewColumns.value
-
-  return [
-    {
-      key: "__rowIndex",
-      label: "#",
-    },
-    ...reportColumns.value,
-  ]
+  return reportRenderModel.value.columns.visible
 })
 
 const activePreviewSubtitle = computed(() => {
-  const templateName = props.template?.name || "Reporte de activos"
-
-  if (isPdfPreview.value) {
-    return `${templateName} - ${reportPreviewRangeLabel.value} | PDF compacto`
-  }
-
-  return `Hoja Reporte - ${excelPreviewAssetSummary.value} | ${reportPreviewRangeLabel.value}`
+  return reportRenderModel.value.subtitle
 })
 
 const activePreviewTableLabel = computed(() => {
-  const rowsLabel = `${previewReportRows.value.length} de ${reportRows.value.length} filas`
-
-  if (isPdfPreview.value) {
-    return hiddenPdfPreviewColumnsCount.value
-      ? `${rowsLabel} | PDF compacto`
-      : `${rowsLabel} | PDF`
-  }
-
-  return `${rowsLabel} | Excel completo`
+  return reportRenderModel.value.tableLabel
 })
 
 const getPreviewTableCellValue = (row = {}, column = {}, rowIndex = 0) => {
-  if (column.key === "__rowIndex") return rowIndex + 1
-
-  const value = row.values?.[column.key]
-  const text = String(value ?? "").trim()
-
-  return text || getPreviewRowText(row, [column.key])
+  return getReportRenderCellValue(row, column, rowIndex)
 }
 
 const activePreviewFooterLabel = computed(() => {
-  return isPdfPreview.value ? "Vista previa PDF" : "Vista previa Excel"
+  return reportRenderModel.value.footerLabel
 })
 
 const reportDetailTitle = computed(() => {
-  if (isTripReport.value) return "Detalle de viajes"
-  if (isStopsReportTemplate.value) return "Detalle de detenciones"
-
-  return "Detalle GPS"
+  return reportRenderModel.value.detailTitle
 })
 
 const activePreviewExportLabel = computed(() => {
@@ -1241,206 +1138,15 @@ const canExportActivePreview = computed(() => {
 const previewSummaryCards = computed(() => {
   if (!shouldShowSummary.value || !hasReport.value) return []
 
-  if (isTripReport.value) {
-    return [
-      {
-        label: "Viajes",
-        value: tripPreviewSummary.value.trips,
-        valueClass: "text-[#102372]",
-      },
-      {
-        label: "Km total",
-        value: tripPreviewSummary.value.distanceLabel,
-        valueClass: "text-[#ff6600]",
-      },
-      {
-        label: "Tiempo",
-        value: tripPreviewSummary.value.durationLabel,
-        valueClass: "text-emerald-600",
-      },
-      {
-        label: "Activos",
-        value: tripPreviewSummary.value.assets,
-        valueClass: "text-slate-600",
-      },
-    ]
-  }
-
-  return [
-    {
-      label: "Total",
-      value: reportSummary.value.total,
-      valueClass: "text-[#102372]",
-    },
-    {
-      label: "Movimiento",
-      value: reportSummary.value.moving,
-      valueClass: "text-emerald-600",
-    },
-    {
-      label: "Detenidos",
-      value: reportSummary.value.stopped,
-      valueClass: "text-[#ff6600]",
-    },
-    {
-      label: "Sin senal",
-      value: reportSummary.value.offline,
-      valueClass: "text-slate-600",
-    },
-  ]
-})
-
-const parsePreviewNumber = (value) => {
-  if (typeof value === "number") return Number.isFinite(value) ? value : null
-
-  const numericValue = Number.parseFloat(String(value ?? "").replace(",", ".").replace(/[^\d.-]/g, ""))
-
-  return Number.isFinite(numericValue) ? numericValue : null
-}
-
-const parsePreviewDurationMinutes = (value) => {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0
-
-  const text = String(value ?? "").toLowerCase()
-  if (!text.trim()) return 0
-
-  const hours = Number.parseFloat((text.match(/(\d+(?:[.,]\d+)?)\s*h/) || [])[1] || "0")
-  const minutes = Number.parseFloat((text.match(/(\d+(?:[.,]\d+)?)\s*min/) || [])[1] || "0")
-  const seconds = Number.parseFloat((text.match(/(\d+(?:[.,]\d+)?)\s*s/) || [])[1] || "0")
-
-  return (
-    (Number.isFinite(hours) ? hours * 60 : 0) +
-    (Number.isFinite(minutes) ? minutes : 0) +
-    (Number.isFinite(seconds) ? seconds / 60 : 0)
-  )
-}
-
-const formatPreviewDurationMinutes = (minutes) => {
-  const normalizedMinutes = Number.isFinite(minutes) ? Math.max(0, Math.round(minutes)) : 0
-
-  if (normalizedMinutes < 60) return `${normalizedMinutes} min`
-
-  const hours = Math.floor(normalizedMinutes / 60)
-  const remainingMinutes = normalizedMinutes % 60
-
-  return remainingMinutes ? `${hours} h ${remainingMinutes} min` : `${hours} h`
-}
-
-const averagePreviewSpeedLabel = computed(() => {
-  const speeds = reportRows.value
-    .map((row) => getPreviewRowText(row, ["tripMaxSpeed", "speed", "velocidad"], ""))
-    .map(parsePreviewNumber)
-    .filter((speed) => Number.isFinite(speed) && speed > 0)
-
-  if (!speeds.length) return "0 km/h"
-
-  const average = speeds.reduce((total, speed) => total + speed, 0) / speeds.length
-
-  return `${Number(average.toFixed(1)).toLocaleString("es-CL")} km/h`
-})
-
-const stoppedPreviewDurationLabel = computed(() => {
-  const totalMinutes = reportRows.value.reduce((total, row) => {
-    const duration = getPreviewRowText(row, ["duration", "duracion", "tripDuration"], "")
-
-    return total + parsePreviewDurationMinutes(duration)
-  }, 0)
-
-  return formatPreviewDurationMinutes(totalMinutes)
-})
-
-const stopLocationCount = computed(() => {
-  const locations = new Set(
-    reportRows.value
-      .map((row) => getPreviewRowText(row, ["address", "direccion", "ubicacion", "geocerca"], ""))
-      .filter(Boolean),
-  )
-
-  return locations.size
+  return withPreviewMetricClasses(reportRenderModel.value.metrics)
 })
 
 const excelPreviewSummaryCards = computed(() => {
   if (!shouldShowSummary.value || !hasReport.value) return []
 
-  const cards = (() => {
-    if (isTripReport.value) {
-      return [
-        {
-          label: "Viajes",
-          value: tripPreviewSummary.value.trips,
-          valueClass: "text-[#102372]",
-        },
-        {
-          label: "Activos",
-          value: tripPreviewSummary.value.assets,
-          valueClass: "text-[#14b8a6]",
-        },
-        {
-          label: "Km total",
-          value: tripPreviewSummary.value.distanceLabel,
-          valueClass: "text-[#ff6600]",
-        },
-        {
-          label: "Vel. prom.",
-          value: averagePreviewSpeedLabel.value,
-          valueClass: "text-[#2563eb]",
-        },
-      ]
-    }
-
-    if (isStopsReportTemplate.value) {
-      return [
-        {
-          label: "Detenciones",
-          value: reportRows.value.length,
-          valueClass: "text-[#102372]",
-        },
-        {
-          label: "Activos",
-          value: excelPreviewAssetRows.value.length,
-          valueClass: "text-[#14b8a6]",
-        },
-        {
-          label: "Tiempo detenido",
-          value: stoppedPreviewDurationLabel.value,
-          valueClass: "text-[#ff6600]",
-        },
-        {
-          label: "Ubicaciones",
-          value: stopLocationCount.value,
-          valueClass: "text-[#2563eb]",
-        },
-      ]
-    }
-
-    return [
-      {
-        label: "Eventos",
-        value: reportRows.value.length,
-        valueClass: "text-[#102372]",
-      },
-      {
-        label: "Movimiento",
-        value: reportSummary.value.moving,
-        valueClass: "text-[#14b8a6]",
-      },
-      {
-        label: "Detenidos",
-        value: reportSummary.value.stopped,
-        valueClass: "text-[#ff6600]",
-      },
-      {
-        label: "Sin senal",
-        value: reportSummary.value.offline,
-        valueClass: "text-[#2563eb]",
-      },
-    ]
-  })()
-
-  return cards.map((card, index) => ({
-    ...card,
-    labelClass: EXCEL_PREVIEW_METRIC_LABEL_CLASSES[index] || EXCEL_PREVIEW_METRIC_LABEL_CLASSES[0],
-  }))
+  return withPreviewMetricClasses(reportRenderModel.value.metrics, {
+    includeLabelClass: true,
+  })
 })
 
 const shouldResolvePreviewAddresses = computed(() => {

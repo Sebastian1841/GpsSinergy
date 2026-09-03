@@ -258,7 +258,7 @@ const getApplicationAssetTags = (applicationId) => {
         companyId: tag.companyId || companyKey,
         companyName: tag.companyName || companyName,
       }
-  })
+    })
 }
 
 const handleUpdateOperationalScope = (accessId, scopeId) => {

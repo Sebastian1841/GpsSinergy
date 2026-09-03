@@ -56,7 +56,9 @@
               </p>
             </div>
 
-            <div class="grid shrink-0 grid-cols-2 rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
+            <div
+              class="grid shrink-0 grid-cols-2 rounded-lg border border-white/10 bg-white/[0.04] p-0.5"
+            >
               <button
                 type="button"
                 class="rounded-md px-2.5 py-1.5 text-[10px] font-black transition"
@@ -114,7 +116,9 @@
               :key="group.id"
               type="button"
               class="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-lg px-2.5 py-2 text-left transition hover:bg-white/10"
-              :class="normalizeId(selectedCityGroupId) === normalizeId(group.id) ? 'bg-white/10' : ''"
+              :class="
+                normalizeId(selectedCityGroupId) === normalizeId(group.id) ? 'bg-white/10' : ''
+              "
               @click="handleSelectCity(group.id)"
             >
               <span
@@ -150,7 +154,10 @@
         </section>
 
         <section v-show="activeTab === 'groups'" class="p-2">
-          <div v-if="groupFormVisible" class="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+          <div
+            v-if="groupFormVisible"
+            class="rounded-xl border border-white/10 bg-white/[0.04] p-3"
+          >
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <p class="text-[10px] font-black uppercase tracking-[0.14em] text-[#ff6600]">
@@ -218,7 +225,9 @@
                 </div>
               </div>
 
-              <div class="max-h-[184px] overflow-auto rounded-lg border border-white/10 bg-[#111827]/70 p-1">
+              <div
+                class="max-h-[184px] overflow-auto rounded-lg border border-white/10 bg-[#111827]/70 p-1"
+              >
                 <label
                   v-for="asset in filteredAvailableAssets"
                   :key="asset.id"
@@ -302,7 +311,9 @@
                 v-for="group in filteredVehicleGroups"
                 :key="group.id"
                 class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg px-2.5 py-2 transition hover:bg-white/10"
-                :class="normalizeId(selectedVehicleGroupId) === normalizeId(group.id) ? 'bg-white/10' : ''"
+                :class="
+                  normalizeId(selectedVehicleGroupId) === normalizeId(group.id) ? 'bg-white/10' : ''
+                "
               >
                 <button
                   type="button"
@@ -329,7 +340,11 @@
 
                   <span
                     class="rounded px-1.5 py-0.5 text-[8px] font-black"
-                    :class="group.readonly ? 'bg-white/10 text-white/45' : 'bg-[#ff6600]/15 text-[#ffb580]'"
+                    :class="
+                      group.readonly
+                        ? 'bg-white/10 text-white/45'
+                        : 'bg-[#ff6600]/15 text-[#ffb580]'
+                    "
                   >
                     {{ group.readonly ? "Auto" : "Grupo" }}
                   </span>
@@ -602,8 +617,7 @@ const handleDeleteGroup = (group) => {
   if (!props.canManageGroups || !group?.id || group.readonly) return
 
   const confirmed =
-    typeof window === "undefined" ||
-    window.confirm(`Eliminar el grupo "${group.name || "Grupo"}"?`)
+    typeof window === "undefined" || window.confirm(`Eliminar el grupo "${group.name || "Grupo"}"?`)
 
   if (!confirmed) return
 
@@ -659,7 +673,9 @@ const getGroupMeta = (group) => {
 }
 
 const getAssetLabel = (asset = {}) => {
-  return asset.patente || asset.vehiculo || asset.nombrePantalla || asset.name || asset.id || "Activo"
+  return (
+    asset.patente || asset.vehiculo || asset.nombrePantalla || asset.name || asset.id || "Activo"
+  )
 }
 
 const getAssetMeta = (asset = {}) => {

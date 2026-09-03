@@ -24,9 +24,7 @@ export const getEventRuleIds = (template = {}) => {
       ? [template.eventRuleId]
       : []
 
-  const cleanIds = Array.from(
-    new Set(sourceIds.map(String).filter(Boolean)),
-  )
+  const cleanIds = Array.from(new Set(sourceIds.map(String).filter(Boolean)))
 
   return cleanIds.filter((eventRuleId) => eventRuleId !== "all")
 }
@@ -45,13 +43,7 @@ export const getRuleVehicleGroupIds = (rule = {}) => {
       ? rule.groupIds
       : []
 
-  return Array.from(
-    new Set(
-      sourceIds
-        .map(normalizeReportId)
-        .filter(Boolean),
-    ),
-  )
+  return Array.from(new Set(sourceIds.map(normalizeReportId).filter(Boolean)))
 }
 
 /*
@@ -67,10 +59,7 @@ export const getRuleVehicleGroupIds = (rule = {}) => {
  * - etiquetas
  * - labels
  */
-export const doesRuleApplyToAssetVehicleGroup = ({
-  rule,
-  asset,
-}) => {
+export const doesRuleApplyToAssetVehicleGroup = ({ rule, asset }) => {
   const vehicleGroupIds = getRuleVehicleGroupIds(rule)
 
   if (!vehicleGroupIds.length) {
@@ -78,10 +67,7 @@ export const doesRuleApplyToAssetVehicleGroup = ({
   }
 
   return vehicleGroupIds.some((vehicleGroupId) => {
-    return assetMatchesVehicleGroup(
-      asset,
-      vehicleGroupId,
-    )
+    return assetMatchesVehicleGroup(asset, vehicleGroupId)
   })
 }
 
@@ -91,14 +77,9 @@ export const doesRuleApplyToAssetVehicleGroup = ({
  * Los consumidores nuevos deben usar:
  * doesRuleApplyToAssetVehicleGroup()
  */
-export const doesRuleApplyToAssetGroup =
-  doesRuleApplyToAssetVehicleGroup
+export const doesRuleApplyToAssetGroup = doesRuleApplyToAssetVehicleGroup
 
-export const doesTimelineItemMatchRule = ({
-  item,
-  asset,
-  rule,
-}) => {
+export const doesTimelineItemMatchRule = ({ item, asset, rule }) => {
   if (
     !doesRuleApplyToAssetVehicleGroup({
       asset,

@@ -13,8 +13,9 @@ export const normalizeAssetTagId = (value) => {
 
 export const getAssetTagCompanyKey = (tag = {}) => {
   return (
-    normalizeText(tag.companyId || tag.company?.id || tag.applicationCompanyId || tag.applicationId) ||
-    "sin-empresa"
+    normalizeText(
+      tag.companyId || tag.company?.id || tag.applicationCompanyId || tag.applicationId,
+    ) || "sin-empresa"
   )
 }
 
@@ -76,14 +77,7 @@ const normalizeTagEntry = (tag) => {
 }
 
 const getExplicitTagEntries = (asset = {}) => {
-  const sources = [
-    asset.assetTagIds,
-    asset.assetTags,
-    asset.tags,
-    asset.tagIds,
-    asset.labels,
-    asset.etiquetas,
-  ]
+  const sources = [asset.assetTagIds, asset.assetTags]
 
   return sources
     .filter(Array.isArray)

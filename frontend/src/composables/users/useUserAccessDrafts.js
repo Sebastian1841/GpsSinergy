@@ -87,6 +87,13 @@ export function useUserAccessDrafts({
     })
   }
 
+  const normalizeAccessScope = (access) => {
+    return createCleanScope(access?.scope, {
+      assets: assets.value,
+      applicationId: access?.applicationId,
+    })
+  }
+
   const getAccessAssetTags = (access) => {
     const applicationId = normalizeUserAccessKey(access?.applicationId)
 
@@ -399,6 +406,7 @@ export function useUserAccessDrafts({
     })
 
     const primaryAccess = selectedUserAccesses.value[0]
+
     if (primaryAccess && !isPlatformAdminUserRecord(user)) {
       primaryAccess.role = draftUser.value.initialRole
     }
@@ -477,6 +485,7 @@ export function useUserAccessDrafts({
 
     if (!access) return
     if (isPlatformAdminAccess(access)) return
+
     if (
       !canApplySelfAccessChange(accessId, (nextAccess) => {
         applyToggleModuleAccess(nextAccess, moduleId)
@@ -493,6 +502,7 @@ export function useUserAccessDrafts({
 
     if (!access) return
     if (isPlatformAdminAccess(access)) return
+
     if (
       !canApplySelfAccessChange(accessId, (nextAccess) => {
         applyToggleFunctionAccess(nextAccess, functionId)
@@ -510,6 +520,7 @@ export function useUserAccessDrafts({
 
     if (!functionAccess || !functionAccess.enabled) return
     if (isPlatformAdminAccess(access)) return
+
     if (
       !canApplySelfAccessChange(accessId, (nextAccess) => {
         applyTogglePermission(nextAccess, functionId, permissionId)
@@ -529,7 +540,7 @@ export function useUserAccessDrafts({
     if (!access) return
     if (isPlatformAdminAccess(access)) return
 
-    access.scope = createCleanScope(access.scope)
+    access.scope = normalizeAccessScope(access)
     access.scope.type = nextScopeType
 
     if (nextScopeType === "all-assets") {
@@ -561,22 +572,25 @@ export function useUserAccessDrafts({
 
   const toggleScopeAsset = (accessId, assetId) => {
     const access = getAccessById(accessId)
-    const asset = assets.value.find((item) => String(item.id) === String(assetId))
+    const normalizedAssetId = normalizeUserAccessKey(assetId).trim()
+    const asset = assets.value.find((item) => {
+      return normalizeUserAccessKey(item.id).trim() === normalizedAssetId
+    })
 
-    if (!access || !asset) return
+    if (!access || !asset || !normalizedAssetId) return
     if (isPlatformAdminAccess(access)) return
     if (String(asset.applicationId) !== String(access.applicationId)) return
 
-    access.scope = createCleanScope(access.scope)
+    access.scope = normalizeAccessScope(access)
 
-    if (access.scope.assetIds.includes(assetId)) {
-      access.scope.assetIds = access.scope.assetIds.filter((id) => id !== assetId)
-      return
+    if (access.scope.assetIds.includes(normalizedAssetId)) {
+      access.scope.assetIds = access.scope.assetIds.filter((id) => id !== normalizedAssetId)
+    } else {
+      access.scope.assetIds = [...access.scope.assetIds, normalizedAssetId]
     }
 
     access.scope.sucursalIds = []
     access.scope.assetTagIds = []
-    access.scope.assetIds = [...access.scope.assetIds, assetId]
     access.scope.type = "selected-assets"
   }
 
@@ -593,7 +607,7 @@ export function useUserAccessDrafts({
 
     if (!tagExists) return
 
-    access.scope = createCleanScope(access.scope)
+    access.scope = normalizeAccessScope(access)
 
     const isSelected = access.scope.assetTagIds.some((id) => {
       return normalizeAssetTagId(id) === normalizedTagId

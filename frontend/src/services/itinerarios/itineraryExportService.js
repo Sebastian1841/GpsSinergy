@@ -1886,17 +1886,10 @@ const createExcelWorksheetView = ({
 const clampExcelZoom = (zoomScale) => {
   const normalizedZoom = Math.round(Number(zoomScale) || EXCEL_DETAIL_VIEW_ZOOM)
 
-  return Math.min(
-    EXCEL_REPORT_MAX_VIEW_ZOOM,
-    Math.max(EXCEL_REPORT_MIN_VIEW_ZOOM, normalizedZoom),
-  )
+  return Math.min(EXCEL_REPORT_MAX_VIEW_ZOOM, Math.max(EXCEL_REPORT_MIN_VIEW_ZOOM, normalizedZoom))
 }
 
-const getWorksheetColumnPixelWidths = (
-  worksheet,
-  columnCount,
-  startColumn = 1,
-) => {
+const getWorksheetColumnPixelWidths = (worksheet, columnCount, startColumn = 1) => {
   const configuredColumnCount = worksheet.columns?.length || 0
   const normalizedStartColumn = Math.max(1, Math.trunc(Number(startColumn) || 1))
   const fallbackColumnCount = Math.max(
@@ -1905,9 +1898,7 @@ const getWorksheetColumnPixelWidths = (
     DASHBOARD_TABLE_COLUMN_COUNT,
   )
   const normalizedColumnCount =
-    columnCount == null
-      ? fallbackColumnCount
-      : Math.max(0, Math.trunc(Number(columnCount) || 0))
+    columnCount == null ? fallbackColumnCount : Math.max(0, Math.trunc(Number(columnCount) || 0))
 
   if (normalizedColumnCount <= 0) return []
 
@@ -1920,11 +1911,7 @@ const getWorksheetColumnPixelWidths = (
   }).slice(normalizedStartColumn - 1, requiredColumnCount)
 }
 
-const getWorksheetPixelWidth = (
-  worksheet,
-  columnCount,
-  startColumn = 1,
-) => {
+const getWorksheetPixelWidth = (worksheet, columnCount, startColumn = 1) => {
   return getWorksheetColumnPixelWidths(worksheet, columnCount, startColumn).reduce(
     (total, width) => total + width,
     0,
@@ -1947,13 +1934,7 @@ const getExcelRowHeightEmus = (worksheet, zeroBasedRowIndex) => {
 
 const getExcelImageBottomRight = (
   worksheet,
-  {
-    columnCount,
-    height,
-    nativeRow,
-    rowOffsetPixels = 0,
-    startColumn = 1,
-  },
+  { columnCount, height, nativeRow, rowOffsetPixels = 0, startColumn = 1 },
 ) => {
   let rowIndex = nativeRow
   let remainingHeight = Math.round((height + rowOffsetPixels) * EMUS_PER_PIXEL)
@@ -2218,9 +2199,15 @@ const addExcelRouteMapImage = (
 
   if (!image || typeof workbook.addImage !== "function") return false
 
-  addExcelSectionTitle(worksheet, startRow, report.routeMap?.title || "Mapa de viajes", columnCount, {
-    startColumn,
-  })
+  addExcelSectionTitle(
+    worksheet,
+    startRow,
+    report.routeMap?.title || "Mapa de viajes",
+    columnCount,
+    {
+      startColumn,
+    },
+  )
 
   const imageSize = getExcelRouteMapImageSize(worksheet, columnCount, startColumn)
   const rowOffsetPixels = 6
@@ -2302,8 +2289,7 @@ const addExcelReportTables = (
   const detailTitleRowNumber = Math.max(assetsEndRow + 2, assetsHeaderRowNumber + 3)
   const detailColumns = getDetailColumns(report)
   const detailColumnCount = detailColumns.length
-  const shouldStretchDetailTable =
-    detailColumnCount > 0 && detailColumnCount < columnCount
+  const shouldStretchDetailTable = detailColumnCount > 0 && detailColumnCount < columnCount
   const detailTableRanges = shouldStretchDetailTable
     ? getDistributedColumnRanges(detailColumns, columnCount, startColumnNumber)
     : getDistributedColumnRanges(detailColumns, detailColumnCount, startColumnNumber)
@@ -2470,12 +2456,7 @@ const getExcelDashboardCardRanges = (
   startColumn = 1,
 ) => {
   return getDistributedColumnRanges(
-    [
-      { weight: 1 },
-      { weight: 1 },
-      { weight: 1 },
-      { weight: 1 },
-    ],
+    [{ weight: 1 }, { weight: 1 }, { weight: 1 }, { weight: 1 }],
     columnCount,
     startColumn,
   )
@@ -2651,12 +2632,7 @@ export const getExcelReportWorksheetLayout = (report) => {
   }
 }
 
-const prepareExcelChartArea = (
-  worksheet,
-  layout,
-  columnCount,
-  { startColumn = 1 } = {},
-) => {
+const prepareExcelChartArea = (worksheet, layout, columnCount, { startColumn = 1 } = {}) => {
   if (!layout.chartsEnabled) return
 
   addExcelSectionTitle(worksheet, layout.chartSectionRow, "Graficos recomendados", columnCount, {
@@ -2726,7 +2702,9 @@ const buildChartsWorksheet = async (workbook, report) => {
 
     const contentIndex = index - (reportStartColumn - 1)
 
-    return defaultDashboardColumns[contentIndex] || { width: detailColumns[contentIndex]?.width || 14 }
+    return (
+      defaultDashboardColumns[contentIndex] || { width: detailColumns[contentIndex]?.width || 14 }
+    )
   })
   sheet.views = [
     createExcelWorksheetView({

@@ -35,9 +35,7 @@ const getRuleVehicleGroupIds = (rule = {}) => {
       ? rule.groupIds
       : []
 
-  return Array.from(
-    new Set(sourceIds.map(normalizeVehicleGroupId).filter(Boolean)),
-  )
+  return Array.from(new Set(sourceIds.map(normalizeVehicleGroupId).filter(Boolean)))
 }
 
 const doesRuleApplyToVehicleGroup = ({ asset, rule }) => {
@@ -226,7 +224,7 @@ const hasMeaningfulValue = (value) => {
 
   return Boolean(
     normalizedValue &&
-      !["-", "n/a", "na", "null", "undefined", "sin datos", "sin dato"].includes(normalizedValue),
+    !["-", "n/a", "na", "null", "undefined", "sin datos", "sin dato"].includes(normalizedValue),
   )
 }
 

@@ -117,17 +117,25 @@ const visibleScopeType = computed(() => {
 })
 
 const selectedAssetIds = computed(() => {
+  const currentAssetIds = Array.isArray(props.access.scope?.assetIds)
+    ? props.access.scope.assetIds.map((assetId) => String(assetId))
+    : []
+
   if (props.access.scope?.type !== "sucursal") {
-    return props.access.scope?.assetIds || []
+    return currentAssetIds
   }
 
   const legacySucursalIds = new Set(
     (props.access.scope?.sucursalIds || []).map((sucursalId) => String(sucursalId)),
   )
 
-  return scopeAssets.value
-    .filter((asset) => legacySucursalIds.has(String(asset.sucursalId || "")))
-    .map((asset) => asset.id)
+  const legacyAssetIds = scopeAssets.value
+    .filter((asset) => {
+      return legacySucursalIds.has(String(asset.sucursalId || ""))
+    })
+    .map((asset) => String(asset.id))
+
+  return Array.from(new Set([...currentAssetIds, ...legacyAssetIds]))
 })
 
 const assetTagOptions = computed(() => {

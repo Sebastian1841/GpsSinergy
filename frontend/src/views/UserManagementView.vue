@@ -1,5 +1,7 @@
 <template>
-  <section class="users-management-readable h-full min-h-0 overflow-hidden bg-[#f3f6fa] text-slate-900">
+  <section
+    class="users-management-readable h-full min-h-0 overflow-hidden bg-[#f3f6fa] text-slate-900"
+  >
     <div class="grid h-full min-h-0 grid-rows-[auto_1fr]">
       <UserManagementHeader
         :summary-items="summaryItems"

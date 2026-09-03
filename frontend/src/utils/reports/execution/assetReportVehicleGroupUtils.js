@@ -3,11 +3,7 @@ import { normalizeReportId } from "./assetReportExecutionUtils.js"
 const toArray = (value) => {
   if (Array.isArray(value)) return value
 
-  if (
-    value === undefined ||
-    value === null ||
-    String(value).trim() === ""
-  ) {
+  if (value === undefined || value === null || String(value).trim() === "") {
     return []
   }
 
@@ -15,21 +11,11 @@ const toArray = (value) => {
 }
 
 const normalizeIds = (values = []) => {
-  return [
-    ...new Set(
-      values
-        .map((value) => normalizeReportId(value))
-        .filter(Boolean),
-    ),
-  ]
+  return [...new Set(values.map((value) => normalizeReportId(value)).filter(Boolean))]
 }
 
 export const normalizeReportVehicleGroup = (group = {}) => {
-  const id = normalizeReportId(
-    group.vehicleGroupId ??
-      group.groupId ??
-      group.id,
-  )
+  const id = normalizeReportId(group.vehicleGroupId ?? group.groupId ?? group.id)
 
   if (!id) return null
 
@@ -60,18 +46,12 @@ export const getAssetVehicleGroupIds = (asset = {}) => {
   ])
 }
 
-export const assetMatchesVehicleGroup = (
-  asset,
-  vehicleGroupId,
-) => {
-  const normalizedVehicleGroupId =
-    normalizeReportId(vehicleGroupId)
+export const assetMatchesVehicleGroup = (asset, vehicleGroupId) => {
+  const normalizedVehicleGroupId = normalizeReportId(vehicleGroupId)
 
   if (!normalizedVehicleGroupId) {
     return true
   }
 
-  return getAssetVehicleGroupIds(asset).includes(
-    normalizedVehicleGroupId,
-  )
+  return getAssetVehicleGroupIds(asset).includes(normalizedVehicleGroupId)
 }

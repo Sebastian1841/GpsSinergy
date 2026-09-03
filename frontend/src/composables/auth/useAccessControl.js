@@ -68,11 +68,8 @@ export function useAccessControl() {
       activeAccesses.value.map((access) => [
         normalizeKey(access.id),
         {
-          sucursalIds: new Set((access.scope?.sucursalIds || []).map(normalizeKey)),
           assetIds: new Set((access.scope?.assetIds || []).map(normalizeKey)),
-          assetTagIds: new Set(
-            (access.scope?.assetTagIds || access.scope?.tagIds || []).map(normalizeAssetTagId),
-          ),
+          assetTagIds: new Set((access.scope?.assetTagIds || []).map(normalizeAssetTagId)),
         },
       ]),
     )
@@ -181,34 +178,16 @@ export function useAccessControl() {
     }
 
     const scope = access?.scope || {}
+    const scopeIndexes = scopeIndexesByAccessId.value.get(normalizeKey(access.id))
 
     if (scope.type === "all-assets") return true
 
-    if (scope.type === "sucursal") {
-      const company = companiesById.value.get(normalizeKey(asset.companyId))
-      const activeSucursalIds = new Set(
-        (company?.sucursales || [])
-          .filter((sucursal) => sucursal.active !== false)
-          .map((sucursal) => normalizeKey(sucursal.id)),
-      )
-      const sucursalIds = scopeIndexesByAccessId.value.get(normalizeKey(access.id))?.sucursalIds
-
-      return (
-        activeSucursalIds.has(normalizeKey(asset.sucursalId)) &&
-        sucursalIds?.has(normalizeKey(asset.sucursalId))
-      )
-    }
-
     if (scope.type === "selected-assets") {
-      const assetIds = scopeIndexesByAccessId.value.get(normalizeKey(access.id))?.assetIds
-
-      return assetIds?.has(normalizeKey(asset.id))
+      return scopeIndexes?.assetIds.has(normalizeKey(asset.id))
     }
 
     if (scope.type === "asset-tags") {
-      const assetTagIds = scopeIndexesByAccessId.value.get(normalizeKey(access.id))?.assetTagIds
-
-      return assetMatchesTagIds(asset, Array.from(assetTagIds || []))
+      return assetMatchesTagIds(asset, Array.from(scopeIndexes?.assetTagIds || []))
     }
 
     return false

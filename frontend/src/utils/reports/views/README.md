@@ -43,10 +43,10 @@ define que botones de descarga y que imagenes de mapa quedan disponibles al
 ejecutar o exportar. Evitar volver a nombrar ese paso como `Salida`, porque no
 describe bien la accion para el usuario.
 
-El preview de `Exportacion` debe representar formatos distintos. PDF usa las
-columnas de `getPdfVisibleReportColumns` para simular el documento compacto y
-avisar si habra `Detalle adicional`; Excel simula la hoja visual `Reporte` y
-deja claro que el detalle completo queda disponible en hojas auxiliares.
+El preview de `Exportacion` debe representar formatos distintos mediante
+`assetReportRenderModelUtils.js`. PDF usa el corte compacto del modelo comun y
+avisa si habra `Detalle adicional`; Excel simula la hoja visual `Reporte` y deja
+claro que el detalle completo queda disponible en hojas auxiliares.
 
 `Resumen` debe mantenerse como confirmacion final, no como otro panel de
 edicion. Debe resumir nombre, descripcion, estado, tipo, eventos, vista y
