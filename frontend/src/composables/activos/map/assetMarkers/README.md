@@ -20,3 +20,7 @@ Funciones auxiliares para marcadores de activos en mapa.
 ## Regla de mantenimiento
 
 Separar rendering de calculos. Lo que no dependa de Leaflet debe mantenerse como helper puro y testeable.
+
+Los marcadores usan `stopped` para activos detenidos, con color naranja. Las
+alertas reales deben representarse con otra propiedad para no confundir una
+detencion normal con una falla.

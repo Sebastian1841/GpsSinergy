@@ -20,8 +20,8 @@ const statusMarkerStyles = {
     color: "#0369a1",
   },
   stopped: {
-    fillColor: "#ef4444",
-    color: "#b91c1c",
+    fillColor: "#ff6600",
+    color: "#c2410c",
   },
   offline: {
     fillColor: "#94a3b8",

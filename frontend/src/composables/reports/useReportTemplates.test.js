@@ -198,6 +198,18 @@ test("default idle-time report is based on the ralenti event rule", () => {
   }
 })
 
+test("default stops report includes map-ready location columns", () => {
+  const stopsReport = mockReportTemplates.find((template) => template.id === "stops-report")
+
+  assert.ok(stopsReport)
+  assert.equal(stopsReport.reportTypeId, "stops")
+  assert.deepEqual(stopsReport.eventRuleIds, ["stops", "idle"])
+
+  for (const columnId of ["fecha", "timestamp", "patente", "duracion", "address", "lat", "lng"]) {
+    assert.ok(stopsReport.columns.includes(columnId), `missing ${columnId}`)
+  }
+})
+
 test("default geofence report includes address", () => {
   const geofenceReport = mockReportTemplates.find((template) => template.id === "geofence-events")
 

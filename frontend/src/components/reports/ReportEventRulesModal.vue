@@ -245,9 +245,13 @@ function getNotificationCount(rule = {}) {
     : 0
 }
 
+function getRuleVehicleGroupIds(rule = {}) {
+  return Array.isArray(rule.vehicleGroupIds) ? rule.vehicleGroupIds : rule.groupIds || []
+}
+
 function getRuleSummary(rule) {
   const conditionCount = Array.isArray(rule.conditions) ? rule.conditions.length : 0
-  const groupCount = Array.isArray(rule.groupIds) ? rule.groupIds.length : 0
+  const groupCount = getRuleVehicleGroupIds(rule).length
   const notificationCount = getNotificationCount(rule)
   const usesCalendar = rule.schedule?.mode === "calendar"
   const usesDelay = rule.activation?.mode === "delayed"

@@ -4,15 +4,17 @@ import {
   buildFleetEditPayload,
   createEmptyFleetEditForm,
   createFleetEditFormFromActivo,
-  fleetAssetFormSteps,
+  fleetCreateFormSteps,
   fleetAssetTypeOptions,
   fleetTrackerModelOptions,
+  normalizeFleetAssetTagIds,
 } from "../../../utils/activos/fleetAssetFormUtils.js"
 import { getAssetTypeMapIcon, getAssetTypeOption } from "../../../utils/activos/assetTypeOptions.js"
+import { getOperationalProfile } from "../../../utils/activos/operationalProfileOptions.js"
 import { useFleetFormWizard } from "./useFleetFormWizard.js"
 
 export function useFleetEditForm({ props, emit }) {
-  const steps = fleetAssetFormSteps
+  const steps = fleetCreateFormSteps
   const trackerModelOptions = fleetTrackerModelOptions
   const assetTypeOptions = fleetAssetTypeOptions
 
@@ -44,19 +46,30 @@ export function useFleetEditForm({ props, emit }) {
     return getAssetTypeOption(form.value.assetType || form.value.mapIcon)
   })
 
-  const groupOptions = computed(() => {
-    return (props.groups || []).filter((group) => {
-      return group.active !== false || String(group.id) === String(form.value.sucursalId)
+  const selectedOperationalProfile = computed(() => {
+    return getOperationalProfile(selectedAssetType.value?.value)
+  })
+
+  const selectedAssetTagIds = computed(() => {
+    return normalizeFleetAssetTagIds(form.value.assetTagIds)
+  })
+
+  const selectedAssetTags = computed(() => {
+    const selectedTagIdSet = new Set(selectedAssetTagIds.value)
+
+    return (props.assetTags || []).filter((tag) => {
+      return selectedTagIdSet.has(String(tag.id))
     })
   })
 
-  const selectedGroupLabel = computed(() => {
-    if (!form.value.sucursalId) return "Sin grupo"
+  const selectedAssetTagNames = computed(() => {
+    return selectedAssetTags.value.map((tag) => tag.name).filter(Boolean)
+  })
 
-    return (
-      (props.groups || []).find((group) => String(group.id) === String(form.value.sucursalId))
-        ?.name || "Sin grupo"
-    )
+  const selectedAssetTagLabel = computed(() => {
+    if (!selectedAssetTagNames.value.length) return "Sin etiquetas"
+
+    return selectedAssetTagNames.value.join(", ")
   })
 
   const isAssetStepValid = computed(() => {
@@ -92,8 +105,12 @@ export function useFleetEditForm({ props, emit }) {
       value: selectedAssetType.value?.label,
     },
     {
-      label: "Grupo",
-      value: selectedGroupLabel.value,
+      label: "Perfil",
+      value: selectedOperationalProfile.value?.label,
+    },
+    {
+      label: "Etiquetas",
+      value: selectedAssetTagLabel.value,
     },
     {
       label: "Modelo",
@@ -140,27 +157,46 @@ export function useFleetEditForm({ props, emit }) {
     },
   )
 
-  watch(groupOptions, () => {
-    if (!form.value.sucursalId) return
+  watch(
+    () => props.assetTags,
+    (assetTags) => {
+      if (!props.modelValue) return
 
-    const groupExists = (props.groups || []).some((group) => {
-      return String(group.id) === String(form.value.sucursalId)
-    })
+      const availableTagIdSet = new Set(
+        (assetTags || []).map((tag) => {
+          return String(tag.id)
+        }),
+      )
 
-    if (!groupExists) {
-      form.value.sucursalId = ""
-    }
-  })
+      form.value.assetTagIds = normalizeFleetAssetTagIds(form.value.assetTagIds).filter((tagId) => {
+        return availableTagIdSet.has(String(tagId))
+      })
+    },
+    {
+      deep: true,
+    },
+  )
 
   const isStepCompleted = (index) => {
-    if (index === 0) return isAssetStepValid.value
-    if (index === 1) return isDeviceStepValid.value
+    if (index === 0) {
+      return isAssetStepValid.value
+    }
+
+    if (index === 1) {
+      return selectedAssetTagIds.value.length > 0
+    }
+
     if (index === 2) {
+      return isDeviceStepValid.value
+    }
+
+    if (index === 3) {
       return Boolean(
         form.value.entryDate || form.value.deactivationDate || form.value.suspensionDate,
       )
     }
-    if (index === 3) {
+
+    if (index === 4) {
       return Boolean(form.value.dailyHourmeter || form.value.totalHourmeter || form.value.odometer)
     }
 
@@ -181,7 +217,10 @@ export function useFleetEditForm({ props, emit }) {
 
   const buildPayload = () => {
     return buildFleetEditPayload({
-      form: form.value,
+      form: {
+        ...form.value,
+        assetTagIds: normalizeFleetAssetTagIds(form.value.assetTagIds),
+      },
       activo: props.activo,
       selectedTrackerModel: selectedTrackerModel.value,
       selectedTrackerModelLabel: selectedTrackerModelLabel.value,
@@ -213,7 +252,11 @@ export function useFleetEditForm({ props, emit }) {
     selectedTrackerModel,
     selectedTrackerModelLabel,
     selectedAssetType,
-    groupOptions,
+    selectedOperationalProfile,
+    selectedAssetTagIds,
+    selectedAssetTags,
+    selectedAssetTagNames,
+    selectedAssetTagLabel,
     canSaveActivo,
     requiredStatus,
     summaryItems,

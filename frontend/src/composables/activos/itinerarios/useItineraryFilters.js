@@ -1,5 +1,33 @@
 import { computed, ref, watch } from "vue"
 
+const parseLocalDate = (value) => {
+  const [year, month, day] = String(value || "")
+    .split("-")
+    .map(Number)
+
+  if (!year || !month || !day) return new Date()
+
+  return new Date(year, month - 1, day)
+}
+
+const formatLocalDate = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+
+  return `${year}-${month}-${day}`
+}
+
+const getWeekStart = (date) => {
+  const startDate = new Date(date)
+  const day = startDate.getDay()
+  const daysFromMonday = day === 0 ? 6 : day - 1
+
+  startDate.setDate(startDate.getDate() - daysFromMonday)
+
+  return startDate
+}
+
 export function useItineraryFilters({ latestDate, addDays, rangeOptions }) {
   const activePanelView = ref("itinerarios")
   const searchTerm = ref("")
@@ -13,6 +41,11 @@ export function useItineraryFilters({ latestDate, addDays, rangeOptions }) {
     if (dateRange.value === "custom") {
       return `${fromDate.value || "-"} / ${toDate.value || "-"}`
     }
+
+    if (dateRange.value === "week") return "Esta semana"
+    if (dateRange.value === "last-week") return "Ultima semana"
+    if (dateRange.value === "month") return "Este mes"
+    if (dateRange.value === "last-month") return "Ultimo mes"
 
     return rangeOptions.find((option) => option.value === dateRange.value)?.label || "Hoy"
   })
@@ -34,8 +67,32 @@ export function useItineraryFilters({ latestDate, addDays, rangeOptions }) {
     }
 
     if (dateRange.value === "week") {
-      fromDate.value = addDays(latestDate, -6)
+      fromDate.value = formatLocalDate(getWeekStart(parseLocalDate(latestDate)))
       toDate.value = latestDate
+      return
+    }
+
+    if (dateRange.value === "last-week") {
+      const currentWeekStart = getWeekStart(parseLocalDate(latestDate))
+
+      fromDate.value = addDays(formatLocalDate(currentWeekStart), -7)
+      toDate.value = addDays(formatLocalDate(currentWeekStart), -1)
+      return
+    }
+
+    if (dateRange.value === "month") {
+      const baseDate = parseLocalDate(latestDate)
+
+      fromDate.value = formatLocalDate(new Date(baseDate.getFullYear(), baseDate.getMonth(), 1))
+      toDate.value = latestDate
+      return
+    }
+
+    if (dateRange.value === "last-month") {
+      const baseDate = parseLocalDate(latestDate)
+
+      fromDate.value = formatLocalDate(new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1))
+      toDate.value = formatLocalDate(new Date(baseDate.getFullYear(), baseDate.getMonth(), 0))
     }
   }
 

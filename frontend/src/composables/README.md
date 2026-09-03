@@ -7,10 +7,13 @@ Hooks Vue que coordinan estado, efectos, watchers y flujos de pantalla.
 - `activos/`: estado de activos, mapa, flota, geocercas, rutas e itinerarios.
 - `audit/`: historial de auditoria en cliente.
 - `auth/`: sesion y control de acceso.
-- `companies/`: gestion de empresas y sucursales.
+- `companies/`: gestion de empresas.
+- `layout/`: composicion de datos y estado de controles globales del layout.
 - `location/`: geocodificacion inversa para filas.
+- `maintenance/`: estado local, filtros, calculos y acciones del prototipo de mantenciones.
 - `mock/`: base mock local.
 - `reports/`: ejecucion y configuracion de reportes.
+- `search/`: busquedas transversales usadas por controles globales.
 - `ui/`: estado de UI reutilizable.
 - `users/`: gestion de usuarios y accesos.
 - `workspaces/`: espacios de trabajo y persistencia visual.

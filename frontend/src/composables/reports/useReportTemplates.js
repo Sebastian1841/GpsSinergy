@@ -21,6 +21,7 @@ const REPORT_TEMPLATES_STORAGE_KEY = "sinergy-report-templates"
 const REPORT_DELETED_TEMPLATE_IDS_STORAGE_KEY = "sinergy-report-deleted-template-ids"
 const DEPRECATED_REPORT_TEMPLATE_IDS = new Set(["alerts-report"])
 const DAILY_ITINERARY_TEMPLATE_ID = "daily-itinerary"
+const GEOFENCE_EVENTS_TEMPLATE_ID = "geofence-events"
 
 const isDeprecatedReportTemplate = (template = {}) => {
   return DEPRECATED_REPORT_TEMPLATE_IDS.has(String(template?.id || ""))
@@ -118,6 +119,15 @@ const shouldRestoreDailyItineraryPreset = (template = {}, seedTemplate = {}) => 
   )
 }
 
+const shouldMergeGeofencePresetColumns = (template = {}, seedTemplate = {}) => {
+  const templateId = String(seedTemplate?.id || template?.id || "")
+
+  return (
+    templateId === GEOFENCE_EVENTS_TEMPLATE_ID &&
+    getTemplatePresetVersion(template) < getTemplatePresetVersion(seedTemplate)
+  )
+}
+
 export const resolveReportTemplateWidgets = (template = {}, seedTemplate = {}) => {
   if (shouldRestoreDailyItineraryPreset(template, seedTemplate)) {
     return seedTemplate.widgets || []
@@ -128,6 +138,13 @@ export const resolveReportTemplateWidgets = (template = {}, seedTemplate = {}) =
 
 export const mergeStoredDefaultTemplate = (template, seedTemplate) => {
   const shouldRestorePreset = shouldRestoreDailyItineraryPreset(template, seedTemplate)
+  const shouldMergePresetColumns = shouldMergeGeofencePresetColumns(template, seedTemplate)
+  const mergedColumns = shouldMergePresetColumns
+    ? withRequiredValues(
+        getStoredArrayOrSeedArray(template.columns, seedTemplate.columns),
+        seedTemplate.columns || [],
+      )
+    : getStoredArrayOrSeedArray(template.columns, seedTemplate.columns)
 
   return cloneReportTemplate({
     ...seedTemplate,
@@ -138,7 +155,9 @@ export const mergeStoredDefaultTemplate = (template, seedTemplate) => {
     status: template.status || seedTemplate.status,
     presetVersion: shouldRestorePreset
       ? seedTemplate.presetVersion
-      : template.presetVersion || seedTemplate.presetVersion,
+      : shouldMergePresetColumns
+        ? seedTemplate.presetVersion
+        : template.presetVersion || seedTemplate.presetVersion,
     eventRuleIds: shouldRestorePreset
       ? seedTemplate.eventRuleIds || []
       : getStoredArrayOrSeedArray(template.eventRuleIds, seedTemplate.eventRuleIds),
@@ -150,7 +169,7 @@ export const mergeStoredDefaultTemplate = (template, seedTemplate) => {
       : getStoredArrayOrSeedArray(template.filters, seedTemplate.filters),
     columns: shouldRestorePreset
       ? seedTemplate.columns || []
-      : getStoredArrayOrSeedArray(template.columns, seedTemplate.columns),
+      : mergedColumns,
     widgets: resolveReportTemplateWidgets(template, seedTemplate),
     behaviorOptions: shouldRestorePreset
       ? seedTemplate.behaviorOptions || {}

@@ -37,8 +37,7 @@
       @create-circle="handleCreateCircle"
       @create-polygon="handleCreatePolygon"
       @create-route="handleCreateRoute"
-      @open-edit-geofence-modal="openEditGeofenceModal"
-      @open-geofence-history-selector="openGeofenceHistorySelector"
+      @open-geofence-section="openGeofenceSection"
       @toggle-geofence-visibility="handleToggleGeofenceVisibility"
       @finish-polygon="finishPolygon"
       @finish-route="finishRoute"
@@ -47,42 +46,6 @@
       @cancel="handleCancel"
       @change-map-type="handleChangeMapType"
     />
-
-    <div class="pointer-events-none absolute right-3 top-3 z-[520]">
-      <div
-        class="flex items-center gap-1.5 rounded-xl border border-white/70 bg-white/90 px-2.5 py-1.5 text-[10px] font-black text-[#102372] shadow-lg backdrop-blur-md"
-      >
-        <span class="h-1.5 w-1.5 rounded-full bg-[#FF6600]"></span>
-        <span>{{ currentMapTypeOption.label }}</span>
-      </div>
-    </div>
-
-    <div class="pointer-events-none absolute right-3 top-12 z-[520]">
-      <div
-        class="pointer-events-auto flex items-center gap-1 rounded-xl border border-white/70 bg-white/90 p-1 shadow-lg backdrop-blur-md"
-      >
-        <button
-          type="button"
-          class="rounded-lg px-2.5 py-1.5 text-[10px] font-black transition"
-          :class="
-            showMovementTrails
-              ? 'bg-[#102372] text-white shadow-sm'
-              : 'bg-white text-[#102372] hover:bg-[#f3f5fa]'
-          "
-          @click="toggleMovementTrails"
-        >
-          Estela
-        </button>
-
-        <button
-          type="button"
-          class="rounded-lg bg-white px-2.5 py-1.5 text-[10px] font-black text-[#FF6600] transition hover:bg-[#fff3eb]"
-          @click="clearMovementTrails"
-        >
-          Limpiar
-        </button>
-      </div>
-    </div>
 
     <div
       v-if="plannedRouteMapDraft"
@@ -134,6 +97,7 @@
       :helper-title="helperTitle"
       :helper-text="helperText"
       :draft-geofence-form="draftGeofenceForm"
+      :geofence-groups="geofenceGroups"
       :draft-geofence-preview-name="draftGeofencePreviewName"
       :edit-add-point="editAddPoint"
       :editing-color="editingColor"
@@ -144,25 +108,6 @@
       @update-edit-add-point="handleUpdateEditAddPoint"
       @remove-last-edit-point="removeLastEditPoint"
       @stop-editing="handleStopEditing"
-    />
-
-    <GeofenceSelectorModal
-      v-if="showGeofenceModal || hasMountedGeofenceModal"
-      v-model="showGeofenceModal"
-      :geofence-items="geofenceItems"
-      :selected-geofence-id="activeGeofenceId"
-      :editing-draft="editingDraft"
-      :can-edit="canEditGeofences"
-      @select-edit="selectGeofenceToEdit"
-      @open-history="openGeofenceHistory"
-      @delete-geofence="handleDeleteGeofence"
-    />
-
-    <GeofenceHistoryModal
-      v-if="showGeofenceHistoryModal || hasMountedGeofenceHistoryModal"
-      v-model="showGeofenceHistoryModal"
-      :geofence="selectedHistoryGeofence"
-      :events="selectedHistoryEvents"
     />
   </section>
 </template>
@@ -178,7 +123,6 @@ import GeofenceEditorPanel from "../geocercas/GeofenceEditorPanel.vue"
 import { useActivosMap } from "../../../composables/activos/map/useActivosMap.js"
 import {
   useMapPanelGeofenceActions,
-  useMapPanelGeofenceModals,
   useMapPanelGeofenceState,
 } from "../../../composables/activos/map/useMapPanelGeofences.js"
 import { useMapPanelFullscreen } from "../../../composables/activos/map/useMapPanelFullscreen.js"
@@ -207,6 +151,10 @@ const props = defineProps({
     default: "all",
   },
   geofences: {
+    type: Array,
+    default: () => [],
+  },
+  geofenceGroups: {
     type: Array,
     default: () => [],
   },
@@ -251,6 +199,7 @@ const emit = defineEmits([
   "geofence-updated",
   "geofence-deleted",
   "clear-geofence-selection",
+  "open-geofence-section",
 ])
 
 const panelRef = ref(null)
@@ -273,33 +222,13 @@ const { isFullscreen, toggleFullscreen } = useMapPanelFullscreen(panelRef)
 const geofencePanel = useMapPanelGeofenceState({ props, emit })
 
 const {
-  showGeofenceModal,
-  showGeofenceHistoryModal,
-  activeGeofenceId,
-  selectedHistoryGeofence,
-  selectedHistoryEvents,
   showGeofences,
   draftGeofenceForm,
-  geofenceItems,
   visibleGeofences,
   draftGeofencePreviewName,
   draftGeofenceOptions,
   handleDraftGeofenceField,
-  openEditGeofenceModal,
-  openGeofenceHistorySelector,
-  openGeofenceHistory,
 } = geofencePanel
-
-const {
-  GeofenceHistoryModal,
-  GeofenceSelectorModal,
-  hasMountedGeofenceHistoryModal,
-  hasMountedGeofenceModal,
-  preloadGeofenceModals,
-} = useMapPanelGeofenceModals({
-  showGeofenceModal,
-  showGeofenceHistoryModal,
-})
 
 const mapTypeOptions = [
   {
@@ -329,9 +258,13 @@ const mapTypeOptions = [
   },
 ]
 
-const currentMapTypeOption = computed(() => {
-  return mapTypeOptions.find((option) => option.value === mapType.value) || mapTypeOptions[0]
-})
+const openGeofenceSection = async () => {
+  if (isFullscreen.value) {
+    await toggleFullscreen()
+  }
+
+  emit("open-geofence-section")
+}
 
 const mapStatsActivos = computed(() => {
   return props.allActivos.length ? props.allActivos : props.activos
@@ -400,10 +333,6 @@ const {
   updateEditingGeofenceMeta,
 
   applyActivoTelemetryBatch,
-
-  showMovementTrails,
-  toggleMovementTrails,
-  clearMovementTrails,
 } = useActivosMap({
   props: mapProps,
   emit,
@@ -439,7 +368,6 @@ const {
   handleExternalGeofenceSelection,
   handleStopEditing,
   handleCancel,
-  handleDeleteGeofence,
 } = useMapPanelGeofenceActions({
   props,
   state: geofencePanel,
@@ -546,8 +474,6 @@ watch(
 )
 
 onMounted(() => {
-  preloadGeofenceModals()
-
   if (!props.selectedGeofenceId) return
 
   window.setTimeout(() => {

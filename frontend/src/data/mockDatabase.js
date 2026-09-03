@@ -19,13 +19,14 @@ const createFunctionAccess = (functionId, permissions = {}) => ({
   permissions: createPermissions(permissions),
 })
 
-const systemModuleIds = ["assets", "users", "audit"]
+const systemModuleIds = ["assets", "maintenance", "users", "audit"]
 
 const getModuleIdFromFunctionId = (functionId) => {
   const normalizedFunctionId = String(functionId || "")
 
   if (normalizedFunctionId.startsWith("users-")) return "users"
   if (normalizedFunctionId.startsWith("audit-")) return "audit"
+  if (normalizedFunctionId.startsWith("maintenance-")) return "maintenance"
 
   return "assets"
 }
@@ -42,6 +43,7 @@ const createAccessScope = (scope = {}) => {
     type: "all-assets",
     sucursalIds: [],
     assetIds: [],
+    assetTagIds: [],
     ...cleanScope,
   }
 }
@@ -81,6 +83,7 @@ const createAsset = ({
   companyId,
   applicationId,
   sucursalId,
+  assetTagIds = [],
   patente,
   vehiculo,
   conductor,
@@ -100,6 +103,13 @@ const createAsset = ({
   companyId,
   applicationId,
   sucursalId,
+  assetTagIds: [
+    ...new Set(
+      (Array.isArray(assetTagIds) ? assetTagIds : [])
+        .map((tagId) => String(tagId ?? "").trim())
+        .filter(Boolean),
+    ),
+  ],
   source: "mock-database",
   estado,
   vehiculo,
@@ -344,6 +354,72 @@ const mockApplicationDefinitions = mockCompanies.map((company) => ({
   type: company.status === "internal" ? "Administracion interna" : "Empresa cliente",
 }))
 
+const mockAssetTags = [
+  {
+    id: "asset-tag-001",
+    companyId: "company-001",
+    applicationId: "app-001",
+    name: "Supervisores",
+    active: true,
+  },
+  {
+    id: "asset-tag-002",
+    companyId: "company-001",
+    applicationId: "app-001",
+    name: "Faena Norte",
+    active: true,
+  },
+  {
+    id: "asset-tag-003",
+    companyId: "company-001",
+    applicationId: "app-001",
+    name: "Contratistas",
+    active: true,
+  },
+  {
+    id: "asset-tag-004",
+    companyId: "company-002",
+    applicationId: "app-002",
+    name: "Supervisores",
+    active: true,
+  },
+  {
+    id: "asset-tag-005",
+    companyId: "company-002",
+    applicationId: "app-002",
+    name: "Operación forestal",
+    active: true,
+  },
+  {
+    id: "asset-tag-006",
+    companyId: "company-003",
+    applicationId: "app-003",
+    name: "Calama",
+    active: true,
+  },
+  {
+    id: "asset-tag-007",
+    companyId: "company-003",
+    applicationId: "app-003",
+    name: "Antofagasta",
+    active: true,
+  },
+  {
+    id: "asset-tag-008",
+    companyId: "company-003",
+    applicationId: "app-003",
+    name: "Faena Sierra",
+    active: true,
+  },
+  {
+    id: "asset-tag-009",
+    companyId: "company-004",
+    applicationId: "app-004",
+    name: "Soporte",
+    active: true,
+  },
+]
+
 const SAN_PEDRO_LOAD_TEST_ASSET_TARGET = 280
 const SAN_PEDRO_LOAD_TEST_EXISTING_ASSETS = 16
 
@@ -380,8 +456,11 @@ const buildSanPedroLoadTestAsset = (index) => {
   const ring = Math.floor(index / sanPedroLoadTestCenters.length)
   const angle = (index * 137.508 * Math.PI) / 180
   const radius = 0.008 + (ring % 9) * 0.004
-  const speed = index % 5 === 0 ? 0 : 22 + (index % 58)
-  const estado = index % 13 === 0 ? "offline" : speed > 0 ? "moving" : "idle"
+  const isOffline = index % 13 === 0
+  const isStopped = !isOffline && index % 5 === 0
+  const isIdle = !isOffline && !isStopped && index % 11 === 0
+  const estado = isOffline ? "offline" : isStopped ? "stopped" : isIdle ? "idle" : "moving"
+  const speed = estado === "moving" ? 22 + (index % 58) : 0
   const patenteNumber = String(sequence).padStart(3, "0")
 
   return createAsset({
@@ -425,7 +504,7 @@ export const mockAssets = [
     patente: "MAES-01",
     vehiculo: "Camion reparto 01",
     conductor: "Carlos Ramirez",
-    estado: "idle",
+    estado: "stopped",
     lat: -33.4489,
     lng: -70.6693,
     odometro: 125430,
@@ -539,7 +618,7 @@ export const mockAssets = [
     patente: "IQQU-14",
     vehiculo: "Camion Iquique",
     conductor: "Ramon Paredes",
-    estado: "idle",
+    estado: "stopped",
     lat: -20.2133,
     lng: -70.1524,
     odometro: 118430,
@@ -621,7 +700,7 @@ export const mockAssets = [
     patente: "CCPC-19",
     vehiculo: "Camion Concepcion",
     conductor: "Sofia Carrasco",
-    estado: "idle",
+    estado: "stopped",
     lat: -36.8201,
     lng: -73.0444,
     odometro: 101650,
@@ -678,7 +757,9 @@ export const mockAssets = [
     datosUlt: "12:18:49",
     imei: "868123450022",
   }),
+
   ...mockSanPedroLoadTestAssets,
+
   createAsset({
     id: "asset-007",
     companyId: "company-002",
@@ -791,6 +872,11 @@ const mockSystemModules = [
     description: "Administracion de cuentas, empresas asignadas y permisos.",
   },
   {
+    id: "maintenance",
+    name: "Mantenciones",
+    description: "Control visual de planes, ordenes y vencimientos de mantenimiento.",
+  },
+  {
     id: "audit",
     name: "Auditoria",
     description: "Trazabilidad de sesiones, permisos, reportes y cambios operativos.",
@@ -798,8 +884,18 @@ const mockSystemModules = [
 ]
 
 const mockModuleFunctions = [
-  { id: "gps", moduleId: "assets", name: "Control GPS", description: "Monitoreo de activos." },
-  { id: "geofences", moduleId: "assets", name: "Geocercas", description: "Control territorial." },
+  {
+    id: "gps",
+    moduleId: "assets",
+    name: "Control GPS",
+    description: "Monitoreo de activos.",
+  },
+  {
+    id: "geofences",
+    moduleId: "assets",
+    name: "Geocercas",
+    description: "Control territorial.",
+  },
   {
     id: "itineraries",
     moduleId: "assets",
@@ -812,7 +908,30 @@ const mockModuleFunctions = [
     name: "Grupos",
     description: "Administracion y asignacion de grupos de activos.",
   },
-  { id: "reports", moduleId: "assets", name: "Reportes", description: "Informes operativos." },
+  {
+    id: "reports",
+    moduleId: "assets",
+    name: "Reportes",
+    description: "Informes operativos.",
+  },
+  {
+    id: "maintenance-view",
+    moduleId: "maintenance",
+    name: "Ver mantenciones",
+    description: "Consultar el tablero de mantenciones.",
+  },
+  {
+    id: "maintenance-orders",
+    moduleId: "maintenance",
+    name: "Gestionar ordenes",
+    description: "Crear y actualizar ordenes de mantenimiento.",
+  },
+  {
+    id: "maintenance-plans",
+    moduleId: "maintenance",
+    name: "Gestionar planes",
+    description: "Configurar planes base de mantenimiento.",
+  },
   {
     id: "users-view",
     moduleId: "users",
@@ -858,12 +977,20 @@ const mockPermissions = [
 ]
 
 const mockOperationalScopes = [
-  { id: "all-assets", name: "Todos los activos", description: "Acceso a toda la flota." },
-  { id: "sucursal", name: "Grupo asignado", description: "Acceso por grupo." },
+  {
+    id: "all-assets",
+    name: "Todos los activos",
+    description: "Acceso a toda la flota.",
+  },
   {
     id: "selected-assets",
     name: "Activos especificos",
     description: "Acceso a activos seleccionados.",
+  },
+  {
+    id: "asset-tags",
+    name: "Etiquetas de activos",
+    description: "Acceso a activos que compartan etiquetas operativas.",
   },
 ]
 
@@ -937,6 +1064,23 @@ const adminAuditFunctions = [
   createFunctionAccess("audit-export", { view: true }),
 ]
 
+const adminMaintenanceFunctions = [
+  createFunctionAccess("maintenance-view", { view: true }),
+  createFunctionAccess("maintenance-orders", { view: true, edit: true }),
+  createFunctionAccess("maintenance-plans", { view: true, edit: true, admin: true }),
+]
+
+const getAssetIdsBySucursal = ({ applicationId, sucursalId }) => {
+  return mockAssets
+    .filter((asset) => {
+      return (
+        String(asset.applicationId) === String(applicationId) &&
+        String(asset.sucursalId) === String(sucursalId)
+      )
+    })
+    .map((asset) => asset.id)
+}
+
 const mockUserAccesses = [
   createAccess({
     id: "access-001",
@@ -945,11 +1089,16 @@ const mockUserAccesses = [
     role: "admin",
     functions: [
       ...adminAssetFunctions,
+      ...adminMaintenanceFunctions,
       ...adminAuditFunctions,
       createFunctionAccess("users-view", { view: true, edit: true, admin: true }),
       createFunctionAccess("users-create", { view: true, edit: true, admin: true }),
       createFunctionAccess("users-edit", { view: true, edit: true, admin: true }),
-      createFunctionAccess("users-permissions", { view: true, edit: true, admin: true }),
+      createFunctionAccess("users-permissions", {
+        view: true,
+        edit: true,
+        admin: true,
+      }),
     ],
     scope: {
       type: "all-assets",
@@ -960,7 +1109,7 @@ const mockUserAccesses = [
     userId: "user-001",
     applicationId: "app-002",
     role: "supervisor",
-    functions: [...adminAssetFunctions, ...adminAuditFunctions],
+    functions: [...adminAssetFunctions, ...adminMaintenanceFunctions, ...adminAuditFunctions],
     scope: {
       type: "all-assets",
     },
@@ -974,10 +1123,14 @@ const mockUserAccesses = [
       createFunctionAccess("gps", { view: true, edit: true }),
       createFunctionAccess("itineraries", { view: true }),
       createFunctionAccess("branches", { view: true }),
+      createFunctionAccess("maintenance-view", { view: true }),
     ],
     scope: {
-      type: "sucursal",
-      sucursalIds: ["sucursal-company-003-001"],
+      type: "selected-assets",
+      assetIds: getAssetIdsBySucursal({
+        applicationId: "app-003",
+        sucursalId: "sucursal-company-003-001",
+      }),
     },
   }),
   createAccess({
@@ -990,10 +1143,14 @@ const mockUserAccesses = [
       createFunctionAccess("geofences", { view: true, edit: true }),
       createFunctionAccess("branches", { view: true }),
       createFunctionAccess("reports", { view: true }),
+      createFunctionAccess("maintenance-view", { view: true }),
     ],
     scope: {
-      type: "sucursal",
-      sucursalIds: ["sucursal-company-001-002"],
+      type: "selected-assets",
+      assetIds: getAssetIdsBySucursal({
+        applicationId: "app-001",
+        sucursalId: "sucursal-company-001-002",
+      }),
     },
   }),
   createAccess({
@@ -1016,6 +1173,8 @@ const mockUserAccesses = [
     functions: [
       createFunctionAccess("gps", { view: true }),
       createFunctionAccess("branches", { view: true }),
+      createFunctionAccess("maintenance-view", { view: true }),
+      createFunctionAccess("maintenance-orders", { view: true, edit: true }),
     ],
     scope: {
       type: "all-assets",
@@ -1026,6 +1185,7 @@ const mockUserAccesses = [
 export const mockDatabaseSeed = {
   companies: mockCompanies,
   applicationDefinitions: mockApplicationDefinitions,
+  assetTags: mockAssetTags,
   assets: mockAssets,
   users: mockUsers,
   accesses: mockUserAccesses,

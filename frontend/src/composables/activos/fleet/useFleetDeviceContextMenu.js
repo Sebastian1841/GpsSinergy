@@ -14,7 +14,7 @@ const resolveBoolean = (value) => {
 }
 
 export function useFleetDeviceContextMenu({
-  canManageAssets = false,
+  canOpenDeviceContextMenu = false,
   closeColumns = () => {},
   onDeviceAction = () => {},
 } = {}) {
@@ -25,15 +25,15 @@ export function useFleetDeviceContextMenu({
   }
 
   const openDeviceContextMenu = (event, activo) => {
-    if (!activo || !resolveBoolean(canManageAssets)) return
+    if (!activo || !resolveBoolean(canOpenDeviceContextMenu)) return
 
     event?.preventDefault?.()
     event?.stopPropagation?.()
 
     closeColumns()
 
-    const menuWidth = 186
-    const menuHeight = 118
+    const menuWidth = 268
+    const menuHeight = 306
     const padding = 8
 
     const viewportWidth =
@@ -59,11 +59,8 @@ export function useFleetDeviceContextMenu({
     openDeviceContextMenu(event, activo)
   }
 
-  const handleDeviceAction = ({ action, activo } = {}) => {
-    onDeviceAction({
-      action,
-      activo,
-    })
+  const handleDeviceAction = (payload = {}) => {
+    onDeviceAction(payload)
 
     closeDeviceContextMenu()
   }

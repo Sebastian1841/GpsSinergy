@@ -5,6 +5,7 @@ import {
   getAssetTypeMapIcon,
   getAssetTypeOption,
 } from "./assetTypeOptions.js"
+import { getOperationalProfile } from "./operationalProfileOptions.js"
 
 export const fleetAssetFormSteps = [
   {
@@ -37,14 +38,43 @@ export const fleetAssetFormSteps = [
   },
 ]
 
-export const fleetCreateFormSteps = fleetAssetFormSteps.map((step) => {
-  if (step.key !== "metrics") return step
-
-  return {
-    ...step,
+export const fleetCreateFormSteps = [
+  {
+    key: "asset",
+    label: "Activo",
+    helper: "Nombre",
+    eyebrow: "Módulo 01",
+    title: "Datos del activo",
+  },
+  {
+    key: "tags",
+    label: "Etiquetas",
+    helper: "Clasificación",
+    eyebrow: "Módulo 02",
+    title: "Etiquetas del activo",
+  },
+  {
+    key: "device",
+    label: "Dispositivo",
+    helper: "GPS / IMEI",
+    eyebrow: "Módulo 03",
+    title: "Dispositivo GPS",
+  },
+  {
+    key: "admin",
+    label: "Fechas",
+    helper: "Ciclo",
+    eyebrow: "Módulo 04",
+    title: "Fechas administrativas",
+  },
+  {
+    key: "metrics",
+    label: "Métricas",
+    helper: "Iniciales",
+    eyebrow: "Módulo 05",
     title: "Métricas iniciales",
-  }
-})
+  },
+]
 
 export const fleetTrackerModelOptions = [
   {
@@ -81,11 +111,28 @@ export const fleetTrackerModelOptions = [
 
 export const fleetAssetTypeOptions = assetTypeOptions
 
+export const normalizeFleetAssetTagIds = (tagIds = []) => {
+  if (!Array.isArray(tagIds)) return []
+
+  return [
+    ...new Set(
+      tagIds
+        .map((tagId) => {
+          if (tagId === null || tagId === undefined) return ""
+
+          return String(tagId).trim()
+        })
+        .filter(Boolean),
+    ),
+  ]
+}
+
 export const createEmptyFleetEditForm = () => ({
   assetType: DEFAULT_ASSET_TYPE,
   assetTypeLabel: getAssetTypeLabel(DEFAULT_ASSET_TYPE),
   mapIcon: getAssetTypeMapIcon(DEFAULT_ASSET_TYPE),
   sucursalId: "",
+  assetTagIds: [],
   trackerModel: "",
   trackerModelLabel: "",
   trackerManufacturer: "",
@@ -107,6 +154,7 @@ export const createEmptyFleetCreateForm = () => ({
   assetTypeLabel: getAssetTypeLabel(DEFAULT_ASSET_TYPE),
   mapIcon: getAssetTypeMapIcon(DEFAULT_ASSET_TYPE),
   sucursalId: "",
+  assetTagIds: [],
   trackerModel: "",
   imei: "",
   protocol: "tcp",
@@ -185,19 +233,25 @@ export const createFleetEditFormFromActivo = (
     assetType: assetTypeOption.value,
     assetTypeLabel: activo.assetTypeLabel || activo.tipoActivoLabel || assetTypeOption.label,
     mapIcon: activo.mapIcon || activo.markerIcon || activo.iconType || assetTypeOption.mapIcon,
+
     sucursalId: activo.sucursalId || "",
 
+    assetTagIds: normalizeFleetAssetTagIds(activo.assetTagIds),
+
     trackerModel: findFleetTrackerModel(activo, trackerModelOptions),
+
     trackerModelLabel:
       activo.trackerModelLabel && activo.trackerModelLabel !== "-"
         ? String(activo.trackerModelLabel)
         : "",
+
     trackerManufacturer:
       activo.trackerManufacturer && activo.trackerManufacturer !== "-"
         ? String(activo.trackerManufacturer)
         : "",
 
     imei: activo.imei && activo.imei !== "-" ? String(activo.imei) : "",
+
     protocol:
       activo.protocol && activo.protocol !== "-" ? String(activo.protocol).toLowerCase() : "tcp",
 
@@ -217,11 +271,15 @@ export const createFleetEditFormFromActivo = (
         : String(activo.description || ""),
 
     entryDate: normalizeFleetAssetDate(activo.fechaIngreso || activo.entryDate),
+
     deactivationDate: normalizeFleetAssetDate(activo.fechaBaja || activo.deactivationDate),
+
     suspensionDate: normalizeFleetAssetDate(activo.fechaSuspension || activo.suspensionDate),
 
     dailyHourmeter: extractFleetAssetNumber(activo.horometroDiario ?? activo.dailyHourmeter),
+
     totalHourmeter: extractFleetAssetNumber(activo.horometroTotal ?? activo.totalHourmeter),
+
     odometer: extractFleetAssetNumber(activo.odometro ?? activo.odometer),
   }
 }
@@ -235,26 +293,48 @@ export const buildFleetEditPayload = ({
   const displayName = form.displayName.trim()
   const name = form.name.trim() || displayName
   const description = form.description.trim()
+
   const assetTypeOption = getAssetTypeOption(form.assetType || form.mapIcon)
+
+  const operationalProfile = getOperationalProfile(assetTypeOption.value)
 
   return {
     assetType: assetTypeOption.value,
     assetTypeLabel: assetTypeOption.label,
+
     tipoActivo: assetTypeOption.value,
     tipoActivoLabel: assetTypeOption.label,
+
     mapIcon: assetTypeOption.mapIcon,
     markerIcon: assetTypeOption.mapIcon,
     iconType: assetTypeOption.mapIcon,
+
+    operationalProfileId: operationalProfile.id,
+    operationalProfileLabel: operationalProfile.label,
+
+    defaultReportTypeIds: [...operationalProfile.reportTypeIds],
+
+    defaultColumnKeys: [...operationalProfile.columnKeys],
+
+    defaultEventRuleIds: [...operationalProfile.eventRuleIds],
+
     sucursalId: form.sucursalId || null,
 
+    assetTagIds: normalizeFleetAssetTagIds(form.assetTagIds ?? activo?.assetTagIds),
+
     vehiculo: displayName || "Activo sin nombre",
+
     name: name || "Activo sin nombre",
+
     nombrePantalla: displayName || name || "Activo sin nombre",
+
     displayName: displayName || name || "Activo sin nombre",
 
     trackerModel: form.trackerModel || activo?.trackerModel || "-",
+
     trackerModelLabel:
       selectedTrackerModelLabel || form.trackerModelLabel || activo?.trackerModelLabel || "-",
+
     trackerManufacturer:
       selectedTrackerModel?.manufacturer ||
       form.trackerManufacturer ||
@@ -262,27 +342,35 @@ export const buildFleetEditPayload = ({
       "-",
 
     imei: form.imei.trim() || "-",
+
     protocol: form.protocol || "tcp",
 
     descripcion: description || "-",
+
     description,
 
     fechaIngreso: form.entryDate || "-",
+
     entryDate: form.entryDate,
 
     fechaBaja: form.deactivationDate || "-",
+
     deactivationDate: form.deactivationDate,
 
     fechaSuspension: form.suspensionDate || "-",
+
     suspensionDate: form.suspensionDate,
 
     horometroDiario: toFleetNumberOrEmpty(form.dailyHourmeter),
+
     dailyHourmeter: toFleetNumberOrEmpty(form.dailyHourmeter),
 
     horometroTotal: toFleetNumberOrEmpty(form.totalHourmeter),
+
     totalHourmeter: toFleetNumberOrEmpty(form.totalHourmeter),
 
     odometro: toFleetNumberOrEmpty(form.odometer),
+
     odometer: toFleetNumberOrEmpty(form.odometer),
 
     connectionStatus: "updated",
@@ -296,29 +384,60 @@ export const buildFleetCreatePayload = ({
 }) => {
   const assetTypeOption = getAssetTypeOption(form.assetType || form.mapIcon)
 
+  const operationalProfile = getOperationalProfile(assetTypeOption.value)
+
   return {
     assetType: assetTypeOption.value,
     assetTypeLabel: assetTypeOption.label,
+
     tipoActivo: assetTypeOption.value,
     tipoActivoLabel: assetTypeOption.label,
+
     mapIcon: assetTypeOption.mapIcon,
     markerIcon: assetTypeOption.mapIcon,
     iconType: assetTypeOption.mapIcon,
+
+    operationalProfileId: operationalProfile.id,
+    operationalProfileLabel: operationalProfile.label,
+
+    defaultReportTypeIds: [...operationalProfile.reportTypeIds],
+
+    defaultColumnKeys: [...operationalProfile.columnKeys],
+
+    defaultEventRuleIds: [...operationalProfile.eventRuleIds],
+
     sucursalId: form.sucursalId || null,
+
+    assetTagIds: normalizeFleetAssetTagIds(form.assetTagIds),
+
     trackerModel: form.trackerModel,
+
     trackerModelLabel: selectedTrackerModelLabel,
+
     trackerManufacturer: selectedTrackerModel?.manufacturer || "",
+
     imei: form.imei.trim(),
+
     protocol: form.protocol || "tcp",
+
     name: form.name.trim(),
+
     displayName: form.displayName.trim(),
+
     description: form.description.trim(),
+
     entryDate: form.entryDate,
+
     deactivationDate: form.deactivationDate,
+
     suspensionDate: form.suspensionDate,
+
     dailyHourmeter: toFleetNumberOrEmpty(form.dailyHourmeter),
+
     totalHourmeter: toFleetNumberOrEmpty(form.totalHourmeter),
+
     odometer: toFleetNumberOrEmpty(form.odometer),
+
     connectionStatus: "pending",
   }
 }

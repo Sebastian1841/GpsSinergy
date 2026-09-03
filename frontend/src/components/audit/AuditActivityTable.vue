@@ -1,216 +1,269 @@
 <template>
   <section
-    class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white"
+    class="flex min-h-0 flex-1 flex-col overflow-hidden bg-white"
   >
-    <header
-      class="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-5 py-3.5"
+    <!-- REGISTROS -->
+    <div
+      v-if="filteredCount"
+      class="min-h-0 flex-1 overflow-auto bg-white"
     >
-      <div class="flex items-center gap-2">
-        <h2 class="text-sm font-bold text-[#102372]">Actividad</h2>
-
-        <span class="text-xs font-medium text-slate-400">
-          - {{ filteredCount }}
-          {{ filteredCount === 1 ? "registro" : "registros" }}
-        </span>
-      </div>
-
-      <div class="hidden items-center gap-4 sm:flex">
-        <span
-          v-for="status in statusOptions"
-          :key="status"
-          class="inline-flex items-center gap-1.5 text-[10px] font-medium text-slate-500"
+      <section
+        v-for="group in groupedRecords"
+        :key="group.dateKey"
+        class="border-b border-[#e5eaf1] last:border-b-0"
+      >
+        <!-- FECHA -->
+        <button
+          type="button"
+          class="flex h-[52px] w-full items-center gap-3 bg-white px-5 text-left transition hover:bg-[#fafbfc]"
+          @click="toggleGroup(group.dateKey)"
         >
-          <span class="h-1.5 w-1.5 rounded-full" :class="getStatusDotClass(status)"></span>
-
-          {{ getStatusLabel(status) }}
-        </span>
-      </div>
-    </header>
-
-    <div v-if="filteredCount" class="min-h-0 flex-1 overflow-auto">
-      <div class="min-w-[1050px]">
-        <div
-          class="sticky top-0 z-20 grid items-center gap-3 border-b border-slate-200 bg-white px-5 py-2.5"
-          style="
-            grid-template-columns:
-              80px
-              120px
-              minmax(240px, 1.5fr)
-              minmax(160px, 1fr)
-              minmax(180px, 1fr)
-              110px
-              24px;
-          "
-        >
-          <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-            Hora
-          </span>
-
-          <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-            Modulo
-          </span>
-
-          <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-            Accion
-          </span>
-
-          <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-            Responsable
-          </span>
-
-          <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-            Entidad
-          </span>
-
-          <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-            Estado
-          </span>
-
-          <span></span>
-        </div>
-
-        <section v-for="group in groupedRecords" :key="group.dateKey">
-          <div
-            class="sticky top-[37px] z-10 flex items-center gap-2.5 border-b border-slate-200 bg-slate-50 px-5 py-2"
+          <svg
+            class="h-4 w-4 shrink-0 text-[#102372] transition-transform duration-150"
+            :class="isGroupExpanded(group.dateKey) ? 'rotate-0' : '-rotate-90'"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
           >
-            <svg
-              class="h-3.5 w-3.5 text-slate-500"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 9l6 6 6-6"
+            />
+          </svg>
 
-            <p class="text-xs font-semibold capitalize text-slate-700">
-              {{ group.label }}
-            </p>
+          <span
+            class="min-w-0 flex-1 truncate text-[13px] font-black capitalize text-[#102372]"
+          >
+            {{ group.label }}
+          </span>
 
-            <span
-              class="inline-flex min-w-6 items-center justify-center rounded-full bg-slate-200/70 px-2 py-0.5 text-[10px] font-semibold text-slate-500"
-            >
-              {{ group.records.length }}
-            </span>
-          </div>
+          <span
+            class="shrink-0 rounded-full bg-[#f1f4f8] px-2.5 py-1 text-[10px] font-black text-slate-500"
+          >
+            {{ group.records.length }}
+            {{ group.records.length === 1 ? "evento" : "eventos" }}
+          </span>
+        </button>
 
+        <!-- EVENTOS -->
+        <div
+          v-if="isGroupExpanded(group.dateKey)"
+          class="border-t border-[#e8edf3]"
+        >
           <button
             v-for="record in group.records"
             :key="record.id"
-            class="grid w-full items-center gap-3 border-b border-slate-100 px-5 py-2.5 text-left transition last:border-b-0 hover:bg-slate-50"
-            :class="{
-              'bg-orange-50/50': selectedRecordId === record.id,
-            }"
-            style="
-              grid-template-columns:
-                80px
-                120px
-                minmax(240px, 1.5fr)
-                minmax(160px, 1fr)
-                minmax(180px, 1fr)
-                110px
-                24px;
-            "
             type="button"
+            class="group relative grid w-full grid-cols-[20px_76px_minmax(0,1fr)_24px] items-center gap-3 border-b border-[#edf1f5] px-5 py-3.5 text-left transition last:border-b-0 hover:bg-[#f8fafc] lg:grid-cols-[20px_82px_minmax(260px,1fr)_170px_115px_110px_24px]"
+            :class="
+              String(selectedRecordId) === String(record.id)
+                ? 'bg-[#f6f8ff] shadow-[inset_3px_0_0_#102372]'
+                : 'bg-white'
+            "
             @click="emit('select-record', record.id)"
           >
-            <span class="font-mono text-[11px] font-medium text-slate-600">
+            <!-- PUNTO -->
+            <span class="flex items-center justify-center">
+              <span
+                class="h-2 w-2 rounded-full"
+                :class="
+                  String(selectedRecordId) === String(record.id)
+                    ? 'bg-[#102372]'
+                    : 'bg-[#d6dee9]'
+                "
+              ></span>
+            </span>
+
+            <!-- HORA -->
+            <span
+              class="font-mono text-[11px] font-semibold text-slate-500"
+            >
               {{ formatTime(record.timestamp) }}
             </span>
 
-            <span
-              class="inline-flex w-fit rounded-md bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-600"
-            >
-              {{ getModuleLabel(record.module) }}
-            </span>
-
+            <!-- ACCIÓN / ENTIDAD -->
             <span class="min-w-0">
-              <span class="block truncate text-xs font-semibold text-[#102372]">
+              <span
+                class="block truncate text-[13px] font-black text-[#102372]"
+              >
                 {{ getActionLabel(record.action) }}
               </span>
 
-              <span class="mt-0.5 block truncate text-[10px] text-slate-400">
-                {{ record.description || "Sin descripcion" }}
+              <span
+                class="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-semibold text-slate-400"
+              >
+                <span class="truncate">
+                  Entidad:
+                  <strong class="font-bold text-slate-500">
+                    {{ record.entityName || "-" }}
+                  </strong>
+                </span>
+
+                <span class="text-slate-300">•</span>
+
+                <span class="truncate">
+                  Tipo:
+                  <strong class="font-bold text-slate-500">
+                    {{ record.entityType || "-" }}
+                  </strong>
+                </span>
+              </span>
+
+              <!-- MOBILE -->
+              <span
+                class="mt-2 flex flex-wrap items-center gap-2 lg:hidden"
+              >
+                <span class="text-[10px] font-bold text-slate-500">
+                  {{ record.actorName || "Sin usuario" }}
+                </span>
+
+                <span
+                  class="rounded-md bg-[#eef1ff] px-2 py-0.5 text-[10px] font-black text-[#102372]"
+                >
+                  {{ getModuleLabel(record.module) }}
+                </span>
+
+                <span
+                  class="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[10px] font-black"
+                  :class="getStatusClass(record.status)"
+                >
+                  <span
+                    class="h-1.5 w-1.5 rounded-full"
+                    :class="getStatusDotClass(record.status)"
+                  ></span>
+
+                  {{ getStatusLabel(record.status) }}
+                </span>
               </span>
             </span>
 
-            <span class="min-w-0">
-              <span class="block truncate text-xs font-medium text-slate-700">
-                {{ record.actorName || "Sin usuario" }}
-              </span>
-
-              <span class="mt-0.5 block truncate text-[10px] text-slate-400">
-                {{ getRecordCompanyName(record) || "Sin empresa" }}
-              </span>
-            </span>
-
-            <span class="min-w-0">
-              <span class="block truncate text-xs font-medium text-slate-700">
-                {{ record.entityName || "Sin entidad" }}
-              </span>
-
-              <span class="mt-0.5 block truncate text-[10px] text-slate-400">
-                {{ record.entityType || "Sin tipo" }}
-              </span>
-            </span>
-
+            <!-- RESPONSABLE -->
             <span
-              class="inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold"
-              :class="getStatusClass(record.status)"
+              class="hidden min-w-0 items-center gap-2.5 lg:flex"
             >
               <span
-                class="h-1.5 w-1.5 rounded-full"
-                :class="getStatusDotClass(record.status)"
-              ></span>
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#eef2f8] text-[10px] font-black text-[#102372]"
+              >
+                {{ getInitials(record.actorName) }}
+              </span>
 
-              {{ getStatusLabel(record.status) }}
+              <span class="min-w-0">
+                <span
+                  class="block truncate text-[12px] font-black text-[#172033]"
+                >
+                  {{ record.actorName || "Sin usuario" }}
+                </span>
+
+                <span
+                  class="mt-0.5 block truncate text-[10px] font-semibold text-slate-400"
+                >
+                  {{ getRecordCompanyName(record) || "Sin empresa" }}
+                </span>
+              </span>
             </span>
 
-            <svg
-              class="h-3.5 w-3.5 text-slate-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+            <!-- MÓDULO -->
+            <span class="hidden lg:block">
+              <span
+                class="inline-flex rounded-md bg-[#eef1ff] px-2.5 py-1 text-[10px] font-black text-[#102372]"
+              >
+                {{ getModuleLabel(record.module) }}
+              </span>
+            </span>
+
+            <!-- ESTADO -->
+            <span class="hidden lg:block">
+              <span
+                class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-black"
+                :class="getStatusClass(record.status)"
+              >
+                <span
+                  class="h-1.5 w-1.5 rounded-full"
+                  :class="getStatusDotClass(record.status)"
+                ></span>
+
+                {{ getStatusLabel(record.status) }}
+              </span>
+            </span>
+
+            <!-- FLECHA -->
+            <span
+              class="flex items-center justify-end text-[20px] font-light text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#102372]"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 5l7 7-7 7"
-              />
-            </svg>
+              ›
+            </span>
           </button>
-        </section>
-      </div>
+        </div>
+      </section>
     </div>
 
-    <div v-else class="flex min-h-0 flex-1 items-center justify-center px-6 py-12 text-center">
+    <!-- SIN REGISTROS -->
+    <div
+      v-else
+      class="flex min-h-0 flex-1 items-center justify-center bg-white px-6 py-12 text-center"
+    >
       <div>
-        <h3 class="text-sm font-semibold text-[#102372]">Sin registros</h3>
+        <h3 class="text-[14px] font-black text-[#102372]">
+          Sin registros
+        </h3>
 
-        <p class="mt-1 text-xs text-slate-500">
+        <p class="mt-1 text-[12px] font-semibold text-slate-500">
           No se encontraron eventos para los filtros seleccionados.
         </p>
 
         <button
           v-if="hasActiveFilters"
-          class="mt-3 text-xs font-semibold text-[#ff6600] transition hover:text-[#e65c00]"
           type="button"
+          class="mt-3 text-[12px] font-black text-[#ff6600] transition hover:text-[#e65c00]"
           @click="emit('clear-filters')"
         >
           Limpiar filtros
         </button>
       </div>
     </div>
+
+    <!-- PAGINACIÓN -->
+    <footer
+      v-if="filteredCount && pageCount > 1"
+      class="flex shrink-0 items-center justify-between gap-3 border-t border-[#e5eaf1] bg-white px-5 py-3"
+    >
+      <p class="text-[11px] font-semibold text-slate-400">
+        Mostrando {{ pageStart }}-{{ pageEnd }} de {{ filteredCount }}
+      </p>
+
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          class="h-8 rounded-lg border border-[#d8dee8] bg-white px-3 text-[11px] font-black text-[#102372] transition hover:border-[#102372] disabled:cursor-not-allowed disabled:opacity-40"
+          :disabled="page <= 1"
+          @click="emit('previous-page')"
+        >
+          Anterior
+        </button>
+
+        <span class="px-1 text-[11px] font-black text-slate-500">
+          {{ page }} / {{ pageCount }}
+        </span>
+
+        <button
+          type="button"
+          class="h-8 rounded-lg border border-[#d8dee8] bg-white px-3 text-[11px] font-black text-[#102372] transition hover:border-[#102372] disabled:cursor-not-allowed disabled:opacity-40"
+          :disabled="page >= pageCount"
+          @click="emit('next-page')"
+        >
+          Siguiente
+        </button>
+      </div>
+    </footer>
   </section>
 </template>
 
 <script setup>
-defineProps({
+import { ref, watch } from "vue"
+
+const props = defineProps({
   filteredCount: {
     type: Number,
     default: 0,
@@ -251,6 +304,22 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  page: {
+    type: Number,
+    default: 1,
+  },
+  pageCount: {
+    type: Number,
+    default: 1,
+  },
+  pageEnd: {
+    type: Number,
+    default: 0,
+  },
+  pageStart: {
+    type: Number,
+    default: 0,
+  },
   selectedRecordId: {
     type: [String, Number],
     default: "",
@@ -261,5 +330,70 @@ defineProps({
   },
 })
 
-const emit = defineEmits(["clear-filters", "select-record"])
+const emit = defineEmits([
+  "clear-filters",
+  "next-page",
+  "previous-page",
+  "select-record",
+])
+
+const expandedGroups = ref(new Set())
+
+const syncExpandedGroups = () => {
+  const availableKeys = props.groupedRecords.map((group) => {
+    return String(group.dateKey)
+  })
+
+  const nextExpanded = new Set(
+    [...expandedGroups.value].filter((key) => {
+      return availableKeys.includes(String(key))
+    }),
+  )
+
+  if (!nextExpanded.size && availableKeys.length) {
+    nextExpanded.add(availableKeys[0])
+  }
+
+  expandedGroups.value = nextExpanded
+}
+
+const toggleGroup = (dateKey) => {
+  const key = String(dateKey)
+  const nextExpanded = new Set(expandedGroups.value)
+
+  if (nextExpanded.has(key)) {
+    nextExpanded.delete(key)
+  } else {
+    nextExpanded.add(key)
+  }
+
+  expandedGroups.value = nextExpanded
+}
+
+const isGroupExpanded = (dateKey) => {
+  return expandedGroups.value.has(String(dateKey))
+}
+
+const getInitials = (name) => {
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+
+  if (!parts.length) return "?"
+
+  if (parts.length === 1) {
+    return parts[0].charAt(0).toUpperCase()
+  }
+
+  return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase()
+}
+
+watch(
+  () => props.groupedRecords.map((group) => String(group.dateKey)),
+  syncExpandedGroups,
+  {
+    immediate: true,
+  },
+)
 </script>

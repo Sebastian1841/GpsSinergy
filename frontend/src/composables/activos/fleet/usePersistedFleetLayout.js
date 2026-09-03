@@ -5,13 +5,15 @@ import { readJsonStorage, writeJsonStorage } from "../../../services/storage/bro
 const STORAGE_KEY = "sinergy-fleet-layout"
 const LEGACY_STORAGE_KEY = "sinergy-activos-fleet-state"
 const DEFAULT_PANEL_WIDTH = 380
+const MIN_PANEL_WIDTH = 300
+const MAX_PANEL_WIDTH = 1600
 
 const normalizePanelWidth = (value) => {
   const width = Number(value)
 
   if (!Number.isFinite(width)) return DEFAULT_PANEL_WIDTH
 
-  return Math.min(Math.max(width, 300), 900)
+  return Math.min(Math.max(width, MIN_PANEL_WIDTH), MAX_PANEL_WIDTH)
 }
 
 const readPanelWidth = () => {

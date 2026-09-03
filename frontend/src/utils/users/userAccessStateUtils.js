@@ -31,10 +31,17 @@ export const createEmptyPermissions = () => {
 }
 
 export const createCleanScope = (scope = {}) => {
+  const assetTagIds = Array.isArray(scope.assetTagIds)
+    ? scope.assetTagIds
+    : Array.isArray(scope.tagIds)
+      ? scope.tagIds
+      : []
+
   return {
-    type: scope.type || "sucursal",
+    type: scope.type || "all-assets",
     sucursalIds: Array.isArray(scope.sucursalIds) ? scope.sucursalIds : [],
     assetIds: Array.isArray(scope.assetIds) ? scope.assetIds : [],
+    assetTagIds,
   }
 }
 

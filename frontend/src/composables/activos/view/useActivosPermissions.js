@@ -21,6 +21,14 @@ export function useActivosPermissions({ activeCompanyId, canAccessFunction }) {
     )
   })
 
+  const canViewAssetTags = computed(() => {
+    return canViewGps.value
+  })
+
+  const canManageAssetTags = computed(() => {
+    return canManageAssets.value
+  })
+
   const canViewReports = computed(() => {
     return Boolean(
       activeCompanyId.value && canAccessFunction("reports", permissionCompanyId.value, "view"),
@@ -30,6 +38,13 @@ export function useActivosPermissions({ activeCompanyId, canAccessFunction }) {
   const canViewItineraries = computed(() => {
     return Boolean(
       activeCompanyId.value && canAccessFunction("itineraries", permissionCompanyId.value, "view"),
+    )
+  })
+
+  const canViewMaintenance = computed(() => {
+    return Boolean(
+      activeCompanyId.value &&
+      canAccessFunction("maintenance-view", permissionCompanyId.value, "view"),
     )
   })
 
@@ -45,18 +60,6 @@ export function useActivosPermissions({ activeCompanyId, canAccessFunction }) {
     )
   })
 
-  const canViewSucursales = computed(() => {
-    return Boolean(
-      activeCompanyId.value && canAccessFunction("branches", permissionCompanyId.value, "view"),
-    )
-  })
-
-  const canManageSucursales = computed(() => {
-    return Boolean(
-      activeCompanyId.value && canAccessFunction("branches", permissionCompanyId.value, "edit"),
-    )
-  })
-
   const allowedSidebarSections = computed(() => {
     const sections = []
 
@@ -64,7 +67,7 @@ export function useActivosPermissions({ activeCompanyId, canAccessFunction }) {
     if (canViewReports.value) sections.push("reportes")
     if (canViewItineraries.value) sections.push("itinerarios")
     if (canViewGeofences.value) sections.push("geocercas")
-    if (canViewSucursales.value) sections.push("sucursales")
+    if (canViewAssetTags.value) sections.push("etiquetas")
 
     return sections
   })
@@ -74,11 +77,12 @@ export function useActivosPermissions({ activeCompanyId, canAccessFunction }) {
     canCreateAssets,
     canEditGeofences,
     canManageAssets,
-    canManageSucursales,
+    canManageAssetTags,
+    canViewAssetTags,
     canViewGeofences,
     canViewGps,
     canViewItineraries,
+    canViewMaintenance,
     canViewReports,
-    canViewSucursales,
   }
 }

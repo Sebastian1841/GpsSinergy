@@ -23,3 +23,9 @@ Integracion del mapa de activos con Leaflet.
 ## Regla de mantenimiento
 
 Encapsular Leaflet aqui para que los componentes no manipulen capas directamente.
+
+## Rendimiento
+
+- `useActivosMap.js` agrupa sincronizaciones y refrescos de marcadores con `requestAnimationFrame`.
+- `useMapAssetMarkers.js` mantiene cache por activo y aplica telemetria por lote, sin redibujar toda la flota por cada pulso.
+- El clustering trabaja sobre los activos visibles ya calculados para evitar recorridos duplicados de la flota.

@@ -40,6 +40,7 @@ Responsabilidad:
 - Decidir empresas visibles.
 - Decidir modulos y funciones disponibles.
 - Filtrar activos segun alcance.
+- Aplicar etiquetas de acceso como restriccion real de visibilidad de activos.
 
 Funciones criticas:
 
@@ -52,6 +53,35 @@ Funciones criticas:
 Riesgo:
 
 - Un error aqui puede mostrar datos de una empresa o activo que no corresponde.
+
+Regla:
+
+- La cadena correcta es permisos/etiquetas de acceso -> `visibleAssets` ->
+  filtros visuales de ciudad o grupos de vehiculos. Los grupos de vehiculos no
+  deben entregar ni quitar permisos.
+
+### `frontend/src/composables/search/useGlobalSearch.js`
+
+Responsabilidad:
+
+- Construir resultados del buscador global.
+- Aplicar filtro por tipo antes del limite global.
+- Exponer solo rutas permitidas para empresas, activos, reportes, usuarios,
+  auditoria y espacios.
+
+Funciones criticas:
+
+- `useGlobalSearch`
+- `globalSearchResults`
+- `globalSearchGroups`
+- `primaryGlobalSearchResult`
+
+Riesgo:
+
+- Si filtra solo en el componente, una busqueda por empresas o activos puede
+  perder resultados validos por el limite de resultados de `Todo`.
+- Si no usa `visibleAssets` y permisos de modulo, puede mostrar rutas que el
+  usuario no deberia abrir.
 
 ## Datos mock y servicios
 
@@ -77,6 +107,9 @@ Funciones criticas:
 - `createAccess`
 - `createAsset`
 - `updateAsset`
+- `createAssetTag`
+- `updateAssetTag`
+- `deleteAssetTag`
 
 Riesgo:
 
@@ -85,6 +118,8 @@ Riesgo:
 Regla:
 
 - No agregar logica visual aqui. Solo datos y normalizacion.
+- Si se agregan empresas o aplicaciones, los usuarios `isPlatformAdmin` deben
+  conservar acceso total normalizado.
 
 ### `frontend/src/services/storage/browserStorage.js`
 
@@ -123,6 +158,37 @@ Cuando modificar:
 - Conectar nuevos paneles.
 - Cambiar flujo general de la vista.
 - Integrar nuevos eventos globales de activos.
+
+### `frontend/src/components/Layout/HeaderFleetAssetFilterMenu.vue`
+
+Responsabilidad:
+
+- Centralizar filtros visuales de ciudad y grupos de vehiculos para Activos.
+- Crear, eliminar y asignar vehiculos a grupos organizativos.
+- Trabajar solo con activos ya autorizados por permisos/etiquetas.
+
+Riesgo:
+
+- Si este menu vuelve a mezclarse con permisos o con empresas, se pierde la
+  separacion entre organizacion de flota y alcance real de usuarios.
+
+### `frontend/src/utils/activos/assetVehicleGroupUtils.js`
+
+Responsabilidad:
+
+- Construir grupos de vehiculos desde definiciones propias del modulo.
+- Recortar `assetIds` contra el arreglo autorizado recibido.
+- Evitar que campos legacy de activo o sucursal creen permisos implicitos.
+
+Funciones criticas:
+
+- `createVehicleAssetGroups`
+- normalizadores de IDs de grupo y activos
+
+Riesgo:
+
+- Un grupo nunca debe incorporar activos fuera del universo autorizado. Si lo
+  hace, el filtro visual puede convertirse en fuga de datos.
 
 ### `frontend/src/composables/activos/view/useActivosTelemetrySync.js`
 
@@ -217,6 +283,73 @@ Funciones criticas:
 Riesgo:
 
 - Mucho clustering oculta detalle; poco clustering causa lag.
+
+## Geocercas
+
+### `frontend/src/composables/activos/geocercas/useGeofences.js`
+
+Responsabilidad:
+
+- Persistir geocercas y grupos de geocercas por empresa en el prototipo.
+- Normalizar circulos, poligonos, rutas, colores y grupos.
+- Crear, actualizar, eliminar, importar y renombrar grupos sin borrar zonas.
+
+Funciones criticas:
+
+- `useGeofences`
+- acciones de crear, actualizar, eliminar e importar geocercas
+- acciones de crear, renombrar y eliminar grupos de geocercas
+
+Riesgo:
+
+- Borrar un grupo debe dejar las geocercas como `Sin grupo`, no eliminarlas.
+- Si una importacion solo parsea pero no persiste, la UI dira que leyo el
+  archivo sin agregar nada al mapa.
+
+### `frontend/src/utils/geofenceImportExportUtils.js`
+
+Responsabilidad:
+
+- Convertir geocercas desde y hacia KML, KMZ, GeoJSON, CSV y XML.
+- Soportar XML flexible, KML con extension `.xml`, GPX, WKT y grupos GpsGate.
+- Preparar archivos exportables por uno, varios o todos los grupos visibles.
+
+Funciones criticas:
+
+- `parseGeofenceImportFile`
+- `parseGeofenceImportFileAsync`
+- `buildGeofenceExportFile`
+- `buildGeofenceExportFileAsync`
+- importadores/exportadores por formato
+
+Riesgo:
+
+- El orden de coordenadas cambia por formato. Mezclar lat/lng con lng/lat puede
+  dibujar zonas en otro lugar.
+- KMZ es KML comprimido; no tratarlo como texto plano.
+
+## Mantenciones
+
+### `frontend/src/composables/maintenance/useMaintenanceModule.js`
+
+Responsabilidad:
+
+- Orquestar resumen, ordenes de trabajo, calendario, historial, costos,
+  seleccion de vehiculo y modal operativo de mantenciones.
+- Mantener acciones locales del prototipo en refs temporales.
+- Distinguir mantencion como plan y OT como ejecucion concreta.
+
+Funciones criticas:
+
+- apertura/cierre de modales de mantencion y OT
+- creacion/edicion/eliminacion de planes manuales
+- creacion/reprogramacion/asignacion/cancelacion/cierre de OT
+- registro de costos y seleccion de vehiculo
+
+Riesgo:
+
+- Crear una mantencion no debe crear una OT automaticamente.
+- No presentar acciones locales como persistencia real de backend.
 
 ## Reportes
 
@@ -317,6 +450,52 @@ Riesgo:
 
 - Si no usa snapshots, cambios de UI durante ejecucion pueden mezclar resultados.
 - Si no usa lotes, puede congelar UI.
+
+### `frontend/src/utils/reports/export/assetReportExportUtils.js`
+
+Responsabilidad:
+
+- Orquestar exportacion PDF/Excel de reportes de activos desde las mismas filas
+  ejecutadas.
+- Mantener mapa, metricas, branding y columnas seleccionadas alineadas con la
+  vista previa.
+- Abrir Excel en una hoja `Reporte` tipo informe y dejar el detalle completo en
+  hojas auxiliares para analisis.
+
+Funciones criticas:
+
+- `exportAssetReportExcel`
+- `exportAssetReportPdf`
+- `createAssetReportExcelWorkbook`
+
+Riesgo:
+
+- Excel debe conservar todas las columnas seleccionadas.
+- PDF debe mantener legibilidad: columnas principales en la tabla visible y el
+  resto en `Detalle adicional`.
+
+### `frontend/src/services/itinerarios/itineraryExportService.js`
+
+Responsabilidad:
+
+- Construir PDF/Excel de itinerarios y reportes compatibles con el layout
+  corporativo.
+- Ordenar la hoja principal de Excel como la vista previa: datos generales,
+  resumen, mapa, graficos y tablas.
+- Separar columnas adicionales de PDF cuando no caben legibles.
+
+Funciones criticas:
+
+- `exportItineraryPdfReport`
+- `createItineraryExcelWorkbook`
+- helpers internos de `Detalle adicional`
+
+Riesgo:
+
+- Si PDF y Excel no usan el mismo dataset, el usuario vera menos datos en un
+  formato sin entender que las columnas restantes siguen disponibles.
+- Si el inyector de graficos nativos no reutiliza dibujos existentes, un Excel
+  con mapa y graficos puede quedar sin graficos o fallar al exportar.
 
 ### `frontend/src/utils/reports/execution/assetReportExecutionUtils.js`
 

@@ -5,7 +5,8 @@
     @click.self="closeModal"
   >
     <section
-      class="flex max-h-[calc(100%-16px)] w-full max-w-[1080px] flex-col overflow-hidden rounded-xl bg-white shadow-[0_24px_80px_rgba(15,23,42,0.34)] sm:max-h-[calc(100%-32px)]"
+      class="flex max-h-[calc(100%-16px)] w-full flex-col overflow-hidden rounded-xl bg-white shadow-[0_24px_80px_rgba(15,23,42,0.34)] sm:max-h-[calc(100%-32px)]"
+      :class="isExcelPreview && hasReport ? 'max-w-[1540px]' : 'max-w-[1080px]'"
     >
       <header class="shrink-0 border-b border-slate-200/80 bg-white px-4 py-3">
         <div class="flex items-start justify-between gap-3">
@@ -181,7 +182,7 @@
           class="relative flex min-h-0 flex-col overflow-hidden bg-[#f6f8fb]"
           :aria-busy="isReportBusy ? 'true' : 'false'"
         >
-          <div class="shrink-0 border-b border-slate-200/80 bg-white p-3">
+          <div class="shrink-0 border-b border-slate-200/80 bg-white px-3 py-2">
             <div class="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
               <div class="min-w-0">
                 <p class="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
@@ -189,7 +190,7 @@
                 </p>
 
                 <p class="mt-1 text-[12px] font-black text-[#102372]">
-                  {{ dateFrom }} a {{ dateTo }}
+                  {{ reportPreviewTitle }} - {{ reportPreviewRangeLabel }}
                 </p>
 
                 <p v-if="hasReport" class="mt-0.5 text-[10px] font-bold text-slate-500">
@@ -197,318 +198,492 @@
                 </p>
               </div>
 
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-if="shouldAllowExcelExport"
-                  type="button"
-                  class="h-8 rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#ff6600] hover:text-[#ff6600] disabled:cursor-not-allowed disabled:opacity-40"
-                  :disabled="!hasReport || !!dateRangeError || isExportingExcel || isExportingPdf"
-                  @click="handleExportExcel"
+              <div class="flex flex-wrap items-center gap-2">
+                <div
+                  v-if="hasReport && previewFormatOptions.length > 1"
+                  class="grid grid-cols-2 rounded-lg border border-[#d8dee8] bg-[#f8fafc] p-1"
+                  aria-label="Formato de vista previa"
                 >
-                  {{ isExportingExcel ? "Exportando..." : "Excel" }}
-                </button>
+                  <button
+                    v-for="mode in previewFormatOptions"
+                    :key="mode.id"
+                    type="button"
+                    class="h-7 rounded-md px-3 text-[10px] font-black transition"
+                    :class="
+                      activePreviewMode === mode.id
+                        ? 'bg-[#102372] text-white shadow-sm'
+                        : isReportBusy
+                          ? 'cursor-not-allowed text-slate-400'
+                          : 'text-[#102372] hover:bg-white'
+                    "
+                    :disabled="isReportBusy"
+                    @click="setActivePreviewFormat(mode.id)"
+                  >
+                    {{ mode.label }}
+                  </button>
+                </div>
 
                 <button
-                  v-if="shouldAllowPdfExport"
+                  v-if="previewFormatOptions.length"
                   type="button"
-                  class="h-8 rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#ff6600] hover:text-[#ff6600] disabled:cursor-not-allowed disabled:opacity-40"
-                  :disabled="!hasReport || !!dateRangeError || isExportingExcel || isExportingPdf"
-                  @click="handleExportPdf"
+                  class="h-8 rounded-lg bg-[#ff6600] px-4 text-[10px] font-black uppercase tracking-[0.08em] text-white transition hover:bg-[#e65c00] disabled:cursor-not-allowed disabled:bg-slate-300"
+                  :disabled="!canExportActivePreview"
+                  @click="handleExportActivePreview"
                 >
-                  {{ isExportingPdf ? "Exportando..." : "PDF" }}
+                  {{ activePreviewExportLabel }}
                 </button>
-              </div>
-            </div>
-
-            <div
-              v-if="hasReport && shouldShowSummary && !isTripReport"
-              class="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4"
-            >
-              <div class="rounded-lg border border-[#edf1f5] bg-[#f8fafc] px-3 py-2">
-                <p class="text-[9px] font-black uppercase text-slate-400">Total</p>
-
-                <p class="mt-0.5 text-[15px] font-black text-[#102372]">
-                  {{ reportSummary.total }}
-                </p>
-              </div>
-
-              <div class="rounded-lg border border-[#edf1f5] bg-[#f8fafc] px-3 py-2">
-                <p class="text-[9px] font-black uppercase text-slate-400">Movimiento</p>
-
-                <p class="mt-0.5 text-[15px] font-black text-emerald-600">
-                  {{ reportSummary.moving }}
-                </p>
-              </div>
-
-              <div class="rounded-lg border border-[#edf1f5] bg-[#f8fafc] px-3 py-2">
-                <p class="text-[9px] font-black uppercase text-slate-400">Detenidos</p>
-
-                <p class="mt-0.5 text-[15px] font-black text-[#ff6600]">
-                  {{ reportSummary.stopped }}
-                </p>
-              </div>
-
-              <div class="rounded-lg border border-[#edf1f5] bg-[#f8fafc] px-3 py-2">
-                <p class="text-[9px] font-black uppercase text-slate-400">Sin señal</p>
-
-                <p class="mt-0.5 text-[15px] font-black text-slate-500">
-                  {{ reportSummary.offline }}
-                </p>
-              </div>
-            </div>
-
-            <div
-              v-if="hasReport && shouldShowSummary && isTripReport"
-              class="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4"
-            >
-              <div class="rounded-lg border border-[#edf1f5] bg-[#f8fafc] px-3 py-2">
-                <p class="text-[9px] font-black uppercase text-slate-400">Viajes</p>
-
-                <p class="mt-0.5 text-[15px] font-black text-[#102372]">
-                  {{ tripPreviewSummary.trips }}
-                </p>
-              </div>
-
-              <div class="rounded-lg border border-[#edf1f5] bg-[#f8fafc] px-3 py-2">
-                <p class="text-[9px] font-black uppercase text-slate-400">Km total</p>
-
-                <p class="mt-0.5 text-[15px] font-black text-[#ff6600]">
-                  {{ tripPreviewSummary.distanceLabel }}
-                </p>
-              </div>
-
-              <div class="rounded-lg border border-[#edf1f5] bg-[#f8fafc] px-3 py-2">
-                <p class="text-[9px] font-black uppercase text-slate-400">Tiempo</p>
-
-                <p class="mt-0.5 text-[15px] font-black text-emerald-600">
-                  {{ tripPreviewSummary.durationLabel }}
-                </p>
-              </div>
-
-              <div class="rounded-lg border border-[#edf1f5] bg-[#f8fafc] px-3 py-2">
-                <p class="text-[9px] font-black uppercase text-slate-400">Activos</p>
-
-                <p class="mt-0.5 text-[15px] font-black text-slate-600">
-                  {{ tripPreviewSummary.assets }}
-                </p>
               </div>
             </div>
           </div>
 
-          <div class="min-h-0 flex-1 overflow-auto p-3">
-            <section
-              v-if="hasReport && isTripReport && shouldShowTripMap"
-              class="mb-3 overflow-hidden rounded-xl bg-white shadow-[0_1px_3px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70"
+          <div class="min-h-0 flex-1 overflow-auto bg-[#e8edf5] p-3 sm:p-4">
+            <article
+              v-if="hasReport"
+              class="w-full overflow-hidden bg-white shadow-[0_18px_55px_rgba(15,23,42,0.18)] ring-1 ring-slate-200"
+              :class="isPdfPreview ? 'mx-auto max-w-[900px]' : 'min-w-[1180px]'"
             >
-              <div class="border-b border-[#edf1f5] px-3 py-3">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p class="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-                      Reporte de viajes
-                    </p>
+              <header class="px-5 pb-4 pt-6 text-center sm:px-7">
+                <img
+                  :src="reportBrandLogo"
+                  alt="Sinergy Group"
+                  class="mx-auto h-auto w-[220px] max-w-full object-contain"
+                />
 
-                    <p class="mt-1 text-[13px] font-black text-[#102372]">
-                      Recorridos agrupados por origen, destino y kilometraje
-                    </p>
+                <p class="mt-2 text-[10px] font-semibold italic text-slate-500">
+                  Monitoreo GPS y Telemetria IoT
+                </p>
+
+                <div class="mt-3 border-t-2 border-[#ff6600]"></div>
+
+                <h3 class="mt-4 text-[18px] font-black uppercase text-[#102372]">
+                  {{ activePreviewHeaderTitle }}
+                </h3>
+
+                <p class="mt-1 text-[11px] font-semibold text-slate-600">
+                  {{ activePreviewSubtitle }}
+                </p>
+              </header>
+
+              <section class="px-5 py-3 sm:px-7">
+                <template v-if="isExcelPreview">
+                  <div class="border-l-4 border-[#ff6600] bg-[#102372] px-3 py-2">
+                    <h4 class="text-[11px] font-black text-white">Datos generales</h4>
                   </div>
 
-                  <div
-                    class="flex flex-wrap items-center gap-2 text-[9px] font-black text-slate-500"
-                  >
-                    <span class="inline-flex items-center gap-1">
-                      <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
-                      Inicio
-                    </span>
+                  <div class="grid border-x border-b border-[#d8dee8] text-center md:grid-cols-4">
+                    <div
+                      v-for="detail in excelPreviewDetails"
+                      :key="detail.label"
+                      class="border-b border-r border-[#d8dee8] last:border-r-0 md:border-b-0"
+                    >
+                      <p class="bg-white px-2 py-2 text-[9px] font-bold text-slate-500">
+                        {{ detail.label }}
+                      </p>
 
-                    <span class="inline-flex items-center gap-1">
-                      <span class="h-2 w-2 rounded-full bg-[#ff6600]"></span>
-                      Recorrido
-                    </span>
+                      <p
+                        class="min-h-[34px] bg-[#f8fafc] px-2 py-2 text-[11px] font-black text-[#102372]"
+                      >
+                        {{ detail.value }}
+                      </p>
+                    </div>
+                  </div>
+                </template>
 
-                    <span class="inline-flex items-center gap-1">
-                      <span class="h-2 w-2 rounded-full bg-sky-500"></span>
-                      Fin
-                    </span>
+                <template v-else>
+                  <div class="border-b-2 border-[#ff6600] pb-1">
+                    <h4 class="text-[12px] font-black text-[#102372]">Datos generales</h4>
+                  </div>
+
+                  <dl class="mt-2 overflow-hidden border border-[#d8dee8] text-[10px]">
+                    <div
+                      v-for="detail in reportPreviewDetails"
+                      :key="detail.label"
+                      class="grid grid-cols-[150px_minmax(0,1fr)] border-b border-[#d8dee8] last:border-b-0"
+                    >
+                      <dt class="bg-[#f3f4f6] px-2 py-2 font-black text-[#102372]">
+                        {{ detail.label }}
+                      </dt>
+
+                      <dd class="min-w-0 px-2 py-2 font-semibold text-slate-700">
+                        {{ detail.value }}
+                      </dd>
+                    </div>
+                  </dl>
+                </template>
+              </section>
+
+              <section
+                v-if="shouldShowSummary && previewSummaryCards.length"
+                class="px-5 py-3 sm:px-7"
+              >
+                <template v-if="isExcelPreview">
+                  <div class="border-l-4 border-[#ff6600] bg-[#102372] px-3 py-2">
+                    <h4 class="text-[11px] font-black text-white">Resumen del periodo</h4>
+                  </div>
+
+                  <div class="grid border-x border-b border-[#d8dee8] text-center md:grid-cols-4">
+                    <div
+                      v-for="card in excelPreviewSummaryCards"
+                      :key="card.label"
+                      class="border-b border-r border-[#d8dee8] last:border-r-0 md:border-b-0"
+                    >
+                      <p class="px-2 py-2 text-[10px] font-black text-white" :class="card.labelClass">
+                        {{ card.label }}
+                      </p>
+
+                      <p class="bg-[#eff6ff] px-2 py-3 text-[15px] font-black" :class="card.valueClass">
+                        {{ card.value }}
+                      </p>
+                    </div>
+                  </div>
+                </template>
+
+                <template v-else>
+                  <div class="border-b-2 border-[#ff6600] pb-1">
+                    <h4 class="text-[12px] font-black text-[#102372]">Resumen del periodo</h4>
+                  </div>
+
+                  <div class="mt-2 grid border border-[#d8dee8] sm:grid-cols-2 xl:grid-cols-4">
+                    <div
+                      v-for="card in previewSummaryCards"
+                      :key="card.label"
+                      class="border-b border-r border-[#d8dee8] px-3 py-3 last:border-r-0 sm:[&:nth-child(2n)]:border-r-0 xl:border-b-0 xl:[&:nth-child(2n)]:border-r xl:[&:last-child]:border-r-0"
+                    >
+                      <p class="text-center text-[9px] font-bold text-slate-500">
+                        {{ card.label }}
+                      </p>
+
+                      <p class="mt-1 text-center text-[18px] font-black" :class="card.valueClass">
+                        {{ card.value }}
+                      </p>
+                    </div>
+                  </div>
+                </template>
+              </section>
+
+              <section v-if="isMapReport && shouldShowTripMap" class="px-5 py-3 sm:px-7">
+                <div
+                  :class="
+                    isExcelPreview
+                      ? 'border-l-4 border-[#ff6600] bg-[#102372] px-3 py-2'
+                      : 'border-b-2 border-[#ff6600] pb-1'
+                  "
+                >
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h4
+                      class="text-[12px] font-black"
+                      :class="isExcelPreview ? 'text-white' : 'text-[#102372]'"
+                    >
+                      {{ isStopsReportTemplate ? "Mapa de detenciones" : "Mapa de viajes" }}
+                    </h4>
+
+                    <div
+                      class="flex flex-wrap items-center gap-2 text-[9px] font-black"
+                      :class="isExcelPreview ? 'text-white/80' : 'text-slate-500'"
+                    >
+                      <span class="inline-flex items-center gap-1">
+                        <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                        Inicio
+                      </span>
+
+                      <span class="inline-flex items-center gap-1">
+                        <span class="h-2 w-2 rounded-full bg-[#ff6600]"></span>
+                        Recorrido
+                      </span>
+
+                      <span class="inline-flex items-center gap-1">
+                        <span class="h-2 w-2 rounded-full bg-sky-500"></span>
+                        Fin
+                      </span>
+
+                      <span v-if="isStopsReportTemplate" class="inline-flex items-center gap-1">
+                        <span class="h-2 w-2 rounded-full bg-rose-500"></span>
+                        Detenciones
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div class="bg-[#f8fafc] p-3">
-                <div class="overflow-hidden rounded-lg border border-[#d8dee8] bg-[#dbe5f0]">
+                <div
+                  class="mt-3 overflow-hidden bg-[#dbe5f0]"
+                  :class="isPdfPreview ? 'mx-auto max-w-[620px]' : 'w-full'"
+                >
                   <img
                     v-if="tripMapImageDataUrl"
                     :src="tripMapImageDataUrl"
-                    alt="Mapa del reporte de viajes"
-                    class="block max-h-[360px] w-full object-contain"
+                    :alt="routeMapPreviewAlt"
+                    class="block w-full object-contain"
                   />
 
                   <div
                     v-else-if="isBuildingTripMap"
-                    class="flex h-[260px] items-center justify-center px-5 text-center text-[12px] font-black text-[#102372]"
+                    class="flex h-[300px] items-center justify-center px-5 text-center text-[12px] font-black text-[#102372]"
                   >
                     Preparando imagen del mapa...
                   </div>
 
                   <div
                     v-else
-                    class="flex h-[260px] items-center justify-center px-5 text-center text-[12px] font-black text-[#102372]"
+                    class="flex h-[300px] items-center justify-center px-5 text-center text-[12px] font-black text-[#102372]"
                   >
-                    No hay coordenadas suficientes para dibujar el mapa de viajes.
+                    {{ routeMapPreviewEmptyText }}
                   </div>
                 </div>
-              </div>
-            </section>
-
-            <div
-              v-if="hasReport && shouldShowCharts && reportChartRecommendations.length"
-              class="mb-3 rounded-xl bg-white p-3 shadow-[0_1px_3px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70"
-            >
-              <div class="flex flex-wrap items-center justify-between gap-2">
-                <p class="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-                  Graficos recomendados
-                </p>
-
-                <span
-                  class="rounded-md bg-[#eef2ff] px-2 py-1 text-[9px] font-black text-[#102372]"
-                >
-                  {{ reportChartRecommendations.length }}
-                </span>
-              </div>
-
-              <div class="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-                <article
-                  v-for="chart in reportChartRecommendations"
-                  :key="chart.id"
-                  class="rounded-lg border border-[#edf1f5] bg-[#f8fafc] px-3 py-2"
-                >
-                  <div class="flex items-center justify-between gap-2">
-                    <p class="truncate text-[10px] font-black text-[#102372]">
-                      {{ chart.label }}
-                    </p>
-
-                    <span
-                      class="shrink-0 rounded-md bg-white px-1.5 py-0.5 text-[8px] font-black uppercase text-slate-500"
-                    >
-                      {{ chart.chartTypeLabel }}
-                    </span>
-                  </div>
-
-                  <p class="mt-1 line-clamp-2 text-[9px] font-semibold text-slate-500">
-                    {{ chart.detail }}
-                  </p>
-                </article>
-              </div>
-            </div>
-
-            <ReportCharts
-              v-if="hasReport && shouldShowCharts"
-              ref="reportChartsRef"
-              class="mb-3"
-              title="Graficos del reporte"
-              records-label="filas del reporte"
-              empty-label="No hay graficos agregados al reporte"
-              :rows="reportChartRows"
-              :total-records="reportRows.length"
-              :revision="reportRevision"
-              :summary="reportSummary"
-              @update:chart-count="handleChartCountUpdate"
-            />
-
-            <div
-              v-if="hasReport && shouldShowTable"
-              class="overflow-hidden rounded-xl bg-white shadow-[0_1px_3px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70"
-            >
-              <table class="min-w-full border-collapse text-left text-[11px]">
-                <thead class="bg-[#102372] text-white">
-                  <tr>
-                    <th
-                      v-for="column in reportColumns"
-                      :key="column.key"
-                      class="whitespace-nowrap px-3 py-2 font-black"
-                    >
-                      {{ column.label }}
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  <tr
-                    v-for="row in previewReportRowsWithAddresses"
-                    :key="row.id"
-                    class="border-b border-[#edf1f5] transition last:border-b-0 hover:bg-[#f8fafc]"
-                  >
-                    <td
-                      v-for="column in reportColumns"
-                      :key="column.key"
-                      class="whitespace-nowrap px-3 py-2 font-bold text-slate-600"
-                    >
-                      {{ row.values[column.key] }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <div
-                v-if="shouldResolvePreviewAddresses"
-                class="border-t border-[#edf1f5] bg-[#f8fafc] px-3 py-1.5 text-[9px] font-bold text-slate-400"
-              >
-                {{ reverseGeocodingAttribution }}
-              </div>
-
-              <div
-                v-if="hiddenReportRowsCount"
-                class="border-t border-[#edf1f5] bg-[#f8fafc] px-3 py-2 text-[10px] font-bold text-slate-500"
-              >
-                {{ hiddenReportRowsCount }} filas adicionales no se muestran en la vista previa para
-                mantener fluida la pantalla. La exportación incluye el reporte completo.
-              </div>
-            </div>
-
-            <div
-              v-else-if="hasExecutedReport && !hasReport"
-              class="flex min-h-[260px] items-center justify-center rounded-xl border border-dashed border-[#cbd5e1] bg-white p-6 text-center"
-            >
-              <div class="max-w-[360px]">
-                <div
-                  class="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-[#fff3e8] text-[#ff6600]"
-                >
-                  <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" aria-hidden="true">
-                    <path
-                      d="M5 5l14 14M9.5 9.5A4.8 4.8 0 0 1 12 9c3.8 0 7 3 8.2 4.3a1 1 0 0 1 0 1.4 15.6 15.6 0 0 1-3.2 2.5M14.5 14.5A3.5 3.5 0 0 1 8.8 11M6.7 8A15.4 15.4 0 0 0 3.8 10.3a1 1 0 0 0 0 1.4C5 13 8.2 16 12 16c.7 0 1.4-.1 2-.3"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                  </svg>
-                </div>
-
-                <p class="mt-3 text-[13px] font-black text-[#102372]">
-                  {{ emptyReportTitle }}
-                </p>
-
-                <p class="mt-1 text-[11px] font-semibold leading-relaxed text-slate-500">
-                  {{ emptyReportDetail }}
-                </p>
-              </div>
-            </div>
-
-            <div
-              v-else
-              class="flex min-h-[260px] items-center justify-center rounded-xl border border-dashed border-[#cbd5e1] bg-white p-6 text-center"
-            >
-              <div>
-                <p class="text-[13px] font-black text-[#102372]">
-                  Configura y genera la vista previa
-                </p>
 
                 <p
-                  class="mt-1 max-w-[280px] text-[11px] font-semibold leading-relaxed text-slate-500"
+                  class="mt-2 text-[9px] italic text-slate-500"
+                  :class="isPdfPreview ? 'mx-auto max-w-[620px]' : ''"
                 >
-                  Selecciona activos y presiona generar para revisar el reporte antes de exportarlo.
+                  {{ routeMapPreviewTitle }}
                 </p>
+              </section>
+
+              <section
+                v-if="shouldShowCharts && reportChartRecommendations.length"
+                class="px-5 py-3 sm:px-7"
+              >
+                <div
+                  :class="
+                    isExcelPreview
+                      ? 'border-l-4 border-[#ff6600] bg-[#102372] px-3 py-2'
+                      : 'border-b-2 border-[#ff6600] pb-1'
+                  "
+                >
+                  <h4
+                    class="text-[12px] font-black"
+                    :class="isExcelPreview ? 'text-white' : 'text-[#102372]'"
+                  >
+                    Graficos recomendados
+                  </h4>
+                </div>
+
+                <div class="mt-2 grid gap-2 md:grid-cols-2">
+                  <article
+                    v-for="chart in reportChartRecommendations"
+                    :key="chart.id"
+                    class="border border-[#d8dee8] bg-[#f8fafc] px-3 py-2"
+                  >
+                    <div class="flex items-center justify-between gap-2">
+                      <p class="truncate text-[10px] font-black text-[#102372]">
+                        {{ chart.label }}
+                      </p>
+
+                      <span
+                        class="shrink-0 bg-white px-1.5 py-0.5 text-[8px] font-black uppercase text-slate-500"
+                      >
+                        {{ chart.chartTypeLabel }}
+                      </span>
+                    </div>
+
+                    <p class="mt-1 line-clamp-2 text-[9px] font-semibold text-slate-500">
+                      {{ chart.detail }}
+                    </p>
+                  </article>
+                </div>
+              </section>
+
+              <section v-if="shouldShowCharts" class="px-5 py-3 sm:px-7">
+                <ReportCharts
+                  ref="reportChartsRef"
+                  title="Graficos del reporte"
+                  records-label="filas del reporte"
+                  empty-label="No hay graficos agregados al reporte"
+                  :rows="reportChartRows"
+                  :total-records="reportRows.length"
+                  :revision="reportRevision"
+                  :summary="reportSummary"
+                  @update:chart-count="handleChartCountUpdate"
+                />
+              </section>
+
+              <section
+                v-if="isExcelPreview && excelPreviewAssetRows.length"
+                class="px-5 py-3 sm:px-7"
+              >
+                <div class="border-l-4 border-[#ff6600] bg-[#102372] px-3 py-2">
+                  <h4 class="text-[11px] font-black text-white">Activos incluidos</h4>
+                </div>
+
+                <div class="overflow-auto border-x border-b border-[#d8dee8]">
+                  <table class="min-w-full border-collapse text-left text-[10px]">
+                    <thead class="bg-[#102372] text-white">
+                      <tr>
+                        <th class="whitespace-nowrap px-3 py-2 font-black">Vehiculo</th>
+                        <th class="whitespace-nowrap px-3 py-2 font-black">Patente</th>
+                        <th class="whitespace-nowrap px-3 py-2 font-black">GPS / IMEI</th>
+                        <th class="whitespace-nowrap px-3 py-2 font-black">Conductor</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      <tr
+                        v-for="asset in excelPreviewAssetRows"
+                        :key="asset.key"
+                        class="border-b border-[#d8dee8] odd:bg-white even:bg-[#f3f4f6]"
+                      >
+                        <td class="whitespace-nowrap px-3 py-2 font-black text-[#102372]">
+                          {{ asset.name }}
+                        </td>
+                        <td class="whitespace-nowrap bg-[#fff7ed] px-3 py-2 font-black text-[#ff6600]">
+                          {{ asset.patent }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-2 font-semibold text-slate-700">
+                          {{ asset.deviceId }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-2 font-semibold text-slate-700">
+                          {{ asset.driver }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <section v-if="shouldShowTable" class="px-5 py-3 sm:px-7">
+                <div
+                  :class="
+                    isExcelPreview
+                      ? 'border-l-4 border-[#ff6600] bg-[#102372] px-3 py-2'
+                      : 'border-b-2 border-[#ff6600] pb-1'
+                  "
+                >
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h4
+                      class="text-[12px] font-black"
+                      :class="isExcelPreview ? 'text-white' : 'text-[#102372]'"
+                    >
+                      {{ isExcelPreview ? reportDetailTitle : "Detalle del reporte" }}
+                    </h4>
+
+                    <span
+                      class="text-[9px] font-bold"
+                      :class="isExcelPreview ? 'text-white/80' : 'text-slate-500'"
+                    >
+                      {{ activePreviewTableLabel }}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="mt-2 overflow-auto border border-[#d8dee8]">
+                  <table class="min-w-full border-collapse text-left text-[10px]">
+                    <thead class="bg-[#102372] text-white">
+                      <tr>
+                        <th
+                          v-for="column in previewTableColumns"
+                          :key="column.key"
+                          class="whitespace-nowrap px-3 py-2 font-black"
+                        >
+                          {{ column.label }}
+                        </th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      <tr
+                        v-for="(row, rowIndex) in previewReportRowsWithAddresses"
+                        :key="row.id"
+                        class="border-b border-[#d8dee8] odd:bg-white even:bg-[#f3f4f6]"
+                      >
+                        <td
+                          v-for="column in previewTableColumns"
+                          :key="column.key"
+                          class="whitespace-nowrap px-3 py-2 font-semibold text-slate-700"
+                        >
+                          {{ getPreviewTableCellValue(row, column, rowIndex) }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  <div
+                    v-if="shouldResolvePreviewAddresses"
+                    class="border-t border-[#d8dee8] bg-[#f8fafc] px-3 py-1.5 text-[9px] font-bold text-slate-400"
+                  >
+                    {{ reverseGeocodingAttribution }}
+                  </div>
+
+                  <div
+                    v-if="isPdfPreview && hiddenPdfPreviewColumnsCount"
+                    class="border-t border-[#d8dee8] bg-[#f8fafc] px-3 py-2 text-[10px] font-bold text-slate-500"
+                  >
+                    PDF compacto: {{ hiddenPdfPreviewColumnsCount }} columnas adicionales se veran
+                    en Detalle adicional. Excel conserva todas las columnas.
+                  </div>
+
+                  <div
+                    v-else-if="isExcelPreview"
+                    class="border-t border-[#d8dee8] bg-[#f8fafc] px-3 py-2 text-[10px] font-bold text-slate-500"
+                  >
+                    Excel muestra todas las columnas seleccionadas y mantiene hojas auxiliares para
+                    analisis.
+                  </div>
+
+                  <div
+                    v-if="hiddenReportRowsCount"
+                    class="border-t border-[#d8dee8] bg-[#f8fafc] px-3 py-2 text-[10px] font-bold text-slate-500"
+                  >
+                    {{ hiddenReportRowsCount }} filas adicionales no se muestran en la vista previa
+                    para mantener fluida la pantalla. La exportacion incluye el reporte completo.
+                  </div>
+                </div>
+              </section>
+
+              <footer
+                class="mt-4 flex items-center justify-between border-t border-[#d8dee8] px-5 py-3 text-[8px] font-semibold text-slate-500 sm:px-7"
+              >
+                <span>Sinergy Group Chile</span>
+                <span>{{ activePreviewFooterLabel }}</span>
+              </footer>
+            </article>
+
+            <template v-else>
+              <div
+                v-if="hasExecutedReport && !hasReport"
+                class="flex min-h-[260px] items-center justify-center rounded-xl border border-dashed border-[#cbd5e1] bg-white p-6 text-center"
+              >
+                <div class="max-w-[360px]">
+                  <div
+                    class="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-[#fff3e8] text-[#ff6600]"
+                  >
+                    <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" aria-hidden="true">
+                      <path
+                        d="M5 5l14 14M9.5 9.5A4.8 4.8 0 0 1 12 9c3.8 0 7 3 8.2 4.3a1 1 0 0 1 0 1.4 15.6 15.6 0 0 1-3.2 2.5M14.5 14.5A3.5 3.5 0 0 1 8.8 11M6.7 8A15.4 15.4 0 0 0 3.8 10.3a1 1 0 0 0 0 1.4C5 13 8.2 16 12 16c.7 0 1.4-.1 2-.3"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </div>
+
+                  <p class="mt-3 text-[13px] font-black text-[#102372]">
+                    {{ emptyReportTitle }}
+                  </p>
+
+                  <p class="mt-1 text-[11px] font-semibold leading-relaxed text-slate-500">
+                    {{ emptyReportDetail }}
+                  </p>
+                </div>
               </div>
-            </div>
+
+              <div
+                v-else
+                class="flex min-h-[260px] items-center justify-center rounded-xl border border-dashed border-[#cbd5e1] bg-white p-6 text-center"
+              >
+                <div>
+                  <p class="text-[13px] font-black text-[#102372]">
+                    Configura y genera la vista previa
+                  </p>
+
+                  <p
+                    class="mt-1 max-w-[280px] text-[11px] font-semibold leading-relaxed text-slate-500"
+                  >
+                    Selecciona activos y presiona generar para revisar el reporte antes de
+                    exportarlo.
+                  </p>
+                </div>
+              </div>
+            </template>
           </div>
 
           <div
@@ -543,6 +718,7 @@
 <script setup>
 import { computed, defineAsyncComponent, nextTick, ref, toRef, watch } from "vue"
 
+import reportBrandLogo from "../../assets/branding/sinergy-group-report.png"
 import { useAuditTrail } from "../../composables/audit/useAuditTrail.js"
 import { useReverseGeocodedRows } from "../../composables/location/useReverseGeocodedRows.js"
 import { useAssetReportExecution } from "../../composables/reports/useAssetReportExecution.js"
@@ -552,11 +728,18 @@ import {
   normalizeReportBehaviorOptions,
 } from "../../utils/reports/config/reportBehaviorOptions.js"
 import { getReportChartRecommendations } from "../../utils/reports/config/reportChartRecommendations.js"
-import { buildReportChartRows, sampleReportRows } from "../../utils/reports/export/reportChartRowUtils.js"
+import {
+  buildReportChartRows,
+  sampleReportRows,
+} from "../../utils/reports/export/reportChartRowUtils.js"
 import {
   REPORT_OUTPUT_OPTION_IDS,
   normalizeReportOutputOptions,
 } from "../../utils/reports/config/reportOutputOptions.js"
+import {
+  getPdfHiddenReportColumns,
+  getPdfVisibleReportColumns,
+} from "../../utils/reports/execution/assetReportColumnUtils.js"
 import {
   REPORT_ADDRESS_PREVIEW_RESOLVE_LIMIT,
   REPORT_CHART_LIMIT,
@@ -566,9 +749,14 @@ import {
   getEmptyReportContext,
   getReportBusyDetail,
   getReportBusyTitle,
+  isRouteMapReport,
   isRouteHistoryReport,
+  isStopsReport,
 } from "../../utils/reports/views/reportExecutionModalUtils.js"
-import { REPORT_WIDGET_IDS, normalizeReportWidgets } from "../../utils/reports/config/reportWidgetUtils.js"
+import {
+  REPORT_WIDGET_IDS,
+  normalizeReportWidgets,
+} from "../../utils/reports/config/reportWidgetUtils.js"
 
 const ReportCharts = defineAsyncComponent(
   () => import("../activos/itinerarios/ItineraryCharts.vue"),
@@ -610,6 +798,17 @@ const reportChartCount = ref(0)
 const isExecutingReport = ref(false)
 const isExportingExcel = ref(false)
 const isExportingPdf = ref(false)
+const PREVIEW_FORMAT_IDS = {
+  pdf: "pdf",
+  excel: "excel",
+}
+const EXCEL_PREVIEW_METRIC_LABEL_CLASSES = [
+  "bg-[#102372]",
+  "bg-[#14b8a6]",
+  "bg-[#ff6600]",
+  "bg-[#2563eb]",
+]
+const activePreviewFormat = ref(PREVIEW_FORMAT_IDS.pdf)
 
 const templateWidgets = computed(() => {
   return new Set(normalizeReportWidgets(props.template?.widgets))
@@ -642,6 +841,47 @@ const shouldAllowExcelExport = computed(() => {
 const shouldAllowPdfExport = computed(() => {
   return templateOutputOptions.value[REPORT_OUTPUT_OPTION_IDS.pdfExport] === true
 })
+
+const previewFormatOptions = computed(() => {
+  return [
+    {
+      id: PREVIEW_FORMAT_IDS.pdf,
+      label: "PDF",
+      enabled: shouldAllowPdfExport.value,
+    },
+    {
+      id: PREVIEW_FORMAT_IDS.excel,
+      label: "Excel",
+      enabled: shouldAllowExcelExport.value,
+    },
+  ].filter((option) => option.enabled)
+})
+
+const activePreviewMode = computed(() => {
+  const activeOption = previewFormatOptions.value.find((option) => {
+    return option.id === activePreviewFormat.value
+  })
+
+  return activeOption?.id || previewFormatOptions.value[0]?.id || PREVIEW_FORMAT_IDS.pdf
+})
+
+const isPdfPreview = computed(() => {
+  return activePreviewMode.value === PREVIEW_FORMAT_IDS.pdf
+})
+
+const isExcelPreview = computed(() => {
+  return activePreviewMode.value === PREVIEW_FORMAT_IDS.excel
+})
+
+const setActivePreviewFormat = (formatId) => {
+  const nextOption = previewFormatOptions.value.find((option) => {
+    return option.id === formatId
+  })
+
+  if (nextOption) {
+    activePreviewFormat.value = nextOption.id
+  }
+}
 
 const reportChartRecommendations = computed(() => {
   return getReportChartRecommendations({
@@ -751,8 +991,42 @@ const isTripReport = computed(() => {
   return isRouteHistoryReport(props.template)
 })
 
+const isStopsReportTemplate = computed(() => {
+  return isStopsReport(props.template)
+})
+
+const isMapReport = computed(() => {
+  return isRouteMapReport(props.template)
+})
+
 const shouldShowTripMap = computed(() => {
-  return isTripReport.value && templateOutputOptions.value[REPORT_OUTPUT_OPTION_IDS.previewTripMap]
+  if (!isMapReport.value || !templateOutputOptions.value[REPORT_OUTPUT_OPTION_IDS.previewTripMap]) {
+    return false
+  }
+
+  if (isPdfPreview.value) {
+    return templateOutputOptions.value[REPORT_OUTPUT_OPTION_IDS.pdfTripMap]
+  }
+
+  return templateOutputOptions.value[REPORT_OUTPUT_OPTION_IDS.excelTripMap]
+})
+
+const routeMapPreviewTitle = computed(() => {
+  return isStopsReportTemplate.value
+    ? "Detenciones numeradas sobre la ruta del vehiculo"
+    : "Recorridos agrupados por origen, destino y kilometraje"
+})
+
+const routeMapPreviewAlt = computed(() => {
+  return isStopsReportTemplate.value
+    ? "Mapa del reporte de detenciones"
+    : "Mapa del reporte de viajes"
+})
+
+const routeMapPreviewEmptyText = computed(() => {
+  return isStopsReportTemplate.value
+    ? "No hay coordenadas suficientes para dibujar el mapa de detenciones."
+    : "No hay coordenadas suficientes para dibujar el mapa de viajes."
 })
 
 const { tripMapImageDataUrl, isBuildingTripMap, resetTripMapPreview } = useRouteTripMapPreview({
@@ -764,13 +1038,418 @@ const tripPreviewSummary = computed(() => {
   return buildTripPreviewSummary(reportRows.value)
 })
 
+const reportPreviewTitle = computed(() => {
+  if (isStopsReportTemplate.value) return "Informe de detenciones"
+  if (isTripReport.value) return "Informe de viajes"
+
+  return props.template?.name || "Informe operativo"
+})
+
+const activePreviewHeaderTitle = computed(() => {
+  if (isExcelPreview.value) return props.template?.name || "Reporte de activos"
+
+  return reportPreviewTitle.value
+})
+
+const reportPreviewRangeLabel = computed(() => {
+  if (dateFrom.value && dateTo.value && dateFrom.value !== dateTo.value) {
+    return `${dateFrom.value} a ${dateTo.value}`
+  }
+
+  return dateFrom.value || dateTo.value || "-"
+})
+
+const getPreviewRowText = (row = {}, keys = [], fallback = "-") => {
+  const sources = [row.values, row.itineraryRow, row.report, row.asset, row]
+
+  for (const key of keys) {
+    for (const source of sources) {
+      const value = source?.[key]
+      const text = String(value ?? "").trim()
+
+      if (text && text !== "-") return text
+    }
+  }
+
+  return fallback
+}
+
+const getPreviewAssetKey = (row = {}, index = 0) => {
+  return (
+    getPreviewRowText(row, ["deviceId", "dispositivo", "imei"], "") ||
+    getPreviewRowText(row, ["patente", "patent"], "") ||
+    getPreviewRowText(row, ["vehiculo", "vehicle", "asset", "activo", "name", "nombre"], "") ||
+    `asset-${index}`
+  )
+}
+
+const excelPreviewAssetRows = computed(() => {
+  const assetsByKey = new Map()
+
+  reportRows.value.forEach((row, index) => {
+    const key = getPreviewAssetKey(row, index)
+
+    if (assetsByKey.has(key)) return
+
+    assetsByKey.set(key, {
+      key,
+      name: getPreviewRowText(row, ["vehiculo", "vehicle", "asset", "activo", "name", "nombre"]),
+      patent: getPreviewRowText(row, ["patente", "patent"]),
+      deviceId: getPreviewRowText(row, ["deviceId", "dispositivo", "imei"]),
+      driver: getPreviewRowText(row, ["conductor", "driver"], "Sin conductor"),
+    })
+  })
+
+  return Array.from(assetsByKey.values()).sort((firstAsset, secondAsset) => {
+    return (
+      firstAsset.deviceId.localeCompare(secondAsset.deviceId, "es") ||
+      firstAsset.name.localeCompare(secondAsset.name, "es")
+    )
+  })
+})
+
+const excelPreviewAssetSummary = computed(() => {
+  const assetCount = excelPreviewAssetRows.value.length
+
+  if (isTripReport.value) return `${assetCount} activos con viajes`
+  if (isStopsReportTemplate.value) return `${assetCount} activos con detenciones`
+
+  return `${assetCount} activos con reglas de evento`
+})
+
+const reportPreviewDetails = computed(() => {
+  return [
+    {
+      label: "Reporte",
+      value: props.template?.name || "Reporte de activos",
+    },
+    {
+      label: "Periodo",
+      value: reportPreviewRangeLabel.value,
+    },
+    {
+      label: "Grupo",
+      value: selectedGroupLabel.value,
+    },
+    {
+      label: "Activos",
+      value: `${selectedAssetCount.value} patentes seleccionadas`,
+    },
+  ]
+})
+
+const excelPreviewDetails = computed(() => {
+  return [
+    {
+      label: "Reporte",
+      value: props.template?.name || "Reporte de activos",
+    },
+    {
+      label: "Periodo",
+      value: reportPreviewRangeLabel.value,
+    },
+    {
+      label: "Activos",
+      value: excelPreviewAssetSummary.value,
+    },
+    {
+      label: "Generado",
+      value: "Al exportar",
+    },
+  ]
+})
+
+const pdfPreviewColumns = computed(() => {
+  return getPdfVisibleReportColumns(reportColumns.value)
+})
+
+const hiddenPdfPreviewColumns = computed(() => {
+  return getPdfHiddenReportColumns(reportColumns.value)
+})
+
+const hiddenPdfPreviewColumnsCount = computed(() => {
+  return hiddenPdfPreviewColumns.value.length
+})
+
+const previewTableColumns = computed(() => {
+  if (isPdfPreview.value) return pdfPreviewColumns.value
+
+  return [
+    {
+      key: "__rowIndex",
+      label: "#",
+    },
+    ...reportColumns.value,
+  ]
+})
+
+const activePreviewSubtitle = computed(() => {
+  const templateName = props.template?.name || "Reporte de activos"
+
+  if (isPdfPreview.value) {
+    return `${templateName} - ${reportPreviewRangeLabel.value} | PDF compacto`
+  }
+
+  return `Hoja Reporte - ${excelPreviewAssetSummary.value} | ${reportPreviewRangeLabel.value}`
+})
+
+const activePreviewTableLabel = computed(() => {
+  const rowsLabel = `${previewReportRows.value.length} de ${reportRows.value.length} filas`
+
+  if (isPdfPreview.value) {
+    return hiddenPdfPreviewColumnsCount.value
+      ? `${rowsLabel} | PDF compacto`
+      : `${rowsLabel} | PDF`
+  }
+
+  return `${rowsLabel} | Excel completo`
+})
+
+const getPreviewTableCellValue = (row = {}, column = {}, rowIndex = 0) => {
+  if (column.key === "__rowIndex") return rowIndex + 1
+
+  const value = row.values?.[column.key]
+  const text = String(value ?? "").trim()
+
+  return text || getPreviewRowText(row, [column.key])
+}
+
+const activePreviewFooterLabel = computed(() => {
+  return isPdfPreview.value ? "Vista previa PDF" : "Vista previa Excel"
+})
+
+const reportDetailTitle = computed(() => {
+  if (isTripReport.value) return "Detalle de viajes"
+  if (isStopsReportTemplate.value) return "Detalle de detenciones"
+
+  return "Detalle GPS"
+})
+
+const activePreviewExportLabel = computed(() => {
+  if (isExportingExcel.value || isExportingPdf.value) return "Exportando..."
+  if (isExecutingReport.value) return "Generando..."
+
+  return isPdfPreview.value ? "Exportar PDF" : "Exportar Excel"
+})
+
+const canExportActivePreview = computed(() => {
+  if (!hasReport.value || dateRangeError.value || isReportBusy.value) return false
+
+  return isPdfPreview.value ? shouldAllowPdfExport.value : shouldAllowExcelExport.value
+})
+
+const previewSummaryCards = computed(() => {
+  if (!shouldShowSummary.value || !hasReport.value) return []
+
+  if (isTripReport.value) {
+    return [
+      {
+        label: "Viajes",
+        value: tripPreviewSummary.value.trips,
+        valueClass: "text-[#102372]",
+      },
+      {
+        label: "Km total",
+        value: tripPreviewSummary.value.distanceLabel,
+        valueClass: "text-[#ff6600]",
+      },
+      {
+        label: "Tiempo",
+        value: tripPreviewSummary.value.durationLabel,
+        valueClass: "text-emerald-600",
+      },
+      {
+        label: "Activos",
+        value: tripPreviewSummary.value.assets,
+        valueClass: "text-slate-600",
+      },
+    ]
+  }
+
+  return [
+    {
+      label: "Total",
+      value: reportSummary.value.total,
+      valueClass: "text-[#102372]",
+    },
+    {
+      label: "Movimiento",
+      value: reportSummary.value.moving,
+      valueClass: "text-emerald-600",
+    },
+    {
+      label: "Detenidos",
+      value: reportSummary.value.stopped,
+      valueClass: "text-[#ff6600]",
+    },
+    {
+      label: "Sin senal",
+      value: reportSummary.value.offline,
+      valueClass: "text-slate-600",
+    },
+  ]
+})
+
+const parsePreviewNumber = (value) => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null
+
+  const numericValue = Number.parseFloat(String(value ?? "").replace(",", ".").replace(/[^\d.-]/g, ""))
+
+  return Number.isFinite(numericValue) ? numericValue : null
+}
+
+const parsePreviewDurationMinutes = (value) => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0
+
+  const text = String(value ?? "").toLowerCase()
+  if (!text.trim()) return 0
+
+  const hours = Number.parseFloat((text.match(/(\d+(?:[.,]\d+)?)\s*h/) || [])[1] || "0")
+  const minutes = Number.parseFloat((text.match(/(\d+(?:[.,]\d+)?)\s*min/) || [])[1] || "0")
+  const seconds = Number.parseFloat((text.match(/(\d+(?:[.,]\d+)?)\s*s/) || [])[1] || "0")
+
+  return (
+    (Number.isFinite(hours) ? hours * 60 : 0) +
+    (Number.isFinite(minutes) ? minutes : 0) +
+    (Number.isFinite(seconds) ? seconds / 60 : 0)
+  )
+}
+
+const formatPreviewDurationMinutes = (minutes) => {
+  const normalizedMinutes = Number.isFinite(minutes) ? Math.max(0, Math.round(minutes)) : 0
+
+  if (normalizedMinutes < 60) return `${normalizedMinutes} min`
+
+  const hours = Math.floor(normalizedMinutes / 60)
+  const remainingMinutes = normalizedMinutes % 60
+
+  return remainingMinutes ? `${hours} h ${remainingMinutes} min` : `${hours} h`
+}
+
+const averagePreviewSpeedLabel = computed(() => {
+  const speeds = reportRows.value
+    .map((row) => getPreviewRowText(row, ["tripMaxSpeed", "speed", "velocidad"], ""))
+    .map(parsePreviewNumber)
+    .filter((speed) => Number.isFinite(speed) && speed > 0)
+
+  if (!speeds.length) return "0 km/h"
+
+  const average = speeds.reduce((total, speed) => total + speed, 0) / speeds.length
+
+  return `${Number(average.toFixed(1)).toLocaleString("es-CL")} km/h`
+})
+
+const stoppedPreviewDurationLabel = computed(() => {
+  const totalMinutes = reportRows.value.reduce((total, row) => {
+    const duration = getPreviewRowText(row, ["duration", "duracion", "tripDuration"], "")
+
+    return total + parsePreviewDurationMinutes(duration)
+  }, 0)
+
+  return formatPreviewDurationMinutes(totalMinutes)
+})
+
+const stopLocationCount = computed(() => {
+  const locations = new Set(
+    reportRows.value
+      .map((row) => getPreviewRowText(row, ["address", "direccion", "ubicacion", "geocerca"], ""))
+      .filter(Boolean),
+  )
+
+  return locations.size
+})
+
+const excelPreviewSummaryCards = computed(() => {
+  if (!shouldShowSummary.value || !hasReport.value) return []
+
+  const cards = (() => {
+    if (isTripReport.value) {
+      return [
+        {
+          label: "Viajes",
+          value: tripPreviewSummary.value.trips,
+          valueClass: "text-[#102372]",
+        },
+        {
+          label: "Activos",
+          value: tripPreviewSummary.value.assets,
+          valueClass: "text-[#14b8a6]",
+        },
+        {
+          label: "Km total",
+          value: tripPreviewSummary.value.distanceLabel,
+          valueClass: "text-[#ff6600]",
+        },
+        {
+          label: "Vel. prom.",
+          value: averagePreviewSpeedLabel.value,
+          valueClass: "text-[#2563eb]",
+        },
+      ]
+    }
+
+    if (isStopsReportTemplate.value) {
+      return [
+        {
+          label: "Detenciones",
+          value: reportRows.value.length,
+          valueClass: "text-[#102372]",
+        },
+        {
+          label: "Activos",
+          value: excelPreviewAssetRows.value.length,
+          valueClass: "text-[#14b8a6]",
+        },
+        {
+          label: "Tiempo detenido",
+          value: stoppedPreviewDurationLabel.value,
+          valueClass: "text-[#ff6600]",
+        },
+        {
+          label: "Ubicaciones",
+          value: stopLocationCount.value,
+          valueClass: "text-[#2563eb]",
+        },
+      ]
+    }
+
+    return [
+      {
+        label: "Eventos",
+        value: reportRows.value.length,
+        valueClass: "text-[#102372]",
+      },
+      {
+        label: "Movimiento",
+        value: reportSummary.value.moving,
+        valueClass: "text-[#14b8a6]",
+      },
+      {
+        label: "Detenidos",
+        value: reportSummary.value.stopped,
+        valueClass: "text-[#ff6600]",
+      },
+      {
+        label: "Sin senal",
+        value: reportSummary.value.offline,
+        valueClass: "text-[#2563eb]",
+      },
+    ]
+  })()
+
+  return cards.map((card, index) => ({
+    ...card,
+    labelClass: EXCEL_PREVIEW_METRIC_LABEL_CLASSES[index] || EXCEL_PREVIEW_METRIC_LABEL_CLASSES[0],
+  }))
+})
+
 const shouldResolvePreviewAddresses = computed(() => {
   const canResolveAddresses =
     templateBehaviorOptions.value[REPORT_BEHAVIOR_OPTION_IDS.resolveAddresses] === true
   const canResolveTripEndpoints =
     templateBehaviorOptions.value[REPORT_BEHAVIOR_OPTION_IDS.resolveTripEndpoints] === true
 
-  return reportColumns.value.some((column) => {
+  return previewTableColumns.value.some((column) => {
     if (["address", "lastPosition", "direccion"].includes(column.key)) {
       return canResolveAddresses
     }
@@ -932,6 +1611,17 @@ const handleExportPdf = async () => {
   }
 }
 
+const handleExportActivePreview = async () => {
+  if (!canExportActivePreview.value) return
+
+  if (isPdfPreview.value) {
+    await handleExportPdf()
+    return
+  }
+
+  await handleExportExcel()
+}
+
 watch(
   () => props.modelValue,
   (isOpen) => {
@@ -944,6 +1634,10 @@ watch(
     isExecutingReport.value = false
     isExportingExcel.value = false
     isExportingPdf.value = false
+    activePreviewFormat.value =
+      previewFormatOptions.value.find((option) => option.id === PREVIEW_FORMAT_IDS.pdf)?.id ||
+      previewFormatOptions.value[0]?.id ||
+      PREVIEW_FORMAT_IDS.pdf
   },
 )
 

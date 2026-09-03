@@ -4,7 +4,7 @@ import {
   normalizeReportTemplateStoredEventRuleIds,
 } from "../../../composables/reports/useReportTemplates.js"
 
-export const REPORTS_VIEW_PAGE_SIZE = 8
+export const REPORTS_VIEW_PAGE_SIZE = 12
 
 export const REPORTS_VIEW_TYPE_FILTERS = [
   {
@@ -80,19 +80,8 @@ export const normalizeReportsViewSearch = (value) => {
     .replace(/[\u0300-\u036f]/g, "")
 }
 
-export const buildReportsViewEventRuleGroups = ({ companyRecords = [], currentCompanyId = "" }) => {
-  const companies = currentCompanyId
-    ? companyRecords.filter((company) => String(company.id) === String(currentCompanyId))
-    : companyRecords
-
-  return companies.flatMap((company) => {
-    return (company.sucursales || []).map((group) => ({
-      ...group,
-      id: String(group.id),
-      companyId: company.id,
-      companyName: company.name,
-    }))
-  })
+export const buildReportsViewEventRuleGroups = () => {
+  return []
 }
 
 export const getReportsViewStats = (reportTemplates = []) => {
@@ -166,13 +155,12 @@ const buildReportsViewRow = ({
     eventRuleLabel,
     eventInitial: getEventInitial(eventRuleLabels[0] || storedEventRuleLabels[0] || eventRuleLabel),
     categoryLabel,
+    categoryId: template.category,
     canEdit,
     iconClass: eventStyle.iconClass,
     eventClass: eventStyle.eventClass,
     typeLabel: template.isDefault ? "Base" : "Creado",
-    typeClass: template.isDefault
-      ? "bg-[#eef3ff] text-[#102372]"
-      : "bg-[#fff3eb] text-[#ff6600]",
+    typeClass: template.isDefault ? "bg-[#eef3ff] text-[#102372]" : "bg-[#fff3eb] text-[#ff6600]",
     statusLabel: isActive ? "Activo" : "Inactivo",
     statusClass: isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500",
     searchText: normalizeReportsViewSearch(
@@ -219,14 +207,39 @@ export const filterReportsViewRows = ({
   reportRows = [],
   reportSearch = "",
   selectedReportType = "all",
+  selectedCategory = "all",
+  selectedSort = "alphabetical-asc",
 }) => {
   const term = normalizeReportsViewSearch(reportSearch)
 
-  return reportRows.filter((report) => {
+  const filteredRows = reportRows.filter((report) => {
     if (selectedReportType === "custom" && report.template.isDefault) return false
     if (selectedReportType === "default" && !report.template.isDefault) return false
+    if (selectedCategory !== "all" && report.categoryId !== selectedCategory) return false
     if (!term) return true
 
     return report.searchText.includes(term)
+  })
+
+  return filteredRows.sort((firstReport, secondReport) => {
+    if (selectedSort === "alphabetical-desc") {
+      return secondReport.name.localeCompare(firstReport.name, "es")
+    }
+
+    if (selectedSort === "default-first") {
+      const firstIsDefault = firstReport.template.isDefault ? 0 : 1
+      const secondIsDefault = secondReport.template.isDefault ? 0 : 1
+
+      if (firstIsDefault !== secondIsDefault) return firstIsDefault - secondIsDefault
+    }
+
+    if (selectedSort === "custom-first") {
+      const firstIsCustom = firstReport.template.isDefault ? 1 : 0
+      const secondIsCustom = secondReport.template.isDefault ? 1 : 0
+
+      if (firstIsCustom !== secondIsCustom) return firstIsCustom - secondIsCustom
+    }
+
+    return firstReport.name.localeCompare(secondReport.name, "es")
   })
 }

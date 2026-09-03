@@ -4,7 +4,8 @@ Imagenes de identidad visual.
 
 ## Archivos
 
-- `sinergy-group.png`: logo principal de Sinergy Group usado en login y branding de reportes.
+- `sinergy-group.png`: logo principal de Sinergy Group usado en pantallas de la plataforma.
+- `sinergy-group-report.png`: logo horizontal de alta legibilidad usado por los exportadores PDF/Excel.
 
 ## Regla de mantenimiento
 

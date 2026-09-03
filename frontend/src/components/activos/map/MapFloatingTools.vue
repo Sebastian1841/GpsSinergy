@@ -217,31 +217,16 @@
       <button
         v-if="canEditGeofences"
         type="button"
-        title="Editar geocercas"
+        title="Abrir panel de geocercas"
         class="group relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl bg-white text-[15px] font-black text-[#102372] transition hover:bg-[#eef3ff]"
-        @click.stop="emitAndClose('open-edit-geofence-modal')"
+        @click.stop="emitAndClose('open-geofence-section')"
       >
         ✎
 
         <span
           class="pointer-events-none absolute left-1/2 top-[43px] hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-[#102372] px-2 py-1 text-[10px] font-black text-white shadow-lg group-hover:block"
         >
-          Editar
-        </span>
-      </button>
-
-      <button
-        type="button"
-        title="Historial de geocercas"
-        class="group relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl bg-white text-[15px] font-black text-[#102372] transition hover:bg-[#eef3ff]"
-        @click.stop="emitAndClose('open-geofence-history-selector')"
-      >
-        ◷
-
-        <span
-          class="pointer-events-none absolute left-1/2 top-[43px] hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-[#102372] px-2 py-1 text-[10px] font-black text-white shadow-lg group-hover:block"
-        >
-          Historial
+          Geocercas
         </span>
       </button>
 
@@ -462,8 +447,7 @@ const emit = defineEmits([
   "create-circle",
   "create-polygon",
   "create-route",
-  "open-edit-geofence-modal",
-  "open-geofence-history-selector",
+  "open-geofence-section",
   "toggle-geofence-visibility",
   "finish-polygon",
   "finish-route",

@@ -199,15 +199,6 @@
             :report-types="reportTypes"
           />
 
-          <GestionSucursalesPanel
-            v-if="activeTab === 'sucursales'"
-            :company="company"
-            @alternar-sucursales-habilitadas="$emit('alternar-sucursales-habilitadas')"
-            @agregar-sucursal="$emit('agregar-sucursal', $event)"
-            @actualizar-nombre-sucursal="handleActualizarNombreSucursal"
-            @alternar-estado-sucursal="$emit('alternar-estado-sucursal', $event)"
-            @eliminar-sucursal="$emit('eliminar-sucursal', $event)"
-          />
         </main>
       </div>
     </section>
@@ -217,7 +208,6 @@
 <script setup>
 import { computed, ref, watch } from "vue"
 
-import GestionSucursalesPanel from "../activos/sucursales/GestionSucursalesPanel.vue"
 import CompanyReportPanel from "./CompanyReportPanel.vue"
 
 import {
@@ -245,15 +235,10 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits([
+defineEmits([
   "close",
   "edit-company",
   "toggle-company-status",
-  "alternar-sucursales-habilitadas",
-  "agregar-sucursal",
-  "actualizar-nombre-sucursal",
-  "alternar-estado-sucursal",
-  "eliminar-sucursal",
   "enter-company",
 ])
 
@@ -269,11 +254,6 @@ const tabs = [
     id: "reports",
     label: "Reportes",
     icon: "M6 20V10m6 10V4m6 16v-7",
-  },
-  {
-    id: "sucursales",
-    label: "Grupos",
-    icon: "M4 20V8l8-4 8 4v12M8 20v-6h8v6M9 10h.01M15 10h.01",
   },
 ]
 
@@ -325,9 +305,7 @@ const companyDetails = computed(() => [
   },
   {
     label: "Cuenta",
-    value: `${props.company?.usersCount || 0} usuarios - ${
-      props.company?.sucursales?.length || 0
-    } grupos`,
+    value: `${props.company?.usersCount || 0} usuarios - ${props.company?.assetsCount || 0} activos`,
   },
   {
     label: "Reportes",
@@ -341,8 +319,4 @@ watch(
     if (isOpen) activeTab.value = "summary"
   },
 )
-
-const handleActualizarNombreSucursal = (sucursalId, nombreSucursal) => {
-  emit("actualizar-nombre-sucursal", sucursalId, nombreSucursal)
-}
 </script>

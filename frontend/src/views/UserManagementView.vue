@@ -1,22 +1,24 @@
 <template>
-  <section class="h-full min-h-0 bg-[#eef2f7]">
+  <section class="users-management-readable h-full min-h-0 overflow-hidden bg-[#f3f6fa] text-slate-900">
     <div class="grid h-full min-h-0 grid-rows-[auto_1fr]">
       <UserManagementHeader
         :summary-items="summaryItems"
         :can-create-users="canCreateUsersForRoute"
+        :selected-status="selectedStatus"
         @create-user="handleOpenCreateUserModal"
+        @select-status="selectedStatus = $event"
       />
 
-      <div
-        class="grid min-h-0 grid-cols-1 gap-3 overflow-hidden p-3 xl:grid-cols-[320px_minmax(0,1fr)]"
-      >
-        <aside class="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden">
+      <!-- VISTA PRINCIPAL -->
+      <div class="min-h-0 overflow-hidden px-4 pb-4">
+        <div class="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden">
           <UserFiltersBar
             :search-term="searchTerm"
             :selected-role="selectedRole"
             :selected-company="selectedCompany"
             :selected-status="selectedStatus"
             :selected-module="selectedModule"
+            :company-filter-locked="companyFilterLocked"
             :roles="roles"
             :companies="companies"
             :modules="modules"
@@ -31,49 +33,103 @@
           <UserListPanel
             :users="visibleUsers"
             :accesses="accesses"
+            :applications="applications"
+            :companies="companies"
+            :roles="roles"
+            :selected-company="selectedCompany"
             :selected-user-id="selectedUserId"
             :visible-users-remaining="visibleUsersRemaining"
             :can-show-more="canShowMoreUsers"
-            @select-user="selectUser"
+            @select-user="handleSelectUser"
             @clear-filters="clearFilters"
             @show-more="showMoreUsers"
           />
-        </aside>
-
-        <main class="min-h-0 overflow-hidden">
-          <UserAccessDetail
-            :user="selectedUser"
-            :accesses="selectedUserAccesses"
-            :applications="applications"
-            :companies="companies"
-            :modules="modules"
-            :module-functions="moduleFunctions"
-            :permissions="permissions"
-            :scopes="scopes"
-            :roles="roles"
-            :assets="assets"
-            :can-impersonate="canImpersonateSelectedUser"
-            :can-edit-users="canEditUsersForRoute"
-            :can-manage-user-permissions="canManageUserPermissionsForRoute"
-            @impersonate-user="handleImpersonateSelectedUser"
-            @edit-user="handleOpenEditUserModal"
-            @toggle-user-status="handleToggleSelectedUserStatus"
-            @add-application-access="handleAddApplicationAccess"
-            @update-access-role="handleUpdateAccessRole"
-            @toggle-access-status="handleToggleAccessStatus"
-            @remove-application-access="handleRemoveApplicationAccess"
-            @toggle-module-access="handleToggleModuleAccess"
-            @toggle-function-access="handleToggleFunctionAccess"
-            @toggle-permission="handleTogglePermission"
-            @update-operational-scope="handleUpdateOperationalScope"
-            @toggle-scope-asset="handleToggleScopeAsset"
-            @toggle-scope-sucursal="handleToggleScopeSucursal"
-          />
-        </main>
+        </div>
       </div>
     </div>
 
+    <!-- DRAWER DETALLE USUARIO -->
+    <Teleport to="body">
+      <div
+        v-if="showUserDrawer"
+        class="users-management-readable fixed inset-0 z-[2147483000]"
+        role="dialog"
+        aria-modal="true"
+      >
+        <!-- FONDO -->
+        <button
+          type="button"
+          class="absolute inset-0 cursor-default bg-slate-950/30"
+          aria-label="Cerrar detalle de usuario"
+          @click="closeUserDrawer"
+        ></button>
+
+        <!-- PANEL -->
+        <aside
+          class="absolute inset-y-0 right-0 flex w-full max-w-[920px] flex-col bg-[#f3f6fa] shadow-[-16px_0_50px_rgba(15,23,42,0.18)]"
+        >
+          <!-- CABECERA DRAWER -->
+          <div
+            class="flex min-h-[58px] shrink-0 items-center justify-between border-b border-[#d8dee8] bg-white px-4"
+          >
+            <div class="min-w-0">
+              <p class="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                Gestión de usuario
+              </p>
+
+              <p class="mt-0.5 truncate text-[11px] font-black text-[#102372]">
+                {{ selectedUserDrawerName }}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              class="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-[#d8dee8] bg-white text-[20px] font-light leading-none text-slate-400 transition hover:border-[#102372] hover:text-[#102372]"
+              aria-label="Cerrar"
+              @click="closeUserDrawer"
+            >
+              ×
+            </button>
+          </div>
+
+          <!-- DETALLE ACTUAL -->
+          <div class="min-h-0 flex-1 overflow-hidden p-3">
+            <UserAccessDetail
+              :user="selectedUser"
+              :accesses="selectedUserAccesses"
+              :applications="applications"
+              :companies="companies"
+              :modules="modules"
+              :module-functions="moduleFunctions"
+              :permissions="permissions"
+              :scopes="scopes"
+              :roles="roles"
+              :assets="assets"
+              :asset-tags="assetTags"
+              :can-impersonate="canImpersonateSelectedUser"
+              :can-edit-users="canEditUsersForRoute"
+              :can-manage-user-permissions="canManageSelectedUserPermissionsForRoute"
+              @impersonate-user="handleImpersonateSelectedUser"
+              @edit-user="handleOpenEditUserModal"
+              @toggle-user-status="handleToggleSelectedUserStatus"
+              @add-application-access="handleAddApplicationAccess"
+              @update-access-role="handleUpdateAccessRole"
+              @toggle-access-status="handleToggleAccessStatus"
+              @remove-application-access="handleRemoveApplicationAccess"
+              @toggle-module-access="handleToggleModuleAccess"
+              @toggle-function-access="handleToggleFunctionAccess"
+              @toggle-permission="handleTogglePermission"
+              @update-operational-scope="handleUpdateOperationalScope"
+              @toggle-scope-asset="handleToggleScopeAsset"
+              @toggle-scope-asset-tag="handleToggleScopeAssetTag"
+            />
+          </div>
+        </aside>
+      </div>
+    </Teleport>
+
     <UserEditorModal
+      v-if="showEditorModal"
       :model-value="showEditorModal"
       :mode="editorMode"
       :draft-user="draftUser"
@@ -87,24 +143,38 @@
 </template>
 
 <script setup>
-import { computed } from "vue"
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 
 import UserAccessDetail from "../components/users/UserAccessDetail.vue"
-import UserEditorModal from "../components/users/UserEditorModal.vue"
 import UserFiltersBar from "../components/users/UserFiltersBar.vue"
 import UserListPanel from "../components/users/UserListPanel.vue"
 import UserManagementHeader from "../components/users/UserManagementHeader.vue"
 
-import { useAuditTrail } from "../composables/audit/useAuditTrail.js"
-import { useUserAccessManagement } from "../composables/users/useUserAccessManagement.js"
 import { useAccessControl } from "../composables/auth/useAccessControl.js"
 import { useAuthSession } from "../composables/auth/useAuthSession.js"
+import { useAuditTrail } from "../composables/audit/useAuditTrail.js"
+import { useMockDatabase } from "../composables/mock/useMockDatabase.js"
+import { preloadWhenIdle } from "../composables/ui/useIdlePreload.js"
+import { useUserAccessManagement } from "../composables/users/useUserAccessManagement.js"
+
+const loadUserEditorModal = () => import("../components/users/UserEditorModal.vue")
+
+const UserEditorModal = defineAsyncComponent(loadUserEditorModal)
 
 const route = useRoute()
 const router = useRouter()
+
 const { canImpersonateUser, startImpersonation, defaultAuthenticatedRoute } = useAuthSession()
+
 const { canAccessFunction } = useAccessControl()
+const { assetTags } = useMockDatabase()
+
+const showUserDrawer = ref(false)
+
+const routeCompanyId = computed(() => {
+  return route.params.empresaId || null
+})
 
 const {
   users,
@@ -123,6 +193,7 @@ const {
   selectedCompany,
   selectedStatus,
   selectedModule,
+  companyFilterLocked,
 
   selectedUserId,
   selectedUser,
@@ -135,6 +206,7 @@ const {
   showEditorModal,
   editorMode,
   draftUser,
+  selectedUserIsPlatformAdmin,
 
   selectUser,
   clearFilters,
@@ -155,15 +227,60 @@ const {
   togglePermission,
   updateOperationalScope,
   toggleScopeAsset,
-  toggleScopeSucursal,
-} = useUserAccessManagement()
-
-const routeCompanyId = computed(() => {
-  return route.params.empresaId || null
+  toggleScopeAssetTag,
+} = useUserAccessManagement({
+  routeCompanyId,
+  assetTags,
 })
+
 const { recordAudit } = useAuditTrail({
   companyId: routeCompanyId,
 })
+
+const selectedUserDrawerName = computed(() => {
+  return (
+    selectedUser.value?.name ||
+    selectedUser.value?.username ||
+    selectedUser.value?.email ||
+    "Detalle del usuario"
+  )
+})
+
+const lockBodyScroll = () => {
+  if (typeof document === "undefined") return
+
+  document.body.style.overflow = "hidden"
+}
+
+const unlockBodyScroll = () => {
+  if (typeof document === "undefined") return
+
+  document.body.style.overflow = ""
+}
+
+const openUserDrawer = () => {
+  if (!selectedUser.value) return
+
+  showUserDrawer.value = true
+}
+
+const closeUserDrawer = () => {
+  showUserDrawer.value = false
+}
+
+const handleSelectUser = (userId) => {
+  selectUser(userId)
+
+  if (!selectedUser.value) return
+
+  openUserDrawer()
+}
+
+const handleDrawerKeydown = (event) => {
+  if (event.key === "Escape" && showUserDrawer.value && !showEditorModal.value) {
+    closeUserDrawer()
+  }
+}
 
 const getUserAuditName = (user = {}) => {
   return user.name || user.username || user.email || user.id || "Usuario"
@@ -233,6 +350,10 @@ const canManageUserPermissionsForRoute = computed(() => {
   return canAccessFunction("users-permissions", routeCompanyId.value, "admin")
 })
 
+const canManageSelectedUserPermissionsForRoute = computed(() => {
+  return canManageUserPermissionsForRoute.value && !selectedUserIsPlatformAdmin.value
+})
+
 const canImpersonateSelectedUser = computed(() => {
   return canImpersonateUser(selectedUser.value?.id)
 })
@@ -250,14 +371,21 @@ const handleOpenEditUserModal = () => {
 }
 
 const handleSaveUserFromModal = () => {
-  if (editorMode.value === "create" && !canCreateUsersForRoute.value) return
-  if (editorMode.value === "edit" && !canEditUsersForRoute.value) return
+  if (editorMode.value === "create" && !canCreateUsersForRoute.value) {
+    return
+  }
+
+  if (editorMode.value === "edit" && !canEditUsersForRoute.value) {
+    return
+  }
 
   const mode = editorMode.value
   const draftSnapshot = {
     ...draftUser.value,
   }
+
   const previousUsersCount = users.value.length
+
   const previousUserSignature =
     mode === "edit"
       ? JSON.stringify(
@@ -277,7 +405,9 @@ const handleSaveUserFromModal = () => {
             String(user.email || "") === String(draftSnapshot.email || "")
           )
         })
-      : users.value.find((user) => String(user.id) === String(draftSnapshot.id))
+      : users.value.find((user) => {
+          return String(user.id) === String(draftSnapshot.id)
+        })
 
   if (!savedUser) return
 
@@ -287,6 +417,7 @@ const handleSaveUserFromModal = () => {
       user: savedUser,
       description: "Se creo un usuario.",
     })
+
     return
   }
 
@@ -296,7 +427,9 @@ const handleSaveUserFromModal = () => {
       user: savedUser,
       description: "Se actualizo la ficha de un usuario.",
       metadata: {
-        changedFields: Object.keys(draftSnapshot).filter((key) => key !== "password"),
+        changedFields: Object.keys(draftSnapshot).filter((key) => {
+          return key !== "password"
+        }),
       },
     })
   }
@@ -304,6 +437,8 @@ const handleSaveUserFromModal = () => {
 
 const handleToggleSelectedUserStatus = () => {
   if (!canEditUsersForRoute.value) return
+  if (selectedUserIsPlatformAdmin.value) return
+
   const user = selectedUser.value
   const previousStatus = user?.status
 
@@ -324,7 +459,8 @@ const handleToggleSelectedUserStatus = () => {
 }
 
 const handleAddApplicationAccess = (applicationId) => {
-  if (!canManageUserPermissionsForRoute.value) return
+  if (!canManageSelectedUserPermissionsForRoute.value) return
+
   const previousAccessesCount = accesses.value.length
 
   addApplicationAccess(applicationId)
@@ -345,12 +481,17 @@ const handleAddApplicationAccess = (applicationId) => {
 }
 
 const handleRemoveApplicationAccess = (accessId) => {
-  if (!canManageUserPermissionsForRoute.value) return
-  const access = accesses.value.find((item) => String(item.id) === String(accessId))
+  if (!canManageSelectedUserPermissionsForRoute.value) return
+
+  const access = accesses.value.find((item) => {
+    return String(item.id) === String(accessId)
+  })
 
   removeApplicationAccess(accessId)
 
-  const stillExists = accesses.value.some((item) => String(item.id) === String(accessId))
+  const stillExists = accesses.value.some((item) => {
+    return String(item.id) === String(accessId)
+  })
 
   if (stillExists) return
 
@@ -361,8 +502,12 @@ const handleRemoveApplicationAccess = (accessId) => {
 }
 
 const handleUpdateAccessRole = (accessId, roleId) => {
-  if (!canManageUserPermissionsForRoute.value) return
-  const access = accesses.value.find((item) => String(item.id) === String(accessId))
+  if (!canManageSelectedUserPermissionsForRoute.value) return
+
+  const access = accesses.value.find((item) => {
+    return String(item.id) === String(accessId)
+  })
+
   const previousRole = access?.role
 
   updateAccessRole(accessId, roleId)
@@ -380,8 +525,12 @@ const handleUpdateAccessRole = (accessId, roleId) => {
 }
 
 const handleToggleAccessStatus = (accessId) => {
-  if (!canManageUserPermissionsForRoute.value) return
-  const access = accesses.value.find((item) => String(item.id) === String(accessId))
+  if (!canManageSelectedUserPermissionsForRoute.value) return
+
+  const access = accesses.value.find((item) => {
+    return String(item.id) === String(accessId)
+  })
+
   const previousStatus = access?.status
 
   toggleAccessStatus(accessId)
@@ -399,13 +548,19 @@ const handleToggleAccessStatus = (accessId) => {
 }
 
 const handleToggleModuleAccess = (accessId, moduleId) => {
-  if (!canManageUserPermissionsForRoute.value) return
-  const access = accesses.value.find((item) => String(item.id) === String(accessId))
+  if (!canManageSelectedUserPermissionsForRoute.value) return
+
+  const access = accesses.value.find((item) => {
+    return String(item.id) === String(accessId)
+  })
+
   const previousSignature = JSON.stringify(access || {})
 
   toggleModuleAccess(accessId, moduleId)
 
-  if (!access || previousSignature === JSON.stringify(access)) return
+  if (!access || previousSignature === JSON.stringify(access)) {
+    return
+  }
 
   recordAccessAudit({
     access,
@@ -417,13 +572,19 @@ const handleToggleModuleAccess = (accessId, moduleId) => {
 }
 
 const handleToggleFunctionAccess = (accessId, functionId) => {
-  if (!canManageUserPermissionsForRoute.value) return
-  const access = accesses.value.find((item) => String(item.id) === String(accessId))
+  if (!canManageSelectedUserPermissionsForRoute.value) return
+
+  const access = accesses.value.find((item) => {
+    return String(item.id) === String(accessId)
+  })
+
   const previousSignature = JSON.stringify(access || {})
 
   toggleFunctionAccess(accessId, functionId)
 
-  if (!access || previousSignature === JSON.stringify(access)) return
+  if (!access || previousSignature === JSON.stringify(access)) {
+    return
+  }
 
   recordAccessAudit({
     access,
@@ -435,13 +596,19 @@ const handleToggleFunctionAccess = (accessId, functionId) => {
 }
 
 const handleTogglePermission = (accessId, functionId, permissionId) => {
-  if (!canManageUserPermissionsForRoute.value) return
-  const access = accesses.value.find((item) => String(item.id) === String(accessId))
+  if (!canManageSelectedUserPermissionsForRoute.value) return
+
+  const access = accesses.value.find((item) => {
+    return String(item.id) === String(accessId)
+  })
+
   const previousSignature = JSON.stringify(access || {})
 
   togglePermission(accessId, functionId, permissionId)
 
-  if (!access || previousSignature === JSON.stringify(access)) return
+  if (!access || previousSignature === JSON.stringify(access)) {
+    return
+  }
 
   recordAccessAudit({
     access,
@@ -454,13 +621,19 @@ const handleTogglePermission = (accessId, functionId, permissionId) => {
 }
 
 const handleUpdateOperationalScope = (accessId, scopeType) => {
-  if (!canManageUserPermissionsForRoute.value) return
-  const access = accesses.value.find((item) => String(item.id) === String(accessId))
+  if (!canManageSelectedUserPermissionsForRoute.value) return
+
+  const access = accesses.value.find((item) => {
+    return String(item.id) === String(accessId)
+  })
+
   const previousSignature = JSON.stringify(access || {})
 
   updateOperationalScope(accessId, scopeType)
 
-  if (!access || previousSignature === JSON.stringify(access)) return
+  if (!access || previousSignature === JSON.stringify(access)) {
+    return
+  }
 
   recordAccessAudit({
     access,
@@ -472,13 +645,19 @@ const handleUpdateOperationalScope = (accessId, scopeType) => {
 }
 
 const handleToggleScopeAsset = (accessId, assetId) => {
-  if (!canManageUserPermissionsForRoute.value) return
-  const access = accesses.value.find((item) => String(item.id) === String(accessId))
+  if (!canManageSelectedUserPermissionsForRoute.value) return
+
+  const access = accesses.value.find((item) => {
+    return String(item.id) === String(accessId)
+  })
+
   const previousSignature = JSON.stringify(access || {})
 
   toggleScopeAsset(accessId, assetId)
 
-  if (!access || previousSignature === JSON.stringify(access)) return
+  if (!access || previousSignature === JSON.stringify(access)) {
+    return
+  }
 
   recordAccessAudit({
     access,
@@ -489,20 +668,26 @@ const handleToggleScopeAsset = (accessId, assetId) => {
   })
 }
 
-const handleToggleScopeSucursal = (accessId, sucursalId) => {
-  if (!canManageUserPermissionsForRoute.value) return
-  const access = accesses.value.find((item) => String(item.id) === String(accessId))
+const handleToggleScopeAssetTag = (accessId, tagId) => {
+  if (!canManageSelectedUserPermissionsForRoute.value) return
+
+  const access = accesses.value.find((item) => {
+    return String(item.id) === String(accessId)
+  })
+
   const previousSignature = JSON.stringify(access || {})
 
-  toggleScopeSucursal(accessId, sucursalId)
+  toggleScopeAssetTag(accessId, tagId)
 
-  if (!access || previousSignature === JSON.stringify(access)) return
+  if (!access || previousSignature === JSON.stringify(access)) {
+    return
+  }
 
   recordAccessAudit({
     access,
-    description: "Se modificaron las sucursales del alcance de un usuario.",
+    description: "Se modificaron las etiquetas del alcance de un usuario.",
     metadata: {
-      branchId: sucursalId,
+      tagId,
     },
   })
 }
@@ -520,4 +705,83 @@ const handleImpersonateSelectedUser = async () => {
 const updateDraftUser = (nextDraftUser) => {
   draftUser.value = nextDraftUser
 }
+
+watch(showUserDrawer, (isOpen) => {
+  if (isOpen) {
+    lockBodyScroll()
+    return
+  }
+
+  unlockBodyScroll()
+})
+
+onMounted(() => {
+  preloadWhenIdle([loadUserEditorModal])
+
+  if (typeof window !== "undefined") {
+    window.addEventListener("keydown", handleDrawerKeydown)
+  }
+})
+
+onBeforeUnmount(() => {
+  unlockBodyScroll()
+
+  if (typeof window !== "undefined") {
+    window.removeEventListener("keydown", handleDrawerKeydown)
+  }
+})
 </script>
+
+<style scoped>
+.users-management-readable :deep(.text-\[8px\]) {
+  font-size: 10px !important;
+  line-height: 1rem !important;
+}
+
+.users-management-readable :deep(.text-\[9px\]) {
+  font-size: 11px !important;
+  line-height: 1rem !important;
+}
+
+.users-management-readable :deep(.text-\[10px\]) {
+  font-size: 12px !important;
+  line-height: 1.1rem !important;
+}
+
+.users-management-readable :deep(.text-\[11px\]),
+.users-management-readable :deep(.text-xs) {
+  font-size: 13px !important;
+  line-height: 1.25rem !important;
+}
+
+.users-management-readable :deep(.text-\[12px\]) {
+  font-size: 14px !important;
+  line-height: 1.35rem !important;
+}
+
+.users-management-readable :deep(.text-\[13px\]),
+.users-management-readable :deep(.text-sm) {
+  font-size: 15px !important;
+  line-height: 1.45rem !important;
+}
+
+.users-management-readable :deep(.text-\[14px\]) {
+  font-size: 16px !important;
+  line-height: 1.45rem !important;
+}
+
+.users-management-readable :deep(.text-\[15px\]) {
+  font-size: 17px !important;
+  line-height: 1.5rem !important;
+}
+
+.users-management-readable :deep(.text-\[17px\]) {
+  font-size: 19px !important;
+  line-height: 1.55rem !important;
+}
+
+.users-management-readable :deep(.text-\[18px\]) {
+  font-size: 20px !important;
+  line-height: 1.7rem !important;
+}
+</style>

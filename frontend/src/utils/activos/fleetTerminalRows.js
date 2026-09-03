@@ -300,7 +300,7 @@ export const getTerminalStateBadgeClass = (estado) => {
   }
 
   if (normalizedEstado === "stopped") {
-    return "border-red-200 bg-red-50 text-red-700"
+    return "border-orange-200 bg-orange-50 text-[#FF6600]"
   }
 
   if (normalizedEstado === "offline") {

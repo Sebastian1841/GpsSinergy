@@ -10,13 +10,104 @@ import {
 // ==================
 // VISTAS
 // ==================
-const ActivosView = () => import("../views/ActivosView.vue")
-const AuditView = () => import("../views/AuditView.vue")
-const CompanyManagementView = () => import("../views/CompanyManagementView.vue")
-const UserManagementView = () => import("../views/UserManagementView.vue")
-const ReportsView = () => import("../views/ReportsView.vue")
-const LoginView = () => import("../views/LoginView.vue")
-const NoAccessView = () => import("../views/NoAccessView.vue")
+const routeViewLoaders = {
+  activos: () => import("../views/ActivosView.vue"),
+  audit: () => import("../views/AuditView.vue"),
+  companies: () => import("../views/CompanyManagementView.vue"),
+  login: () => import("../views/LoginView.vue"),
+  maintenance: () => import("../views/MaintenanceView.vue"),
+  noAccess: () => import("../views/NoAccessView.vue"),
+  reports: () => import("../views/ReportsView.vue"),
+  users: () => import("../views/UserManagementView.vue"),
+}
+
+const PRIVATE_ROUTE_VIEW_KEYS = ["activos", "reports", "maintenance", "audit", "users", "companies"]
+const preloadedRouteViewKeys = new Set()
+
+export const preloadPrivateRouteViews = ({
+  batchDelayMs = 280,
+  exclude = [],
+  startDelayMs = 1200,
+} = {}) => {
+  if (typeof window === "undefined") return () => {}
+
+  const excludedKeys = new Set(exclude.filter(Boolean))
+  const pendingKeys = PRIVATE_ROUTE_VIEW_KEYS.filter((key) => {
+    return !excludedKeys.has(key) && !preloadedRouteViewKeys.has(key)
+  })
+
+  let cancelled = false
+  let idleId = null
+  let startTimeoutId = null
+  let timeoutId = null
+
+  const clearScheduledWork = () => {
+    if (startTimeoutId !== null) {
+      window.clearTimeout(startTimeoutId)
+      startTimeoutId = null
+    }
+
+    if (idleId !== null && typeof window.cancelIdleCallback === "function") {
+      window.cancelIdleCallback(idleId)
+      idleId = null
+    }
+
+    if (timeoutId !== null) {
+      window.clearTimeout(timeoutId)
+      timeoutId = null
+    }
+  }
+
+  const scheduleNextLoad = () => {
+    if (cancelled || !pendingKeys.length) return
+
+    if (typeof window.requestIdleCallback === "function") {
+      idleId = window.requestIdleCallback(loadNextView, {
+        timeout: 1800,
+      })
+      return
+    }
+
+    timeoutId = window.setTimeout(loadNextView, batchDelayMs)
+  }
+
+  const loadNextView = () => {
+    if (cancelled) return
+
+    idleId = null
+    timeoutId = null
+
+    const key = pendingKeys.shift()
+    const loadView = routeViewLoaders[key]
+
+    if (!loadView) {
+      scheduleNextLoad()
+      return
+    }
+
+    preloadedRouteViewKeys.add(key)
+
+    loadView()
+      .catch(() => {
+        preloadedRouteViewKeys.delete(key)
+      })
+      .finally(() => {
+        if (!cancelled && pendingKeys.length) {
+          timeoutId = window.setTimeout(scheduleNextLoad, batchDelayMs)
+        }
+      })
+  }
+
+  startTimeoutId = window.setTimeout(() => {
+    startTimeoutId = null
+    scheduleNextLoad()
+  }, startDelayMs)
+
+  return () => {
+    cancelled = true
+    clearScheduledWork()
+  }
+}
 
 const LAST_COMPANY_CACHE_KEY = "sinergy-last-company-id"
 
@@ -33,21 +124,35 @@ const persistLastCompanyId = (companyId) => {
   removeStorageValue(LAST_COMPANY_CACHE_KEY)
 }
 
-const getLastAccessibleAssetsCompany = ({ accessibleCompanies, canAccessModule }) => {
+const getLastAccessibleCompany = ({ accessibleCompanies, canAccess }) => {
   const companies = accessibleCompanies.value || []
   const cachedCompanyId = String(readLastCompanyId() || "")
 
   const cachedCompany = companies.find((company) => {
-    return String(company.id) === cachedCompanyId && canAccessModule("assets", company.id)
+    return String(company.id) === cachedCompanyId && canAccess(company)
   })
 
   if (cachedCompany) return cachedCompany
 
   return (
     companies.find((company) => {
-      return canAccessModule("assets", company.id)
+      return canAccess(company)
     }) || null
   )
+}
+
+const getLastAccessibleAssetsCompany = ({ accessibleCompanies, canAccessModule }) => {
+  return getLastAccessibleCompany({
+    accessibleCompanies,
+    canAccess: (company) => canAccessModule("assets", company.id),
+  })
+}
+
+const getLastAccessibleMaintenanceCompany = ({ accessibleCompanies, canAccessFunction }) => {
+  return getLastAccessibleCompany({
+    accessibleCompanies,
+    canAccess: (company) => canAccessFunction("maintenance-view", company.id, "view"),
+  })
 }
 
 // ==================
@@ -57,7 +162,7 @@ const routes = [
   {
     path: "/login",
     name: "Login",
-    component: LoginView,
+    component: routeViewLoaders.login,
     meta: {
       public: true,
     },
@@ -65,7 +170,7 @@ const routes = [
   {
     path: "/sin-acceso",
     name: "NoAccess",
-    component: NoAccessView,
+    component: routeViewLoaders.noAccess,
   },
 
   // ==================
@@ -82,8 +187,9 @@ const routes = [
   {
     path: "/activos",
     name: "Activos",
-    component: ActivosView,
+    component: routeViewLoaders.activos,
     meta: {
+      preloadKey: "activos",
       requiresPlatformAdmin: true,
     },
   },
@@ -94,8 +200,9 @@ const routes = [
   {
     path: "/reportes",
     name: "Reports",
-    component: ReportsView,
+    component: routeViewLoaders.reports,
     meta: {
+      preloadKey: "reports",
       requiresPlatformAdmin: true,
     },
   },
@@ -106,8 +213,22 @@ const routes = [
   {
     path: "/auditoria",
     name: "Audit",
-    component: AuditView,
+    component: routeViewLoaders.audit,
     meta: {
+      preloadKey: "audit",
+      requiresPlatformAdmin: true,
+    },
+  },
+
+  // ==================
+  // MANTENCIONES GENERAL
+  // ==================
+  {
+    path: "/mantenciones",
+    name: "Maintenance",
+    component: routeViewLoaders.maintenance,
+    meta: {
+      preloadKey: "maintenance",
       requiresPlatformAdmin: true,
     },
   },
@@ -118,8 +239,9 @@ const routes = [
   {
     path: "/usuarios",
     name: "UserManagement",
-    component: UserManagementView,
+    component: routeViewLoaders.users,
     meta: {
+      preloadKey: "users",
       requiresUserManagementView: true,
     },
   },
@@ -130,8 +252,9 @@ const routes = [
   {
     path: "/empresas",
     name: "CompanyManagement",
-    component: CompanyManagementView,
+    component: routeViewLoaders.companies,
     meta: {
+      preloadKey: "companies",
       requiresPlatformAdmin: true,
     },
   },
@@ -142,8 +265,9 @@ const routes = [
   {
     path: "/app/:empresaId/activos",
     name: "AppActivos",
-    component: ActivosView,
+    component: routeViewLoaders.activos,
     meta: {
+      preloadKey: "activos",
       requiresModule: "assets",
     },
   },
@@ -154,8 +278,9 @@ const routes = [
   {
     path: "/app/:empresaId/reportes",
     name: "AppReports",
-    component: ReportsView,
+    component: routeViewLoaders.reports,
     meta: {
+      preloadKey: "reports",
       requiresFunction: {
         id: "reports",
         permission: "view",
@@ -169,10 +294,27 @@ const routes = [
   {
     path: "/app/:empresaId/auditoria",
     name: "AppAudit",
-    component: AuditView,
+    component: routeViewLoaders.audit,
     meta: {
+      preloadKey: "audit",
       requiresFunction: {
         id: "audit-view",
+        permission: "view",
+      },
+    },
+  },
+
+  // ==================
+  // MANTENCIONES EMPRESA
+  // ==================
+  {
+    path: "/app/:empresaId/mantenciones",
+    name: "AppMaintenance",
+    component: routeViewLoaders.maintenance,
+    meta: {
+      preloadKey: "maintenance",
+      requiresFunction: {
+        id: "maintenance-view",
         permission: "view",
       },
     },
@@ -184,8 +326,9 @@ const routes = [
   {
     path: "/app/:empresaId/usuarios",
     name: "AppUserManagement",
-    component: UserManagementView,
+    component: routeViewLoaders.users,
     meta: {
+      preloadKey: "users",
       requiresFunction: {
         id: "users-view",
         permission: "view",
@@ -199,8 +342,9 @@ const routes = [
   {
     path: "/app/:empresaId/empresas",
     name: "AppCompanyManagement",
-    component: CompanyManagementView,
+    component: routeViewLoaders.companies,
     meta: {
+      preloadKey: "companies",
       requiresPlatformAdmin: true,
     },
   },
@@ -290,6 +434,17 @@ router.beforeEach((to) => {
       : {
           name: "NoAccess",
         }
+  }
+
+  if (to.path === "/mantenciones") {
+    const targetCompany = getLastAccessibleMaintenanceCompany({
+      accessibleCompanies,
+      canAccessFunction,
+    })
+
+    if (targetCompany) {
+      return `/app/${targetCompany.id}/mantenciones`
+    }
   }
 
   if (to.meta.requiresPlatformAdmin && !isPlatformAdmin.value) {

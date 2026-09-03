@@ -2,33 +2,33 @@
   <section class="h-full min-h-0 bg-[#eef2f7]">
     <div class="grid h-full min-h-0 grid-rows-[auto_1fr]">
       <CompanyManagementHeader
+        :search-term="searchTerm"
+        :selected-status="selectedStatus"
         :summary-items="summaryItems"
+        @clear-filters="clearFilters"
         @create-company="openCreateCompanyModal"
+        @select-status="selectedStatus = $event"
+        @update:search-term="searchTerm = $event"
       />
 
-      <main class="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden p-3">
-        <CompanyFiltersBar
-          :search-term="searchTerm"
-          :selected-status="selectedStatus"
-          @update:search-term="searchTerm = $event"
-          @update:selected-status="selectedStatus = $event"
-          @clear-filters="clearFilters"
-        />
-
+      <main class="min-h-0 overflow-y-auto bg-[#f6f8fb] px-4 pb-6 sm:px-8">
         <CompanyCatalog
           :companies="visibleCompanies"
+          :selected-company-id="selectedCompanyId || ''"
           :visible-companies-remaining="visibleCompaniesRemaining"
           :can-show-more="canShowMoreCompanies"
           :get-company-health="getCompanyHealth"
           @configure-company="openCompanyConfigPanel"
           @enter-company="enterCompanyWorkspace"
           @clear-filters="clearFilters"
+          @select-company="selectCompany"
           @show-more="showMoreCompanies"
         />
       </main>
     </div>
 
     <CompanyConfigPanel
+      v-if="showConfigPanel"
       :model-value="showConfigPanel"
       :company="selectedCompany"
       :report-types="reportTypes"
@@ -36,15 +36,11 @@
       @close="showConfigPanel = false"
       @edit-company="openEditCompanyModal"
       @toggle-company-status="toggleSelectedCompanyStatus"
-      @alternar-sucursales-habilitadas="alternarSucursalesHabilitadas"
-      @agregar-sucursal="agregarSucursal"
-      @actualizar-nombre-sucursal="actualizarNombreSucursal"
-      @alternar-estado-sucursal="alternarEstadoSucursal"
-      @eliminar-sucursal="eliminarSucursal"
       @enter-company="enterCompanyWorkspace"
     />
 
     <CompanyEditorModal
+      v-if="showEditorModal"
       :model-value="showEditorModal"
       :mode="editorMode"
       :draft-company="draftCompany"
@@ -56,18 +52,22 @@
 </template>
 
 <script setup>
-import { ref } from "vue"
+import { defineAsyncComponent, onMounted, ref } from "vue"
 import { useRouter } from "vue-router"
 
 import CompanyCatalog from "../components/companies/CompanyCatalog.vue"
-import CompanyConfigPanel from "../components/companies/CompanyConfigPanel.vue"
-import CompanyEditorModal from "../components/companies/CompanyEditorModal.vue"
-import CompanyFiltersBar from "../components/companies/CompanyFiltersBar.vue"
 import CompanyManagementHeader from "../components/companies/CompanyManagementHeader.vue"
 
 import { useAuditTrail } from "../composables/audit/useAuditTrail.js"
 import { useCompanyManagement } from "../composables/companies/useCompanyManagement.js"
+import { preloadWhenIdle } from "../composables/ui/useIdlePreload.js"
 import { getCompanyWorkspacePath } from "../utils/companies/companyUtils.js"
+
+const loadCompanyConfigPanel = () => import("../components/companies/CompanyConfigPanel.vue")
+const loadCompanyEditorModal = () => import("../components/companies/CompanyEditorModal.vue")
+
+const CompanyConfigPanel = defineAsyncComponent(loadCompanyConfigPanel)
+const CompanyEditorModal = defineAsyncComponent(loadCompanyEditorModal)
 
 const router = useRouter()
 
@@ -76,6 +76,7 @@ const {
 
   searchTerm,
   selectedStatus,
+  selectedCompanyId,
   selectedCompany,
   visibleCompanies,
   visibleCompaniesRemaining,
@@ -94,11 +95,6 @@ const {
   closeEditorModal,
   saveCompanyFromModal: saveCompanyFromModalBase,
   toggleSelectedCompanyStatus: toggleSelectedCompanyStatusBase,
-  alternarSucursalesHabilitadas: alternarSucursalesHabilitadasBase,
-  agregarSucursal: agregarSucursalBase,
-  actualizarNombreSucursal: actualizarNombreSucursalBase,
-  alternarEstadoSucursal: alternarEstadoSucursalBase,
-  eliminarSucursal: eliminarSucursalBase,
   getCompanyHealth,
 } = useCompanyManagement()
 
@@ -210,114 +206,7 @@ const toggleSelectedCompanyStatus = () => {
   })
 }
 
-const alternarSucursalesHabilitadas = () => {
-  const company = selectedCompany.value
-  const previousEnabled = company?.sucursalesHabilitadas !== false
-
-  alternarSucursalesHabilitadasBase()
-
-  if (!company || previousEnabled === (company.sucursalesHabilitadas !== false)) return
-
-  recordCompanyAudit({
-    action: "branch:toggle",
-    company,
-    entityType: "sucursales",
-    entityName: "Sucursales",
-    description: "Se cambio la configuracion de sucursales de la empresa.",
-    metadata: {
-      previousEnabled,
-      nextEnabled: company.sucursalesHabilitadas !== false,
-    },
-  })
-}
-
-const agregarSucursal = (nombreSucursal) => {
-  const company = selectedCompany.value
-  const previousBranchCount = company?.sucursales?.length || 0
-
-  agregarSucursalBase(nombreSucursal)
-
-  if (!company || (company.sucursales?.length || 0) <= previousBranchCount) return
-
-  const branch = company.sucursales[company.sucursales.length - 1]
-
-  recordCompanyAudit({
-    action: "branch:create",
-    company,
-    entityType: "sucursal",
-    entityName: branch?.name || nombreSucursal || "Sucursal",
-    description: "Se creo una sucursal.",
-    metadata: {
-      branchId: branch?.id || "",
-    },
-  })
-}
-
-const actualizarNombreSucursal = (sucursalId, nombreSucursal) => {
-  const company = selectedCompany.value
-  const branch = company?.sucursales?.find((item) => String(item.id) === String(sucursalId))
-  const previousName = branch?.name
-
-  actualizarNombreSucursalBase(sucursalId, nombreSucursal)
-
-  if (!company || !branch || previousName === branch.name) return
-
-  recordCompanyAudit({
-    action: "branch:rename",
-    company,
-    entityType: "sucursal",
-    entityName: branch.name || nombreSucursal || "Sucursal",
-    description: "Se renombro una sucursal.",
-    metadata: {
-      branchId: sucursalId,
-      previousName,
-    },
-  })
-}
-
-const alternarEstadoSucursal = (sucursalId) => {
-  const company = selectedCompany.value
-  const branch = company?.sucursales?.find((item) => String(item.id) === String(sucursalId))
-  const previousActive = branch?.active !== false
-
-  alternarEstadoSucursalBase(sucursalId)
-
-  if (!company || !branch || previousActive === (branch.active !== false)) return
-
-  recordCompanyAudit({
-    action: "branch:status",
-    company,
-    entityType: "sucursal",
-    entityName: branch.name || "Sucursal",
-    description: "Se cambio el estado de una sucursal.",
-    metadata: {
-      branchId: sucursalId,
-      previousActive,
-      nextActive: branch.active !== false,
-    },
-  })
-}
-
-const eliminarSucursal = (sucursalId) => {
-  const company = selectedCompany.value
-  const branch = company?.sucursales?.find((item) => String(item.id) === String(sucursalId))
-
-  eliminarSucursalBase(sucursalId)
-
-  const stillExists = company?.sucursales?.some((item) => String(item.id) === String(sucursalId))
-
-  if (!company || !branch || stillExists) return
-
-  recordCompanyAudit({
-    action: "branch:delete",
-    company,
-    entityType: "sucursal",
-    entityName: branch.name || "Sucursal",
-    severity: "warning",
-    description: "Se elimino una sucursal.",
-    metadata: {
-      branchId: sucursalId,
-    },
-  })
-}
+onMounted(() => {
+  preloadWhenIdle([loadCompanyConfigPanel, loadCompanyEditorModal])
+})
 </script>

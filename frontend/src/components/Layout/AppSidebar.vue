@@ -170,6 +170,44 @@
             </RouterLink>
           </li>
 
+          <li v-if="maintenanceNavigationItem">
+            <RouterLink
+              :to="maintenanceNavigationItem.to"
+              class="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-white/75 transition-colors duration-100 hover:bg-white/[0.08] hover:text-white"
+              :class="isMaintenanceRouteActive ? 'sidebar-link-active' : ''"
+              active-class="sidebar-link-active"
+              @click="$emit('update:isOpen', false)"
+            >
+              <div
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/70 transition-colors duration-100 group-hover:bg-[#ff6600] group-hover:text-white"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 0 0 5.4-5.4l-2.4 2.4-3-3 2.4-2.4Z"
+                  />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 19h5M17.5 16.5v5" />
+                </svg>
+              </div>
+
+              <span class="min-w-0 flex-1 truncate">
+                {{ maintenanceNavigationItem.label }}
+              </span>
+
+              <span
+                class="h-2 w-2 rounded-full bg-transparent transition-colors duration-100 group-hover:bg-[#ff6600]"
+              ></span>
+            </RouterLink>
+          </li>
+
           <li v-if="isPlatformAdmin">
             <RouterLink
               to="/empresas"
@@ -339,12 +377,51 @@ const auditNavigationItem = computed(() => {
   }
 })
 
+const getAccessibleMaintenanceCompany = () => {
+  const currentCompany = accessibleCompanies.value.find((company) => {
+    return (
+      String(company.id) === currentRouteCompanyId.value &&
+      canAccessFunction("maintenance-view", company.id, "view")
+    )
+  })
+
+  if (currentCompany) return currentCompany
+
+  return (
+    accessibleCompanies.value.find((company) => {
+      return canAccessFunction("maintenance-view", company.id, "view")
+    }) || null
+  )
+}
+
+const maintenanceNavigationItem = computed(() => {
+  const targetCompany = getAccessibleMaintenanceCompany()
+
+  if (!targetCompany && isPlatformAdmin.value) {
+    return {
+      to: "/mantenciones",
+      label: "Mantenciones",
+    }
+  }
+
+  if (!targetCompany) return null
+
+  return {
+    to: `/app/${targetCompany.id}/mantenciones`,
+    label: "Mantenciones",
+  }
+})
+
 const isReportsRouteActive = computed(() => {
   return route.name === "Reports" || route.name === "AppReports"
 })
 
 const isAuditRouteActive = computed(() => {
   return route.name === "Audit" || route.name === "AppAudit"
+})
+
+const isMaintenanceRouteActive = computed(() => {
+  return route.name === "Maintenance" || route.name === "AppMaintenance"
 })
 
 const isNavigationItemActive = (item) => {

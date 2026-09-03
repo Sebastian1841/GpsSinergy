@@ -132,10 +132,6 @@ export function useMapPanelGeofenceActions({ props, state, mapController }) {
       state.clearActiveGeofenceSelection()
     }
 
-    if (normalizeId(state.selectedHistoryGeofence.value?.id) === normalizeId(geofenceId)) {
-      state.resetHistoryState()
-    }
-
     mapController.deleteGeofence(geofenceId)
   }
 

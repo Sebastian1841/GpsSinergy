@@ -1,6 +1,5 @@
 import { computed, ref, watch } from "vue"
 
-import { useCompanyBranches } from "./useCompanyBranches.js"
 import { useCompaniesService } from "../../services/companies/useCompaniesService.js"
 import { useDebouncedValue } from "../ui/useDebouncedValue.js"
 
@@ -45,27 +44,9 @@ export function useCompanyManagement() {
   const {
     companyRecords: companies,
     reportTypes,
-    getCompany,
     createCompany: createDatabaseCompany,
     updateCompany: updateDatabaseCompany,
-    addSucursal: addDatabaseSucursal,
-    updateSucursal,
-    deleteSucursal: deleteDatabaseSucursal,
   } = useCompaniesService()
-
-  const {
-    alternarSucursalesHabilitadas: toggleCompanyBranchesEnabled,
-    agregarSucursal: addCompanyBranch,
-    actualizarNombreSucursal: updateCompanyBranchName,
-    alternarEstadoSucursal: toggleCompanyBranchStatus,
-    eliminarSucursal: deleteCompanyBranch,
-  } = useCompanyBranches({
-    getCompany,
-    updateCompany: updateDatabaseCompany,
-    addSucursal: addDatabaseSucursal,
-    updateSucursal,
-    deleteSucursal: deleteDatabaseSucursal,
-  })
 
   const searchTerm = ref("")
   const selectedStatus = ref("all")
@@ -114,22 +95,20 @@ export function useCompanyManagement() {
 
   const summaryItems = computed(() => {
     const activeCompanies = companies.value.filter((company) => company.status === "active")
+    const pendingCompanies = companies.value.filter((company) => company.status === "pending")
+    const inactiveCompanies = companies.value.filter((company) => company.status === "inactive")
+    const internalCompanies = companies.value.filter((company) => company.status === "internal")
     const totalAssets = companies.value.reduce((total, company) => {
       return total + (Number(company.assetsCount) || 0)
-    }, 0)
-    const activeAssets = companies.value.reduce((total, company) => {
-      return total + (Number(company.activeAssetsCount) || 0)
-    }, 0)
-    const totalAlerts = companies.value.reduce((total, company) => {
-      return total + (Number(company.alertsCount) || 0)
     }, 0)
 
     return [
       { key: "all", label: "Empresas", value: companies.value.length },
       { key: "active", label: "Activas", value: activeCompanies.length },
+      { key: "pending", label: "Pendientes", value: pendingCompanies.length },
+      { key: "inactive", label: "Suspendidas", value: inactiveCompanies.length },
+      { key: "internal", label: "Internas", value: internalCompanies.length },
       { key: "assets", label: "Activos", value: totalAssets },
-      { key: "online", label: "En linea", value: activeAssets },
-      { key: "alerts", label: "Alertas", value: totalAlerts },
     ]
   })
 
@@ -194,8 +173,6 @@ export function useCompanyManagement() {
       createdAt: new Date().toISOString().slice(0, 10),
       lastTelemetryAt: "Sin telemetria",
       workspacePath: `/app/${companyId}/activos`,
-      sucursalesHabilitadas: true,
-      sucursales: [],
       reports: createCompanyReports(reportTypes.value),
     })
 
@@ -245,33 +222,6 @@ export function useCompanyManagement() {
     })
   }
 
-  const alternarSucursalesHabilitadas = () => {
-    if (!selectedCompany.value) return
-
-    toggleCompanyBranchesEnabled(
-      selectedCompany.value.id,
-      selectedCompany.value.sucursalesHabilitadas !== false,
-    )
-  }
-
-  const agregarSucursal = (name) => {
-    if (!selectedCompany.value) return
-
-    addCompanyBranch(selectedCompany.value.id, name)
-  }
-
-  const actualizarNombreSucursal = (sucursalId, name) => {
-    updateCompanyBranchName(sucursalId, name, selectedCompany.value?.sucursales || [])
-  }
-
-  const alternarEstadoSucursal = (sucursalId) => {
-    toggleCompanyBranchStatus(sucursalId, selectedCompany.value?.sucursales || [])
-  }
-
-  const eliminarSucursal = (sucursalId) => {
-    deleteCompanyBranch(sucursalId, selectedCompany.value?.sucursales || [])
-  }
-
   const getCompanyHealth = (company) => {
     return getCompanyOperationHealth(company)
   }
@@ -303,11 +253,6 @@ export function useCompanyManagement() {
     closeEditorModal,
     saveCompanyFromModal,
     toggleSelectedCompanyStatus,
-    alternarSucursalesHabilitadas,
-    agregarSucursal,
-    actualizarNombreSucursal,
-    alternarEstadoSucursal,
-    eliminarSucursal,
     getCompanyHealth,
   }
 }

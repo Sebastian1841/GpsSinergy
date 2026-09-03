@@ -62,7 +62,6 @@ export const companyMatchesSearch = ({ company, term = "" }) => {
     company.contactEmail,
     company.region,
     company.city,
-    ...(company.sucursales || []).map((sucursal) => sucursal.name),
   ]
     .filter(Boolean)
     .join(" ")

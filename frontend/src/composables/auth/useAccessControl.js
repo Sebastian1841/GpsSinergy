@@ -2,6 +2,7 @@ import { computed } from "vue"
 
 import { useAuthSession } from "./useAuthSession.js"
 import { useAccessService } from "../../services/access/useAccessService.js"
+import { assetMatchesTagIds, normalizeAssetTagId } from "../../utils/users/userAssetTagUtils.js"
 
 const normalizeKey = (value) => String(value ?? "")
 
@@ -69,6 +70,9 @@ export function useAccessControl() {
         {
           sucursalIds: new Set((access.scope?.sucursalIds || []).map(normalizeKey)),
           assetIds: new Set((access.scope?.assetIds || []).map(normalizeKey)),
+          assetTagIds: new Set(
+            (access.scope?.assetTagIds || access.scope?.tagIds || []).map(normalizeAssetTagId),
+          ),
         },
       ]),
     )
@@ -172,6 +176,10 @@ export function useAccessControl() {
   }
 
   const accessAllowsAsset = (access, asset) => {
+    if (normalizeKey(access?.applicationId) !== normalizeKey(asset?.applicationId)) {
+      return false
+    }
+
     const scope = access?.scope || {}
 
     if (scope.type === "all-assets") return true
@@ -195,6 +203,12 @@ export function useAccessControl() {
       const assetIds = scopeIndexesByAccessId.value.get(normalizeKey(access.id))?.assetIds
 
       return assetIds?.has(normalizeKey(asset.id))
+    }
+
+    if (scope.type === "asset-tags") {
+      const assetTagIds = scopeIndexesByAccessId.value.get(normalizeKey(access.id))?.assetTagIds
+
+      return assetMatchesTagIds(asset, Array.from(assetTagIds || []))
     }
 
     return false

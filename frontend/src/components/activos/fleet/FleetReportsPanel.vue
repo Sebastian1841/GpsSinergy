@@ -14,6 +14,7 @@
 
           <p class="mt-0.5 truncate text-[10px] font-semibold text-slate-500">
             Genera información operativa de {{ reportAssets.length }} activos
+            <span v-if="operationalProfileLabel">· {{ operationalProfileLabel }}</span>
           </p>
         </div>
 
@@ -75,7 +76,7 @@
 
     <!-- Filtros -->
     <div
-      class="flex shrink-0 items-center justify-between gap-3 border-b border-[#e5eaf1] bg-white px-4 py-2.5"
+      class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#e5eaf1] bg-white px-4 py-2.5"
     >
       <div class="flex min-w-0 items-center gap-2">
         <label
@@ -113,16 +114,234 @@
         </div>
       </div>
 
-      <p class="shrink-0 text-[9px] font-bold text-slate-400">
-        {{ visibleTemplates.length }}
-        {{ visibleTemplates.length === 1 ? "resultado" : "resultados" }}
-      </p>
+      <div class="flex shrink-0 items-center gap-2">
+        <p class="text-[9px] font-bold text-slate-400">
+          {{ visibleTemplates.length }}
+          {{ visibleTemplates.length === 1 ? "resultado" : "resultados" }}
+          <span v-if="recommendedVisibleCount">· {{ recommendedVisibleCount }} perfil</span>
+        </p>
+
+        <div
+          class="grid h-8 grid-cols-2 rounded-lg border border-[#d8dee8] bg-[#f8fafc] p-1"
+          aria-label="Vista de reportes en flota"
+        >
+          <button
+            type="button"
+            class="flex h-6 w-8 cursor-pointer items-center justify-center rounded-md transition"
+            :class="
+              viewMode === 'cards' ? 'bg-[#102372] text-white shadow-sm' : 'text-slate-500'
+            "
+            title="Vista en tarjetas"
+            aria-label="Vista en tarjetas"
+            @click="viewMode = 'cards'"
+          >
+            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+              <path d="M4 4h7v7H4V4Zm9 0h7v7h-7V4ZM4 13h7v7H4v-7Zm9 0h7v7h-7v-7Z" />
+            </svg>
+          </button>
+
+          <button
+            type="button"
+            class="flex h-6 w-8 cursor-pointer items-center justify-center rounded-md transition"
+            :class="
+              viewMode === 'rows' ? 'bg-[#102372] text-white shadow-sm' : 'text-slate-500'
+            "
+            title="Vista en filas"
+            aria-label="Vista en filas"
+            @click="viewMode = 'rows'"
+          >
+            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+              <path
+                d="M5 6.5A1.5 1.5 0 1 1 2 6.5a1.5 1.5 0 0 1 3 0ZM7 5h15v3H7V5Zm-2 6.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0ZM7 10h15v3H7v-3Zm-2 6.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0ZM7 15h15v3H7v-3Z"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
     </div>
 
-    <!-- Lista -->
+    <!-- Contenido -->
     <main class="min-h-0 flex-1 overflow-auto p-3">
       <div
-        v-if="visibleTemplates.length"
+        v-if="visibleTemplates.length && viewMode === 'cards'"
+        class="grid content-start gap-3 sm:grid-cols-2 2xl:grid-cols-3"
+      >
+        <article
+          v-for="template in visibleTemplates"
+          :key="template.id"
+          class="group flex min-h-[160px] flex-col rounded-xl border border-[#d8dee8] bg-white p-3 shadow-sm transition hover:border-[#b8c5d8]"
+        >
+          <div class="flex min-w-0 items-start gap-3">
+            <div
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#eef2ff] text-[#102372] transition group-hover:bg-[#102372] group-hover:text-white"
+            >
+              <svg viewBox="0 0 24 24" class="h-[17px] w-[17px]" fill="none" aria-hidden="true">
+                <path
+                  d="M6.5 4h8l3 3v13h-11V4Z"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linejoin="round"
+                />
+
+                <path
+                  d="M14.5 4v3h3M9.5 11h5M9.5 14.5h5M9.5 18h3"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </div>
+
+            <div class="min-w-0 flex-1">
+              <div class="flex min-w-0 items-start justify-between gap-2">
+                <p class="min-w-0 truncate text-[12px] font-black text-[#172033]">
+                  {{ template.name }}
+                </p>
+
+                <span
+                  class="shrink-0 rounded-md border border-[#d8dee8] bg-[#f8fafc] px-2 py-0.5 text-[8px] font-black uppercase tracking-wide text-slate-500"
+                >
+                  {{ getCategoryLabel(template.category) }}
+                </span>
+              </div>
+
+              <p class="mt-1 line-clamp-2 text-[9px] font-semibold leading-relaxed text-slate-500">
+                {{ template.description || "Reporte operativo de activos." }}
+              </p>
+            </div>
+          </div>
+
+          <div class="mt-3 flex flex-wrap items-center gap-1.5">
+            <span
+              v-if="template.type === 'custom'"
+              class="rounded-md bg-[#fff3e8] px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wide text-[#FF6600]"
+            >
+              Personalizado
+            </span>
+
+            <span
+              v-if="isRecommendedTemplate(template)"
+              class="rounded-md bg-[#eef3ff] px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wide text-[#102372]"
+            >
+              Recomendado
+            </span>
+
+            <span
+              class="rounded-md px-2 py-0.5 text-[8px] font-black uppercase"
+              :class="
+                template.status === 'active'
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : 'bg-slate-100 text-slate-500'
+              "
+            >
+              {{ template.status === "active" ? "Activo" : "Inactivo" }}
+            </span>
+          </div>
+
+          <div class="mt-3 rounded-lg border border-[#edf1f5] bg-[#f8fafc] px-2.5 py-2">
+            <p class="text-[8px] font-black uppercase tracking-[0.08em] text-slate-400">
+              Reglas asociadas
+            </p>
+
+            <div class="mt-1.5 flex min-w-0 items-center gap-2">
+              <span
+                class="h-1.5 w-1.5 shrink-0 rounded-full"
+                :class="
+                  getTemplateEventRuleIds(template).length ? 'bg-emerald-500' : 'bg-slate-300'
+                "
+              ></span>
+
+              <p
+                class="min-w-0 truncate text-[9px] font-bold text-slate-600"
+                :title="getTemplateRuleSummary(template)"
+              >
+                {{ getTemplateRuleSummary(template) }}
+              </p>
+            </div>
+          </div>
+
+          <div class="mt-auto flex items-center justify-end gap-1.5 pt-3">
+            <button
+              type="button"
+              class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-transparent text-slate-400 transition hover:border-[#d8dee8] hover:bg-white hover:text-[#102372] disabled:cursor-not-allowed disabled:opacity-30"
+              :disabled="!template.id"
+              title="Editar reporte"
+              aria-label="Editar reporte"
+              @click="openEditReportModal(template)"
+            >
+              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" aria-hidden="true">
+                <path
+                  d="m14.5 5.5 4 4M5 19l3.5-.75L18 7.75a1.4 1.4 0 0 0 0-2l-.75-.75a1.4 1.4 0 0 0-2 0L5.75 14.5 5 19Z"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+
+            <button
+              type="button"
+              class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-transparent text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30"
+              :disabled="!canDeleteTemplate(template)"
+              title="Eliminar reporte"
+              aria-label="Eliminar reporte"
+              @click="deleteTemplate(template)"
+            >
+              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" aria-hidden="true">
+                <path
+                  d="M5 7h14M10 11v6M14 11v6M9 7l.5-2h5l.5 2M7 7l1 13h8l1-13"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+
+            <button
+              type="button"
+              class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-transparent text-slate-400 transition hover:border-[#d8dee8] hover:bg-white hover:text-[#102372] disabled:cursor-not-allowed disabled:opacity-30"
+              :disabled="!canScheduleTemplate(template)"
+              title="Programar reporte"
+              aria-label="Programar reporte"
+              @click="openSchedulesModal(template)"
+            >
+              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" aria-hidden="true">
+                <path
+                  d="M7 3v3M17 3v3M5 9h14M7 13h4M7 17h3M6 5h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+
+            <button
+              type="button"
+              class="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg bg-[#102372] px-3 text-[9px] font-black text-white transition hover:bg-[#0b1a58] disabled:cursor-not-allowed disabled:bg-slate-300"
+              :disabled="!canExecuteTemplate(template)"
+              @click="openReportExecution(template)"
+            >
+              Ejecutar
+
+              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" aria-hidden="true">
+                <path
+                  d="m9 5 7 7-7 7"
+                  stroke="currentColor"
+                  stroke-width="1.9"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
+        </article>
+      </div>
+
+      <div
+        v-else-if="visibleTemplates.length"
         class="overflow-hidden rounded-xl border border-[#d8dee8] bg-white"
       >
         <div
@@ -182,6 +401,13 @@
                     class="shrink-0 rounded-md bg-[#fff3e8] px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wide text-[#FF6600]"
                   >
                     Personalizado
+                  </span>
+
+                  <span
+                    v-if="isRecommendedTemplate(template)"
+                    class="shrink-0 rounded-md bg-[#eef3ff] px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wide text-[#102372]"
+                  >
+                    Recomendado
                   </span>
                 </div>
 
@@ -372,7 +598,7 @@
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, ref, watch } from "vue"
+import { computed, defineAsyncComponent, onMounted, ref, watch } from "vue"
 
 import { useAuditTrail } from "../../../composables/audit/useAuditTrail.js"
 import { useReportEventRules } from "../../../composables/reports/useReportEventRules.js"
@@ -382,25 +608,26 @@ import {
   normalizeReportTemplateStoredEventRuleIds,
   useReportTemplates,
 } from "../../../composables/reports/useReportTemplates.js"
+import { preloadWhenIdle } from "../../../composables/ui/useIdlePreload.js"
 import { useReportsService } from "../../../services/reports/useReportsService.js"
+import {
+  getOperationalProfileReportPriority,
+  getOperationalProfileReportTypeIdsForAssets,
+  getOperationalProfilesForAssets,
+  isOperationalProfileReport,
+} from "../../../utils/activos/operationalProfileOptions.js"
 
 import { REPORT_CATEGORIES, REPORT_TEMPLATE_TYPES } from "../../../data/mockReportTemplates.js"
 
-const ReportExecutionModal = defineAsyncComponent(
-  () => import("../../reports/ReportExecutionModal.vue"),
-)
+const loadReportExecutionModal = () => import("../../reports/ReportExecutionModal.vue")
+const loadReportEventRulesModal = () => import("../../reports/ReportEventRulesModal.vue")
+const loadReportSchedulesModal = () => import("../../reports/ReportSchedulesModal.vue")
+const loadReportTemplateModal = () => import("../../reports/ReportTemplateModal.vue")
 
-const ReportEventRulesModal = defineAsyncComponent(
-  () => import("../../reports/ReportEventRulesModal.vue"),
-)
-
-const ReportSchedulesModal = defineAsyncComponent(
-  () => import("../../reports/ReportSchedulesModal.vue"),
-)
-
-const ReportTemplateModal = defineAsyncComponent(
-  () => import("../../reports/ReportTemplateModal.vue"),
-)
+const ReportExecutionModal = defineAsyncComponent(loadReportExecutionModal)
+const ReportEventRulesModal = defineAsyncComponent(loadReportEventRulesModal)
+const ReportSchedulesModal = defineAsyncComponent(loadReportSchedulesModal)
+const ReportTemplateModal = defineAsyncComponent(loadReportTemplateModal)
 
 const CATEGORY_ALL_ID = "all"
 
@@ -448,6 +675,7 @@ const { reportEventRules } = useReportEventRules()
 const { companyRecords } = useReportsService()
 
 const selectedCategory = ref(CATEGORY_ALL_ID)
+const viewMode = ref("rows")
 const executionTemplate = ref(null)
 const isExecutionModalOpen = ref(false)
 const isReportTemplateModalOpen = ref(false)
@@ -458,6 +686,21 @@ const scheduleTemplate = ref(null)
 
 const reportAssets = computed(() => {
   return props.allActivos.length ? props.allActivos : props.activos
+})
+
+const operationalProfiles = computed(() => {
+  return getOperationalProfilesForAssets(reportAssets.value)
+})
+
+const operationalProfileLabel = computed(() => {
+  if (!reportAssets.value.length) return ""
+  if (operationalProfiles.value.length === 1) return operationalProfiles.value[0].label
+
+  return `${operationalProfiles.value.length} perfiles operativos`
+})
+
+const recommendedReportTypeIds = computed(() => {
+  return getOperationalProfileReportTypeIdsForAssets(reportAssets.value)
 })
 
 const normalizeText = (value) => {
@@ -476,22 +719,7 @@ const { recordAudit } = useAuditTrail({
   companyId: currentCompanyId,
 })
 
-const currentCompany = computed(() => {
-  if (!currentCompanyId.value) return null
-
-  return (
-    companyRecords.value.find((company) => String(company.id) === currentCompanyId.value) || null
-  )
-})
-
-const reportGroups = computed(() => {
-  return (currentCompany.value?.sucursales || []).map((group) => ({
-    ...group,
-    id: String(group.id),
-    companyId: currentCompany.value?.id || currentCompanyId.value,
-    companyName: currentCompany.value?.name || "",
-  }))
-})
+const reportGroups = computed(() => [])
 
 const eventRulesById = computed(() => {
   return new Map(reportEventRules.value.map((rule) => [String(rule.id), rule]))
@@ -557,12 +785,20 @@ const visibleTemplates = computed(() => {
           template.reportTypeId,
           getCategoryLabel(template.category),
           getTemplateRuleSummary(template),
+          isRecommendedTemplate(template) ? "perfil recomendado" : "",
         ].join(" "),
       )
 
       return matchesCategory && (!searchTerm || searchableText.includes(searchTerm))
     })
     .sort((firstTemplate, secondTemplate) => {
+      const firstProfilePriority = getTemplateOperationalPriority(firstTemplate)
+      const secondProfilePriority = getTemplateOperationalPriority(secondTemplate)
+
+      if (firstProfilePriority !== secondProfilePriority) {
+        return firstProfilePriority - secondProfilePriority
+      }
+
       const firstIndex = REPORT_ORDER.indexOf(firstTemplate.reportTypeId)
       const secondIndex = REPORT_ORDER.indexOf(secondTemplate.reportTypeId)
 
@@ -578,8 +814,28 @@ const visibleTemplates = computed(() => {
     })
 })
 
+const recommendedVisibleCount = computed(() => {
+  return visibleTemplates.value.filter(isRecommendedTemplate).length
+})
+
 const getCategoryLabel = (categoryId) => {
   return REPORT_CATEGORIES.find((category) => category.id === categoryId)?.label || "Reporte"
+}
+
+const isRecommendedTemplate = (template = {}) => {
+  return isOperationalProfileReport({
+    reportTypeId: template.reportTypeId,
+    assets: reportAssets.value,
+  })
+}
+
+const getTemplateOperationalPriority = (template = {}) => {
+  if (!recommendedReportTypeIds.value.length) return REPORT_ORDER.length + 100
+
+  return getOperationalProfileReportPriority({
+    reportTypeId: template.reportTypeId,
+    assets: reportAssets.value,
+  })
 }
 
 const getTemplateEventRuleIds = (template = {}) => {
@@ -760,4 +1016,13 @@ const saveReportTemplate = ({ templateId, payload }) => {
 
   closeReportTemplateModal()
 }
+
+onMounted(() => {
+  preloadWhenIdle([
+    loadReportExecutionModal,
+    loadReportTemplateModal,
+    loadReportEventRulesModal,
+    loadReportSchedulesModal,
+  ])
+})
 </script>

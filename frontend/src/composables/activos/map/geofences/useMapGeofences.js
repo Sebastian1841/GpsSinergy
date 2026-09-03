@@ -107,9 +107,7 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
     getMap,
     layers,
     editingDraft,
-    drawMode,
     normalizeId,
-    onStartEditGeofence: (id) => startEditGeofence(id),
   })
 
   const resetDraftState = () => {

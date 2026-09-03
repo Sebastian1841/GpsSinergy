@@ -3,6 +3,7 @@ import { computed, ref } from "vue"
 import { mockDatabaseSeed } from "../../data/mockDatabase.js"
 import { readJsonStorage, writeJsonStorage } from "../../services/storage/browserStorage.js"
 import { getAssetTypeOption } from "../../utils/activos/assetTypeOptions.js"
+import { normalizeFleetAssetTagIds } from "../../utils/activos/fleetAssetFormUtils.js"
 
 const STORAGE_KEY = "sinergy-mock-database"
 const STORAGE_VERSION = 1
@@ -154,8 +155,29 @@ const normalizeAsset = (asset) => {
     seedAsset?.vehiculo ||
     patente ||
     "Activo"
+
   const assetTypeOption = resolveAssetTypeOption(asset, seedAsset)
   const mapIcon = resolveAssetMapIcon(asset, seedAsset, assetTypeOption)
+
+  const assetType =
+    asset?.assetType || asset?.tipoActivo || seedAsset?.assetType || assetTypeOption.value
+
+  const assetTypeLabel =
+    asset?.assetTypeLabel ||
+    asset?.tipoActivoLabel ||
+    seedAsset?.assetTypeLabel ||
+    assetTypeOption.label
+
+  const tipoActivo =
+    asset?.tipoActivo || asset?.assetType || seedAsset?.tipoActivo || assetTypeOption.value
+
+  const tipoActivoLabel =
+    asset?.tipoActivoLabel ||
+    asset?.assetTypeLabel ||
+    seedAsset?.tipoActivoLabel ||
+    assetTypeOption.label
+
+  const assetTagIds = normalizeFleetAssetTagIds(asset?.assetTagIds)
 
   return {
     ...asset,
@@ -163,20 +185,11 @@ const normalizeAsset = (asset) => {
     companyId,
     patente,
     nombrePantalla,
-    assetType:
-      asset?.assetType || asset?.tipoActivo || seedAsset?.assetType || assetTypeOption.value,
-    assetTypeLabel:
-      asset?.assetTypeLabel ||
-      asset?.tipoActivoLabel ||
-      seedAsset?.assetTypeLabel ||
-      assetTypeOption.label,
-    tipoActivo:
-      asset?.tipoActivo || asset?.assetType || seedAsset?.tipoActivo || assetTypeOption.value,
-    tipoActivoLabel:
-      asset?.tipoActivoLabel ||
-      asset?.assetTypeLabel ||
-      seedAsset?.tipoActivoLabel ||
-      assetTypeOption.label,
+    assetType,
+    assetTypeLabel,
+    tipoActivo,
+    tipoActivoLabel,
+    assetTagIds,
     mapIcon,
     markerIcon: asset?.markerIcon || mapIcon,
     iconType: asset?.iconType || mapIcon,
@@ -186,6 +199,21 @@ const normalizeAsset = (asset) => {
 
 const normalizeAssets = (items = []) => {
   return mergeSeedById(items, mockDatabaseSeed.assets).map(normalizeAsset)
+}
+
+const normalizeAssetTag = (tag = {}) => {
+  return {
+    ...tag,
+    id: normalizeKey(tag.id),
+    companyId: normalizeKey(tag.companyId),
+    applicationId: normalizeKey(tag.applicationId),
+    name: String(tag.name || "").trim(),
+    active: tag.active !== false,
+  }
+}
+
+const normalizeAssetTags = (items = []) => {
+  return items.map(normalizeAssetTag).filter((tag) => tag.id && tag.name)
 }
 
 const normalizeUser = (user) => {
@@ -200,11 +228,18 @@ const normalizeUsers = (items = []) => {
 }
 
 const normalizeAccessScope = (scope = {}) => {
+  const assetTagIds = Array.isArray(scope?.assetTagIds)
+    ? scope.assetTagIds
+    : Array.isArray(scope?.tagIds)
+      ? scope.tagIds
+      : []
+
   return {
     ...scope,
-    type: scope?.type || "all",
+    type: scope?.type || "all-assets",
     assetIds: Array.isArray(scope?.assetIds) ? scope.assetIds : [],
     sucursalIds: Array.isArray(scope?.sucursalIds) ? scope.sucursalIds : [],
+    assetTagIds: normalizeFleetAssetTagIds(assetTagIds),
   }
 }
 
@@ -222,6 +257,50 @@ const createDisabledFunctionAccess = (functionId) => ({
     admin: false,
   },
 })
+
+const createEnabledModuleAccess = (moduleId) => ({
+  moduleId,
+  enabled: true,
+})
+
+const createEnabledFunctionAccess = (functionId) => ({
+  functionId,
+  enabled: true,
+  permissions: {
+    view: true,
+    edit: true,
+    admin: true,
+  },
+})
+
+const buildPlatformAdminAccessId = ({ userId, applicationId }) => {
+  return `access-platform-admin-${normalizeKey(userId)}-${normalizeKey(applicationId)}`
+}
+
+const createPlatformAdminAccess = ({ userId, applicationId, id = null }) => {
+  return {
+    id:
+      id ||
+      buildPlatformAdminAccessId({
+        userId,
+        applicationId,
+      }),
+    userId: normalizeKey(userId),
+    applicationId: normalizeKey(applicationId),
+    role: "admin",
+    status: "active",
+    modules: mockDatabaseSeed.modules.map((module) => createEnabledModuleAccess(module.id)),
+    functions: mockDatabaseSeed.moduleFunctions.map((moduleFunction) => {
+      return createEnabledFunctionAccess(moduleFunction.id)
+    }),
+    scope: {
+      type: "all-assets",
+      sucursalIds: [],
+      assetIds: [],
+      assetTagIds: [],
+    },
+  }
+}
 
 const normalizeAccessModules = (items = []) => {
   const modulesById = new Map(
@@ -267,8 +346,91 @@ const normalizeAccess = (access) => {
   }
 }
 
-const normalizeAccesses = (items = []) => {
-  return mergeSeedById(items, mockDatabaseSeed.accesses).map(normalizeAccess)
+const normalizePlatformAdminAccess = (access) => {
+  return normalizeAccess(
+    createPlatformAdminAccess({
+      userId: access.userId,
+      applicationId: access.applicationId,
+      id: access.id,
+    }),
+  )
+}
+
+const ensurePlatformAdminAccesses = ({
+  items = [],
+  userItems = mockDatabaseSeed.users,
+  applicationItems = mockDatabaseSeed.applicationDefinitions,
+} = {}) => {
+  const usersById = new Map(
+    userItems.map((user) => {
+      const normalizedUser = normalizeUser(user)
+
+      return [normalizeKey(normalizedUser.id), normalizedUser]
+    }),
+  )
+  const platformAdminUsers = Array.from(usersById.values()).filter((user) => {
+    return user.isPlatformAdmin
+  })
+
+  if (!platformAdminUsers.length) {
+    return items.map(normalizeAccess)
+  }
+
+  const normalizedAccesses = []
+  const accessKeys = new Set()
+
+  items.forEach((access) => {
+    const accessUser = usersById.get(normalizeKey(access.userId))
+    const normalizedAccess = accessUser?.isPlatformAdmin
+      ? normalizePlatformAdminAccess(access)
+      : normalizeAccess(access)
+
+    normalizedAccesses.push(normalizedAccess)
+    accessKeys.add(
+      buildAccessUniqueKey({
+        userId: normalizedAccess.userId,
+        applicationId: normalizedAccess.applicationId,
+      }),
+    )
+  })
+
+  platformAdminUsers.forEach((user) => {
+    applicationItems.forEach((application) => {
+      const applicationId = normalizeKey(application.id || application.applicationId)
+
+      if (!applicationId) return
+
+      const accessKey = buildAccessUniqueKey({
+        userId: user.id,
+        applicationId,
+      })
+
+      if (accessKeys.has(accessKey)) return
+
+      normalizedAccesses.push(
+        normalizePlatformAdminAccess(
+          createPlatformAdminAccess({
+            userId: user.id,
+            applicationId,
+          }),
+        ),
+      )
+      accessKeys.add(accessKey)
+    })
+  })
+
+  return normalizedAccesses
+}
+
+const normalizeAccesses = (
+  items = [],
+  { userItems = mockDatabaseSeed.users, applicationItems = mockDatabaseSeed.applicationDefinitions } = {},
+) => {
+  return ensurePlatformAdminAccesses({
+    items: mergeSeedById(items, mockDatabaseSeed.accesses),
+    userItems,
+    applicationItems,
+  })
 }
 
 const readPersistedDatabase = () => {
@@ -284,15 +446,32 @@ const persistedDatabase = readPersistedDatabase()
 const companies = ref(
   normalizeCompanies(cloneData(persistedDatabase?.companies || mockDatabaseSeed.companies)),
 )
+
 const applicationDefinitions = ref(
   normalizeApplicationDefinitions(
     cloneData(persistedDatabase?.applicationDefinitions || mockDatabaseSeed.applicationDefinitions),
   ),
 )
+
+const assetTags = ref(
+  normalizeAssetTags(
+    cloneData(
+      Array.isArray(persistedDatabase?.assetTags)
+        ? persistedDatabase.assetTags
+        : mockDatabaseSeed.assetTags || [],
+    ),
+  ),
+)
+
 const assets = ref(normalizeAssets(cloneData(persistedDatabase?.assets || mockDatabaseSeed.assets)))
+
 const users = ref(normalizeUsers(cloneData(persistedDatabase?.users || mockDatabaseSeed.users)))
+
 const accesses = ref(
-  normalizeAccesses(cloneData(persistedDatabase?.accesses || mockDatabaseSeed.accesses)),
+  normalizeAccesses(cloneData(persistedDatabase?.accesses || mockDatabaseSeed.accesses), {
+    userItems: users.value,
+    applicationItems: applicationDefinitions.value,
+  }),
 )
 
 const reportTypes = ref(cloneData(mockDatabaseSeed.reportTypes))
@@ -328,6 +507,7 @@ const persistDatabase = () => {
     data: {
       companies: companies.value,
       applicationDefinitions: applicationDefinitions.value,
+      assetTags: assetTags.value,
       assets: assets.value,
       users: users.value,
       accesses: accesses.value,
@@ -347,6 +527,34 @@ const schedulePersistDatabase = () => {
     persistTimeout = null
     persistDatabase()
   }, PERSIST_DEBOUNCE_MS)
+}
+
+const getAccessesSignature = (items = []) => {
+  return JSON.stringify(
+    items.map((access) => ({
+      id: access.id,
+      userId: access.userId,
+      applicationId: access.applicationId,
+      role: access.role,
+      status: access.status,
+      modules: access.modules,
+      functions: access.functions,
+      scope: access.scope,
+    })),
+  )
+}
+
+const syncPlatformAdminAccesses = () => {
+  const previousSignature = getAccessesSignature(accesses.value)
+
+  accesses.value = normalizeAccesses(accesses.value, {
+    userItems: users.value,
+    applicationItems: applicationDefinitions.value,
+  })
+
+  if (previousSignature !== getAccessesSignature(accesses.value)) {
+    schedulePersistDatabase()
+  }
 }
 
 const handleBeforeUnloadPersist = () => {
@@ -548,10 +756,13 @@ const companyRecords = computed(() => {
     const companyId = normalizeKey(company.id)
     const companyAssets = assetsByCompanyId.value.get(companyId) || []
     const companyAssetStats = assetStatsByCompanyId.value.get(companyId) || emptyCompanyAssetStats
+
     const application =
       applicationDefinitionsByCompanyId.value.get(companyId) ||
       applicationDefinitionsById.value.get(normalizeKey(company.applicationId))
+
     const applicationId = application?.id || company.applicationId
+
     const companyUserIds =
       userIdsByApplicationId.value.get(normalizeKey(applicationId)) || new Set()
 
@@ -572,25 +783,6 @@ const applicationRecordsByCompanyId = computed(() => {
   return new Map(
     applications.value.map((application) => [normalizeKey(application.companyId), application]),
   )
-})
-
-const sucursalesById = computed(() => {
-  const index = new Map()
-
-  companies.value.forEach((company) => {
-    ;(company.sucursales || []).forEach((sucursal) => {
-      const sucursalId = normalizeKey(sucursal.id)
-
-      if (!sucursalId) return
-
-      index.set(sucursalId, {
-        company,
-        sucursal,
-      })
-    })
-  })
-
-  return index
 })
 
 const getCompany = (companyId) => {
@@ -623,6 +815,7 @@ const createCompany = (company) => {
     }),
   )
 
+  syncPlatformAdminAccesses()
   schedulePersistDatabase()
 
   return getCompany(companyId)
@@ -640,6 +833,11 @@ const createUser = (user) => {
   const nextUser = normalizeUser(user)
 
   users.value.unshift(nextUser)
+
+  if (nextUser.isPlatformAdmin) {
+    syncPlatformAdminAccesses()
+  }
+
   schedulePersistDatabase()
 
   return nextUser
@@ -651,6 +849,11 @@ const updateUser = (userId, changes) => {
   if (!user) return null
 
   Object.assign(user, normalizeUser({ ...user, ...changes }))
+
+  if (user.isPlatformAdmin) {
+    syncPlatformAdminAccesses()
+  }
+
   schedulePersistDatabase()
 
   return user
@@ -658,11 +861,15 @@ const updateUser = (userId, changes) => {
 
 const createAccess = (access) => {
   const nextAccess = normalizeAccess(access)
+
   const userExists = usersById.value.has(normalizeKey(nextAccess.userId))
+
   const applicationExists = applicationDefinitionsById.value.has(
     normalizeKey(nextAccess.applicationId),
   )
+
   const accessIdExists = accessesById.value.has(normalizeKey(nextAccess.id))
+
   const userApplicationAccessExists = accessesByUserApplicationKey.value.has(
     buildAccessUniqueKey({
       userId: nextAccess.userId,
@@ -702,6 +909,90 @@ const updateCompany = (companyId, changes) => {
   schedulePersistDatabase()
 
   return company
+}
+
+const createAssetTag = (tag = {}) => {
+  const companyId = normalizeKey(tag.companyId)
+
+  const application =
+    applicationDefinitionsById.value.get(normalizeKey(tag.applicationId)) ||
+    applicationDefinitionsByCompanyId.value.get(companyId)
+
+  const nextAssetTag = normalizeAssetTag({
+    ...tag,
+    id: tag.id || `asset-tag-${Date.now()}`,
+    companyId: companyId || application?.companyId || "",
+    applicationId: tag.applicationId || application?.id || "",
+  })
+
+  if (!nextAssetTag.id || !nextAssetTag.name) return null
+
+  const tagIdExists = assetTags.value.some((item) => {
+    return normalizeKey(item.id) === normalizeKey(nextAssetTag.id)
+  })
+
+  if (tagIdExists) return null
+
+  assetTags.value.unshift(nextAssetTag)
+  schedulePersistDatabase()
+
+  return nextAssetTag
+}
+
+const updateAssetTag = (assetTagId, changes = {}) => {
+  const normalizedAssetTagId = normalizeKey(assetTagId)
+  let updatedAssetTag = null
+
+  assetTags.value = assetTags.value.map((assetTag) => {
+    if (normalizeKey(assetTag.id) !== normalizedAssetTagId) return assetTag
+
+    const nextAssetTag = normalizeAssetTag({
+      ...assetTag,
+      ...changes,
+      id: assetTag.id,
+    })
+
+    if (!nextAssetTag.name) return assetTag
+
+    updatedAssetTag = nextAssetTag
+
+    return nextAssetTag
+  })
+
+  if (updatedAssetTag) {
+    schedulePersistDatabase()
+  }
+
+  return updatedAssetTag
+}
+
+const deleteAssetTag = (assetTagId) => {
+  const normalizedAssetTagId = normalizeKey(assetTagId)
+  const previousLength = assetTags.value.length
+
+  assetTags.value = assetTags.value.filter((assetTag) => {
+    return normalizeKey(assetTag.id) !== normalizedAssetTagId
+  })
+
+  if (assetTags.value.length === previousLength) return
+
+  assets.value.forEach((asset) => {
+    asset.assetTagIds = normalizeFleetAssetTagIds(asset.assetTagIds).filter((id) => {
+      return normalizeKey(id) !== normalizedAssetTagId
+    })
+  })
+
+  accesses.value.forEach((access) => {
+    if (!access.scope) {
+      access.scope = {}
+    }
+
+    access.scope.assetTagIds = normalizeFleetAssetTagIds(access.scope.assetTagIds).filter((id) => {
+      return normalizeKey(id) !== normalizedAssetTagId
+    })
+  })
+
+  schedulePersistDatabase()
 }
 
 const createAsset = (asset) => {
@@ -756,66 +1047,15 @@ const deleteAsset = (assetId) => {
   }
 }
 
-const addSucursal = (companyId, sucursal) => {
-  const company = getCompany(companyId)
-
-  if (!company) return null
-
-  company.sucursales = [...(company.sucursales || []), sucursal]
-  schedulePersistDatabase()
-
-  return sucursal
-}
-
-const updateSucursal = (sucursalId, changes) => {
-  const indexedSucursal = sucursalesById.value.get(normalizeKey(sucursalId))
-  const sucursal = indexedSucursal?.sucursal
-
-  if (!sucursal) return null
-
-  Object.assign(sucursal, changes)
-  schedulePersistDatabase()
-
-  return sucursal
-}
-
-const deleteSucursal = (sucursalId) => {
-  const normalizedSucursalId = normalizeKey(sucursalId)
-  const indexedSucursal = sucursalesById.value.get(normalizedSucursalId)
-  const company = indexedSucursal?.company
-
-  if (!company) return
-
-  company.sucursales = (company.sucursales || []).filter((sucursal) => {
-    return normalizeKey(sucursal.id) !== normalizedSucursalId
-  })
-
-  assets.value.forEach((asset) => {
-    if (normalizeKey(asset.sucursalId) === normalizedSucursalId) {
-      asset.sucursalId = null
-    }
-  })
-
-  accesses.value.forEach((access) => {
-    if (!access.scope) {
-      access.scope = {}
-    }
-
-    access.scope.sucursalIds = (access.scope.sucursalIds || []).filter((id) => {
-      return normalizeKey(id) !== normalizedSucursalId
-    })
-  })
-
-  schedulePersistDatabase()
-}
-
 export function useMockDatabase() {
   syncCompaniesWithSeed()
+  syncPlatformAdminAccesses()
 
   return {
     companies,
     companyRecords,
     applications,
+    assetTags,
     assets,
     users,
     accesses,
@@ -834,11 +1074,11 @@ export function useMockDatabase() {
     updateUser,
     createAccess,
     deleteAccess,
+    createAssetTag,
+    updateAssetTag,
+    deleteAssetTag,
     createAsset,
     updateAsset,
     deleteAsset,
-    addSucursal,
-    updateSucursal,
-    deleteSucursal,
   }
 }

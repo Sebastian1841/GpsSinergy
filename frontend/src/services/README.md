@@ -8,7 +8,7 @@ Capa de acceso a datos, adaptadores mock y servicios externos.
 - `activos/`: acceso a datos de activos.
 - `audit/`: registros de auditoria.
 - `auth/`: autenticacion.
-- `companies/`: empresas y sucursales.
+- `companies/`: empresas.
 - `itinerarios/`: exportacion y procesamiento de itinerarios.
 - `location/`: geocodificacion inversa.
 - `reports/`: plantillas y programaciones de reportes.

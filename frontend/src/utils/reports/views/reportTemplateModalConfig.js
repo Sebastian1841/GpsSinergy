@@ -2,20 +2,28 @@ import { REPORT_WIDGET_IDS } from "../config/reportWidgetUtils.js"
 
 export const REPORT_TEMPLATE_MODAL_STEPS = [
   {
+    id: "tipo",
+    label: "Tipo",
+  },
+  {
     id: "datos",
     label: "Datos",
   },
   {
-    id: "evento",
-    label: "Evento",
+    id: "comportamiento",
+    label: "Eventos",
   },
   {
-    id: "columnas",
-    label: "Columnas",
-  },
-  {
-    id: "vista",
+    id: "visualizacion",
     label: "Vista",
+  },
+  {
+    id: "exportacion",
+    label: "Exportacion",
+  },
+  {
+    id: "resumen",
+    label: "Resumen",
   },
 ]
 
@@ -75,6 +83,8 @@ const REPORT_TEMPLATE_PREVIEW_VALUES = {
   odometro: ["82.440 km", "41.102 km", "66.220 km"],
   horometro: ["1.204 h", "890 h", "1.560 h"],
   geocerca: ["Grupo Norte", "Bodega Central", "Ruta 5"],
+  geofenceEntryTime: ["08:12:04", "10:21:18", "12:40:30"],
+  geofenceExitTime: ["08:28:10", "10:34:45", "13:02:09"],
   evento: ["Entrada", "Salida", "Permanencia"],
   duracion: ["12 min", "4 min", "38 min"],
   combustible: ["74%", "38%", "62%"],

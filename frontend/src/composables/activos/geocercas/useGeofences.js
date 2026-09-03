@@ -4,7 +4,7 @@ import { readJsonStorage, writeJsonStorage } from "../../../services/storage/bro
 import { getGeofenceColor, removeLegacyGeofenceColorFields } from "../../../utils/geofenceUtils.js"
 
 const STORAGE_KEY = "sinergy-activos-geofences"
-const STORAGE_VERSION = 1
+const STORAGE_VERSION = 2
 
 const VALID_GEOFENCE_TYPES = new Set(["circle", "polygon", "route"])
 
@@ -12,10 +12,47 @@ const normalizeGeofenceId = (id) => {
   return String(id ?? "")
 }
 
+const createGeofenceId = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `geofence-${crypto.randomUUID()}`
+  }
+
+  return `geofence-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+const createGeofenceGroupId = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `geofence-group-${crypto.randomUUID()}`
+  }
+
+  return `geofence-group-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
 const normalizeGeofenceGroupName = (geofence = {}) => {
+  if (typeof geofence === "string") return geofence.trim()
+
   return String(
     geofence.groupName || geofence.group || geofence.grupo || geofence.groupLabel || "",
   ).trim()
+}
+
+const normalizeGroupNameKey = (value) => {
+  return normalizeGeofenceGroupName(value).toLocaleLowerCase("es")
+}
+
+const normalizeGeofenceGroup = (group, companyId = "general") => {
+  const name = normalizeGeofenceGroupName(group?.name || group?.label || group)
+
+  if (!name) return null
+
+  const resolvedCompanyId = String(group?.companyId || companyId || "general")
+
+  return {
+    id: String(group?.id || createGeofenceGroupId()),
+    companyId: resolvedCompanyId,
+    name,
+    createdAt: group?.createdAt || new Date().toISOString(),
+  }
 }
 
 const isFiniteNumber = (value) => {
@@ -190,6 +227,25 @@ const normalizeGeofences = (geofences) => {
   return Array.from(geofencesById.values())
 }
 
+const normalizeGeofenceGroups = (groups = []) => {
+  if (!Array.isArray(groups)) return []
+
+  const groupsByKey = new Map()
+
+  groups
+    .map((group) => normalizeGeofenceGroup(group))
+    .filter(Boolean)
+    .forEach((group) => {
+      const groupKey = `${group.companyId}::${normalizeGroupNameKey(group.name)}`
+
+      if (!groupsByKey.has(groupKey)) {
+        groupsByKey.set(groupKey, group)
+      }
+    })
+
+  return Array.from(groupsByKey.values())
+}
+
 const readStoredPayload = () => {
   return readJsonStorage(STORAGE_KEY, null)
 }
@@ -209,28 +265,45 @@ const readStoredGeofences = () => {
 
   // Formato nuevo:
   // {
-  //   version: 1,
+  //   version: 1 | 2,
   //   geofences: []
   // }
-  if (payload.version === STORAGE_VERSION) {
+  if (payload.version === 1 || payload.version === STORAGE_VERSION) {
     return normalizeGeofences(payload.geofences)
   }
 
   return []
 }
 
-const persistGeofences = (geofences) => {
+const readStoredGeofenceGroups = () => {
+  const payload = readStoredPayload()
+
+  if (!payload || Array.isArray(payload)) return []
+
+  if (payload.version === 1 || payload.version === STORAGE_VERSION) {
+    return normalizeGeofenceGroups(payload.groups)
+  }
+
+  return []
+}
+
+const persistGeofenceState = ({ geofences, groups }) => {
   writeJsonStorage(STORAGE_KEY, {
     version: STORAGE_VERSION,
     geofences: normalizeGeofences(geofences),
+    groups: normalizeGeofenceGroups(groups),
   })
 }
 
 export function useGeofences({ companyId = "general" } = {}) {
   const allGeofences = ref(readStoredGeofences())
+  const allGeofenceGroups = ref(readStoredGeofenceGroups())
   const resolvedCompanyId = computed(() => String(unref(companyId) || "general"))
 
-  persistGeofences(allGeofences.value)
+  persistGeofenceState({
+    geofences: allGeofences.value,
+    groups: allGeofenceGroups.value,
+  })
 
   const migrateLegacyGeofencesToCompany = () => {
     const currentCompanyId = resolvedCompanyId.value
@@ -266,6 +339,204 @@ export function useGeofences({ companyId = "general" } = {}) {
       return String(geofence.companyId || "") === resolvedCompanyId.value
     })
   })
+
+  const geofenceGroups = computed(() => {
+    const currentCompanyId = resolvedCompanyId.value
+    const groupsByName = new Map()
+
+    allGeofenceGroups.value
+      .filter((group) => {
+        return currentCompanyId === "general" || String(group.companyId || "") === currentCompanyId
+      })
+      .forEach((group) => {
+        groupsByName.set(normalizeGroupNameKey(group.name), {
+          ...group,
+          count: 0,
+          color: "#102372",
+        })
+      })
+
+    geofences.value.forEach((geofence) => {
+      const groupName = normalizeGeofenceGroupName(geofence)
+
+      if (!groupName) return
+
+      const groupKey = normalizeGroupNameKey(groupName)
+      const existingGroup =
+        groupsByName.get(groupKey) ||
+        normalizeGeofenceGroup({
+          id: `derived-${currentCompanyId}-${groupKey}`,
+          companyId: currentCompanyId,
+          name: groupName,
+        })
+
+      if (!existingGroup) return
+
+      groupsByName.set(groupKey, {
+        ...existingGroup,
+        count: Number(existingGroup.count || 0) + 1,
+        color: existingGroup.color === "#102372" ? getGeofenceColor(geofence) : existingGroup.color,
+      })
+    })
+
+    return Array.from(groupsByName.values()).sort((firstGroup, secondGroup) => {
+      return firstGroup.name.localeCompare(secondGroup.name, "es", {
+        sensitivity: "base",
+      })
+    })
+  })
+
+  const createGeofenceGroup = (groupName) => {
+    const name = normalizeGeofenceGroupName(groupName)
+
+    if (!name) return null
+
+    const currentCompanyId = resolvedCompanyId.value
+    const groupKey = normalizeGroupNameKey(name)
+    const existingGroup = geofenceGroups.value.find((group) => {
+      return normalizeGroupNameKey(group.name) === groupKey
+    })
+
+    if (existingGroup) return existingGroup
+
+    const nextGroup = normalizeGeofenceGroup({
+      companyId: currentCompanyId,
+      name,
+    })
+
+    if (!nextGroup) return null
+
+    allGeofenceGroups.value = normalizeGeofenceGroups([...allGeofenceGroups.value, nextGroup])
+
+    return (
+      geofenceGroups.value.find((group) => {
+        return normalizeGroupNameKey(group.name) === groupKey
+      }) || nextGroup
+    )
+  }
+
+  const deleteGeofenceGroup = (groupIdOrName) => {
+    const targetGroup = geofenceGroups.value.find((group) => {
+      return (
+        normalizeGeofenceId(group.id) === normalizeGeofenceId(groupIdOrName) ||
+        normalizeGroupNameKey(group.name) === normalizeGroupNameKey(groupIdOrName)
+      )
+    })
+
+    if (!targetGroup) return false
+
+    const targetGroupNameKey = normalizeGroupNameKey(targetGroup.name)
+    const currentCompanyId = resolvedCompanyId.value
+
+    allGeofenceGroups.value = allGeofenceGroups.value.filter((group) => {
+      const isSameCompany =
+        currentCompanyId === "general" || String(group.companyId || "") === currentCompanyId
+      const isSameGroup =
+        normalizeGeofenceId(group.id) === normalizeGeofenceId(targetGroup.id) ||
+        normalizeGroupNameKey(group.name) === targetGroupNameKey
+
+      return !(isSameCompany && isSameGroup)
+    })
+
+    allGeofences.value = normalizeGeofences(
+      allGeofences.value.map((geofence) => {
+        const isSameCompany =
+          currentCompanyId === "general" || String(geofence.companyId || "") === currentCompanyId
+
+        if (!isSameCompany || normalizeGroupNameKey(geofence) !== targetGroupNameKey) {
+          return geofence
+        }
+
+        return {
+          ...geofence,
+          groupName: "",
+        }
+      }),
+    )
+
+    return true
+  }
+
+  const renameGeofenceGroup = ({ groupIdOrName, name: nextGroupName } = {}) => {
+    const nextName = normalizeGeofenceGroupName(nextGroupName)
+
+    if (!nextName) return null
+
+    const targetGroup = geofenceGroups.value.find((group) => {
+      return (
+        normalizeGeofenceId(group.id) === normalizeGeofenceId(groupIdOrName) ||
+        normalizeGroupNameKey(group.name) === normalizeGroupNameKey(groupIdOrName)
+      )
+    })
+
+    if (!targetGroup) return null
+
+    const currentCompanyId = resolvedCompanyId.value
+    const previousGroupNameKey = normalizeGroupNameKey(targetGroup.name)
+    const nextGroupNameKey = normalizeGroupNameKey(nextName)
+
+    if (previousGroupNameKey === nextGroupNameKey) return targetGroup
+
+    const duplicatedGroup = geofenceGroups.value.some((group) => {
+      return (
+        normalizeGeofenceId(group.id) !== normalizeGeofenceId(targetGroup.id) &&
+        normalizeGroupNameKey(group.name) === nextGroupNameKey
+      )
+    })
+
+    if (duplicatedGroup) return null
+
+    let groupWasPersisted = false
+
+    allGeofenceGroups.value = normalizeGeofenceGroups([
+      ...allGeofenceGroups.value.map((group) => {
+        const isSameCompany =
+          currentCompanyId === "general" || String(group.companyId || "") === currentCompanyId
+        const isSameGroup =
+          normalizeGeofenceId(group.id) === normalizeGeofenceId(targetGroup.id) ||
+          normalizeGroupNameKey(group.name) === previousGroupNameKey
+
+        if (!isSameCompany || !isSameGroup) return group
+
+        groupWasPersisted = true
+
+        return {
+          ...group,
+          name: nextName,
+        }
+      }),
+      ...(groupWasPersisted
+        ? []
+        : [
+            {
+              companyId: currentCompanyId,
+              name: nextName,
+            },
+          ]),
+    ])
+
+    allGeofences.value = normalizeGeofences(
+      allGeofences.value.map((geofence) => {
+        const isSameCompany =
+          currentCompanyId === "general" || String(geofence.companyId || "") === currentCompanyId
+
+        if (!isSameCompany || normalizeGroupNameKey(geofence) !== previousGroupNameKey) {
+          return geofence
+        }
+
+        return {
+          ...geofence,
+          groupName: nextName,
+        }
+      }),
+    )
+
+    return (
+      geofenceGroups.value.find((group) => {
+        return normalizeGroupNameKey(group.name) === nextGroupNameKey
+      }) || null
+    )
+  }
 
   const updateGeofence = (updatedGeofence) => {
     if (!updatedGeofence?.id) return null
@@ -323,6 +594,42 @@ export function useGeofences({ companyId = "general" } = {}) {
     )
   }
 
+  const importGeofences = (importedGeofences = []) => {
+    if (!Array.isArray(importedGeofences) || !importedGeofences.length) return []
+
+    const existingIds = new Set(
+      allGeofences.value.map((geofence) => normalizeGeofenceId(geofence.id)).filter(Boolean),
+    )
+
+    const normalizedImportedGeofences = importedGeofences
+      .map((geofence) => {
+        let nextId = normalizeGeofenceId(geofence?.id)
+
+        if (!nextId || existingIds.has(nextId)) {
+          nextId = createGeofenceId()
+        }
+
+        existingIds.add(nextId)
+
+        return normalizeGeofence({
+          ...geofence,
+          id: nextId,
+          companyId: resolvedCompanyId.value,
+        })
+      })
+      .filter(Boolean)
+
+    if (!normalizedImportedGeofences.length) return []
+
+    allGeofences.value = normalizeGeofences([...allGeofences.value, ...normalizedImportedGeofences])
+
+    return normalizedImportedGeofences.filter((importedGeofence) => {
+      return geofences.value.some((geofence) => {
+        return normalizeGeofenceId(geofence.id) === normalizeGeofenceId(importedGeofence.id)
+      })
+    })
+  }
+
   const deleteGeofence = (geofenceId) => {
     const visibleGeofenceExists = geofences.value.some((geofence) => {
       return normalizeGeofenceId(geofence.id) === normalizeGeofenceId(geofenceId)
@@ -346,8 +653,11 @@ export function useGeofences({ companyId = "general" } = {}) {
     })
   }
 
-  watch(allGeofences, (nextGeofences) => {
-    persistGeofences(nextGeofences)
+  watch([allGeofences, allGeofenceGroups], ([nextGeofences, nextGroups]) => {
+    persistGeofenceState({
+      geofences: nextGeofences,
+      groups: nextGroups,
+    })
   })
 
   watch(resolvedCompanyId, migrateLegacyGeofencesToCompany, {
@@ -356,9 +666,14 @@ export function useGeofences({ companyId = "general" } = {}) {
 
   return {
     geofences,
+    geofenceGroups,
     createGeofence,
+    createGeofenceGroup,
     updateGeofence,
     deleteGeofence,
+    deleteGeofenceGroup,
+    renameGeofenceGroup,
     clearGeofences,
+    importGeofences,
   }
 }

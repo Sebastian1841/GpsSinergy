@@ -91,10 +91,16 @@ const cloneConditions = (conditions) => {
     : []
 }
 
-const cloneGroupIds = (groupIds) => {
-  return Array.isArray(groupIds)
-    ? Array.from(new Set(groupIds.map((groupId) => String(groupId || "").trim()).filter(Boolean)))
+const cloneVehicleGroupIds = (vehicleGroupIds) => {
+  return Array.isArray(vehicleGroupIds)
+    ? Array.from(
+        new Set(vehicleGroupIds.map((groupId) => String(groupId || "").trim()).filter(Boolean)),
+      )
     : []
+}
+
+const getRuleVehicleGroupIds = (rule = {}) => {
+  return Array.isArray(rule.vehicleGroupIds) ? rule.vehicleGroupIds : rule.groupIds || []
 }
 
 const makeRuleConfigId = () => {
@@ -190,7 +196,7 @@ const createSeedRules = () => {
     ),
     schedule: DEFAULT_SCHEDULE,
     activation: DEFAULT_ACTIVATION,
-    groupIds: [],
+    vehicleGroupIds: [],
     notifications: cloneNotifications(rule.notifications),
     conditions: cloneConditions(DEFAULT_RULE_CONDITIONS[rule.id]),
   }))
@@ -239,7 +245,7 @@ const normalizeEventRule = (rule = {}) => {
     severity: normalizeAlertType(rule.alertType || rule.severity),
     schedule: normalizeSchedule(rule.schedule),
     activation: normalizeActivation(rule.activation),
-    groupIds: cloneGroupIds(rule.groupIds),
+    vehicleGroupIds: cloneVehicleGroupIds(getRuleVehicleGroupIds(rule)),
     notifications: cloneNotifications(rule.notifications),
     conditions: cloneConditions(rule.conditions),
   }
@@ -325,7 +331,7 @@ export function useReportEventRules() {
       alertType: payload.alertType,
       schedule: payload.schedule,
       activation: payload.activation,
-      groupIds: payload.groupIds,
+      vehicleGroupIds: getRuleVehicleGroupIds(payload),
       notifications: payload.notifications,
       conditions: payload.conditions?.length
         ? payload.conditions
@@ -345,13 +351,17 @@ export function useReportEventRules() {
 
   const updateEventRule = (ruleId, changes = {}) => {
     let updatedRule = null
+    const normalizedChanges =
+      changes.vehicleGroupIds === undefined && changes.groupIds !== undefined
+        ? { ...changes, vehicleGroupIds: changes.groupIds }
+        : changes
 
     const nextRules = reportEventRules.value.map((rule) => {
       if (normalizeRuleId(rule.id) !== normalizeRuleId(ruleId)) return rule
 
       updatedRule = normalizeEventRule({
         ...rule,
-        ...changes,
+        ...normalizedChanges,
         id: rule.id,
         source: rule.source,
       })

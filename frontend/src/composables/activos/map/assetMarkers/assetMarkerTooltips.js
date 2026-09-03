@@ -30,7 +30,7 @@ const getActivoStatusLabel = (estado) => {
   const labels = {
     moving: "Ruta",
     idle: "Espera",
-    stopped: "Alerta",
+    stopped: "Detenido",
     offline: "Offline",
   }
 

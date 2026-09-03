@@ -108,6 +108,9 @@ const drawMapLegend = ({ context, routes, width, height }) => {
   const visibleRouteItems = routeLegendItems.slice(0, 4)
   const overflowCount = routeLegendItems.length - visibleRouteItems.length
   const maxLegendWidth = Math.min(width - 170, 760)
+  const hasStopMarkers = routes.some((route) => {
+    return Array.isArray(route.stopMarkers) && route.stopMarkers.length > 0
+  })
   const entries = [
     {
       type: "dot",
@@ -119,6 +122,15 @@ const drawMapLegend = ({ context, routes, width, height }) => {
       color: "#38bdf8",
       label: "Fin",
     },
+    ...(hasStopMarkers
+      ? [
+          {
+            type: "dot",
+            color: "#ff6600",
+            label: "Detenciones",
+          },
+        ]
+      : []),
     ...visibleRouteItems.map((item) => ({
       type: "route",
       color: item.color,

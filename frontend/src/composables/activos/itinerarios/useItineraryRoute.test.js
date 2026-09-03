@@ -82,3 +82,57 @@ test("useItineraryRoute keeps fallback route points when appending current locat
   assert.equal(showDeviceList.value, false)
   assert.equal(emitted.at(-1).event, "route-selected")
 })
+
+test("useItineraryRoute can disable fallback route points for daily summaries", () => {
+  const emitted = []
+  const asset = {
+    id: "asset-without-history",
+    displayName: "Activo sin historial",
+    patente: "NOHIST",
+    lat: -33.45,
+    lng: -70.66,
+    speed: 0,
+    timestamp: "2026-07-10T15:00:00.000",
+  }
+  const selectedAssetIds = ref([asset.id])
+  const filteredAssets = ref([asset])
+  const selectedAssets = ref([asset])
+  const primarySelectedAsset = ref(asset)
+  const showDeviceList = ref(true)
+  const fromDate = ref("2026-07-09")
+  const toDate = ref("2026-07-09")
+  const formError = ref("")
+
+  const { routeResult, handleGenerateRoute } = useItineraryRoute({
+    emit: (event, payload) => emitted.push({ event, payload }),
+    latestDate: "2026-07-10",
+    selectedAssetIds,
+    filteredAssets,
+    selectedAssets,
+    primarySelectedAsset,
+    showDeviceList,
+    fromDate,
+    toDate,
+    formError,
+    applyDateRange: () => {},
+    allowFallbackPoints: false,
+    filterItineraryPoints: () => [
+      {
+        id: "fallback-yesterday",
+        assetId: asset.id,
+        timestamp: "2026-07-09T08:00:00.000",
+        lat: -33.46,
+        lng: -70.67,
+        speed: 20,
+      },
+    ],
+    buildItineraryResult: buildRoute,
+  })
+
+  handleGenerateRoute()
+
+  assert.equal(formError.value, "")
+  assert.equal(routeResult.value.rows.length, 0)
+  assert.equal(showDeviceList.value, false)
+  assert.equal(emitted.at(-1).event, "route-selected")
+})

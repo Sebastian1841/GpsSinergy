@@ -4,7 +4,8 @@ Estado mock del prototipo.
 
 ## Archivos
 
-- `useMockDatabase.js`: acceso reactivo a la base mock local.
+- `useMockDatabase.js`: acceso reactivo a la base mock local. Normaliza activos, empresas, accesos y scopes, incluyendo `assetTagIds` para el alcance por etiquetas. Tambien asegura que todo usuario con `isPlatformAdmin` tenga acceso `admin` activo a todas las aplicaciones/empresas actuales y a las que se creen despues.
+- `useMockDatabase.test.js`: valida que los administradores de plataforma reciban acceso completo a cada aplicacion, con rol `admin`, scope `all-assets` y permisos completos.
 
 ## Regla de mantenimiento
 

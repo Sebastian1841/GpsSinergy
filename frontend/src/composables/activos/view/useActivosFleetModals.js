@@ -1,5 +1,7 @@
 import { defineAsyncComponent, ref, watch } from "vue"
 
+import { preloadWhenIdle } from "../../ui/useIdlePreload.js"
+
 const loadAddActivoModal = () => import("../../../components/activos/fleet/AddActivoModal.vue")
 const loadFleetEditModal = () => import("../../../components/activos/fleet/FleetEditModal.vue")
 const loadFleetTerminalModal = () =>
@@ -33,22 +35,7 @@ export function useActivosFleetModals({ showActivoModal, showEditActivoModal, sh
   })
 
   const preloadFleetModals = () => {
-    if (typeof window === "undefined") return
-
-    const preload = () => {
-      void Promise.allSettled([
-        loadAddActivoModal(),
-        loadFleetEditModal(),
-        loadFleetTerminalModal(),
-      ])
-    }
-
-    if (typeof window.requestIdleCallback === "function") {
-      window.requestIdleCallback(preload, { timeout: 2500 })
-      return
-    }
-
-    window.setTimeout(preload, 800)
+    preloadWhenIdle([loadAddActivoModal, loadFleetEditModal, loadFleetTerminalModal])
   }
 
   return {

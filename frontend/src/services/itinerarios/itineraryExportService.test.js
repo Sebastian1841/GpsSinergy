@@ -12,7 +12,7 @@ import {
 } from "./itineraryExportService.js"
 import { injectNativeItineraryCharts } from "./nativeExcelCharts.js"
 
-const BRAND_IMAGE_URL = new URL("../../assets/branding/sinergy-group.png", import.meta.url)
+const BRAND_IMAGE_URL = new URL("../../assets/branding/sinergy-group-report.png", import.meta.url)
 
 const getOriginalBrandImageBuffer = () => {
   return readFile(BRAND_IMAGE_URL)
@@ -143,27 +143,43 @@ test("Excel export includes editable native charts, logo, and complete report da
     ["Reporte", "Detalle GPS", "Activos", "DatosGraficos"],
   )
   assert.equal(workbook.views[0].activeTab, 0)
+  assert.equal(workbook.getWorksheet("Reporte").views[0].zoomScale, 105)
+  assert.equal(workbook.getWorksheet("Reporte").views[0].zoomScaleNormal, 105)
+  assert.equal(workbook.getWorksheet("Reporte").views[0].showRowColHeaders, false)
+  assert.equal(workbook.getWorksheet("Detalle GPS").views[0].zoomScale, 80)
+  assert.equal(workbook.getWorksheet("Activos").views[0].zoomScale, 80)
 
   // Con gráficos, la imagen se agrega después mediante OOXML.
   assert.equal(workbook.getWorksheet("Reporte").getImages().length, 0)
   assert.equal(workbook.media.length, 0)
+  assert.equal(workbook.getWorksheet("Reporte").getCell("A1").fill.fgColor.argb, "FFFFFFFF")
+  assert.equal(
+    workbook.getWorksheet("Reporte").getCell("B3").value,
+    "Monitoreo GPS y Telemetria IoT",
+  )
+  assert.equal(workbook.getWorksheet("Reporte").getCell("B4").value, "REPORTE DE ITINERARIO")
+  assert.equal(workbook.getWorksheet("Reporte").getCell("B4").font.color.argb, "FF102372")
 
   assert.equal(workbook.getWorksheet("DatosGraficos").state, "veryHidden")
   assert.equal(workbook.getWorksheet("DatosGraficos").getCell("B2").value, 12.7)
   assert.equal(workbook.getWorksheet("DatosGraficos").getCell("D2").value, 31)
   assert.equal(workbook.getWorksheet("DatosGraficos").getCell("E2").value, "Ruta normal")
 
-  assert.equal(workbook.getWorksheet("Reporte").getCell("A46").value, "Activos incluidos")
-  assert.equal(workbook.getWorksheet("Reporte").getCell("A47").value, "Activo")
-  assert.equal(workbook.getWorksheet("Reporte").getCell("A48").value, "Camion 01")
-  assert.equal(workbook.getWorksheet("Reporte").getCell("A50").value, "Detalle GPS")
-  assert.equal(workbook.getWorksheet("Reporte").getCell("A51").value, "#")
-  assert.equal(workbook.getWorksheet("Reporte").getCell("A52").value, 1)
+  assert.equal(workbook.getWorksheet("Reporte").getCell("B6").value, "Datos generales")
+  assert.equal(workbook.getWorksheet("Reporte").getCell("B10").value, "Resumen del periodo")
+  assert.equal(workbook.getWorksheet("Reporte").getCell("B14").value, "Graficos recomendados")
+  assert.equal(workbook.getWorksheet("Reporte").getCell("B53").value, "Activos incluidos")
+  assert.equal(workbook.getWorksheet("Reporte").getCell("B54").value, "Activo")
+  assert.equal(workbook.getWorksheet("Reporte").getCell("B55").value, "Camion 01")
+  assert.equal(workbook.getWorksheet("Reporte").getCell("B57").value, "Detalle GPS")
+  assert.equal(workbook.getWorksheet("Reporte").getCell("B58").value, "#")
+  assert.equal(workbook.getWorksheet("Reporte").getCell("B59").value, 1)
   assert.equal(workbook.getWorksheet("Detalle GPS").getRow(5).getCell(1).value, "#")
 
   const buffer = await createItineraryExcelBuffer(report)
   const zip = await loadExcelZip(buffer)
 
+  const worksheetXml = await zip.file("xl/worksheets/sheet1.xml").async("string")
   const drawingXml = await zip.file("xl/drawings/drawing1.xml").async("string")
   const drawingRelsXml = await zip.file("xl/drawings/_rels/drawing1.xml.rels").async("string")
   const contentTypesXml = await zip.file("[Content_Types].xml").async("string")
@@ -174,10 +190,13 @@ test("Excel export includes editable native charts, logo, and complete report da
   assert.ok(zip.file("xl/media/sinergy-report-logo.png"))
   await assertZipUsesOriginalBrandImage(zip)
 
+  assert.match(worksheetXml, /<sheetView[^>]*showRowColHeaders="0"/)
+  assert.match(worksheetXml, /<sheetView[^>]*zoomScale="105"/)
+  assert.match(worksheetXml, /<sheetView[^>]*zoomScaleNormal="105"/)
   assert.match(drawingXml, /Logo Sinergy Group/)
   assert.match(
     drawingXml,
-    /<xdr:oneCellAnchor><xdr:from><xdr:col>1<\/xdr:col><xdr:colOff>\d+<\/xdr:colOff><xdr:row>0<\/xdr:row>[\s\S]*?Logo Sinergy Group/,
+    /<xdr:oneCellAnchor><xdr:from><xdr:col>7<\/xdr:col><xdr:colOff>509588<\/xdr:colOff><xdr:row>0<\/xdr:row>[\s\S]*?Logo Sinergy Group/,
   )
   assert.match(drawingXml, /Grafico de Voltaje de bateria/)
   assert.match(drawingXml, /Grafico de Velocidad/)
@@ -326,7 +345,7 @@ test("Excel export creates only the selected number of charts", async () => {
 
   const workbook = await createItineraryExcelWorkbook(report)
 
-  assert.equal(workbook.getWorksheet("Reporte").getCell("A29").value, "Activos incluidos")
+  assert.equal(workbook.getWorksheet("Reporte").getCell("B36").value, "Activos incluidos")
   assert.equal(workbook.getWorksheet("DatosGraficos").columnCount, 2)
 
   const buffer = await createItineraryExcelBuffer(report)
@@ -371,9 +390,16 @@ test("Excel export omits native charts and inserts the logo with ExcelJS when di
     workbook.worksheets.map((worksheet) => worksheet.name),
     ["Reporte", "Detalle GPS", "Activos"],
   )
-  assert.equal(workbook.getWorksheet("Reporte").getCell("A8").value, "Activos incluidos")
+  assert.equal(workbook.getWorksheet("Reporte").getCell("B14").value, "Activos incluidos")
   assert.equal(workbook.getWorksheet("Reporte").getImages().length, 1)
   assert.equal(workbook.media.length, 1)
+
+  const [reportImage] = workbook.getWorksheet("Reporte").getImages()
+
+  assert.equal(reportImage.range.tl.nativeCol, 7)
+  assert.equal(reportImage.range.tl.nativeColOff, 509588)
+  assert.equal(reportImage.range.tl.nativeRow, 0)
+  assert.equal(reportImage.range.tl.nativeRowOff, 38100)
 
   const buffer = await createItineraryExcelBuffer(report)
   const zip = await loadExcelZip(buffer)
@@ -384,6 +410,74 @@ test("Excel export omits native charts and inserts the logo with ExcelJS when di
   await assertZipUsesOriginalBrandImage(zip)
   assert.ok(zip.file("xl/drawings/drawing1.xml"))
   assert.match(worksheetXml, /<drawing r:id="rId\d+"/)
+})
+
+test("Excel export keeps route map and native charts in the report sheet", async () => {
+  const routeMapImage = await getOriginalBrandImageDataUrl()
+  const report = {
+    filename: "itinerario-mapa-grafico",
+    selectedAssetsSummary: "Activo de prueba",
+    fromDate: "2026-06-22",
+    toDate: "2026-06-22",
+    generatedAt: "22-06-2026 17:00",
+    summary: {},
+    routeMap: {
+      title: "Mapa de la ruta",
+      image: routeMapImage,
+    },
+    charts: {
+      enabled: true,
+      items: [
+        {
+          id: "chart-1",
+          type: "line",
+          key: "speed",
+          label: "Velocidad",
+          unit: "km/h",
+          decimals: 1,
+          color: "#2563eb",
+          labels: ["17:00", "17:05"],
+          values: [34, 45],
+        },
+      ],
+    },
+    assets: [],
+    rows: [],
+  }
+
+  const workbook = await createItineraryExcelWorkbook(report)
+
+  assert.equal(workbook.getWorksheet("Reporte").getCell("B14").value, "Mapa de la ruta")
+  assert.equal(workbook.getWorksheet("Reporte").getCell("B41").value, "Graficos recomendados")
+  assert.equal(workbook.getWorksheet("Reporte").getCell("B63").value, "Activos incluidos")
+  assert.equal(workbook.getWorksheet("Reporte").getImages().length, 1)
+
+  const [routeMapImagePlacement] = workbook.getWorksheet("Reporte").getImages()
+
+  assert.equal(routeMapImagePlacement.range.tl.nativeCol, 1)
+  assert.equal(routeMapImagePlacement.range.tl.nativeColOff, 0)
+  assert.equal(routeMapImagePlacement.range.tl.nativeRow, 14)
+  assert.equal(routeMapImagePlacement.range.tl.nativeRowOff, 57150)
+  assert.equal(routeMapImagePlacement.range.br.nativeCol, 14)
+  assert.equal(routeMapImagePlacement.range.br.nativeColOff, 0)
+  assert.equal(routeMapImagePlacement.range.br.nativeRow, 38)
+  assert.equal(routeMapImagePlacement.range.br.nativeRowOff, 142875)
+  assert.equal(routeMapImagePlacement.range.ext, undefined)
+
+  const buffer = await createItineraryExcelBuffer(report)
+  const zip = await loadExcelZip(buffer)
+  const drawingXml = await zip.file("xl/drawings/drawing1.xml").async("string")
+
+  assert.equal(zip.file(/^xl\/charts\/chart\d+\.xml$/).length, 1)
+  assert.ok(zip.file("xl/media/sinergy-report-logo.png"))
+  assert.ok(zip.file(/^xl\/media\/.*\.png$/).length >= 2)
+  assert.match(
+    drawingXml,
+    /<xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>1<\/xdr:col><xdr:colOff>0<\/xdr:colOff><xdr:row>14<\/xdr:row><xdr:rowOff>57150<\/xdr:rowOff><\/xdr:from><xdr:to><xdr:col>14<\/xdr:col><xdr:colOff>0<\/xdr:colOff><xdr:row>38<\/xdr:row><xdr:rowOff>142875<\/xdr:rowOff><\/xdr:to>/,
+  )
+  assert.match(drawingXml, /Logo Sinergy Group/)
+  assert.match(drawingXml, /Grafico de Velocidad/)
+  assert.match(drawingXml, /<xdr:row>41<\/xdr:row>[\s\S]*?Grafico de Velocidad/)
 })
 
 test("Excel export sorts assets and detail rows by device", async () => {
@@ -457,10 +551,10 @@ test("Excel export sorts assets and detail rows by device", async () => {
   assert.equal(workbook.getWorksheet("Activos").getRow(7).getCell(3).value, "DEV-200")
   assert.equal(workbook.getWorksheet("Detalle GPS").getRow(6).getCell(4).value, "DEV-100")
   assert.equal(workbook.getWorksheet("Detalle GPS").getRow(7).getCell(4).value, "DEV-200")
-  assert.equal(workbook.getWorksheet("Reporte").getRow(10).getCell(7).value, "DEV-100")
-  assert.equal(workbook.getWorksheet("Reporte").getRow(11).getCell(7).value, "DEV-200")
-  assert.equal(workbook.getWorksheet("Reporte").getRow(15).getCell(4).value, "DEV-100")
-  assert.equal(workbook.getWorksheet("Reporte").getRow(16).getCell(4).value, "DEV-200")
+  assert.equal(workbook.getWorksheet("Reporte").getRow(16).getCell(8).value, "DEV-100")
+  assert.equal(workbook.getWorksheet("Reporte").getRow(17).getCell(8).value, "DEV-200")
+  assert.equal(workbook.getWorksheet("Reporte").getRow(21).getCell(5).value, "DEV-100")
+  assert.equal(workbook.getWorksheet("Reporte").getRow(22).getCell(5).value, "DEV-200")
 })
 
 test("Excel native charts share the report drawing with the brand image", async () => {
@@ -516,7 +610,7 @@ test("Excel native charts share the report drawing with the brand image", async 
   assert.match(drawingXml, /Logo Sinergy Group/)
   assert.match(
     drawingXml,
-    /<xdr:oneCellAnchor><xdr:from><xdr:col>1<\/xdr:col><xdr:colOff>\d+<\/xdr:colOff><xdr:row>0<\/xdr:row>[\s\S]*?Logo Sinergy Group/,
+    /<xdr:oneCellAnchor><xdr:from><xdr:col>7<\/xdr:col><xdr:colOff>509588<\/xdr:colOff><xdr:row>0<\/xdr:row>[\s\S]*?Logo Sinergy Group/,
   )
   assert.match(drawingXml, /r:embed="rId2"/)
   assert.match(drawingXml, /Grafico de Velocidad/)
@@ -626,7 +720,7 @@ test("PDF export uses the original logo and configured filename", async () => {
 
   assert.equal(addedBrandImage, expectedBrandImage)
   assert.equal(savedFilename, "reporte-pdf-prueba.pdf")
-  assert.match(writtenText.join(" "), /Resumen del informe: Reporte de itinerario/)
+  assert.match(writtenText.join(" "), /REPORTE DE ITINERARIO/)
   assert.ok(
     textPlacements.some((placement) => {
       return placement.value === "Activos incluidos" && placement.y >= 80

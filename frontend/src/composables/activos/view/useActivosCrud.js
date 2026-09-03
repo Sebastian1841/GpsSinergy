@@ -1,6 +1,7 @@
 import { computed, ref, unref } from "vue"
 
 import { getAssetTypeOption } from "../../../utils/activos/assetTypeOptions.js"
+import { normalizeFleetAssetTagIds } from "../../../utils/activos/fleetAssetFormUtils.js"
 
 const fallbackDrivers = [
   "Carlos Ramírez",
@@ -91,6 +92,8 @@ export function useActivosCrud({
       return {
         ...activo,
 
+        assetTagIds: normalizeFleetAssetTagIds(activo.assetTagIds),
+
         vehiculo:
           activo.vehiculo || activo.nombrePantalla || activo.displayName || activo.name || "-",
 
@@ -135,20 +138,25 @@ export function useActivosCrud({
           activo.ignicion ??
           activo.contacto ??
           (estado === "moving" || estado === "idle"),
+
         contacto:
           activo.contacto ??
           activo.ignition ??
           activo.ignicion ??
           (estado === "moving" || estado === "idle"),
+
         digitalInput1:
           activo.digitalInput1 ??
           activo.input1 ??
           (estado === "moving" || estado === "idle" ? 1 : 0),
+
         digitalInput2: activo.digitalInput2 ?? activo.input2 ?? 0,
+
         input1:
           activo.input1 ??
           activo.digitalInput1 ??
           (estado === "moving" || estado === "idle" ? 1 : 0),
+
         input2: activo.input2 ?? activo.digitalInput2 ?? 0,
 
         ibutton: isCustomAsset
@@ -164,16 +172,21 @@ export function useActivosCrud({
         protocol: activo.protocol || "-",
 
         trackerModel: activo.trackerModel || "-",
+
         trackerModelLabel: activo.trackerModelLabel || "-",
+
         trackerManufacturer: activo.trackerManufacturer || "-",
 
         descripcion: activo.descripcion || activo.description || "-",
 
         fechaIngreso: activo.fechaIngreso || activo.entryDate || "-",
+
         fechaBaja: activo.fechaBaja || activo.deactivationDate || "-",
+
         fechaSuspension: activo.fechaSuspension || activo.suspensionDate || "-",
 
         horometroDiario: emptyValue(activo.horometroDiario ?? activo.dailyHourmeter),
+
         horometroTotal: emptyValue(activo.horometroTotal ?? activo.totalHourmeter),
       }
     })
@@ -206,6 +219,7 @@ export function useActivosCrud({
     const name = form.name || fallbackActivo.name || displayName
 
     const odometerFromForm = form.odometer ?? form.odometro
+
     const assetTypeOption = getAssetTypeOption(
       form.assetType ||
         form.tipoActivo ||
@@ -216,6 +230,7 @@ export function useActivosCrud({
         fallbackActivo.tipoActivo ||
         fallbackActivo.mapIcon,
     )
+
     const mapIcon =
       form.mapIcon ||
       form.markerIcon ||
@@ -228,26 +243,36 @@ export function useActivosCrud({
     return {
       assetType: assetTypeOption.value,
       assetTypeLabel: assetTypeOption.label,
+
       tipoActivo: assetTypeOption.value,
       tipoActivoLabel: assetTypeOption.label,
+
       mapIcon,
       markerIcon: mapIcon,
       iconType: mapIcon,
+
       sucursalId: form.sucursalId || fallbackActivo.sucursalId || null,
+
+      assetTagIds: normalizeFleetAssetTagIds(form.assetTagIds ?? fallbackActivo.assetTagIds),
 
       estado: form.estado || fallbackActivo.estado || "offline",
 
       vehiculo: displayName,
+
       name,
+
       nombrePantalla:
         form.displayName || form.nombrePantalla || fallbackActivo.nombrePantalla || displayName,
 
       trackerModel: form.trackerModel || fallbackActivo.trackerModel || "-",
+
       trackerModelLabel:
         form.trackerModelLabel || fallbackActivo.trackerModelLabel || form.trackerModel || "-",
+
       trackerManufacturer: form.trackerManufacturer || fallbackActivo.trackerManufacturer || "-",
 
       imei: form.imei || fallbackActivo.imei || "-",
+
       protocol: form.protocol || fallbackActivo.protocol || "tcp",
 
       descripcion: form.description || form.descripcion || fallbackActivo.descripcion || "-",
@@ -282,6 +307,7 @@ export function useActivosCrud({
 
   const openAddActivoModal = () => {
     activeSidebarSection.value = "activos"
+
     showEditActivoModal.value = false
     editingActivo.value = null
     showActivoModal.value = true
@@ -312,6 +338,7 @@ export function useActivosCrud({
       ibutton: "-",
 
       lat: -33.4489 + customActivos.value.length * 0.002,
+
       lng: -70.6693 + customActivos.value.length * 0.002,
     }
 
@@ -340,7 +367,9 @@ export function useActivosCrud({
     if (!activo) return
 
     selectedId.value = activo.id
+
     showActivoModal.value = false
+
     editingActivo.value = activo
     showEditActivoModal.value = true
   }
@@ -348,7 +377,9 @@ export function useActivosCrud({
   const handleUpdateActivo = async (payload) => {
     const id = payload?.id ?? editingActivo.value?.id
 
-    if (id === null || id === undefined) return
+    if (id === null || id === undefined) {
+      return
+    }
 
     const normalizedActivos = getNormalizedActivos?.() || []
 
@@ -371,11 +402,13 @@ export function useActivosCrud({
     } else {
       editedActivos.value = {
         ...editedActivos.value,
+
         [String(id)]: data,
       }
     }
 
     selectedId.value = id
+
     showEditActivoModal.value = false
     editingActivo.value = null
 
@@ -386,6 +419,7 @@ export function useActivosCrud({
     if (!activo) return
 
     selectedId.value = activo.id
+
     openFleetTerminalModal(activo)
   }
 
@@ -396,8 +430,11 @@ export function useActivosCrud({
 
     const confirmed = await openConfirmDialog({
       title: "Eliminar activo",
+
       message: `¿Seguro que deseas eliminar "${activoName}"?`,
+
       detail: "El activo se quitará de la lista y del mapa en esta sesión.",
+
       confirmLabel: "Eliminar",
       cancelLabel: "Cancelar",
       variant: "danger",
@@ -412,7 +449,11 @@ export function useActivosCrud({
         return String(item.id) !== String(activo.id)
       })
 
-      if (!deletedActivoIds.value.some((id) => String(id) === String(activo.id))) {
+      if (
+        !deletedActivoIds.value.some((id) => {
+          return String(id) === String(activo.id)
+        })
+      ) {
         deletedActivoIds.value = [...deletedActivoIds.value, activo.id]
       }
 
@@ -472,16 +513,21 @@ export function useActivosCrud({
   return {
     rawActivos,
     baseNormalizedActivos,
+
     showActivoModal,
     showEditActivoModal,
     editingActivo,
 
     cloneFleetSnapshot,
+
     openAddActivoModal,
     handleAddActivo,
+
     openEditActivoModal,
     handleUpdateActivo,
+
     openTerminalModal,
+
     deleteActivo,
     handleDeviceAction,
   }

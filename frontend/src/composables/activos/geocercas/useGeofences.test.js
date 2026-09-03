@@ -93,3 +93,143 @@ test("createGeofence preserves geofence group names", () => {
     }
   }
 })
+
+test("createGeofenceGroup stores empty groups for the active company", () => {
+  const previousWindow = globalThis.window
+
+  globalThis.window = {
+    localStorage: createMemoryStorage(),
+  }
+
+  try {
+    const { geofenceGroups, createGeofenceGroup } = useGeofences({ companyId: "company-001" })
+
+    const createdGroup = createGeofenceGroup("Zonas norte")
+
+    assert.equal(createdGroup?.name, "Zonas norte")
+    assert.equal(geofenceGroups.value.length, 1)
+    assert.equal(geofenceGroups.value[0]?.count, 0)
+  } finally {
+    if (previousWindow === undefined) {
+      delete globalThis.window
+    } else {
+      globalThis.window = previousWindow
+    }
+  }
+})
+
+test("deleteGeofenceGroup keeps geofences and clears their group", () => {
+  const previousWindow = globalThis.window
+
+  globalThis.window = {
+    localStorage: createMemoryStorage(),
+  }
+
+  try {
+    const { geofences, geofenceGroups, createGeofence, createGeofenceGroup, deleteGeofenceGroup } =
+      useGeofences({ companyId: "company-001" })
+
+    const createdGroup = createGeofenceGroup("Bodegas")
+    const createdGeofence = createGeofence({
+      ...createCircle(1),
+      groupName: "Bodegas",
+    })
+
+    assert.equal(createdGeofence?.groupName, "Bodegas")
+    assert.equal(geofenceGroups.value[0]?.count, 1)
+
+    const deleted = deleteGeofenceGroup(createdGroup.id)
+
+    assert.equal(deleted, true)
+    assert.equal(geofences.value.length, 1)
+    assert.equal(geofences.value[0]?.groupName, "")
+    assert.equal(geofenceGroups.value.length, 0)
+  } finally {
+    if (previousWindow === undefined) {
+      delete globalThis.window
+    } else {
+      globalThis.window = previousWindow
+    }
+  }
+})
+
+test("renameGeofenceGroup updates grouped geofences", () => {
+  const previousWindow = globalThis.window
+
+  globalThis.window = {
+    localStorage: createMemoryStorage(),
+  }
+
+  try {
+    const { geofences, geofenceGroups, createGeofence, createGeofenceGroup, renameGeofenceGroup } =
+      useGeofences({ companyId: "company-001" })
+
+    const createdGroup = createGeofenceGroup("Bodegas")
+
+    createGeofence({
+      ...createCircle(1),
+      groupName: "Bodegas",
+    })
+
+    const renamedGroup = renameGeofenceGroup({
+      groupIdOrName: createdGroup.id,
+      name: "Bodegas norte",
+    })
+
+    assert.equal(renamedGroup?.name, "Bodegas norte")
+    assert.equal(geofences.value[0]?.groupName, "Bodegas norte")
+    assert.deepEqual(
+      geofenceGroups.value.map((group) => group.name),
+      ["Bodegas norte"],
+    )
+  } finally {
+    if (previousWindow === undefined) {
+      delete globalThis.window
+    } else {
+      globalThis.window = previousWindow
+    }
+  }
+})
+
+test("importGeofences adds imported geofences to the active company", () => {
+  const previousWindow = globalThis.window
+
+  globalThis.window = {
+    localStorage: createMemoryStorage(),
+  }
+
+  try {
+    const { geofences, importGeofences } = useGeofences({ companyId: "company-001" })
+    const importedGeofences = importGeofences([
+      {
+        id: "imported-zone",
+        name: "Zona importada",
+        type: "polygon",
+        coordinates: [
+          {
+            lat: -33.44,
+            lng: -70.66,
+          },
+          {
+            lat: -33.45,
+            lng: -70.66,
+          },
+          {
+            lat: -33.45,
+            lng: -70.65,
+          },
+        ],
+      },
+    ])
+
+    assert.equal(importedGeofences.length, 1)
+    assert.equal(geofences.value.length, 1)
+    assert.equal(geofences.value[0]?.companyId, "company-001")
+  } finally {
+    if (previousWindow === undefined) {
+      delete globalThis.window
+    } else {
+      globalThis.window = previousWindow
+    }
+  }
+})

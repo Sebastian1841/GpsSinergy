@@ -287,9 +287,9 @@
         </section>
 
         <!-- Fechas compartidas -->
-        <div class="grid grid-cols-4 gap-1 rounded-lg border border-[#d8dee8] bg-[#f8fafc] p-1">
+        <div class="grid grid-cols-5 gap-1 rounded-lg border border-[#d8dee8] bg-[#f8fafc] p-1">
           <button
-            v-for="option in rangeOptions"
+            v-for="option in displayRangeOptions"
             :key="option.value"
             type="button"
             class="cursor-pointer rounded-md px-2 py-1.5 text-[10px] font-black transition"
@@ -298,7 +298,7 @@
                 ? 'bg-[#102372] text-white shadow-sm'
                 : 'text-[#102372] hover:bg-white hover:text-[#FF6600]'
             "
-            @click="setDateRange(option.value)"
+            @click="handleDateRangeSelection(option.value)"
           >
             {{ option.label }}
           </button>
@@ -361,11 +361,13 @@
 
       <ItineraryDaySummary
         v-else-if="routeResult && activePanelView === 'resumen-dia'"
-        :summary="routeResult.summary"
+        :route="routeResult"
         :rows="routeResult.rows"
         :selected-assets="selectedAssets"
         :selected-assets-summary="selectedAssetsSummary"
         :range-label="activeRangeLabel"
+        :from-date="fromDate"
+        :to-date="toDate"
       />
 
       <div
@@ -456,6 +458,10 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  contextRequest: {
+    type: Object,
+    default: null,
+  },
 })
 
 const emit = defineEmits(["route-selected", "point-selected", "clear-route"])
@@ -485,10 +491,27 @@ const rangeOptions = [
     label: "7 días",
   },
   {
+    value: "last-week",
+    label: "Ultima semana",
+  },
+  {
     value: "custom",
     label: "Fecha",
   },
 ]
+
+const displayRangeOptions = computed(() => {
+  return rangeOptions.map((option) => {
+    if (option.value === "week") {
+      return {
+        ...option,
+        label: "Esta semana",
+      }
+    }
+
+    return option
+  })
+})
 
 const normalizeText = (value) => {
   return String(value || "")
@@ -527,6 +550,7 @@ const {
 
 const {
   selectedAssetIds,
+  normalizedAssets,
   filteredAssets,
   selectedAssets,
   selectedAssetsSummary,
@@ -564,14 +588,78 @@ const {
   toDate,
   formError,
   applyDateRange,
+  allowFallbackPoints: false,
   filterItineraryPoints,
   buildItineraryResult,
 })
+
+const lastHandledContextRequestId = ref("")
+
+const normalizeContextRange = (range) => {
+  const allowedRanges = new Set(["today", "yesterday", "week", "last-week", "month", "last-month"])
+
+  return allowedRanges.has(range) ? range : "today"
+}
+
+const applyContextRequest = async (request) => {
+  if (!request?.id || lastHandledContextRequestId.value === request.id) return
+
+  const targetAssetId = normalizeAssetId(request.assetId || request.activoId || request.asset)
+  const targetPlate = normalizeText(request.plate || request.patente || request.activo?.patente)
+
+  const targetAsset = normalizedAssets.value.find((asset) => {
+    return (
+      (targetAssetId && normalizeAssetId(asset) === targetAssetId) ||
+      (targetPlate && normalizeText(asset.patente) === targetPlate)
+    )
+  })
+
+  if (!targetAsset) return
+
+  lastHandledContextRequestId.value = request.id
+  activePanelView.value = request.panelView === "resumen-dia" ? "resumen-dia" : "itinerarios"
+  searchTerm.value = ""
+  showDeviceList.value = false
+
+  const selectedTargetAssetId = String(targetAsset.id)
+
+  selectedAssetIds.value =
+    request.selectionMode === "append"
+      ? [...new Set([...selectedAssetIds.value, selectedTargetAssetId])]
+      : [selectedTargetAssetId]
+
+  if (!request.keepRange) {
+    setDateRange(normalizeContextRange(request.range))
+  }
+
+  await nextTick()
+
+  handleGenerateRoute()
+}
+
+watch(
+  [() => props.contextRequest, normalizedAssets],
+  ([request]) => {
+    void applyContextRequest(request)
+  },
+  {
+    immediate: true,
+  },
+)
 
 const searchItinerary = handleGenerateRoute
 const refreshItinerary = handleRefreshRoute
 const selectPoint = handleSelectPoint
 const clearResult = handleClearRoute
+
+const handleDateRangeSelection = async (range) => {
+  setDateRange(range)
+
+  if (!routeResult.value || range === "custom") return
+
+  await nextTick()
+  handleGenerateRoute()
+}
 
 const canRefreshItinerary = computed(() => {
   return Boolean(routeResult.value)
@@ -842,7 +930,7 @@ const statusLabel = (estado) => {
   const labels = {
     moving: "Ruta",
     idle: "Espera",
-    stopped: "Alerta",
+    stopped: "Detenido",
     offline: "Offline",
   }
 
@@ -853,7 +941,7 @@ const statusDotClass = (estado) => {
   const classes = {
     moving: "bg-emerald-500",
     idle: "bg-sky-500",
-    stopped: "bg-red-500",
+    stopped: "bg-[#ff6600]",
     offline: "bg-slate-400",
   }
 
@@ -864,7 +952,7 @@ const statusChipClass = (estado) => {
   const classes = {
     moving: "bg-emerald-50 text-emerald-700 ring-emerald-200",
     idle: "bg-sky-50 text-sky-700 ring-sky-200",
-    stopped: "bg-red-50 text-red-700 ring-red-200",
+    stopped: "bg-[#fff3eb] text-[#ff6600] ring-[#ffd7bd]",
     offline: "bg-slate-100 text-slate-500 ring-slate-200",
   }
 

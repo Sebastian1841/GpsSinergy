@@ -1,4 +1,6 @@
 import { normalizeReportId } from "./assetReportColumnUtils.js"
+import { assetMatchesVehicleGroup } from "./assetReportVehicleGroupUtils.js"
+
 import { doesReportMatchEventRule } from "../event-rules/reportEventRuleEngine.js"
 
 export const getReportEventSourceKey = (report = {}) => {
@@ -22,42 +24,83 @@ export const getEventRuleIds = (template = {}) => {
       ? [template.eventRuleId]
       : []
 
-  const cleanIds = Array.from(new Set(sourceIds.map(String).filter(Boolean)))
+  const cleanIds = Array.from(
+    new Set(sourceIds.map(String).filter(Boolean)),
+  )
 
   return cleanIds.filter((eventRuleId) => eventRuleId !== "all")
 }
 
-const getRuleGroupIds = (rule = {}) => {
-  return Array.isArray(rule.groupIds) ? rule.groupIds.map(normalizeReportId).filter(Boolean) : []
-}
+/*
+ * Internamente las reglas trabajan exclusivamente
+ * con grupos vehiculares.
+ *
+ * groupIds se conserva temporalmente como compatibilidad
+ * con reglas antiguas.
+ */
+export const getRuleVehicleGroupIds = (rule = {}) => {
+  const sourceIds = Array.isArray(rule.vehicleGroupIds)
+    ? rule.vehicleGroupIds
+    : Array.isArray(rule.groupIds)
+      ? rule.groupIds
+      : []
 
-const getReportGroupId = ({ report = {}, asset = {} }) => {
-  return normalizeReportId(
-    report.sucursalId ||
-      report.groupId ||
-      report.tagId ||
-      report.branchId ||
-      asset.sucursalId ||
-      asset.groupId ||
-      asset.tagId ||
-      asset.branchId,
+  return Array.from(
+    new Set(
+      sourceIds
+        .map(normalizeReportId)
+        .filter(Boolean),
+    ),
   )
 }
 
-export const doesRuleApplyToAssetGroup = ({ rule, report, asset }) => {
-  const groupIds = getRuleGroupIds(rule)
+/*
+ * Una regla sin grupos vehiculares aplica a cualquier activo.
+ *
+ * Cuando existen grupos configurados, el activo debe pertenecer
+ * al menos a uno de ellos.
+ *
+ * No intervienen:
+ * - sucursalId
+ * - branchId
+ * - tagId
+ * - etiquetas
+ * - labels
+ */
+export const doesRuleApplyToAssetVehicleGroup = ({
+  rule,
+  asset,
+}) => {
+  const vehicleGroupIds = getRuleVehicleGroupIds(rule)
 
-  if (!groupIds.length) return true
+  if (!vehicleGroupIds.length) {
+    return true
+  }
 
-  const groupId = getReportGroupId({ report, asset })
-
-  return Boolean(groupId && groupIds.includes(groupId))
+  return vehicleGroupIds.some((vehicleGroupId) => {
+    return assetMatchesVehicleGroup(
+      asset,
+      vehicleGroupId,
+    )
+  })
 }
 
-export const doesTimelineItemMatchRule = ({ item, asset, rule }) => {
+/*
+ * Alias temporal para evitar romper imports existentes.
+ *
+ * Los consumidores nuevos deben usar:
+ * doesRuleApplyToAssetVehicleGroup()
+ */
+export const doesRuleApplyToAssetGroup =
+  doesRuleApplyToAssetVehicleGroup
+
+export const doesTimelineItemMatchRule = ({
+  item,
+  asset,
+  rule,
+}) => {
   if (
-    !doesRuleApplyToAssetGroup({
-      report: item.report,
+    !doesRuleApplyToAssetVehicleGroup({
       asset,
       rule,
     })

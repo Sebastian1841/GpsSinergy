@@ -34,9 +34,9 @@ export const REPORT_OUTPUT_OPTION_GROUPS = [
   },
   {
     id: "tripMap",
-    label: "Mapa de viajes",
-    description: "Imagen del recorrido para reportes de viajes.",
-    reportTypeIds: ["route-history"],
+    label: "Mapa operativo",
+    description: "Imagen del recorrido para reportes de viajes o detenciones.",
+    reportTypeIds: ["route-history", "stops"],
     options: [
       {
         id: REPORT_OUTPUT_OPTION_IDS.previewTripMap,

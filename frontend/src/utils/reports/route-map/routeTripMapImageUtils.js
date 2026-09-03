@@ -129,6 +129,37 @@ const drawMarkers = ({ context, routes, projectPoint }) => {
   })
 }
 
+const drawStopMarkers = ({ context, routes, projectPoint }) => {
+  routes.forEach((route) => {
+    if (!Array.isArray(route.stopMarkers) || !route.stopMarkers.length) return
+
+    route.stopMarkers.forEach((marker, markerIndex) => {
+      const projectedPoint = projectPoint(marker)
+      const label = String(marker.label || markerIndex + 1)
+
+      context.save()
+      context.shadowColor = "rgba(15, 23, 42, 0.28)"
+      context.shadowBlur = 10
+      context.shadowOffsetY = 3
+      context.beginPath()
+      context.arc(projectedPoint.x, projectedPoint.y, 13, 0, Math.PI * 2)
+      context.fillStyle = "#ff6600"
+      context.fill()
+      context.shadowColor = "transparent"
+      context.lineWidth = 4
+      context.strokeStyle = "#ffffff"
+      context.stroke()
+
+      context.fillStyle = "#ffffff"
+      context.font = "900 13px Arial, Helvetica, sans-serif"
+      context.textAlign = "center"
+      context.textBaseline = "middle"
+      context.fillText(label.slice(0, 3), projectedPoint.x, projectedPoint.y + 0.5)
+      context.restore()
+    })
+  })
+}
+
 const drawMapOverlay = ({ context, width, height }) => {
   context.fillStyle = "rgba(255, 255, 255, 0.13)"
   context.fillRect(0, 0, width, height)
@@ -182,6 +213,7 @@ const drawRouteMap = async ({ routes, width, height, useTiles = true }) => {
   drawMapOverlay({ context, width, height })
   drawRouteLine({ context, routes, projectPoint })
   drawMarkers({ context, routes, projectPoint })
+  drawStopMarkers({ context, routes, projectPoint })
   drawRouteTripMapChrome({ context, routes, width, height, usedTiles })
 
   return canvas.toDataURL("image/png")

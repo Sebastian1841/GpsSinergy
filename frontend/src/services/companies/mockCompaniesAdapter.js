@@ -9,9 +9,6 @@ export const createMockCompaniesAdapter = () => {
     createCompany,
     updateCompany,
     updateAsset,
-    addSucursal,
-    updateSucursal,
-    deleteSucursal,
   } = useMockDatabase()
 
   return {
@@ -22,8 +19,5 @@ export const createMockCompaniesAdapter = () => {
     createCompany,
     updateCompany,
     updateAsset,
-    addSucursal,
-    updateSucursal,
-    deleteSucursal,
   }
 }

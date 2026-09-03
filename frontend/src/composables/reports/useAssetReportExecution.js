@@ -12,15 +12,17 @@ import {
   sortAssetReportRowsByVehicle,
   toDateInputValue,
 } from "../../utils/reports/execution/assetReportExecutionUtils.js"
-import { ensureReportEventsForAssets, getReportEventsForAsset } from "./useGeneratedReportEvents.js"
+import {
+  assetMatchesVehicleGroup,
+  getAssetVehicleGroupIds,
+  normalizeReportVehicleGroup,
+} from "../../utils/reports/execution/assetReportVehicleGroupUtils.js"
+import {
+  ensureReportEventsForAssets,
+  getReportEventsForAsset,
+} from "./useGeneratedReportEvents.js"
 import { useReportEventRules } from "./useReportEventRules.js"
 import { normalizeReportTemplateEventRuleIds } from "./useReportTemplates.js"
-
-const firstNonEmptyValue = (...values) => {
-  return values.find((value) => {
-    return value !== undefined && value !== null && String(value).trim() !== ""
-  })
-}
 
 const REPORT_ASSET_BATCH_SIZE = 20
 
@@ -30,66 +32,15 @@ const waitForReportBatch = () => {
   })
 }
 
-const getAssetGroupId = (asset = {}) => {
-  return normalizeReportId(
-    firstNonEmptyValue(
-      asset.sucursalId,
-      asset.groupId,
-      asset.tagId,
-      asset.branchId,
-      asset.sucursal_id,
-      asset.group_id,
-      asset.tag_id,
-      asset.branch_id,
-      asset.sucursal?.id,
-      asset.group?.id,
-      asset.tag?.id,
-      asset.branch?.id,
-    ),
-  )
-}
-
-const getAssetGroupName = (asset = {}) => {
-  return firstNonEmptyValue(
-    asset.sucursalName,
-    asset.groupName,
-    asset.tagName,
-    asset.branchName,
-    asset.sucursal?.name,
-    asset.group?.name,
-    asset.tag?.name,
-    asset.branch?.name,
-  )
-}
-
-const normalizeReportGroup = (group = {}) => {
-  const id = normalizeReportId(
-    firstNonEmptyValue(
-      group.id,
-      group.sucursalId,
-      group.groupId,
-      group.tagId,
-      group.branchId,
-      group.sucursal_id,
-      group.group_id,
-      group.tag_id,
-      group.branch_id,
-    ),
-  )
-
-  if (!id) return null
-
-  return {
-    ...group,
-    id,
-    name:
-      firstNonEmptyValue(group.name, group.nombre, group.label, group.title, group.alias) ||
-      `Grupo ${id}`,
-  }
-}
-
-export function useAssetReportExecution({ template, assets, companies, geofences, groups }) {
+export function useAssetReportExecution({
+  template,
+  assets,
+  companies,
+  geofences,
+  groups,
+}) {
   const { eventRulesById } = useReportEventRules()
+
   const today = new Date()
   const weekAgo = new Date(today)
 
@@ -101,7 +52,8 @@ export function useAssetReportExecution({ template, assets, companies, geofences
   const dateTo = ref(toDateInputValue(today))
   const assetSearch = ref("")
   const debouncedAssetSearch = useDebouncedValue(assetSearch, 120)
-  const selectedGroupId = ref("all")
+
+  const selectedVehicleGroupId = ref("all")
   const selectedAssetIds = ref([])
   const executedAt = ref(null)
 
@@ -114,11 +66,16 @@ export function useAssetReportExecution({ template, assets, companies, geofences
 
   const companyNameById = computed(() => {
     return new Map(
-      (companies.value || []).map((company) => [normalizeReportId(company.id), company.name]),
+      (companies.value || []).map((company) => [
+        normalizeReportId(company.id),
+        company.name,
+      ]),
     )
   })
 
-  const reportColumns = computed(() => createReportColumns(template.value))
+  const reportColumns = computed(() => {
+    return createReportColumns(template.value)
+  })
 
   const activeEventRuleIds = computed(() => {
     return new Set(
@@ -130,34 +87,51 @@ export function useAssetReportExecution({ template, assets, companies, geofences
   })
 
   const templateEventRuleIds = computed(() => {
-    return normalizeReportTemplateEventRuleIds(template.value, activeEventRuleIds.value)
+    return normalizeReportTemplateEventRuleIds(
+      template.value,
+      activeEventRuleIds.value,
+    )
   })
 
+  /*
+   * Los activos recibidos por este composable deben venir
+   * previamente filtrados por permisos.
+   *
+   * Este composable solo aplica filtros de reporte.
+   */
   const availableAssets = computed(() => {
     return assets.value || []
   })
 
+  /*
+   * Catálogo de grupos vehiculares.
+   *
+   * También incorpora grupos definidos directamente en los activos
+   * mediante vehicleGroupId(s) / groupId(s).
+   *
+   * Nunca se infieren grupos desde sucursal, branch o etiquetas.
+   */
   const availableGroups = computed(() => {
     const groupsById = new Map()
 
-    ;(groups.value || []).forEach((group) => {
-      const normalizedGroup = normalizeReportGroup(group)
+      ; (groups.value || []).forEach((group) => {
+        const normalizedGroup = normalizeReportVehicleGroup(group)
 
-      if (!normalizedGroup) return
+        if (!normalizedGroup) return
 
-      groupsById.set(normalizedGroup.id, normalizedGroup)
-    })
+        groupsById.set(normalizedGroup.id, normalizedGroup)
+      })
 
     availableAssets.value.forEach((asset) => {
-      const groupId = getAssetGroupId(asset)
+      getAssetVehicleGroupIds(asset).forEach((vehicleGroupId) => {
+        if (groupsById.has(vehicleGroupId)) return
 
-      if (!groupId || groupsById.has(groupId)) return
-
-      groupsById.set(groupId, {
-        id: groupId,
-        name: getAssetGroupName(asset) || `Grupo ${groupId}`,
-        active: true,
-        inferredFromAssets: true,
+        groupsById.set(vehicleGroupId, {
+          id: vehicleGroupId,
+          name: `Grupo ${vehicleGroupId}`,
+          active: true,
+          inferredFromAssets: true,
+        })
       })
     })
 
@@ -166,16 +140,25 @@ export function useAssetReportExecution({ template, assets, companies, geofences
 
   const groupNameById = computed(() => {
     return new Map(
-      availableGroups.value.map((group) => [normalizeReportId(group.id), group.name || "Grupo"]),
+      availableGroups.value.map((group) => [
+        normalizeReportId(group.id),
+        group.name || "Grupo",
+      ]),
     )
   })
 
-  const getAssetGroupLabel = (asset = {}) => {
-    const groupId = getAssetGroupId(asset)
+  const getAssetVehicleGroupLabel = (asset = {}) => {
+    const vehicleGroupIds = getAssetVehicleGroupIds(asset)
 
-    if (!groupId) return "Sin grupo"
+    if (!vehicleGroupIds.length) {
+      return "Sin grupo"
+    }
 
-    return groupNameById.value.get(groupId) || getAssetGroupName(asset) || "Grupo"
+    return vehicleGroupIds
+      .map((vehicleGroupId) => {
+        return groupNameById.value.get(vehicleGroupId) || `Grupo ${vehicleGroupId}`
+      })
+      .join(" · ")
   }
 
   const groupAssetCountById = computed(() => {
@@ -185,9 +168,23 @@ export function useAssetReportExecution({ template, assets, companies, geofences
     ])
 
     availableAssets.value.forEach((asset) => {
-      const groupId = getAssetGroupId(asset) || "unassigned"
+      const vehicleGroupIds = getAssetVehicleGroupIds(asset)
 
-      countsById.set(groupId, (countsById.get(groupId) || 0) + 1)
+      if (!vehicleGroupIds.length) {
+        countsById.set(
+          "unassigned",
+          (countsById.get("unassigned") || 0) + 1,
+        )
+
+        return
+      }
+
+      vehicleGroupIds.forEach((vehicleGroupId) => {
+        countsById.set(
+          vehicleGroupId,
+          (countsById.get(vehicleGroupId) || 0) + 1,
+        )
+      })
     })
 
     return countsById
@@ -204,7 +201,8 @@ export function useAssetReportExecution({ template, assets, companies, geofences
         .filter((group) => group.active !== false)
         .map((group) => ({
           ...group,
-          assetCount: groupAssetCountById.value.get(normalizeReportId(group.id)) || 0,
+          assetCount:
+            groupAssetCountById.value.get(normalizeReportId(group.id)) || 0,
         })),
       {
         id: "unassigned",
@@ -215,7 +213,9 @@ export function useAssetReportExecution({ template, assets, companies, geofences
   })
 
   const availableAssetIdsSignature = computed(() => {
-    return availableAssets.value.map((asset) => normalizeReportId(asset.id)).join("|")
+    return availableAssets.value
+      .map((asset) => normalizeReportId(asset.id))
+      .join("|")
   })
 
   const selectedAssetIdSet = computed(() => {
@@ -223,18 +223,21 @@ export function useAssetReportExecution({ template, assets, companies, geofences
   })
 
   const groupFilteredAssets = computed(() => {
-    if (selectedGroupId.value === "all") {
+    if (selectedVehicleGroupId.value === "all") {
       return availableAssets.value
     }
 
+    if (selectedVehicleGroupId.value === "unassigned") {
+      return availableAssets.value.filter((asset) => {
+        return !getAssetVehicleGroupIds(asset).length
+      })
+    }
+
     return availableAssets.value.filter((asset) => {
-      const assetGroupId = getAssetGroupId(asset)
-
-      if (selectedGroupId.value === "unassigned") {
-        return !assetGroupId
-      }
-
-      return assetGroupId === normalizeReportId(selectedGroupId.value)
+      return assetMatchesVehicleGroup(
+        asset,
+        selectedVehicleGroupId.value,
+      )
     })
   })
 
@@ -244,7 +247,10 @@ export function useAssetReportExecution({ template, assets, companies, geofences
 
   const selectedGroupLabel = computed(() => {
     const selectedGroup = groupOptions.value.find((group) => {
-      return normalizeReportId(group.id) === normalizeReportId(selectedGroupId.value)
+      return (
+        normalizeReportId(group.id) ===
+        normalizeReportId(selectedVehicleGroupId.value)
+      )
     })
 
     return selectedGroup?.name || "Grupo"
@@ -253,20 +259,28 @@ export function useAssetReportExecution({ template, assets, companies, geofences
   const filteredAssets = computed(() => {
     const term = normalizeReportText(debouncedAssetSearch.value)
 
-    if (!term) return groupFilteredAssets.value
+    if (!term) {
+      return groupFilteredAssets.value
+    }
 
     return groupFilteredAssets.value.filter((asset) => {
-      const companyName = companyNameById.value.get(normalizeReportId(asset.companyId))
+      const companyName = companyNameById.value.get(
+        normalizeReportId(asset.companyId),
+      )
 
       return getAssetSearchText(asset, companyName).includes(term)
     })
   })
 
   const selectedAssets = computed(() => {
-    if (!selectedAssetIds.value.length) return []
+    if (!selectedAssetIds.value.length) {
+      return []
+    }
 
     return groupFilteredAssets.value.filter((asset) => {
-      return selectedAssetIdSet.value.has(normalizeReportId(asset.id))
+      return selectedAssetIdSet.value.has(
+        normalizeReportId(asset.id),
+      )
     })
   })
 
@@ -327,7 +341,9 @@ export function useAssetReportExecution({ template, assets, companies, geofences
 
   const canExecuteReport = computed(() => {
     return Boolean(
-      selectedAssets.value.length && templateEventRuleIds.value.length && !dateRangeError.value,
+      selectedAssets.value.length &&
+      templateEventRuleIds.value.length &&
+      !dateRangeError.value,
     )
   })
 
@@ -339,7 +355,8 @@ export function useAssetReportExecution({ template, assets, companies, geofences
 
   const resetExecution = () => {
     assetSearch.value = ""
-    selectedGroupId.value = "all"
+    selectedVehicleGroupId.value = "all"
+
     selectedAssetIds.value = groupFilteredAssets.value.map((asset) => {
       return normalizeReportId(asset.id)
     })
@@ -349,7 +366,9 @@ export function useAssetReportExecution({ template, assets, companies, geofences
 
   const toggleAsset = (assetId) => {
     const normalizedAssetId = normalizeReportId(assetId)
-    const nextIds = new Set(selectedAssetIds.value.map(normalizeReportId))
+    const nextIds = new Set(
+      selectedAssetIds.value.map(normalizeReportId),
+    )
 
     if (nextIds.has(normalizedAssetId)) {
       nextIds.delete(normalizedAssetId)
@@ -361,7 +380,9 @@ export function useAssetReportExecution({ template, assets, companies, geofences
   }
 
   const selectFilteredAssets = () => {
-    const nextIds = new Set(selectedAssetIds.value.map(normalizeReportId))
+    const nextIds = new Set(
+      selectedAssetIds.value.map(normalizeReportId),
+    )
 
     filteredAssets.value.forEach((asset) => {
       nextIds.add(normalizeReportId(asset.id))
@@ -381,12 +402,11 @@ export function useAssetReportExecution({ template, assets, companies, geofences
     }
 
     const currentRunId = reportExecutionRunId + 1
-
     reportExecutionRunId = currentRunId
 
     /*
-     * Se capturan los valores actuales para que la ejecución no dependa
-     * de cambios reactivos ocurridos durante la construcción.
+     * Se capturan los valores actuales para que la ejecución
+     * no dependa de cambios reactivos durante la construcción.
      */
     const selectedAssetsSnapshot = [...selectedAssets.value]
     const reportColumnsSnapshot = [...reportColumns.value]
@@ -394,14 +414,15 @@ export function useAssetReportExecution({ template, assets, companies, geofences
     const eventRulesByIdSnapshot = new Map(eventRulesById.value)
     const geofencesSnapshot = [...(geofences?.value || [])]
     const templateEventRuleIdsSnapshot = templateEventRuleIds.value
+
     const templateSnapshot = {
       ...template.value,
       eventRuleIds: templateEventRuleIdsSnapshot,
       eventRuleId: templateEventRuleIdsSnapshot[0] || null,
     }
+
     const dateFromSnapshot = dateFrom.value
     const dateToSnapshot = dateTo.value
-
     const generatedRows = []
 
     for (
@@ -436,7 +457,10 @@ export function useAssetReportExecution({ template, assets, companies, geofences
         }),
       )
 
-      if (assetIndex + REPORT_ASSET_BATCH_SIZE < selectedAssetsSnapshot.length) {
+      if (
+        assetIndex + REPORT_ASSET_BATCH_SIZE <
+        selectedAssetsSnapshot.length
+      ) {
         await waitForReportBatch()
       }
     }
@@ -445,69 +469,67 @@ export function useAssetReportExecution({ template, assets, companies, geofences
       return []
     }
 
-    /*
-     * Los registros más nuevos quedan al comienzo.
-     * El arreglo completo se conserva para Excel y PDF.
-     */
-    reportRows.value = sortAssetReportRowsByVehicle(generatedRows)
+    reportRows.value =
+      sortAssetReportRowsByVehicle(generatedRows)
+
     executedAt.value = new Date().toISOString()
 
     return reportRows.value
   }
 
-  const exportExcel = async (charts = {}, reportRowsOverride = null) => {
-    if (!hasReport.value || dateRangeError.value) return false
+  const exportExcel = async (
+    charts = {},
+    reportRowsOverride = null,
+  ) => {
+    if (!hasReport.value || dateRangeError.value) {
+      return false
+    }
 
-    /*
-     * ExcelJS y sus dependencias solo se cargan cuando el usuario
-     * presiona el botón Excel.
-     */
-    const { exportAssetReportExcel } = await import("../../utils/reports/export/assetReportExportUtils.js")
+    const { exportAssetReportExcel } =
+      await import(
+        "../../utils/reports/export/assetReportExportUtils.js"
+      )
 
     const reportRowsSnapshot = Array.isArray(reportRowsOverride)
       ? reportRowsOverride
       : reportRows.value
-    const reportColumnsSnapshot = [...reportColumns.value]
-    const templateSnapshot = template.value
-    const dateFromSnapshot = dateFrom.value
-    const dateToSnapshot = dateTo.value
 
     await exportAssetReportExcel({
-      template: templateSnapshot,
-      reportColumns: reportColumnsSnapshot,
+      template: template.value,
+      reportColumns: [...reportColumns.value],
       reportRows: reportRowsSnapshot,
-      dateFrom: dateFromSnapshot,
-      dateTo: dateToSnapshot,
+      dateFrom: dateFrom.value,
+      dateTo: dateTo.value,
       charts,
     })
 
     return true
   }
 
-  const exportPdf = async (charts = {}, reportRowsOverride = null) => {
-    if (!hasReport.value || dateRangeError.value) return false
+  const exportPdf = async (
+    charts = {},
+    reportRowsOverride = null,
+  ) => {
+    if (!hasReport.value || dateRangeError.value) {
+      return false
+    }
 
-    /*
-     * jsPDF también se carga únicamente cuando se solicita
-     * una exportación.
-     */
-    const { exportAssetReportPdf } = await import("../../utils/reports/export/assetReportExportUtils.js")
+    const { exportAssetReportPdf } =
+      await import(
+        "../../utils/reports/export/assetReportExportUtils.js"
+      )
 
     const reportRowsSnapshot = Array.isArray(reportRowsOverride)
       ? reportRowsOverride
       : reportRows.value
-    const reportColumnsSnapshot = [...reportColumns.value]
-    const templateSnapshot = template.value
-    const dateFromSnapshot = dateFrom.value
-    const dateToSnapshot = dateTo.value
 
     await Promise.resolve(
       exportAssetReportPdf({
-        template: templateSnapshot,
-        reportColumns: reportColumnsSnapshot,
+        template: template.value,
+        reportColumns: [...reportColumns.value],
         reportRows: reportRowsSnapshot,
-        dateFrom: dateFromSnapshot,
-        dateTo: dateToSnapshot,
+        dateFrom: dateFrom.value,
+        dateTo: dateTo.value,
         charts,
       }),
     )
@@ -526,12 +548,20 @@ export function useAssetReportExecution({ template, assets, companies, geofences
   )
 
   /*
-   * Cambiar filtros invalida la vista previa existente, pero no genera
-   * un reporte nuevo. El reporte solo se reconstruye al presionar Generar.
+   * Cambiar filtros invalida la vista previa existente,
+   * pero no genera automáticamente un nuevo reporte.
    */
-  watch([dateFrom, dateTo, selectedGroupId, selectedAssetIds], () => {
-    clearReportPreview()
-  })
+  watch(
+    [
+      dateFrom,
+      dateTo,
+      selectedVehicleGroupId,
+      selectedAssetIds,
+    ],
+    () => {
+      clearReportPreview()
+    },
+  )
 
   watch(availableAssetIdsSignature, () => {
     const availableAssetIds = new Set(
@@ -540,36 +570,50 @@ export function useAssetReportExecution({ template, assets, companies, geofences
       }),
     )
 
-    const nextSelectedAssetIds = selectedAssetIds.value.filter((assetId) => {
-      return availableAssetIds.has(normalizeReportId(assetId))
-    })
+    const nextSelectedAssetIds =
+      selectedAssetIds.value.filter((assetId) => {
+        return availableAssetIds.has(
+          normalizeReportId(assetId),
+        )
+      })
 
-    if (nextSelectedAssetIds.length !== selectedAssetIds.value.length) {
+    if (
+      nextSelectedAssetIds.length !==
+      selectedAssetIds.value.length
+    ) {
       selectedAssetIds.value = nextSelectedAssetIds
     }
 
-    if (!selectedAssetIds.value.length && availableAssets.value.length) {
-      selectedAssetIds.value = groupFilteredAssets.value.map((asset) => {
-        return normalizeReportId(asset.id)
-      })
+    if (
+      !selectedAssetIds.value.length &&
+      availableAssets.value.length
+    ) {
+      selectedAssetIds.value =
+        groupFilteredAssets.value.map((asset) => {
+          return normalizeReportId(asset.id)
+        })
     }
   })
 
-  watch(selectedGroupId, () => {
-    selectedAssetIds.value = groupFilteredAssets.value.map((asset) => {
-      return normalizeReportId(asset.id)
-    })
+  watch(selectedVehicleGroupId, () => {
+    selectedAssetIds.value =
+      groupFilteredAssets.value.map((asset) => {
+        return normalizeReportId(asset.id)
+      })
   })
 
   watch(
     groupOptions,
     (options) => {
       const selectedGroupExists = options.some((group) => {
-        return normalizeReportId(group.id) === normalizeReportId(selectedGroupId.value)
+        return (
+          normalizeReportId(group.id) ===
+          normalizeReportId(selectedVehicleGroupId.value)
+        )
       })
 
       if (!selectedGroupExists) {
-        selectedGroupId.value = "all"
+        selectedVehicleGroupId.value = "all"
       }
     },
     {
@@ -581,7 +625,13 @@ export function useAssetReportExecution({ template, assets, companies, geofences
     dateFrom,
     dateTo,
     assetSearch,
-    selectedGroupId,
+
+    /*
+     * Alias temporal para no romper ReportExecutionModal.vue.
+     */
+    selectedGroupId: selectedVehicleGroupId,
+    selectedVehicleGroupId,
+
     selectedAssetIds,
     selectedAssetIdSet,
     groupOptions,
@@ -606,6 +656,11 @@ export function useAssetReportExecution({ template, assets, companies, geofences
     exportExcel,
     exportPdf,
     resetExecution,
-    getAssetGroupLabel,
+
+    /*
+     * Alias temporal para mantener compatibilidad.
+     */
+    getAssetGroupLabel: getAssetVehicleGroupLabel,
+    getAssetVehicleGroupLabel,
   }
 }

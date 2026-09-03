@@ -466,11 +466,28 @@
     <path
       stroke-linecap="round"
       stroke-linejoin="round"
-      d="M12 8v4l3 3m6 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
+      d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
     />
   </svg>
 
   <!-- Configuración -->
+  <!-- Llave / Taller -->
+  <svg
+    v-else-if="name === 'llave'"
+    xmlns="http://www.w3.org/2000/svg"
+    class="w-5 h-5"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    stroke-width="2"
+  >
+    <path
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 0 0 5.4-5.4l-2.4 2.4-3-3 2.4-2.4z"
+    />
+  </svg>
+
   <svg
     v-else-if="name === 'configuracion'"
     xmlns="http://www.w3.org/2000/svg"

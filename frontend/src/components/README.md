@@ -10,6 +10,7 @@ Componentes Vue reutilizables y piezas visuales por dominio.
 - `companies/`: administracion de empresas.
 - `icons/`: componentes de iconografia.
 - `Layout/`: estructura principal de navegacion y header.
+- `maintenance/`: piezas visuales del modulo de mantenciones.
 - `reports/`: modales y formularios de reportes.
 - `ui/`: componentes genericos de interfaz.
 - `users/`: administracion de usuarios y permisos.

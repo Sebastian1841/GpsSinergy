@@ -5,15 +5,21 @@ const DRAWING_RELATIONSHIP_TYPE =
 const IMAGE_RELATIONSHIP_TYPE =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
 
+const EMUS_PER_PIXEL = 9525
+const DEFAULT_EXCEL_COLUMN_WIDTH = 8.43
+const DASHBOARD_REPORT_START_COLUMN = 2
+const DASHBOARD_REPORT_COLUMN_COUNT = 13
+const DASHBOARD_REPORT_COLUMN_FALLBACK =
+  DASHBOARD_REPORT_START_COLUMN + DASHBOARD_REPORT_COLUMN_COUNT - 1
 const BRAND_IMAGE_FILENAME = "sinergy-report-logo.png"
 const BRAND_IMAGE_NAME = "Logo Sinergy Group"
 const BRAND_IMAGE_LAYOUT = {
-  column: 1,
-  columnOffset: 95250,
+  column: 8,
+  columnOffset: 47625,
   row: 0,
-  rowOffset: 80010,
-  width: 118,
-  height: 42,
+  rowOffset: 38100,
+  width: 220,
+  height: 62,
 }
 
 const CHART_LAYOUT = {
@@ -21,7 +27,13 @@ const CHART_LAYOUT = {
   splitWidth: 830,
   tallHeight: 360,
   compactHeight: 240,
+  singleColumn: 2,
+  splitLeftColumn: 1,
+  splitRightColumn: 10,
 }
+
+const DEFAULT_CHART_START_ROW = 7
+const STACKED_CHART_ROW_OFFSET = 20
 
 const BAR_COLORS = [
   "4F46E5",
@@ -52,6 +64,72 @@ const normalizeHexColor = (value, fallback) => {
     .toUpperCase()
 
   return /^[0-9A-F]{6}$/.test(color) ? color : fallback
+}
+
+const getXmlNodeAttribute = (xml, attributeName) => {
+  const attributeMatch = String(xml || "").match(new RegExp(`${attributeName}="([^"]*)"`, "i"))
+
+  return attributeMatch?.[1] || ""
+}
+
+const getExcelColumnPixelWidth = (width = DEFAULT_EXCEL_COLUMN_WIDTH) => {
+  const normalizedWidth = Number(width)
+  const safeWidth = Number.isFinite(normalizedWidth) ? Math.max(0, normalizedWidth) : DEFAULT_EXCEL_COLUMN_WIDTH
+
+  return Math.max(16, Math.floor(safeWidth * 7 + 5))
+}
+
+const getWorksheetColumnPixelWidths = (worksheetXml = "") => {
+  const columnNodes = String(worksheetXml || "").match(/<col\b[^>]*\/>/g) || []
+  const maxColumn = Math.max(
+    DASHBOARD_REPORT_COLUMN_FALLBACK,
+    ...columnNodes.map((node) => Number(getXmlNodeAttribute(node, "max")) || 0),
+  )
+  const widths = Array.from({ length: maxColumn }, () =>
+    getExcelColumnPixelWidth(DEFAULT_EXCEL_COLUMN_WIDTH),
+  )
+
+  columnNodes.forEach((node) => {
+    const min = Math.max(1, Number(getXmlNodeAttribute(node, "min")) || 1)
+    const max = Math.max(min, Number(getXmlNodeAttribute(node, "max")) || min)
+    const width = getExcelColumnPixelWidth(
+      Number(getXmlNodeAttribute(node, "width")) || DEFAULT_EXCEL_COLUMN_WIDTH,
+    )
+
+    for (let columnIndex = min - 1; columnIndex < max; columnIndex += 1) {
+      widths[columnIndex] = width
+    }
+  })
+
+  return widths
+}
+
+const getCenteredBrandImagePosition = (worksheetXml = "") => {
+  const columnPixelWidths = getWorksheetColumnPixelWidths(worksheetXml)
+  const contentStartIndex = Math.max(0, DASHBOARD_REPORT_START_COLUMN - 1)
+  const leadingWidth = columnPixelWidths
+    .slice(0, contentStartIndex)
+    .reduce((total, width) => total + width, 0)
+  const contentWidth = columnPixelWidths
+    .slice(contentStartIndex)
+    .reduce((total, width) => total + width, 0)
+  let remainingLeft = leadingWidth + Math.max(0, (contentWidth - BRAND_IMAGE_LAYOUT.width) / 2)
+
+  for (let columnIndex = 0; columnIndex < columnPixelWidths.length; columnIndex += 1) {
+    const columnWidth = columnPixelWidths[columnIndex]
+
+    if (remainingLeft <= columnWidth) {
+      return {
+        ...BRAND_IMAGE_LAYOUT,
+        column: columnIndex,
+        columnOffset: Math.round(remainingLeft * EMUS_PER_PIXEL),
+      }
+    }
+
+    remainingLeft -= columnWidth
+  }
+
+  return BRAND_IMAGE_LAYOUT
 }
 
 const buildSheetReference = (sheetName, range) => {
@@ -325,51 +403,99 @@ const buildDoughnutChartXml = ({ sheetName, item, index }) => {
 }
 
 const buildChartFrame = ({ id, name, relationshipId, from, width, height }) => {
-  const emusPerPixel = 9525
-
-  return `<xdr:oneCellAnchor><xdr:from><xdr:col>${from.col}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${from.row}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:ext cx="${width * emusPerPixel}" cy="${height * emusPerPixel}"/><xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="${id}" name="${escapeXml(
+  return `<xdr:oneCellAnchor><xdr:from><xdr:col>${from.col}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${from.row}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:ext cx="${width * EMUS_PER_PIXEL}" cy="${height * EMUS_PER_PIXEL}"/><xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="${id}" name="${escapeXml(
     name,
   )}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="${relationshipId}"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:oneCellAnchor>`
 }
 
-const buildBrandImageFrame = ({ id, relationshipId }) => {
-  const emusPerPixel = 9525
+const buildBrandImageFrame = ({ id, relationshipId, position = BRAND_IMAGE_LAYOUT }) => {
+  const layout = {
+    ...BRAND_IMAGE_LAYOUT,
+    ...position,
+  }
 
-  return `<xdr:oneCellAnchor><xdr:from><xdr:col>${BRAND_IMAGE_LAYOUT.column}</xdr:col><xdr:colOff>${BRAND_IMAGE_LAYOUT.columnOffset}</xdr:colOff><xdr:row>${BRAND_IMAGE_LAYOUT.row}</xdr:row><xdr:rowOff>${BRAND_IMAGE_LAYOUT.rowOffset}</xdr:rowOff></xdr:from><xdr:ext cx="${BRAND_IMAGE_LAYOUT.width * emusPerPixel}" cy="${BRAND_IMAGE_LAYOUT.height * emusPerPixel}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${id}" name="${BRAND_IMAGE_NAME}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="${relationshipId}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`
+  return `<xdr:oneCellAnchor><xdr:from><xdr:col>${layout.column}</xdr:col><xdr:colOff>${layout.columnOffset}</xdr:colOff><xdr:row>${layout.row}</xdr:row><xdr:rowOff>${layout.rowOffset}</xdr:rowOff></xdr:from><xdr:ext cx="${layout.width * EMUS_PER_PIXEL}" cy="${layout.height * EMUS_PER_PIXEL}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${id}" name="${BRAND_IMAGE_NAME}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="${relationshipId}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`
 }
 
-const buildDrawingXml = (items, { brandImageRelationshipId = "" } = {}) => {
+const buildChartFrames = (
+  items,
+  { chartRelationshipIds = [], chartStartRow = DEFAULT_CHART_START_ROW, startShapeId = 2 } = {},
+) => {
   const singleChart = items.length === 1
   const chartHeight = items.length > 2 ? CHART_LAYOUT.compactHeight : CHART_LAYOUT.tallHeight
   const chartWidth = singleChart ? CHART_LAYOUT.fullWidth : CHART_LAYOUT.splitWidth
+
+  return items
+    .map((item, index) => {
+      const isLastOddStackedChart = items.length > 2 && index === items.length - 1 && index % 2 === 0
+      const usesSingleChartRow = singleChart || isLastOddStackedChart
+      const column = usesSingleChartRow
+        ? CHART_LAYOUT.singleColumn
+        : index % 2 === 0
+          ? CHART_LAYOUT.splitLeftColumn
+          : CHART_LAYOUT.splitRightColumn
+      const row =
+        items.length > 2 && index >= 2 ? chartStartRow + STACKED_CHART_ROW_OFFSET : chartStartRow
+      const width = usesSingleChartRow ? CHART_LAYOUT.fullWidth : chartWidth
+
+      return buildChartFrame({
+        id: startShapeId + index,
+        name: `Grafico de ${item.label}`,
+        relationshipId: chartRelationshipIds[index] || `rId${index + 1}`,
+        from: {
+          col: column,
+          row,
+        },
+        width,
+        height: chartHeight,
+      })
+    })
+    .join("")
+}
+
+const buildDrawingFrames = (
+  items,
+  {
+    brandImageRelationshipId = "",
+    brandImagePosition = BRAND_IMAGE_LAYOUT,
+    chartRelationshipIds = [],
+    chartStartRow = DEFAULT_CHART_START_ROW,
+    startShapeId = 2,
+  } = {},
+) => {
   const brandFrame = brandImageRelationshipId
     ? buildBrandImageFrame({
-        id: 2,
+        id: startShapeId,
         relationshipId: brandImageRelationshipId,
+        position: brandImagePosition,
       })
     : ""
+  const chartFrames = buildChartFrames(items, {
+    chartRelationshipIds,
+    chartStartRow,
+    startShapeId: startShapeId + (brandImageRelationshipId ? 1 : 0),
+  })
 
-  const frames = items.map((item, index) => {
-    const column = singleChart ? 0 : (index % 2) * 7
-    const row = items.length > 2 && index >= 2 ? 27 : 7
+  return `${brandFrame}${chartFrames}`
+}
 
-    return buildChartFrame({
-      id: index + (brandImageRelationshipId ? 3 : 2),
-      name: `Grafico de ${item.label}`,
-      relationshipId: `rId${index + 1}`,
-      from: {
-        col: column,
-        row,
-      },
-      width: chartWidth,
-      height: chartHeight,
-    })
+const buildDrawingXml = (
+  items,
+  {
+    brandImageRelationshipId = "",
+    brandImagePosition = BRAND_IMAGE_LAYOUT,
+    chartStartRow = DEFAULT_CHART_START_ROW,
+  } = {},
+) => {
+  const frames = buildDrawingFrames(items, {
+    brandImageRelationshipId,
+    brandImagePosition,
+    chartStartRow,
+    startShapeId: 2,
   })
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${brandFrame}${frames.join(
-    "",
-  )}</xdr:wsDr>`
+<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${frames}</xdr:wsDr>`
 }
 
 const buildDrawingRelationshipsXml = (chartCount, { brandImageFilename = "" } = {}) => {
@@ -396,6 +522,118 @@ const buildDrawingRelationshipsXml = (chartCount, { brandImageFilename = "" } = 
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${relationships.join(
     "",
   )}</Relationships>`
+}
+
+const createRelationshipsXml = (relationships = []) => {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${relationships.join(
+    "",
+  )}</Relationships>`
+}
+
+const getRelationshipIds = (relationshipsXml = "") => {
+  return [...relationshipsXml.matchAll(/Id="rId(\d+)"/g)].map((match) => Number(match[1]))
+}
+
+const getNextRelationshipId = (relationshipsXml = "") => {
+  return Math.max(0, ...getRelationshipIds(relationshipsXml)) + 1
+}
+
+const getMaxDrawingShapeId = (drawingXml = "") => {
+  const ids = [...drawingXml.matchAll(/<xdr:cNvPr\b[^>]*\bid="(\d+)"/g)].map((match) =>
+    Number(match[1]),
+  )
+
+  return Math.max(1, ...ids)
+}
+
+const appendRelationships = (relationshipsXml, relationships = []) => {
+  const xml = relationshipsXml || createRelationshipsXml()
+
+  return xml.replace("</Relationships>", `${relationships.join("")}</Relationships>`)
+}
+
+const getXmlAttribute = (xml, attributeName) => {
+  const attributeMatch = String(xml || "").match(new RegExp(`${attributeName}="([^"]*)"`, "i"))
+
+  return attributeMatch?.[1] || ""
+}
+
+const getRelationshipTarget = (relationshipsXml, relationshipId) => {
+  const relationshipNodes = String(relationshipsXml || "").match(/<Relationship\b[^>]*\/>/g) || []
+
+  for (const relationshipNode of relationshipNodes) {
+    if (getXmlAttribute(relationshipNode, "Id") === relationshipId) {
+      return getXmlAttribute(relationshipNode, "Target")
+    }
+  }
+
+  return ""
+}
+
+const getZipDirectory = (zipPath) => {
+  return String(zipPath || "")
+    .split("/")
+    .slice(0, -1)
+    .join("/")
+}
+
+const normalizeZipPath = (baseDirectory, target) => {
+  const parts = `${baseDirectory}/${target}`.split("/")
+  const normalizedParts = []
+
+  parts.forEach((part) => {
+    if (!part || part === ".") return
+    if (part === "..") {
+      normalizedParts.pop()
+      return
+    }
+
+    normalizedParts.push(part)
+  })
+
+  return normalizedParts.join("/")
+}
+
+const getWorksheetRelationshipsPath = (worksheetPath) => {
+  const worksheetDirectory = getZipDirectory(worksheetPath)
+  const worksheetFileName = worksheetPath.split("/").pop()
+
+  return `${worksheetDirectory}/_rels/${worksheetFileName}.rels`
+}
+
+const getDrawingRelationshipsPath = (drawingPath) => {
+  const drawingDirectory = getZipDirectory(drawingPath)
+  const drawingFileName = drawingPath.split("/").pop()
+
+  return `${drawingDirectory}/_rels/${drawingFileName}.rels`
+}
+
+const getExistingWorksheetDrawing = async (zip, worksheetPath, worksheetXml) => {
+  const drawingRelationshipId = getXmlAttribute(
+    String(worksheetXml || "").match(/<drawing\b[^>]*\/>/)?.[0] || "",
+    "r:id",
+  )
+
+  if (!drawingRelationshipId) return null
+
+  const worksheetRelationshipsPath = getWorksheetRelationshipsPath(worksheetPath)
+  const worksheetRelationshipsFile = zip.file(worksheetRelationshipsPath)
+
+  if (!worksheetRelationshipsFile) return null
+
+  const worksheetRelationshipsXml = await worksheetRelationshipsFile.async("string")
+  const drawingTarget = getRelationshipTarget(worksheetRelationshipsXml, drawingRelationshipId)
+
+  if (!drawingTarget) return null
+
+  const drawingPath = normalizeZipPath(getZipDirectory(worksheetPath), drawingTarget)
+
+  return {
+    relationshipId: drawingRelationshipId,
+    path: drawingPath,
+    relationshipsPath: getDrawingRelationshipsPath(drawingPath),
+  }
 }
 
 const addDrawingRelationship = async (zip, worksheetPath) => {
@@ -488,6 +726,7 @@ export const injectNativeItineraryCharts = async ({
   worksheetPath = "xl/worksheets/sheet1.xml",
   dataSheetName = "DatosGraficos",
   brandImageDataUrl = "",
+  chartStartRow = DEFAULT_CHART_START_ROW,
 }) => {
   const zipModule = await import("jszip")
   const JSZip = zipModule.default || zipModule
@@ -505,37 +744,95 @@ export const injectNativeItineraryCharts = async ({
     throw new Error("No se recibieron graficos nativos para insertar en el Excel")
   }
 
-  const drawingRelationshipId = await addDrawingRelationship(zip, worksheetPath)
   const worksheetXml = await worksheetFile.async("string")
+  const brandImagePosition = getCenteredBrandImagePosition(worksheetXml)
+  const existingDrawing = await getExistingWorksheetDrawing(zip, worksheetPath, worksheetXml)
 
-  if (worksheetXml.includes("<drawing ")) {
-    throw new Error("La hoja de reporte ya contiene un dibujo OOXML")
-  }
+  if (existingDrawing) {
+    const drawingFile = zip.file(existingDrawing.path)
 
-  zip.file(
-    worksheetPath,
-    worksheetXml.replace("</worksheet>", `<drawing r:id="${drawingRelationshipId}"/></worksheet>`),
-  )
+    if (!drawingFile) {
+      throw new Error(
+        `No se encontro el dibujo existente para los graficos: ${existingDrawing.path}`,
+      )
+    }
 
-  if (brandImageBase64) {
-    zip.file(`xl/media/${brandImageFilename}`, brandImageBase64, {
-      base64: true,
+    const drawingXml = await drawingFile.async("string")
+    const drawingRelationshipsFile = zip.file(existingDrawing.relationshipsPath)
+    const drawingRelationshipsXml = drawingRelationshipsFile
+      ? await drawingRelationshipsFile.async("string")
+      : createRelationshipsXml()
+    const firstRelationshipNumber = getNextRelationshipId(drawingRelationshipsXml)
+    const chartRelationshipIds = chartItems.map(
+      (_, index) => `rId${firstRelationshipNumber + index}`,
+    )
+    const brandImageRelationshipId = brandImageFilename
+      ? `rId${firstRelationshipNumber + chartItems.length}`
+      : ""
+    const drawingRelationships = chartRelationshipIds.map((relationshipId, index) => {
+      return `<Relationship Id="${relationshipId}" Type="${CHART_RELATIONSHIP_TYPE}" Target="../charts/chart${
+        index + 1
+      }.xml"/>`
     })
+
+    if (brandImageFilename) {
+      drawingRelationships.push(
+        `<Relationship Id="${brandImageRelationshipId}" Type="${IMAGE_RELATIONSHIP_TYPE}" Target="../media/${escapeXml(
+          brandImageFilename,
+        )}"/>`,
+      )
+      zip.file(`xl/media/${brandImageFilename}`, brandImageBase64, {
+        base64: true,
+      })
+    }
+
+    zip.file(
+      existingDrawing.relationshipsPath,
+      appendRelationships(drawingRelationshipsXml, drawingRelationships),
+    )
+
+    const frames = buildDrawingFrames(chartItems, {
+      brandImageRelationshipId,
+      brandImagePosition,
+      chartRelationshipIds,
+      chartStartRow,
+      startShapeId: getMaxDrawingShapeId(drawingXml) + 1,
+    })
+
+    zip.file(existingDrawing.path, drawingXml.replace("</xdr:wsDr>", `${frames}</xdr:wsDr>`))
+  } else {
+    const drawingRelationshipId = await addDrawingRelationship(zip, worksheetPath)
+
+    zip.file(
+      worksheetPath,
+      worksheetXml.replace(
+        "</worksheet>",
+        `<drawing r:id="${drawingRelationshipId}"/></worksheet>`,
+      ),
+    )
+
+    if (brandImageBase64) {
+      zip.file(`xl/media/${brandImageFilename}`, brandImageBase64, {
+        base64: true,
+      })
+    }
+
+    zip.file(
+      "xl/drawings/drawing1.xml",
+      buildDrawingXml(chartItems, {
+        brandImageRelationshipId: brandImageFilename ? `rId${chartItems.length + 1}` : "",
+        brandImagePosition,
+        chartStartRow,
+      }),
+    )
+
+    zip.file(
+      "xl/drawings/_rels/drawing1.xml.rels",
+      buildDrawingRelationshipsXml(chartItems.length, {
+        brandImageFilename,
+      }),
+    )
   }
-
-  zip.file(
-    "xl/drawings/drawing1.xml",
-    buildDrawingXml(chartItems, {
-      brandImageRelationshipId: brandImageFilename ? `rId${chartItems.length + 1}` : "",
-    }),
-  )
-
-  zip.file(
-    "xl/drawings/_rels/drawing1.xml.rels",
-    buildDrawingRelationshipsXml(chartItems.length, {
-      brandImageFilename,
-    }),
-  )
 
   chartItems.forEach((item, index) => {
     zip.file(

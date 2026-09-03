@@ -1,6 +1,7 @@
 import { computed, ref } from "vue"
 
 import { doesReportMatchEventRule } from "../../utils/reports/event-rules/reportEventRuleEngine.js"
+import { getAssetVehicleGroupIds } from "../../utils/reports/execution/assetReportVehicleGroupUtils.js"
 import {
   getActiveReportEventRulesSnapshot,
   getReportEventRulesByIdSnapshot,
@@ -99,20 +100,6 @@ const buildGeneratedReportEventId = ({ ruleId, report }) => {
     .join("|")
 }
 
-const getReportGroupId = ({ report = {}, asset = {} }) => {
-  return (
-    report.sucursalId ||
-    report.groupId ||
-    report.tagId ||
-    report.branchId ||
-    asset.sucursalId ||
-    asset.groupId ||
-    asset.tagId ||
-    asset.branchId ||
-    null
-  )
-}
-
 const getRuleAlertType = (rule = {}) => {
   const alertType = String(rule.alertType || rule.severity || "").trim()
 
@@ -152,15 +139,14 @@ const getRulesForRequestedIds = ({ rulesById, ruleIds = [] }) => {
 const buildGeneratedReportEvent = ({ rule, report, asset = {} }) => {
   const assetId = getReportAssetId(report)
   const timestamp = getReportTimestamp(report)
-  const groupId = getReportGroupId({ report, asset })
+  const vehicleGroupIds = getAssetVehicleGroupIds(asset)
+  const vehicleGroupId = vehicleGroupIds[0] || null
   const alertType = getRuleAlertType(rule)
   const notifications = getRuleNotifications(rule)
   const enrichedReport = {
     ...report,
-    sucursalId: report.sucursalId || groupId,
-    groupId: report.groupId || groupId,
-    tagId: report.tagId || asset.tagId || null,
-    branchId: report.branchId || asset.branchId || null,
+    vehicleGroupIds,
+    vehicleGroupId,
     event: rule.label,
     evento: rule.label,
     alerta: rule.label,
@@ -181,10 +167,8 @@ const buildGeneratedReportEvent = ({ rule, report, asset = {} }) => {
     timestamp,
     companyId: report.companyId || null,
     applicationId: report.applicationId || null,
-    sucursalId: groupId,
-    groupId,
-    tagId: enrichedReport.tagId || null,
-    branchId: enrichedReport.branchId || null,
+    vehicleGroupIds,
+    vehicleGroupId,
     alertType,
     severity: alertType,
     notifications,
@@ -424,38 +408,48 @@ const sortReportItemsOldestFirst = (reportItems = []) => {
   })
 }
 
-const getRuleGroupIds = (rule = {}) => {
-  return Array.isArray(rule.groupIds) ? rule.groupIds.map(normalizeId).filter(Boolean) : []
+const getRuleVehicleGroupIds = (rule = {}) => {
+  const sourceIds = Array.isArray(rule.vehicleGroupIds)
+    ? rule.vehicleGroupIds
+    : Array.isArray(rule.groupIds)
+      ? rule.groupIds
+      : []
+
+  return normalizeIdentityList(sourceIds)
 }
 
 const createRuleResolver = (rules = []) => {
   const globalRules = []
-  const rulesByGroupId = new Map()
+  const rulesByVehicleGroupId = new Map()
 
   rules.forEach((rule) => {
-    const groupIds = getRuleGroupIds(rule)
+    const vehicleGroupIds = getRuleVehicleGroupIds(rule)
 
-    if (!groupIds.length) {
+    if (!vehicleGroupIds.length) {
       globalRules.push(rule)
       return
     }
 
-    groupIds.forEach((groupId) => {
-      const groupedRules = rulesByGroupId.get(groupId) || []
+    vehicleGroupIds.forEach((vehicleGroupId) => {
+      const groupedRules = rulesByVehicleGroupId.get(vehicleGroupId) || []
 
       groupedRules.push(rule)
-      rulesByGroupId.set(groupId, groupedRules)
+      rulesByVehicleGroupId.set(vehicleGroupId, groupedRules)
     })
   })
 
-  return ({ report, asset }) => {
-    const groupId = normalizeId(getReportGroupId({ report, asset }))
+  return ({ asset }) => {
+    const vehicleGroupIds = getAssetVehicleGroupIds(asset)
 
-    if (!groupId) return globalRules
+    if (!vehicleGroupIds.length) return globalRules
 
-    const groupedRules = rulesByGroupId.get(groupId) || []
+    const matchedRules = vehicleGroupIds.flatMap((vehicleGroupId) => {
+      return rulesByVehicleGroupId.get(vehicleGroupId) || []
+    })
 
-    return groupedRules.length ? [...globalRules, ...groupedRules] : globalRules
+    if (!matchedRules.length) return globalRules
+
+    return [...globalRules, ...Array.from(new Set(matchedRules))]
   }
 }
 

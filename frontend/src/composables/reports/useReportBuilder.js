@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue"
 import {
   mockReportTemplates,
   REPORT_AVAILABLE_COLUMNS,
+  REPORT_AVAILABLE_FILTERS,
   REPORT_AVAILABLE_WIDGETS,
   REPORT_TEMPLATE_STATUS,
   REPORT_TEMPLATE_TYPES,
@@ -14,7 +15,10 @@ import { normalizeReportBehaviorOptions } from "../../utils/reports/config/repor
 import { normalizeReportOutputOptions } from "../../utils/reports/config/reportOutputOptions.js"
 import { useReportEventRules } from "./useReportEventRules.js"
 import { normalizeReportTemplateEventRuleIds } from "./useReportTemplates.js"
-import { REPORT_WIDGET_IDS, normalizeReportWidgets } from "../../utils/reports/config/reportWidgetUtils.js"
+import {
+  REPORT_WIDGET_IDS,
+  normalizeReportWidgets,
+} from "../../utils/reports/config/reportWidgetUtils.js"
 
 const cloneList = (list) => {
   return Array.isArray(list) ? [...list] : []
@@ -108,8 +112,13 @@ export function useReportBuilder() {
     return Array.from(availableEventRuleIds.value).sort().join("|")
   })
   const availableReportTypes = computed(() => REPORT_TYPE_OPTIONS)
+  const availableFilters = computed(() => REPORT_AVAILABLE_FILTERS)
   const availableColumns = computed(() => REPORT_AVAILABLE_COLUMNS)
   const availableWidgets = computed(() => REPORT_AVAILABLE_WIDGETS)
+
+  const selectedFiltersCount = computed(() => {
+    return reportDraft.value.filters.length
+  })
 
   const selectedColumnsCount = computed(() => {
     return reportDraft.value.columns.length
@@ -257,9 +266,11 @@ export function useReportBuilder() {
     reportDraft,
     availableReportTypes,
     availableEventRules,
+    availableFilters,
     availableColumns,
     availableWidgets,
     canSaveDraft,
+    selectedFiltersCount,
     selectedColumnsCount,
 
     setReportDraft,

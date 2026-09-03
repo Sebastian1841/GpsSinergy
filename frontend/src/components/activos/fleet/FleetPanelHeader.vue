@@ -91,7 +91,7 @@
       </div>
     </div>
 
-    <div v-if="showSearchActions" class="mt-3 flex items-center gap-2">
+    <div v-if="canShowSearchActions" class="mt-3 flex items-center gap-2">
       <div class="relative min-w-0 flex-1">
         <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
           <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" aria-hidden="true">
@@ -221,6 +221,10 @@ const props = defineProps({
     type: String,
     default: "",
   },
+  showSearchActions: {
+    type: Boolean,
+    default: true,
+  },
 })
 
 const emit = defineEmits([
@@ -259,8 +263,8 @@ const orderedSections = computed(() => {
   return sectionOrder.value.map((key) => sectionMap.get(key)).filter(Boolean)
 })
 
-const showSearchActions = computed(() => {
-  return !["itinerarios", "sucursales"].includes(props.activeSection)
+const canShowSearchActions = computed(() => {
+  return props.showSearchActions && props.activeSection !== "itinerarios"
 })
 
 const reorderSections = (fromKey, toKey) => {

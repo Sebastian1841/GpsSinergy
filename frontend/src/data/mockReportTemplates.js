@@ -214,6 +214,16 @@ export const REPORT_AVAILABLE_COLUMNS = [
     group: "Geocercas",
   },
   {
+    id: "geofenceEntryTime",
+    label: "Hora entrada",
+    group: "Geocercas",
+  },
+  {
+    id: "geofenceExitTime",
+    label: "Hora salida",
+    group: "Geocercas",
+  },
+  {
     id: "evento",
     label: "Evento",
     group: "Eventos",
@@ -580,6 +590,7 @@ export const mockReportTemplates = [
     type: REPORT_TEMPLATE_TYPES.DEFAULT,
     status: REPORT_TEMPLATE_STATUS.ACTIVE,
     isDefault: true,
+    presetVersion: 2,
     description: "Entradas, salidas y permanencia en zonas.",
     filters: ["dateRange", "asset", "geofence", "eventType"],
     columns: [
@@ -588,6 +599,8 @@ export const mockReportTemplates = [
       "patente",
       "vehiculo",
       "geocerca",
+      "geofenceEntryTime",
+      "geofenceExitTime",
       "evento",
       "duracion",
       "address",
@@ -627,7 +640,7 @@ export const mockReportTemplates = [
     isDefault: true,
     description: "Tiempos detenidos y permanencia por activo.",
     filters: ["dateRange", "asset", "driver", "assetStatus"],
-    columns: ["fecha", "timestamp", "patente", "duracion"],
+    columns: ["fecha", "timestamp", "patente", "duracion", "address", "lat", "lng"],
     widgets: ["summaryCards", "table"],
     createdAt: "2026-01-01T09:00:00.000Z",
     updatedAt: "2026-01-01T09:00:00.000Z",

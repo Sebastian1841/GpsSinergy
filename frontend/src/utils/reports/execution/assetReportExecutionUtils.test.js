@@ -6,7 +6,12 @@ import {
   createReportColumns,
   REPORT_REALTIME_COLUMN_KEYS,
 } from "../execution/assetReportExecutionUtils.js"
-import { createAssetReportExcelBuffer, exportAssetReportPdf } from "../export/assetReportExportUtils.js"
+import { getPdfHiddenReportColumns, getPdfVisibleReportColumns } from "./assetReportColumnUtils.js"
+import {
+  createAssetReportExcelBuffer,
+  exportAssetReportPdf,
+} from "../export/assetReportExportUtils.js"
+import { getRouteTripMapRoutes } from "../route-map/routeTripMapRouteUtils.js"
 
 test("asset report columns respect the selected template variables", () => {
   const reportColumns = createReportColumns({
@@ -20,6 +25,34 @@ test("asset report columns respect the selected template variables", () => {
   assert.equal(reportColumnKeys.includes("address"), false)
 })
 
+test("pdf report columns keep a compact readable subset", () => {
+  const reportColumns = createReportColumns({
+    columns: [
+      "patente",
+      "vehiculo",
+      "deviceId",
+      "conductor",
+      "estado",
+      "ultimoDato",
+      "velocidad",
+      "address",
+      "gpsSatellites",
+    ],
+  })
+  const visibleColumnKeys = getPdfVisibleReportColumns(reportColumns).map((column) => column.key)
+  const hiddenColumnKeys = getPdfHiddenReportColumns(reportColumns).map((column) => column.key)
+
+  assert.deepEqual(visibleColumnKeys, [
+    "fecha",
+    "patente",
+    "vehiculo",
+    "deviceId",
+    "conductor",
+    "estado",
+  ])
+  assert.deepEqual(hiddenColumnKeys, ["ultimoDato", "velocidad", "address", "gpsSatellites"])
+})
+
 test("idle-time report columns keep the operational ralenti fields", () => {
   const reportColumns = createReportColumns({
     reportTypeId: "idle-time",
@@ -28,7 +61,15 @@ test("idle-time report columns keep the operational ralenti fields", () => {
   })
   const reportColumnKeys = reportColumns.map((column) => column.key)
 
-  assert.deepEqual(reportColumnKeys, ["fecha", "timestamp", "patente", "duracion"])
+  assert.deepEqual(reportColumnKeys, [
+    "fecha",
+    "timestamp",
+    "patente",
+    "duracion",
+    "vehiculo",
+    "conductor",
+    "ultimoDato",
+  ])
 })
 
 test("custom ralenti report columns use the same operational fields", () => {
@@ -39,7 +80,15 @@ test("custom ralenti report columns use the same operational fields", () => {
   })
   const reportColumnKeys = reportColumns.map((column) => column.key)
 
-  assert.deepEqual(reportColumnKeys, ["fecha", "timestamp", "patente", "duracion"])
+  assert.deepEqual(reportColumnKeys, [
+    "fecha",
+    "timestamp",
+    "patente",
+    "duracion",
+    "vehiculo",
+    "conductor",
+    "ultimoDato",
+  ])
 })
 
 test("geofence reports use pass-through and dwell time columns", () => {
@@ -56,8 +105,11 @@ test("geofence reports use pass-through and dwell time columns", () => {
     "patente",
     "vehiculo",
     "geocerca",
+    "geofenceEntryTime",
+    "geofenceExitTime",
     "evento",
     "duracion",
+    "ultimoDato",
   ])
 })
 
@@ -149,7 +201,177 @@ test("reports that mix stops and ralenti use the same operational fields", () =>
   })
   const reportColumnKeys = reportColumns.map((column) => column.key)
 
-  assert.deepEqual(reportColumnKeys, ["fecha", "timestamp", "patente", "duracion"])
+  assert.deepEqual(reportColumnKeys, [
+    "fecha",
+    "timestamp",
+    "patente",
+    "duracion",
+    "address",
+    "lat",
+    "lng",
+    "vehiculo",
+    "conductor",
+    "ultimoDato",
+  ])
+})
+
+test("stops reports keep full route context and stop markers for the map", () => {
+  const asset = {
+    id: "asset-stop-1",
+    companyId: "company-1",
+    patente: "STOP-001",
+    nombrePantalla: "Camion detenciones",
+    estado: "moving",
+  }
+  const template = {
+    reportTypeId: "stops",
+    eventRuleIds: ["stops"],
+    columns: [],
+  }
+  const reports = [
+    {
+      id: "move-1",
+      assetId: "asset-stop-1",
+      timestamp: "2026-06-25T12:00:00.000Z",
+      speed: 34,
+      lat: -33.44,
+      lng: -70.66,
+      address: "Inicio ruta",
+    },
+    {
+      id: "stop-1",
+      assetId: "asset-stop-1",
+      timestamp: "2026-06-25T12:05:00.000Z",
+      speed: 0,
+      lat: -33.45,
+      lng: -70.67,
+      address: "Detencion en ruta",
+    },
+    {
+      id: "stop-2",
+      assetId: "asset-stop-1",
+      timestamp: "2026-06-25T12:06:00.000Z",
+      speed: 0,
+      lat: -33.45,
+      lng: -70.67,
+      address: "Detencion en ruta",
+    },
+    {
+      id: "move-2",
+      assetId: "asset-stop-1",
+      timestamp: "2026-06-25T12:10:00.000Z",
+      speed: 28,
+      lat: -33.46,
+      lng: -70.68,
+      address: "Fin ruta",
+    },
+  ]
+  const rows = buildAssetReportRows({
+    selectedAssets: [asset],
+    reportColumns: createReportColumns(template),
+    companyNameById: new Map([["company-1", "Nodus"]]),
+    dateFrom: "2026-06-25",
+    dateTo: "2026-06-25",
+    getReportsForAsset: () => reports,
+    template,
+    eventRulesById: new Map([
+      [
+        "stops",
+        {
+          id: "stops",
+          label: "Detencion",
+          active: true,
+          conditions: [
+            {
+              field: "speed",
+              operator: "equals",
+              value: "0",
+            },
+          ],
+        },
+      ],
+    ]),
+  })
+  const routes = getRouteTripMapRoutes(rows)
+
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].routeTrip.stopMarkerMode, true)
+  assert.equal(rows[0].routeTrip.points.length, 4)
+  assert.equal(rows[0].values.duracion, "5 min")
+  assert.equal(routes.length, 1)
+  assert.equal(routes[0].points.length, 4)
+  assert.equal(routes[0].stopMarkers.length, 1)
+  assert.equal(routes[0].stopMarkers[0].address, "Detencion en ruta")
+})
+
+test("stops reports ignore short telemetry stop pulses", () => {
+  const asset = {
+    id: "asset-stop-short",
+    companyId: "company-1",
+    patente: "STOP-002",
+    nombrePantalla: "Camion microdetenciones",
+    estado: "moving",
+  }
+  const template = {
+    reportTypeId: "stops",
+    eventRuleIds: ["stops"],
+    columns: [],
+  }
+  const reports = [
+    {
+      id: "move-1",
+      assetId: "asset-stop-short",
+      timestamp: "2026-06-25T12:00:00.000Z",
+      speed: 42,
+      lat: -33.44,
+      lng: -70.66,
+    },
+    {
+      id: "stop-short",
+      assetId: "asset-stop-short",
+      timestamp: "2026-06-25T12:00:05.000Z",
+      speed: 0,
+      lat: -33.4401,
+      lng: -70.6601,
+      address: "Microdetencion",
+    },
+    {
+      id: "move-2",
+      assetId: "asset-stop-short",
+      timestamp: "2026-06-25T12:00:10.000Z",
+      speed: 35,
+      lat: -33.441,
+      lng: -70.661,
+    },
+  ]
+  const rows = buildAssetReportRows({
+    selectedAssets: [asset],
+    reportColumns: createReportColumns(template),
+    companyNameById: new Map([["company-1", "Nodus"]]),
+    dateFrom: "2026-06-25",
+    dateTo: "2026-06-25",
+    getReportsForAsset: () => reports,
+    template,
+    eventRulesById: new Map([
+      [
+        "stops",
+        {
+          id: "stops",
+          label: "Detencion",
+          active: true,
+          conditions: [
+            {
+              field: "speed",
+              operator: "equals",
+              value: "0",
+            },
+          ],
+        },
+      ],
+    ]),
+  })
+
+  assert.equal(rows.length, 0)
 })
 
 test("asset reports include and format realtime GPS and CAN columns", () => {
@@ -1342,6 +1564,8 @@ test("geofence reports group consecutive positions and calculate dwell time", ()
   assert.equal(rows[0].report.id, "inside-start")
   assert.equal(rows[0].values.patente, "GEO-001")
   assert.equal(rows[0].values.geocerca, "PEAJE")
+  assert.equal(rows[0].values.geofenceEntryTime, "08:05:00")
+  assert.equal(rows[0].values.geofenceExitTime, "08:12:00")
   assert.equal(rows[0].values.evento, "Paso por geocerca")
   assert.equal(rows[0].values.duracion, "7 min")
 })
@@ -1624,7 +1848,7 @@ test("asset reports match ignition rules from boolean ignition values", () => {
   assert.equal(rows[0].values.ignition, "true")
 })
 
-test("asset reports respect event rules scoped to asset groups", () => {
+test("asset reports respect event rules scoped to vehicle groups", () => {
   const selectedAssets = [
     {
       id: "asset-1",
@@ -1632,7 +1856,10 @@ test("asset reports respect event rules scoped to asset groups", () => {
       patente: "GRP-001",
       nombrePantalla: "Activo grupo norte",
       estado: "moving",
-      sucursalId: "north",
+      vehicleGroupId: "north",
+      sucursalId: "legacy-south",
+      tagId: "legacy-tag",
+      branchId: "legacy-branch",
     },
     {
       id: "asset-2",
@@ -1640,7 +1867,10 @@ test("asset reports respect event rules scoped to asset groups", () => {
       patente: "GRP-002",
       nombrePantalla: "Activo grupo sur",
       estado: "moving",
-      sucursalId: "south",
+      vehicleGroupId: "south",
+      sucursalId: "north",
+      tagId: "north",
+      branchId: "north",
     },
   ]
   const template = {
@@ -1679,7 +1909,7 @@ test("asset reports respect event rules scoped to asset groups", () => {
           id: "movement",
           label: "Movimiento norte",
           active: true,
-          groupIds: ["north"],
+          vehicleGroupIds: ["north"],
           conditions: [
             {
               field: "speed",
@@ -1793,7 +2023,7 @@ test("asset reports do not mix idle telemetry into stop event rules", () => {
           lng: -70.66,
         },
         {
-          id: "stop-report",
+          id: "stop-report-start",
           assetId: "asset-1",
           timestamp: "2026-06-25T12:05:00.000Z",
           speed: 0,
@@ -1802,6 +2032,28 @@ test("asset reports do not mix idle telemetry into stop event rules", () => {
           evento: "Detencion",
           lat: -33.45,
           lng: -70.67,
+        },
+        {
+          id: "stop-report-end",
+          assetId: "asset-1",
+          timestamp: "2026-06-25T12:06:00.000Z",
+          speed: 0,
+          ignition: false,
+          estado: "stopped",
+          evento: "Detencion",
+          lat: -33.45,
+          lng: -70.67,
+        },
+        {
+          id: "moving-report",
+          assetId: "asset-1",
+          timestamp: "2026-06-25T12:07:00.000Z",
+          speed: 20,
+          ignition: true,
+          estado: "moving",
+          evento: "Movimiento",
+          lat: -33.46,
+          lng: -70.68,
         },
       ],
     ],
@@ -1835,8 +2087,9 @@ test("asset reports do not mix idle telemetry into stop event rules", () => {
   })
 
   assert.equal(rows.length, 1)
-  assert.equal(rows[0].report.id, "stop-report")
+  assert.equal(rows[0].report.id, "stop-report-start")
   assert.equal(rows[0].values.evento, "Detenciones")
+  assert.equal(rows[0].report.duracion, "2 min")
 })
 
 test("asset reports apply the default idle rule to ralenti events", () => {
@@ -2516,6 +2769,7 @@ test("asset report Excel exports a dashboard and a complete data sheet", async (
   const zip = await JSZip.loadAsync(buffer)
   const workbookXml = await zip.file("xl/workbook.xml").async("string")
   const dashboardSheetXml = await zip.file("xl/worksheets/sheet1.xml").async("string")
+  const drawingXml = await zip.file("xl/drawings/drawing1.xml").async("string")
   const detailSheetXml = await zip.file("xl/worksheets/sheet2.xml").async("string")
   const dataSheetXml = await zip.file("xl/worksheets/sheet5.xml").async("string")
   const chartXml = await zip.file("xl/charts/chart1.xml").async("string")
@@ -2534,13 +2788,20 @@ test("asset report Excel exports a dashboard and a complete data sheet", async (
   assert.match(workbookXml, /name="Activos"/)
   assert.match(workbookXml, /name="DatosGraficos"/)
   assert.match(workbookXml, /name="Datos reporte"/)
-  assert.doesNotMatch(dashboardSheetXml, /<autoFilter ref="A35:F35"/)
-  assert.match(dashboardSheetXml, /<mergeCell ref="A35:C35"\/>/)
-  assert.match(dashboardSheetXml, /<mergeCell ref="L35:M35"\/>/)
+  assert.match(dashboardSheetXml, /<dimension ref="B1:N44"/)
+  assert.doesNotMatch(dashboardSheetXml, /<autoFilter /)
+  assert.match(dashboardSheetXml, /<mergeCell ref="B42:D42"\/>/)
+  assert.match(dashboardSheetXml, /<mergeCell ref="M42:N42"\/>/)
   assert.match(detailSheetXml, /<autoFilter ref="A5:F5"/)
   assert.match(dataSheetXml, /<autoFilter ref="A5:E5"/)
   assert.doesNotMatch(dashboardSheetXml, /<pane /)
   assert.match(chartXml, /<c:barChart>/)
+  assert.match(drawingXml, /Grafico de RPM/)
+  assert.match(
+    drawingXml,
+    /<xdr:oneCellAnchor><xdr:from><xdr:col>2<\/xdr:col><xdr:colOff>0<\/xdr:colOff><xdr:row>14<\/xdr:row>[\s\S]*?Grafico de RPM/,
+  )
+  assert.doesNotMatch(drawingXml, /<xdr:row>7<\/xdr:row>[\s\S]*?Grafico de RPM/)
   assert.match(sharedStringsXml, /Detalle GPS/)
   assert.match(sharedStringsXml, /Dispositivo/)
   assert.doesNotMatch(sharedStringsXml, /Direccion/)
@@ -2548,6 +2809,8 @@ test("asset report Excel exports a dashboard and a complete data sheet", async (
   assert.doesNotMatch(sharedStringsXml, /Av\. Exportacion 200/)
   assert.doesNotMatch(sharedStringsXml, /Cons\. L\/h/)
   assert.doesNotMatch(sharedStringsXml, /Pres\. aceite/)
+  assert.equal(dataSheet.getCell("A1").fill.fgColor.argb, "FFFFFFFF")
+  assert.equal(dataSheet.getCell("A1").font.color.argb, "FF102372")
   assert.equal(dataSheet.getRow(6).getCell(deviceColumnIndex).value, "DEV-100")
   assert.equal(dataSheet.getRow(7).getCell(deviceColumnIndex).value, "DEV-200")
   assert.equal(dataSheet.getRow(6).getCell("E").value, "ultimoDato")
@@ -2684,4 +2947,83 @@ test("asset report PDF without charts keeps content below summary cards", async 
       return placement.value === "Activos incluidos" && placement.y >= 80
     }),
   )
+})
+
+test("asset report PDF keeps compacted columns in an additional detail table", async () => {
+  const { jsPDF } = await import("jspdf")
+  const originalAddImage = jsPDF.API.addImage
+  const originalSave = jsPDF.API.save
+  const originalText = jsPDF.API.text
+  const textPlacements = []
+  const reportColumns = createReportColumns({
+    columns: [
+      "patente",
+      "vehiculo",
+      "deviceId",
+      "conductor",
+      "estado",
+      "ultimoDato",
+      "velocidad",
+      "address",
+      "gpsSatellites",
+    ],
+  })
+  const values = Object.fromEntries(reportColumns.map((column) => [column.key, column.key]))
+
+  jsPDF.API.addImage = function addImage() {
+    return this
+  }
+
+  jsPDF.API.text = function text(...args) {
+    const [value] = args
+
+    textPlacements.push(Array.isArray(value) ? value.join(" ") : String(value))
+
+    if (typeof originalText === "function") {
+      return originalText.apply(this, args)
+    }
+
+    return this
+  }
+
+  jsPDF.API.save = function save() {
+    return this
+  }
+
+  try {
+    await exportAssetReportPdf({
+      template: {
+        name: "Reporte compacto",
+        description: "Reporte con muchas columnas",
+      },
+      reportColumns,
+      reportRows: [
+        {
+          id: "row-1",
+          asset: {
+            estado: "moving",
+          },
+          values: {
+            ...values,
+            patente: "CNRT-10",
+            vehiculo: "Camion tolva",
+          },
+        },
+      ],
+      charts: {
+        enabled: false,
+      },
+    })
+  } finally {
+    jsPDF.API.addImage = originalAddImage
+    jsPDF.API.text = originalText
+    jsPDF.API.save = originalSave
+  }
+
+  assert.ok(
+    textPlacements.some((value) => {
+      return value.includes("4 columnas adicionales se agregan en Detalle adicional")
+    }),
+  )
+  assert.ok(textPlacements.includes("Detalle adicional"))
 })

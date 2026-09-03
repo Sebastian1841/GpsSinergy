@@ -8,6 +8,7 @@ import {
   fleetTrackerModelOptions,
 } from "../../../utils/activos/fleetAssetFormUtils.js"
 import { getAssetTypeMapIcon, getAssetTypeOption } from "../../../utils/activos/assetTypeOptions.js"
+import { getOperationalProfile } from "../../../utils/activos/operationalProfileOptions.js"
 import { useFleetFormWizard } from "./useFleetFormWizard.js"
 
 export function useFleetCreateForm({ props, emit }) {
@@ -25,7 +26,16 @@ export function useFleetCreateForm({ props, emit }) {
     resetWizard,
   } = useFleetFormWizard(steps)
 
-  const form = ref(createEmptyFleetCreateForm())
+  const createFormState = () => {
+    const emptyForm = createEmptyFleetCreateForm()
+
+    return {
+      ...emptyForm,
+      assetTagIds: Array.isArray(emptyForm.assetTagIds) ? [...emptyForm.assetTagIds] : [],
+    }
+  }
+
+  const form = ref(createFormState())
 
   const selectedTrackerModel = computed(() => {
     return trackerModelOptions.find((option) => option.value === form.value.trackerModel) || null
@@ -41,17 +51,38 @@ export function useFleetCreateForm({ props, emit }) {
     return getAssetTypeOption(form.value.assetType || form.value.mapIcon)
   })
 
-  const activeGroupOptions = computed(() => {
-    return (props.groups || []).filter((group) => group.active !== false)
+  const selectedOperationalProfile = computed(() => {
+    return getOperationalProfile(selectedAssetType.value?.value)
   })
 
-  const selectedGroupLabel = computed(() => {
-    if (!form.value.sucursalId) return "Sin grupo"
+  const activeAssetTagOptions = computed(() => {
+    return (props.assetTags || []).filter((tag) => tag.active !== false)
+  })
 
-    return (
-      activeGroupOptions.value.find((group) => String(group.id) === String(form.value.sucursalId))
-        ?.name || "Sin grupo"
-    )
+  const selectedAssetTagIds = computed(() => {
+    if (!Array.isArray(form.value.assetTagIds)) return []
+
+    return form.value.assetTagIds.map((tagId) => String(tagId))
+  })
+
+  const selectedAssetTags = computed(() => {
+    const selectedIds = new Set(selectedAssetTagIds.value)
+
+    return activeAssetTagOptions.value.filter((tag) => {
+      return selectedIds.has(String(tag.id))
+    })
+  })
+
+  const selectedAssetTagNames = computed(() => {
+    return selectedAssetTags.value.map((tag) => tag.name)
+  })
+
+  const selectedAssetTagLabel = computed(() => {
+    if (!selectedAssetTagNames.value.length) {
+      return "Sin etiquetas"
+    }
+
+    return selectedAssetTagNames.value.join(" · ")
   })
 
   const isAssetStepValid = computed(() => {
@@ -87,8 +118,12 @@ export function useFleetCreateForm({ props, emit }) {
       value: selectedAssetType.value?.label,
     },
     {
-      label: "Grupo",
-      value: selectedGroupLabel.value,
+      label: "Perfil",
+      value: selectedOperationalProfile.value?.label,
+    },
+    {
+      label: "Etiquetas",
+      value: selectedAssetTagLabel.value,
     },
     {
       label: "Modelo",
@@ -100,7 +135,7 @@ export function useFleetCreateForm({ props, emit }) {
     },
     {
       label: "Protocolo",
-      value: form.value.protocol.toUpperCase(),
+      value: form.value.protocol?.toUpperCase() || "",
     },
     {
       label: "Ingreso",
@@ -114,7 +149,7 @@ export function useFleetCreateForm({ props, emit }) {
 
   const resetModal = () => {
     resetWizard()
-    form.value = createEmptyFleetCreateForm()
+    form.value = createFormState()
   }
 
   watch(
@@ -133,25 +168,45 @@ export function useFleetCreateForm({ props, emit }) {
     },
   )
 
-  watch(activeGroupOptions, (groups) => {
-    if (!form.value.sucursalId) return
+  watch(
+    activeAssetTagOptions,
+    (tags) => {
+      if (!Array.isArray(form.value.assetTagIds)) {
+        form.value.assetTagIds = []
+        return
+      }
 
-    const groupExists = groups.some((group) => String(group.id) === String(form.value.sucursalId))
+      const validTagIds = new Set(tags.map((tag) => String(tag.id)))
 
-    if (!groupExists) {
-      form.value.sucursalId = ""
-    }
-  })
+      form.value.assetTagIds = form.value.assetTagIds.filter((tagId) => {
+        return validTagIds.has(String(tagId))
+      })
+    },
+    {
+      deep: true,
+    },
+  )
 
   const isStepCompleted = (index) => {
-    if (index === 0) return isAssetStepValid.value
-    if (index === 1) return isDeviceStepValid.value
+    if (index === 0) {
+      return isAssetStepValid.value
+    }
+
+    if (index === 1) {
+      return selectedAssetTagIds.value.length > 0
+    }
+
     if (index === 2) {
+      return isDeviceStepValid.value
+    }
+
+    if (index === 3) {
       return Boolean(
         form.value.entryDate || form.value.deactivationDate || form.value.suspensionDate,
       )
     }
-    if (index === 3) {
+
+    if (index === 4) {
       return Boolean(form.value.dailyHourmeter || form.value.totalHourmeter || form.value.odometer)
     }
 
@@ -189,21 +244,32 @@ export function useFleetCreateForm({ props, emit }) {
     steps,
     trackerModelOptions,
     assetTypeOptions,
+
     currentStep,
     currentStepConfig,
     progressWidth,
+
     goToStep,
     nextStep,
     previousStep,
+
     form,
+
     selectedTrackerModel,
     selectedTrackerModelLabel,
     selectedAssetType,
-    activeGroupOptions,
-    selectedGroupLabel,
+    selectedOperationalProfile,
+
+    activeAssetTagOptions,
+    selectedAssetTagIds,
+    selectedAssetTags,
+    selectedAssetTagNames,
+    selectedAssetTagLabel,
+
     canSaveActivo,
     requiredStatus,
     summaryItems,
+
     isStepCompleted,
     closeModal,
     selectAssetType,

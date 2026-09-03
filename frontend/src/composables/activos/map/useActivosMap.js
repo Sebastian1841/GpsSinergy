@@ -55,6 +55,25 @@ const MAP_TILE_LAYERS = {
   },
 }
 
+const requestMapWorkFrame = (callback) => {
+  if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+    return window.requestAnimationFrame(callback)
+  }
+
+  return setTimeout(callback, 16)
+}
+
+const cancelMapWorkFrame = (frameId) => {
+  if (frameId === null || frameId === undefined) return
+
+  if (typeof window !== "undefined" && typeof window.cancelAnimationFrame === "function") {
+    window.cancelAnimationFrame(frameId)
+    return
+  }
+
+  clearTimeout(frameId)
+}
+
 const buildItineraryFitKey = (route) => {
   if (!route) return ""
 
@@ -129,6 +148,9 @@ export function useActivosMap({ props, emit, mapRef }) {
   let itineraryRenderer = null
   let lastItineraryFitKey = ""
   let needsTileLayerRefresh = false
+  let markerSyncFrame = null
+  let markerRefreshFrame = null
+  let pendingMarkerSyncOptions = null
 
   const layers = {
     markerLayer: null,
@@ -354,10 +376,67 @@ export function useActivosMap({ props, emit, mapRef }) {
     layers,
   })
 
+  const cancelScheduledMarkerRefresh = () => {
+    if (markerRefreshFrame === null || markerRefreshFrame === undefined) return
+
+    cancelMapWorkFrame(markerRefreshFrame)
+    markerRefreshFrame = null
+  }
+
+  const cancelScheduledMarkerSync = () => {
+    if (markerSyncFrame === null || markerSyncFrame === undefined) return
+
+    cancelMapWorkFrame(markerSyncFrame)
+    markerSyncFrame = null
+    pendingMarkerSyncOptions = null
+  }
+
+  const scheduleActivoMarkerSync = ({ fit = false, trackTrail = false } = {}) => {
+    if (isBackgroundPaused()) return
+
+    cancelScheduledMarkerRefresh()
+
+    pendingMarkerSyncOptions = {
+      fit: Boolean(pendingMarkerSyncOptions?.fit || fit),
+      trackTrail: Boolean(pendingMarkerSyncOptions?.trackTrail || trackTrail),
+    }
+
+    if (markerSyncFrame !== null && markerSyncFrame !== undefined) return
+
+    markerSyncFrame = requestMapWorkFrame(() => {
+      markerSyncFrame = null
+
+      const syncOptions = pendingMarkerSyncOptions || {
+        fit: false,
+        trackTrail: false,
+      }
+
+      pendingMarkerSyncOptions = null
+
+      if (isBackgroundPaused()) return
+
+      assetMarkers.syncActivoMarkers(props.activos, syncOptions)
+    })
+  }
+
+  const scheduleActivoMarkerRefresh = () => {
+    if (isBackgroundPaused()) return
+    if (markerSyncFrame !== null && markerSyncFrame !== undefined) return
+    if (markerRefreshFrame !== null && markerRefreshFrame !== undefined) return
+
+    markerRefreshFrame = requestMapWorkFrame(() => {
+      markerRefreshFrame = null
+
+      if (isBackgroundPaused()) return
+
+      assetMarkers.refreshActivoMarkers()
+    })
+  }
+
   const handleMapZoomEnd = () => {
     if (isBackgroundPaused()) return
 
-    assetMarkers.refreshActivoMarkers()
+    scheduleActivoMarkerRefresh()
     itineraryMap.renderItineraryRoute()
   }
 
@@ -367,7 +446,7 @@ export function useActivosMap({ props, emit, mapRef }) {
     setLayerGroupVisibility(layers.movementTrailLayer, true)
     setLayerGroupVisibility(layers.itineraryLayer, true)
 
-    assetMarkers.refreshActivoMarkers()
+    scheduleActivoMarkerRefresh()
     itineraryMap.renderItineraryRoute()
   }
 
@@ -465,6 +544,8 @@ export function useActivosMap({ props, emit, mapRef }) {
       map.off("moveend", handleMapMoveEnd)
     }
 
+    cancelScheduledMarkerSync()
+    cancelScheduledMarkerRefresh()
     assetMarkers.clearMarkerCache()
     movementTrails.cleanupMovementTrails()
     geofenceMap.cancelAll()
@@ -513,7 +594,7 @@ export function useActivosMap({ props, emit, mapRef }) {
   watch(activosMarkerMetadataSignature, () => {
     if (isBackgroundPaused()) return
 
-    assetMarkers.syncActivoMarkers(props.activos, {
+    scheduleActivoMarkerSync({
       fit: false,
       trackTrail: false,
     })
@@ -522,7 +603,7 @@ export function useActivosMap({ props, emit, mapRef }) {
   watch(focusedRouteActivoSignature, () => {
     if (isBackgroundPaused()) return
 
-    assetMarkers.syncActivoMarkers(props.activos, {
+    scheduleActivoMarkerSync({
       fit: false,
       trackTrail: false,
     })
@@ -555,7 +636,7 @@ export function useActivosMap({ props, emit, mapRef }) {
       if (isBackgroundPaused()) return
 
       geofenceMap.syncAndRenderGeofences()
-      assetMarkers.refreshActivoMarkers()
+      scheduleActivoMarkerRefresh()
     },
   )
 

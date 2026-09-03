@@ -109,6 +109,14 @@ export const isRouteHistoryReport = (template = {}) => {
   return normalizeEmptyReportKey(template?.reportTypeId) === "route-history"
 }
 
+export const isStopsReport = (template = {}) => {
+  return normalizeEmptyReportKey(template?.reportTypeId) === "stops"
+}
+
+export const isRouteMapReport = (template = {}) => {
+  return isRouteHistoryReport(template) || isStopsReport(template)
+}
+
 export const getReportBusyTitle = ({ isExportingExcel = false, isExportingPdf = false } = {}) => {
   if (isExportingExcel) return "Exportando Excel"
   if (isExportingPdf) return "Exportando PDF"

@@ -106,10 +106,10 @@ const stats = computed(() => [
   },
   {
     label: "Detenidos",
-    shortLabel: "Stop",
+    shortLabel: "Detenido",
     value: statsCount.value.stopped,
-    dot: "bg-red-500",
-    valueClass: "text-red-500",
+    dot: "bg-[#ff6600]",
+    valueClass: "text-[#ff6600]",
     filter: "stopped",
   },
   {

@@ -7,7 +7,10 @@ export const REPORT_BRAND = {
   muted: "#64748b",
 }
 
-const REPORT_BRAND_IMAGE_URL = new URL("../../../assets/branding/sinergy-group.png", import.meta.url)
+const REPORT_BRAND_IMAGE_URL = new URL(
+  "../../../assets/branding/sinergy-group-report.png",
+  import.meta.url,
+)
 
 let cachedBrandImageDataUrlPromise = null
 

@@ -12,24 +12,25 @@
           :activos="personalFilteredActivos"
           :all-activos="personalTableActivos"
           :company-id="activeCompanyId"
+          :asset-tags="activeAssetTags"
           :itinerary-activos="normalizedActivos"
           :geofences="permittedGeofences"
+          :geofence-groups="geofenceGroups"
           :selected-geofence-id="selectedGeofenceId"
           :selected-id="selectedId"
           :active-filter="statusFilter"
           :active-section="activeSidebarSection"
           :search="sidebarSearch"
-          :empresa-sucursales="empresaSucursales"
-          :sucursal-companies="sucursalCompanies"
-          :selected-sucursal-company-id="selectedSucursalCompanyId"
-          :show-sucursal-company-selector="false"
           :allowed-sections="allowedSidebarSections"
           :can-manage-assets="canManageAssets"
           :can-create-assets="canCreateAssets"
+          :can-view-itineraries="canViewItineraries"
+          :can-view-maintenance="canViewMaintenance"
+          :has-active-daily-summary="hasActiveDailySummary"
           :can-edit-geofences="canEditGeofences"
-          :can-manage-sucursales="canManageSucursales"
           :use-geofence-location-address="useGeofenceLocationAddress"
           :column-preferences="fleetTableColumnPreferences"
+          :itinerary-context-request="itineraryContextRequest"
           class="min-h-0 flex-1"
           @select="selectActivo"
           @select-filter="setStatusFilter"
@@ -37,20 +38,23 @@
           @update:active-section="setSidebarSection"
           @route-selected="handleItineraryRouteSelected"
           @point-selected="handleItineraryPointSelected"
-          @clear-route="handleClearItineraryRoute"
+          @clear-route="handleClearItineraryRouteState"
           @open-add-activo="openAddActivoModal"
           @device-action="handleDeviceAction"
           @geofence-selected="handleSidebarGeofenceSelected"
           @geofence-edit="handleSidebarGeofenceEdit"
           @geofence-delete="handleGeofenceDeleted"
+          @geofence-export="handleGeofenceExported"
+          @geofence-import="handleGeofencesImported"
+          @geofence-group-create="handleGeofenceGroupCreated"
+          @geofence-group-delete="handleGeofenceGroupDeleted"
+          @geofence-group-rename="handleGeofenceGroupRenamed"
+          @asset-tag-create="handleAssetTagCreate"
+          @asset-tag-update="handleAssetTagUpdate"
+          @asset-tag-delete="handleAssetTagDelete"
           @update:use-geofence-location-address="setUseGeofenceLocationAddress"
-          @select-sucursal-company="selectSucursalCompany"
-          @alternar-sucursales-habilitadas="handleAlternarSucursalesFlotaHabilitadas"
-          @agregar-sucursal="handleAgregarSucursalFlota"
-          @actualizar-nombre-sucursal="handleActualizarNombreSucursalFlota"
-          @alternar-estado-sucursal="handleAlternarEstadoSucursalFlota"
-          @eliminar-sucursal="handleEliminarSucursalFlota"
-          @select-personal-asset-group="selectPersonalAssetGroup"
+          @select-city-asset-group="selectCityAssetGroup"
+          @select-vehicle-asset-group="selectVehicleAssetGroup"
           @update:column-preferences="setFleetTableColumnPreferences"
         />
       </div>
@@ -81,6 +85,7 @@
             :selected-id="selectedId"
             :selected-geofence-id="selectedGeofenceId"
             :geofences="permittedGeofences"
+            :geofence-groups="geofenceGroups"
             :itinerary-route="selectedItineraryRoute"
             :selected-itinerary-point="selectedItineraryPoint"
             :active-filter="statusFilter"
@@ -96,6 +101,7 @@
             @geofence-updated="handleGeofenceUpdated"
             @geofence-deleted="handleGeofenceDeleted"
             @clear-geofence-selection="handleClearGeofenceSelection"
+            @open-geofence-section="setSidebarSection('geocercas')"
           />
         </div>
       </div>
@@ -104,7 +110,7 @@
     <AddActivoModal
       v-if="showActivoModal || hasMountedActivoModal"
       v-model="showActivoModal"
-      :groups="assetCreationGroups"
+      :asset-tags="activeAssetTags"
       @add-activo="handleAddActivo"
     />
 
@@ -112,7 +118,7 @@
       v-if="showEditActivoModal || hasMountedEditActivoModal"
       v-model="showEditActivoModal"
       :activo="editingActivo"
-      :groups="assetCreationGroups"
+      :asset-tags="activeAssetTags"
       @update-activo="handleUpdateActivo"
     />
 
@@ -139,8 +145,8 @@
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue"
-import { useRoute } from "vue-router"
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, watch } from "vue"
+import { useRoute, useRouter } from "vue-router"
 
 import { normalizeId } from "../utils/idUtils.js"
 
@@ -149,27 +155,33 @@ import ConfirmDialog from "../components/ui/ConfirmDialog.vue"
 
 import { useFleetTerminal } from "../composables/activos/fleet/useFleetTerminal"
 import { useFleetTelemetry } from "../composables/activos/fleet/useFleetTelemetry.js"
-import { useSucursalesFlota } from "../composables/activos/fleet/useSucursalesFlota.js"
 import { useGeofences } from "../composables/activos/geocercas/useGeofences.js"
 import { useAuditTrail } from "../composables/audit/useAuditTrail.js"
 import { useConfirmDialog } from "../composables/ui/useConfirmDialog.js"
 import { usePersistedFleetLayout } from "../composables/activos/fleet/usePersistedFleetLayout.js"
 import { useAccessControl } from "../composables/auth/useAccessControl.js"
 import { useAuthSession } from "../composables/auth/useAuthSession.js"
+import { useMockDatabase } from "../composables/mock/useMockDatabase.js"
 import { useActivosService } from "../services/activos/useActivosService.js"
 
 import { useActivosCrud } from "../composables/activos/view/useActivosCrud.js"
+import { useActivosDeviceActions } from "../composables/activos/view/useActivosDeviceActions.js"
 import { useActivosFilters } from "../composables/activos/view/useActivosFilters.js"
 import { useActivosFleetModals } from "../composables/activos/view/useActivosFleetModals.js"
+import { useActivosGeofenceActions } from "../composables/activos/view/useActivosGeofenceActions.js"
 import { useActivosLayout } from "../composables/activos/view/useActivosLayout.js"
+import { useActivosMapTelemetryBridge } from "../composables/activos/view/useActivosMapTelemetryBridge.js"
 import { useActivosPermissions } from "../composables/activos/view/useActivosPermissions.js"
 import { useActivosSelection } from "../composables/activos/view/useActivosSelection.js"
 import { useActivosTelemetrySync } from "../composables/activos/view/useActivosTelemetrySync.js"
 import { useActivosWorkspacePersistence } from "../composables/activos/view/useActivosWorkspacePersistence.js"
-import { usePersonalAssetGroups } from "../composables/activos/fleet/usePersonalAssetGroups.js"
+import { useAssetCityFilter } from "../composables/activos/fleet/useAssetCityFilter.js"
+import { useAssetVehicleGroupFilter } from "../composables/activos/fleet/useAssetVehicleGroupFilter.js"
+import { useAssetVehicleGroupManagement } from "../composables/activos/fleet/useAssetVehicleGroupManagement.js"
 import { useRouteComparisonUiState } from "../composables/activos/routes/useRouteComparisonUiState.js"
 import { useWorkspaceViewState } from "../composables/workspaces/useWorkspaceViewState.js"
 import { createCityAssetGroups } from "../utils/activos/assetCityUtils.js"
+import { createVehicleAssetGroups } from "../utils/activos/assetVehicleGroupUtils.js"
 
 const ActivosMapPanel = defineAsyncComponent(
   () => import("../components/activos/map/ActivosMapPanel.vue"),
@@ -183,9 +195,17 @@ const props = defineProps({
 })
 
 const route = useRoute()
+const router = useRouter()
 const { currentUser } = useAuthSession()
-const { accessibleCompanies, visibleAssets, canAccessFunction } = useAccessControl()
+const { visibleAssets, canAccessFunction } = useAccessControl()
 const { isRouteComparisonModalOpen } = useRouteComparisonUiState()
+
+const {
+  assetTags,
+  createAssetTag,
+  updateAssetTag,
+  deleteAssetTag,
+} = useMockDatabase()
 
 const MOCK_TELEMETRY_ENABLED =
   import.meta.env.DEV && import.meta.env.VITE_MOCK_TELEMETRY !== "false"
@@ -201,6 +221,27 @@ const {
 } = useActivosService()
 
 const activeCompanyId = computed(() => String(route.params.empresaId || ""))
+
+const activeAssetTags = computed(() => {
+  if (!activeCompanyId.value) return []
+
+  return assetTags.value.filter((tag) => {
+    return String(tag.companyId) === activeCompanyId.value && tag.active !== false
+  })
+})
+
+const baseMockActivos = computed(() => {
+  if (!activeCompanyId.value) return []
+
+  return visibleAssets.value.filter((activo) => {
+    return String(activo.companyId) === activeCompanyId.value
+  })
+})
+
+const getRouteSelectedActivoId = () => {
+  return normalizeId(route.query.activoId || route.query.assetId || route.query.asset)
+}
+
 const { recordAudit } = useAuditTrail({
   companyId: activeCompanyId,
 })
@@ -216,68 +257,186 @@ const getActivoAuditName = (activo = {}) => {
   )
 }
 
-const getGeofenceAuditName = (geofence = {}) => {
-  return geofence.name || geofence.nombre || geofence.id || "Geocerca"
-}
-
 const {
   allowedSidebarSections,
   canCreateAssets,
   canEditGeofences,
   canManageAssets,
-  canManageSucursales,
+  canManageAssetTags,
   canViewGeofences,
   canViewGps,
+  canViewItineraries,
+  canViewMaintenance,
 } = useActivosPermissions({
   activeCompanyId,
   canAccessFunction,
 })
 
-const sucursalCompanies = computed(() => {
-  return accessibleCompanies.value.map((company) => ({
-    id: String(company.id),
-    name: company.name,
-  }))
-})
+const normalizeAssetTagIds = (assetTagIds = []) => {
+  if (!Array.isArray(assetTagIds)) return []
 
-const selectedSucursalCompanyId = ref("")
+  return [
+    ...new Set(
+      assetTagIds
+        .map((assetTagId) => {
+          return String(assetTagId ?? "").trim()
+        })
+        .filter(Boolean),
+    ),
+  ]
+}
 
-watch(
-  [activeCompanyId, sucursalCompanies],
-  ([routeCompanyId, companies]) => {
-    if (routeCompanyId) {
-      selectedSucursalCompanyId.value = routeCompanyId
-      return
+const normalizeAssetIds = (assetIds = []) => {
+  if (!Array.isArray(assetIds)) return []
+
+  return [
+    ...new Set(
+      assetIds
+        .map((assetId) => {
+          return normalizeId(assetId)
+        })
+        .filter(Boolean),
+    ),
+  ]
+}
+
+const syncAssetTagAssignments = (assetTagId, selectedAssetIds = []) => {
+  const normalizedAssetTagId = String(assetTagId ?? "").trim()
+
+  if (!normalizedAssetTagId) {
+    return {
+      updatedAssetIds: [],
+      assignedAssetIds: [],
     }
+  }
 
-    const selectionExists = companies.some((company) => {
-      return company.id === selectedSucursalCompanyId.value
+  const selectedAssetIdSet = new Set(normalizeAssetIds(selectedAssetIds))
+  const updatedAssetIds = []
+
+  baseMockActivos.value.forEach((activo) => {
+    const activoId = normalizeId(activo?.id)
+
+    if (!activoId) return
+
+    const currentAssetTagIds = normalizeAssetTagIds(activo.assetTagIds)
+    const hasAssetTag = currentAssetTagIds.includes(normalizedAssetTagId)
+    const shouldHaveAssetTag = selectedAssetIdSet.has(activoId)
+
+    if (hasAssetTag === shouldHaveAssetTag) return
+
+    const nextAssetTagIds = shouldHaveAssetTag
+      ? normalizeAssetTagIds([...currentAssetTagIds, normalizedAssetTagId])
+      : currentAssetTagIds.filter((currentAssetTagId) => {
+          return currentAssetTagId !== normalizedAssetTagId
+        })
+
+    const updatedActivo = updateActivoRecord(activo.id, {
+      assetTagIds: nextAssetTagIds,
     })
 
-    if (!selectionExists) {
-      selectedSucursalCompanyId.value = companies[0]?.id || ""
+    if (updatedActivo) {
+      updatedAssetIds.push(activoId)
     }
-  },
-  { immediate: true },
-)
-
-const selectSucursalCompany = (companyId) => {
-  const exists = sucursalCompanies.value.some((company) => {
-    return company.id === String(companyId)
   })
 
-  if (exists) {
-    selectedSucursalCompanyId.value = String(companyId)
+  return {
+    updatedAssetIds,
+    assignedAssetIds: Array.from(selectedAssetIdSet),
   }
 }
 
-const baseMockActivos = computed(() => {
-  if (!activeCompanyId.value) return []
+const handleAssetTagCreate = (payload = {}) => {
+  if (!canManageAssetTags.value || !activeCompanyId.value) return
 
-  return visibleAssets.value.filter((activo) => {
-    return String(activo.companyId) === activeCompanyId.value
+  const name = String(payload.name || "").trim()
+
+  if (!name) return
+
+  const { assetIds = [], ...assetTagPayload } = payload
+
+  const createdTag = createAssetTag({
+    ...assetTagPayload,
+    companyId: activeCompanyId.value,
+    name,
   })
-})
+
+  if (!createdTag) return
+
+  const assignmentResult = syncAssetTagAssignments(createdTag.id, assetIds)
+
+  recordAudit({
+    module: "activos",
+    action: "asset-tag:create",
+    entityType: "asset-tag",
+    entityName: createdTag.name,
+    description: "Se creo una etiqueta de activos.",
+    metadata: {
+      assetTagId: createdTag.id,
+      assignedAssetIds: assignmentResult.assignedAssetIds,
+      updatedAssetIds: assignmentResult.updatedAssetIds,
+    },
+  })
+}
+
+const handleAssetTagUpdate = (payload = {}) => {
+  if (!canManageAssetTags.value) return
+
+  const assetTagId = payload.id
+
+  if (assetTagId === null || assetTagId === undefined) return
+
+  const updatedTag = updateAssetTag(assetTagId, payload.changes || {})
+
+  if (!updatedTag) return
+
+  const hasAssetAssignments = Array.isArray(payload.assetIds)
+
+  const assignmentResult = hasAssetAssignments
+    ? syncAssetTagAssignments(assetTagId, payload.assetIds)
+    : {
+        updatedAssetIds: [],
+        assignedAssetIds: [],
+      }
+
+  recordAudit({
+    module: "activos",
+    action: "asset-tag:update",
+    entityType: "asset-tag",
+    entityName: updatedTag.name,
+    description: "Se actualizo una etiqueta de activos.",
+    metadata: {
+      assetTagId: updatedTag.id,
+      changedFields: Object.keys(payload.changes || {}),
+      assetAssignmentsChanged: assignmentResult.updatedAssetIds.length > 0,
+      assignedAssetIds: hasAssetAssignments ? assignmentResult.assignedAssetIds : undefined,
+      updatedAssetIds: assignmentResult.updatedAssetIds,
+    },
+  })
+}
+
+const handleAssetTagDelete = (assetTagId) => {
+  if (!canManageAssetTags.value) return
+
+  const tag = assetTags.value.find((item) => {
+    return String(item.id) === String(assetTagId)
+  })
+
+  if (!tag) return
+
+  deleteAssetTag(assetTagId)
+
+  recordAudit({
+    module: "activos",
+    action: "asset-tag:delete",
+    entityType: "asset-tag",
+    entityName: tag.name,
+    severity: "warning",
+    description: "Se elimino una etiqueta de activos.",
+    metadata: {
+      assetTagId: tag.id,
+    },
+  })
+}
 
 const currentUserId = computed(() => {
   return currentUser.value?.id || ""
@@ -287,15 +446,48 @@ const cityAssetGroups = computed(() => {
   return createCityAssetGroups(baseMockActivos.value)
 })
 
-const { selectedPersonalAssetGroupId, selectPersonalAssetGroup, filterActivosBySelectedGroup } =
-  usePersonalAssetGroups({
+const { selectedCityAssetGroupId, selectCityAssetGroup, filterActivosBySelectedCityGroup } =
+  useAssetCityFilter({
     userId: currentUserId,
     companyId: activeCompanyId,
     availableActivos: baseMockActivos,
-    dynamicGroups: cityAssetGroups,
+    cityGroups: cityAssetGroups,
   })
 
-const { geofences, createGeofence, updateGeofence, deleteGeofence } = useGeofences({
+const { managedVehicleGroups } = useAssetVehicleGroupManagement({
+  contextId: activeCompanyId,
+  availableActivos: baseMockActivos,
+})
+
+const vehicleAssetGroups = computed(() => {
+  return createVehicleAssetGroups({
+    assets: baseMockActivos.value,
+    groups: managedVehicleGroups.value,
+  })
+})
+
+const {
+  selectedVehicleAssetGroupId,
+  selectVehicleAssetGroup,
+  filterActivosBySelectedVehicleGroup,
+} = useAssetVehicleGroupFilter({
+  userId: currentUserId,
+  contextId: activeCompanyId,
+  availableActivos: baseMockActivos,
+  vehicleGroups: vehicleAssetGroups,
+})
+
+const {
+  geofences,
+  geofenceGroups,
+  createGeofence,
+  createGeofenceGroup,
+  updateGeofence,
+  deleteGeofence,
+  deleteGeofenceGroup,
+  renameGeofenceGroup,
+  importGeofences,
+} = useGeofences({
   companyId: activeCompanyId,
 })
 
@@ -359,21 +551,8 @@ let telemetrySync = null
 let selection = null
 let personalMapActivos = null
 
-const mapPanelRef = ref(null)
-
-let pendingMapTelemetryBatch = null
-
-const applyMapTelemetryBatch = (batch = []) => {
-  const applyTelemetryBatch = mapPanelRef.value?.applyTelemetryBatch
-
-  if (typeof applyTelemetryBatch !== "function") {
-    pendingMapTelemetryBatch = batch
-    return
-  }
-
-  pendingMapTelemetryBatch = null
-  applyTelemetryBatch(batch)
-}
+const { mapPanelRef, applyMapTelemetryBatch, flushPendingMapTelemetryBatch } =
+  useActivosMapTelemetryBridge()
 
 const filters = useActivosFilters({
   refreshMapLayout,
@@ -399,7 +578,7 @@ const {
 } = filters
 
 selection = useActivosSelection({
-  baseSelectedId: baseMockActivos.value[0]?.id || null,
+  baseSelectedId: getRouteSelectedActivoId() || baseMockActivos.value[0]?.id || null,
   getMapActivos: () => personalMapActivos?.value || telemetrySync?.mapActivos.value || [],
   activeSidebarSection,
   refreshMapLayout,
@@ -419,6 +598,18 @@ const {
   handleClearItineraryRoute,
 } = selection
 
+watch(
+  () => route.query.activoId || route.query.assetId || route.query.asset,
+  async () => {
+    const routeActivoId = getRouteSelectedActivoId()
+
+    if (!routeActivoId || normalizeId(selectedId.value) === routeActivoId) return
+
+    selectedId.value = routeActivoId
+    await refreshMapLayout(true)
+  },
+)
+
 const { publishWorkspaceViewState, pendingWorkspaceViewRestore } = useWorkspaceViewState()
 
 const {
@@ -437,33 +628,44 @@ const {
   refreshMapLayout,
   route,
   sectionSearch,
-  selectPersonalAssetGroup,
+  selectCityAssetGroup,
+  selectVehicleAssetGroup,
   selectedGeofenceId,
   selectedId,
-  selectedPersonalAssetGroupId,
+  selectedCityAssetGroupId,
+  selectedVehicleAssetGroupId,
   statusFilter,
 })
 
-const handleSidebarGeofenceSelected = async (geofence) => {
-  const isSameSelectedGeofence = normalizeId(selectedGeofenceId.value) === normalizeId(geofence?.id)
-
-  await selectSidebarGeofence(geofence)
-
-  if (!geofence) return
-
-  if (isSameSelectedGeofence) {
-    mapPanelRef.value?.focusGeofenceSelection?.(geofence)
-  }
-}
-
-const handleSidebarGeofenceEdit = (geofence) => {
-  if (!geofence?.id || !canEditGeofences.value) return
-
-  selectedGeofenceId.value = geofence.id
-  activeSidebarSection.value = "geocercas"
-
-  mapPanelRef.value?.editGeofenceSelection?.(geofence)
-}
+const {
+  handleGeofenceCreated,
+  handleGeofenceDeleted,
+  handleGeofenceExported,
+  handleGeofenceGroupCreated,
+  handleGeofenceGroupDeleted,
+  handleGeofenceGroupRenamed,
+  handleGeofencesImported,
+  handleGeofenceUpdated,
+  handleSidebarGeofenceEdit,
+  handleSidebarGeofenceSelected,
+} = useActivosGeofenceActions({
+  activeSidebarSection,
+  canEditGeofences,
+  createGeofence,
+  createGeofenceGroup,
+  deleteGeofence,
+  deleteGeofenceGroup,
+  geofences,
+  geofenceGroups,
+  importGeofences,
+  mapPanelRef,
+  recordAudit,
+  refreshMapLayout,
+  renameGeofenceGroup,
+  selectedGeofenceId,
+  selectSidebarGeofence,
+  updateGeofence,
+})
 
 const {
   baseNormalizedActivos,
@@ -590,11 +792,22 @@ const handleUpdateActivo = (payload) => {
   handleUpdateActivoBase(payload)
 }
 
-const handleDeviceAction = (payload) => {
-  if (!canManageAssets.value) return
-
-  handleDeviceActionBase(payload)
-}
+const {
+  hasActiveDailySummary,
+  itineraryContextRequest,
+  handleClearItineraryRouteState,
+  handleDeviceAction,
+} = useActivosDeviceActions({
+  activeCompanyId,
+  canManageAssets,
+  canViewItineraries,
+  canViewMaintenance,
+  handleClearItineraryRoute,
+  handleDeviceActionBase,
+  router,
+  selectedId,
+  setSidebarSection,
+})
 
 telemetrySync = useActivosTelemetrySync({
   telemetryActivos,
@@ -628,15 +841,15 @@ const { normalizedActivos, tableActivos, mapActivos, filteredActivos, cleanupTel
   telemetrySync
 
 personalMapActivos = computed(() => {
-  return filterActivosBySelectedGroup(mapActivos.value)
+  return filterActivosBySelectedCityGroup(filterActivosBySelectedVehicleGroup(mapActivos.value))
 })
 
 const personalFilteredActivos = computed(() => {
-  return filterActivosBySelectedGroup(filteredActivos.value)
+  return filterActivosBySelectedCityGroup(filterActivosBySelectedVehicleGroup(filteredActivos.value))
 })
 
 const personalTableActivos = computed(() => {
-  return filterActivosBySelectedGroup(tableActivos.value)
+  return filterActivosBySelectedCityGroup(filterActivosBySelectedVehicleGroup(tableActivos.value))
 })
 
 const personalMapActivoIdsSignature = computed(() => {
@@ -654,197 +867,13 @@ const permittedMapStatsActivos = computed(() => {
   return canViewGps.value ? personalTableActivos.value : []
 })
 
-const {
-  empresaSucursales,
-  alternarSucursalesHabilitadas: alternarSucursalesFlotaHabilitadas,
-  agregarSucursal: agregarSucursalFlota,
-  actualizarNombreSucursal: actualizarNombreSucursalFlota,
-  alternarEstadoSucursal: alternarEstadoSucursalFlota,
-  eliminarSucursal: eliminarSucursalFlota,
-} = useSucursalesFlota({
-  activos: tableActivos,
-  companyId: selectedSucursalCompanyId,
-})
-
-const assetCreationGroups = computed(() => {
-  return empresaSucursales.value?.sucursales || []
-})
-
-const handleAlternarSucursalesFlotaHabilitadas = () => {
-  if (!canManageSucursales.value) return
-
-  alternarSucursalesFlotaHabilitadas()
-
-  recordAudit({
-    companyId: selectedSucursalCompanyId.value || activeCompanyId.value,
-    module: "empresas",
-    action: "branch:toggle",
-    entityType: "sucursales",
-    entityName: empresaSucursales.value.name || "Sucursales",
-    description: "Se cambio la configuracion de sucursales de la empresa.",
-  })
-}
-
-const handleAgregarSucursalFlota = (nombreSucursal) => {
-  if (!canManageSucursales.value) return
-
-  agregarSucursalFlota(nombreSucursal)
-
-  recordAudit({
-    companyId: selectedSucursalCompanyId.value || activeCompanyId.value,
-    module: "empresas",
-    action: "branch:create",
-    entityType: "sucursal",
-    entityName: nombreSucursal || "Sucursal",
-    description: "Se creo una sucursal para organizar la flota.",
-  })
-}
-
-const handleActualizarNombreSucursalFlota = (sucursalId, nombreSucursal) => {
-  if (!canManageSucursales.value) return
-
-  actualizarNombreSucursalFlota(sucursalId, nombreSucursal)
-
-  recordAudit({
-    companyId: selectedSucursalCompanyId.value || activeCompanyId.value,
-    module: "empresas",
-    action: "branch:rename",
-    entityType: "sucursal",
-    entityName: nombreSucursal || "Sucursal",
-    description: "Se renombro una sucursal de flota.",
-    metadata: {
-      branchId: sucursalId,
-    },
-  })
-}
-
-const handleAlternarEstadoSucursalFlota = (sucursalId) => {
-  if (!canManageSucursales.value) return
-
-  const sucursal = empresaSucursales.value.sucursales.find((item) => {
-    return normalizeId(item.id) === normalizeId(sucursalId)
-  })
-
-  alternarEstadoSucursalFlota(sucursalId)
-
-  recordAudit({
-    companyId: selectedSucursalCompanyId.value || activeCompanyId.value,
-    module: "empresas",
-    action: "branch:status",
-    entityType: "sucursal",
-    entityName: sucursal?.name || "Sucursal",
-    description: "Se cambio el estado de una sucursal de flota.",
-    metadata: {
-      branchId: sucursalId,
-    },
-  })
-}
-
-const handleEliminarSucursalFlota = (sucursalId) => {
-  if (!canManageSucursales.value) return
-
-  const sucursal = empresaSucursales.value.sucursales.find((item) => {
-    return normalizeId(item.id) === normalizeId(sucursalId)
-  })
-
-  eliminarSucursalFlota(sucursalId)
-
-  recordAudit({
-    companyId: selectedSucursalCompanyId.value || activeCompanyId.value,
-    module: "empresas",
-    action: "branch:delete",
-    entityType: "sucursal",
-    entityName: sucursal?.name || "Sucursal",
-    severity: "warning",
-    description: "Se elimino una sucursal de flota.",
-    metadata: {
-      branchId: sucursalId,
-    },
-  })
-}
-
-const handleGeofenceCreated = async (geofence) => {
-  if (!canEditGeofences.value) return
-
-  const createdGeofence = createGeofence(geofence)
-
-  if (!createdGeofence) return
-
-  selectedGeofenceId.value = createdGeofence.id
-
-  recordAudit({
-    module: "geocercas",
-    action: "geofence:create",
-    entityType: "geocerca",
-    entityName: getGeofenceAuditName(createdGeofence),
-    description: "Se creo una geocerca.",
-    metadata: {
-      geofenceId: createdGeofence.id,
-      type: createdGeofence.type,
-    },
-  })
-
-  await refreshMapLayout(true)
-}
-
-const handleGeofenceUpdated = (updatedGeofence) => {
-  if (!canEditGeofences.value) return
-
-  const geofence = updateGeofence(updatedGeofence)
-
-  if (!geofence) return
-
-  recordAudit({
-    module: "geocercas",
-    action: "geofence:update",
-    entityType: "geocerca",
-    entityName: getGeofenceAuditName(geofence),
-    description: "Se actualizo una geocerca.",
-    metadata: {
-      geofenceId: geofence.id,
-      type: geofence.type,
-    },
-  })
-}
-
-const handleGeofenceDeleted = async (geofenceId) => {
-  if (!canEditGeofences.value) return
-
-  const geofence = geofences.value.find((item) => {
-    return normalizeId(item.id) === normalizeId(geofenceId)
-  })
-
-  deleteGeofence(geofenceId)
-
-  recordAudit({
-    module: "geocercas",
-    action: "geofence:delete",
-    entityType: "geocerca",
-    entityName: getGeofenceAuditName(geofence),
-    severity: "warning",
-    description: "Se elimino una geocerca.",
-    metadata: {
-      geofenceId,
-    },
-  })
-
-  if (normalizeId(selectedGeofenceId.value) === normalizeId(geofenceId)) {
-    selectedGeofenceId.value = null
-  }
-
-  await refreshMapLayout(true)
-}
-
 watch(personalMapActivoIdsSignature, () => {
   ensureSelectedActivo()
 })
 
 onMounted(() => {
   preloadFleetModals()
-
-  if (pendingMapTelemetryBatch) {
-    applyMapTelemetryBatch(pendingMapTelemetryBatch)
-  }
+  flushPendingMapTelemetryBatch()
 })
 
 onBeforeUnmount(() => {

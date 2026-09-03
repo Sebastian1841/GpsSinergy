@@ -122,6 +122,30 @@ const normalizeDateOnly = (value) => {
   )
 }
 
+const getDateOnlyFromTimestamp = (value) => {
+  if (!value) return ""
+
+  const rawText = String(value).trim()
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(rawText)) {
+    return rawText.slice(0, 10)
+  }
+
+  const localMatch = rawText.match(/^(\d{2})-(\d{2})-(\d{4})/)
+
+  if (localMatch) {
+    return `${localMatch[3]}-${localMatch[2]}-${localMatch[1]}`
+  }
+
+  const date = new Date(rawText)
+
+  if (Number.isNaN(date.getTime())) return ""
+
+  return [date.getFullYear(), padTimePart(date.getMonth() + 1), padTimePart(date.getDate())].join(
+    "-",
+  )
+}
+
 const isTimeOnlyValue = (value) => {
   return /^\d{1,2}:\d{2}(:\d{2})?(\.\d{1,3})?$/.test(String(value || "").trim())
 }
@@ -244,7 +268,11 @@ const normalizeReportTimestamp = ({ source, referenceDate }) => {
 }
 
 const isPointInsideDateRange = ({ point, fromDate, toDate }) => {
-  const date = String(point?.timestamp || "").slice(0, 10)
+  const date = getDateOnlyFromTimestamp(
+    point?.timestamp || point?.date || point?.fecha || point?.reportedAt || point?.lastReport,
+  )
+
+  if (!date) return false
 
   return date >= fromDate && date <= toDate
 }
@@ -261,6 +289,7 @@ export function useItineraryRoute({
   toDate,
   formError,
   applyDateRange,
+  allowFallbackPoints = true,
   filterItineraryPoints,
   buildItineraryResult,
 }) {
@@ -398,8 +427,7 @@ export function useItineraryRoute({
   }
 
   const getTelemetryReportsForAsset = (asset) => {
-    const assetId = normalizeAssetId(asset)
-    const reports = getReportsForAsset(assetId)
+    const reports = getReportsForAsset(asset)
 
     if (!reports.length) return []
 
@@ -433,6 +461,10 @@ export function useItineraryRoute({
     */
     if (telemetryReports.length) {
       return mergeRoutePoints(telemetryReports, currentLocationPoints)
+    }
+
+    if (!unref(allowFallbackPoints)) {
+      return currentLocationPoints
     }
 
     const fallbackPoints = filterItineraryPoints({

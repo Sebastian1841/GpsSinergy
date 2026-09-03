@@ -23,6 +23,7 @@
   >
     <ItineraryPanel
       :activos="itineraryActivos"
+      :context-request="itineraryContextRequest"
       class="h-full min-h-0 rounded-none border-0 shadow-none"
       @route-selected="emit('route-selected', $event)"
       @point-selected="emit('point-selected', $event)"
@@ -47,34 +48,35 @@
   <FleetGeofencePanel
     v-else-if="activeSection === 'geocercas' && allowedSections.includes('geocercas')"
     :geofences="geofences"
+    :geofence-groups="geofenceGroups"
     :filtered-geofences="filteredGeofences"
+    :search="search"
     :selected-geofence-id="selectedGeofenceId"
     :can-edit-geofences="canEditGeofences"
     :use-geofence-location-address="useGeofenceLocationAddress"
     @update:use-geofence-location-address="emit('update:use-geofence-location-address', $event)"
+    @update:search="emit('update:search', $event)"
     @select-geofence="emit('select-geofence', $event)"
     @edit-geofence="emit('edit-geofence', $event)"
     @delete-geofence="emit('delete-geofence', $event)"
+    @export-geofences="emit('export-geofences', $event)"
+    @import-geofences="emit('import-geofences', $event)"
+    @create-geofence-group="emit('create-geofence-group', $event)"
+    @delete-geofence-group="emit('delete-geofence-group', $event)"
+    @rename-geofence-group="emit('rename-geofence-group', $event)"
   />
 
-  <div
-    v-else-if="activeSection === 'sucursales' && allowedSections.includes('sucursales')"
-    class="min-h-0 flex-1 overflow-auto bg-[#eef2f7] p-3"
-  >
-    <GestionSucursalesPanel
-      :company="empresaSucursales"
-      :companies="sucursalCompanies"
-      :selected-company-id="selectedSucursalCompanyId"
-      :show-company-selector="showSucursalCompanySelector"
-      :can-manage="canManageSucursales"
-      @select-company="emit('select-sucursal-company', $event)"
-      @alternar-sucursales-habilitadas="emit('alternar-sucursales-habilitadas')"
-      @agregar-sucursal="emit('agregar-sucursal', $event)"
-      @actualizar-nombre-sucursal="emitActualizarNombreSucursal"
-      @alternar-estado-sucursal="emit('alternar-estado-sucursal', $event)"
-      @eliminar-sucursal="emit('eliminar-sucursal', $event)"
-    />
-  </div>
+  <FleetAssetTagsPanel
+    v-else-if="activeSection === 'etiquetas' && allowedSections.includes('etiquetas')"
+    :activos="activos"
+    :all-activos="allActivos"
+    :asset-tags="assetTags"
+    :can-manage-asset-tags="canManageAssetTags"
+    :search="search"
+    @create-asset-tag="emit('create-asset-tag', $event)"
+    @update-asset-tag="emit('update-asset-tag', $event)"
+    @delete-asset-tag="emit('delete-asset-tag', $event)"
+  />
 
   <div v-else class="flex min-h-0 flex-1 items-center justify-center bg-[#eef2f7] p-4 text-center">
     <p class="text-[11px] font-black text-[#102372]">Sin funciones habilitadas</p>
@@ -83,10 +85,13 @@
 
 <script setup>
 import { defineAsyncComponent, h, onBeforeUnmount, onMounted, watch } from "vue"
+
+import FleetAssetTagsPanel from "./FleetAssetTagsPanel.vue"
 import FleetTable from "./FleetTable.vue"
 
 const FleetSectionLoading = {
   name: "FleetSectionLoading",
+
   setup() {
     return () =>
       h(
@@ -112,7 +117,6 @@ const FleetSectionLoading = {
   },
 }
 
-const loadGestionSucursalesPanel = () => import("../sucursales/GestionSucursalesPanel.vue")
 const loadItineraryPanel = () => import("../itinerarios/ItineraryPanel.vue")
 const loadFleetGeofencePanel = () => import("./FleetGeofencePanel.vue")
 const loadFleetReportsPanel = () => import("./FleetReportsPanel.vue")
@@ -125,7 +129,6 @@ const createAsyncFleetSection = (loader) =>
     suspensible: false,
   })
 
-const GestionSucursalesPanel = createAsyncFleetSection(loadGestionSucursalesPanel)
 const ItineraryPanel = createAsyncFleetSection(loadItineraryPanel)
 const FleetGeofencePanel = createAsyncFleetSection(loadFleetGeofencePanel)
 const FleetReportsPanel = createAsyncFleetSection(loadFleetReportsPanel)
@@ -134,7 +137,6 @@ const sectionLoaders = {
   reportes: loadFleetReportsPanel,
   itinerarios: loadItineraryPanel,
   geocercas: loadFleetGeofencePanel,
-  sucursales: loadGestionSucursalesPanel,
 }
 
 const preloadedSectionKeys = new Set()
@@ -183,6 +185,10 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  itineraryContextRequest: {
+    type: Object,
+    default: null,
+  },
   activos: {
     type: Array,
     default: () => [],
@@ -195,11 +201,23 @@ const props = defineProps({
     type: [String, Number],
     default: "",
   },
+  assetTags: {
+    type: Array,
+    default: () => [],
+  },
+  canManageAssetTags: {
+    type: Boolean,
+    default: false,
+  },
   search: {
     type: String,
     default: "",
   },
   geofences: {
+    type: Array,
+    default: () => [],
+  },
+  geofenceGroups: {
     type: Array,
     default: () => [],
   },
@@ -219,26 +237,6 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
-  empresaSucursales: {
-    type: Object,
-    required: true,
-  },
-  sucursalCompanies: {
-    type: Array,
-    default: () => [],
-  },
-  selectedSucursalCompanyId: {
-    type: [String, Number],
-    default: "",
-  },
-  showSucursalCompanySelector: {
-    type: Boolean,
-    default: false,
-  },
-  canManageSucursales: {
-    type: Boolean,
-    default: false,
-  },
 })
 
 const emit = defineEmits([
@@ -253,18 +251,17 @@ const emit = defineEmits([
   "select-geofence",
   "edit-geofence",
   "delete-geofence",
+  "export-geofences",
+  "import-geofences",
+  "create-geofence-group",
+  "delete-geofence-group",
+  "rename-geofence-group",
+  "create-asset-tag",
+  "update-asset-tag",
+  "delete-asset-tag",
+  "update:search",
   "update:use-geofence-location-address",
-  "select-sucursal-company",
-  "alternar-sucursales-habilitadas",
-  "agregar-sucursal",
-  "actualizar-nombre-sucursal",
-  "alternar-estado-sucursal",
-  "eliminar-sucursal",
 ])
-
-const emitActualizarNombreSucursal = (sucursalId, nombreSucursal) => {
-  emit("actualizar-nombre-sucursal", sucursalId, nombreSucursal)
-}
 
 const emitResizeColumn = (columnKey, width) => {
   emit("resize-column", columnKey, width)
@@ -277,7 +274,9 @@ const emitMoveColumn = (sourceColumnKey, targetColumnKey) => {
 const preloadSection = (sectionKey) => {
   const loader = sectionLoaders[sectionKey]
 
-  if (!loader || preloadedSectionKeys.has(sectionKey)) return
+  if (!loader || preloadedSectionKeys.has(sectionKey)) {
+    return
+  }
 
   preloadedSectionKeys.add(sectionKey)
 
@@ -288,7 +287,13 @@ const preloadSection = (sectionKey) => {
 
 const preloadAllowedSections = () => {
   props.allowedSections.forEach((sectionKey) => {
-    if (sectionKey === "activos" || sectionKey === props.activeSection) return
+    if (
+      sectionKey === "activos" ||
+      sectionKey === "etiquetas" ||
+      sectionKey === props.activeSection
+    ) {
+      return
+    }
 
     preloadSection(sectionKey)
   })
@@ -324,6 +329,7 @@ const scheduleAllowedSectionPreload = () => {
         timeout: 2200,
       },
     )
+
     return
   }
 

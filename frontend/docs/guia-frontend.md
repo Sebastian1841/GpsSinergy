@@ -21,18 +21,18 @@ El frontend es una SPA hecha con Vue 3, Vue Router, Vite y Tailwind. La app esta
 - `data`: semillas mock usadas por el prototipo.
 - `router`: definicion de rutas y guardas de acceso.
 
-Actualmente `frontend/src` tiene 274 archivos. La distribucion principal es:
+Actualmente `frontend/src` tiene 399 archivos. La distribucion principal es:
 
-- `components`: 77 archivos.
-- `composables`: 96 archivos.
-- `utils`: 48 archivos.
-- `services`: 24 archivos.
-- `views`: 8 archivos.
-- `data`: 7 archivos.
-- `router`: 1 archivo.
-- `assets`: 10 archivos.
+- `components`: 104 archivos.
+- `composables`: 137 archivos.
+- `utils`: 83 archivos.
+- `services`: 36 archivos.
+- `views`: 10 archivos.
+- `data`: 8 archivos.
+- `router`: 2 archivos.
+- `assets`: 15 archivos.
 
-Hay 19 archivos de test `*.test.js`. Estan concentrados en logica pura, no tanto en flujos visuales completos.
+Hay 25 archivos de test `*.test.js`. Estan concentrados en logica pura, no tanto en flujos visuales completos.
 
 ## Arranque de la app
 
@@ -165,7 +165,7 @@ Funciones principales:
 - `getAccessesForCompany`: filtra accesos por empresa.
 - `accessHasModule`: revisa modulo habilitado.
 - `accessHasFunction`: revisa funcion habilitada y permiso especifico.
-- `accessAllowsAsset`: aplica alcance de activos (`all-assets`, `sucursal`, `selected-assets`).
+- `accessAllowsAsset`: aplica alcance de activos (`all-assets`, `selected-assets`, `asset-tags`). Las etiquetas definen visibilidad real; los grupos de vehiculos son solo filtros visuales posteriores.
 
 Computed principales:
 
@@ -209,7 +209,6 @@ Funciones principales:
   - `applicationDefinitionsById`
   - `assetsByCompanyId`
   - `assetStatsByCompanyId`
-  - `sucursalesById`
 - Persistencia:
   - `readPersistedDatabase`
   - `persistDatabase`
@@ -225,9 +224,6 @@ Funciones principales:
   - `createAsset`
   - `updateAsset`
   - `deleteAsset`
-  - `addSucursal`
-  - `updateSucursal`
-  - `deleteSucursal`
 
 Razonamiento:
 
@@ -246,7 +242,7 @@ Servicios actuales:
 - `auth`: usuarios/login mock.
 - `access`: empresas, accesos, aplicaciones, funciones.
 - `activos`: CRUD de activos.
-- `companies`: CRUD de empresas/sucursales.
+- `companies`: CRUD de empresas.
 - `users`: usuarios y accesos.
 - `reports`: reportes/plantillas.
 - `audit`: auditoria local.
@@ -269,8 +265,7 @@ Archivos:
 - `AppHeader.vue`
 - `AppSidebar.vue`
 - `WorkspaceSelector.vue`
-- `HeaderPersonalAssetGroupsMenu.vue`
-- `PersonalAssetGroupModal.vue`
+- `HeaderFleetAssetFilterMenu.vue`
 
 Responsabilidad:
 
@@ -278,7 +273,8 @@ Responsabilidad:
 - Cambiar empresa.
 - Cambiar modulo.
 - Manejar espacios de trabajo.
-- Manejar grupos personales de activos.
+- Filtrar activos por ciudades y grupos de vehiculos en el header.
+- Administrar grupos visuales de vehiculos sin afectar permisos.
 - Mostrar usuario actual y estado.
 
 Razonamiento:
@@ -334,11 +330,6 @@ Funciones y bloques importantes:
 - `handleAddActivo`: crea activo y audita.
 - `handleUpdateActivo`: edita activo y audita.
 - `handleDeviceAction`: acciones desde menu contextual.
-- `handleAlternarSucursalesFlotaHabilitadas`: activa/desactiva sucursales de flota.
-- `handleAgregarSucursalFlota`: crea sucursal.
-- `handleActualizarNombreSucursalFlota`: renombra sucursal.
-- `handleAlternarEstadoSucursalFlota`: activa/desactiva sucursal.
-- `handleEliminarSucursalFlota`: elimina sucursal.
 - `handleGeofenceCreated`: crea geocerca y audita.
 - `handleGeofenceUpdated`: actualiza geocerca y audita.
 - `handleGeofenceDeleted`: elimina geocerca y audita.
@@ -375,8 +366,9 @@ Razonamiento:
 - `useFleetColumns`: columnas visibles, orden y normalizacion.
 - `useFleetSorting`: ordenamiento de tabla.
 - `usePersistedFleetLayout`: persistencia local de layout.
-- `usePersonalAssetGroups`: grupos personales y compartibles.
-- `useSucursalesFlota`: agrupacion por sucursales.
+- `useAssetCityFilter`: conserva el filtro de ciudad/activos usado por el header y workspaces.
+- `useAssetVehicleGroupManagement`: crea, edita asignaciones y elimina grupos de vehiculos desde el header de Activos.
+- `useAssetVehicleGroupFilter`: conserva el filtro seleccionado de grupo de vehiculos, siempre despues de permisos/etiquetas.
 - `useFleetTerminal`: historial/logica de terminal.
 - `useFleetCreateForm` y `useFleetEditForm`: formularios de alta/edicion de activos.
 - `useFleetFormWizard`: pasos de formularios.
@@ -631,7 +623,7 @@ Responsabilidad:
 
 - Ejecuta reporte sobre activos seleccionados.
 - Procesa por lotes para no bloquear UI.
-- Agrupa activos por empresa/sucursal/grupo.
+- Agrupa activos por empresa y criterios de reporte sin usar grupos de vehiculos como permiso.
 - Devuelve filas y resumen.
 
 Funciones principales:
@@ -779,18 +771,17 @@ Razonamiento:
 
 Responsabilidad:
 
-- Gestiona empresas, sucursales, estado y configuracion.
+- Gestiona empresas, estado y configuracion.
 - Muestra catalogo y panel de configuracion.
 
 Composables y utils:
 
 - `useCompanyManagement`: CRUD y seleccion de empresas.
-- `useCompanyBranches`: CRUD de sucursales.
 - `companyUtils.js`: labels, estados, rutas y busqueda.
 
 Razonamiento:
 
-- Empresa/sucursal son datos maestros.
+- Empresa es dato maestro. La organizacion de flota por grupos vive en Activos y no entrega permisos.
 - En produccion deben persistir en backend y auditar cambios.
 
 ## Espacios de trabajo
@@ -923,7 +914,7 @@ Prioridad alta:
 
 - Autenticacion real.
 - Usuarios, roles y permisos.
-- Empresas, aplicaciones, sucursales y activos.
+- Empresas, aplicaciones y activos.
 - Auditoria append-only.
 - Espacios de trabajo multiusuario y compartidos.
 - Plantillas de reportes.
@@ -945,31 +936,23 @@ Prioridad media:
 
 ## Cuellos de botella actuales
 
-1. Telemetria en cliente
+1. Reportes en cliente
 
-El mapa y la tabla reciben datos en vivo. Ya hay amortiguacion de tabla, pero si aumenta la flota, el cuello sera render de marcadores, historial y filtros.
+Mitigado con carga lazy de exportadores y ejecucion por lotes, pero Excel, PDF e imagen de mapa todavia se generan en el navegador. Para prototipo es aceptable; con reportes grandes puede bloquear memoria o UI.
 
-2. Reportes en cliente
+2. Persistencia local
 
-Generar reportes, mapas, Excel y PDF en el navegador puede bloquear UI y consumir mucha memoria.
+`localStorage` ya esta encapsulado en `browserStorage`, pero sigue siendo almacenamiento local. Workspaces, reglas, plantillas, geocercas, mock DB y auditoria no son multiusuario reales hasta pasar a backend.
 
-3. localStorage como base de datos
+3. Auditoria local
 
-No sirve para multiusuario real ni para consistencia entre dispositivos.
+El flujo de auditoria existe y registra acciones, pero no es confiable para produccion porque el historial vive en storage del navegador.
 
-4. Auditoria local
+4. Telemetria en cliente
 
-No es confiable para produccion. El usuario puede limpiar o modificar localStorage.
+Mitigada con tabla amortiguada, mapa incremental, clustering, cache y `recordTelemetryReports` desactivado en `ActivosView`. No es cuello critico del prototipo, pero puede volver a serlo con flotas grandes.
 
-5. Archivo HTML de trabajo
-
-`frontend/src/views/a.html` pesa casi 492 KB, pero fue confirmado como archivo aparte en uso. No debe eliminarse ni moverse sin confirmacion explicita.
-
-6. Encoding
-
-Se reviso el codigo activo y no aparecieron textos rotos relevantes. Si vuelven a aparecer palabras con mojibake, conviene normalizar UTF-8 o mantener ASCII consistente.
-
-7. Componentes aun grandes
+5. Componentes aun grandes
 
 `ActivosView.vue`, `ReportsView.vue`, `ReportExecutionModal.vue` y `ReportEventRuleFormModal.vue` concentran mucha logica.
 
@@ -977,7 +960,6 @@ Se reviso el codigo activo y no aparecieron textos rotos relevantes. Si vuelven 
 
 Candidatos claros:
 
-- `frontend/src/views/a.html`: no tocar sin confirmacion; el archivo esta en uso como referencia/trabajo aparte.
 - `frontend/src/views/a.hm`: aparece en el IDE, revisar si existe. No aparece listado por `rg --files`, pero si esta en disco deberia eliminarse o moverse fuera de `src`.
 - Archivos mock bajo `frontend/src/data`: mantener solo para dev/prototipo.
 - Mock adapters bajo `frontend/src/services/*/mock*.js`: mantener para dev/test, no como fuente productiva.
@@ -2772,12 +2754,12 @@ Explicacion:
 - Admin ve todos.
 - Usuario normal ve activos por alcance:
   - todos los activos
-  - activos por sucursal
+  - activos por etiquetas de acceso
   - activos seleccionados
 
 Riesgo:
 
-- Si falla, se filtra informacion de otras empresas o sucursales.
+- Si falla, se filtra informacion de otras empresas o de activos no autorizados por etiquetas.
 
 Backend:
 
@@ -2794,7 +2776,7 @@ Responsabilidad:
 
 - Simular backend.
 - Guardar datos en memoria/localStorage.
-- Exponer CRUD de empresas, usuarios, accesos, activos y sucursales.
+- Exponer CRUD de empresas, usuarios, accesos y activos.
 
 Funcion representativa:
 
@@ -3089,7 +3071,7 @@ const buildActivosWorkspaceSettings = () => {
     },
     selectedActivoId: normalizeId(selectedId.value),
     selectedGeofenceId: normalizeId(selectedGeofenceId.value),
-    selectedPersonalAssetGroupId: normalizeId(selectedPersonalAssetGroupId.value),
+    selectedCityAssetGroupId: normalizeId(selectedCityAssetGroupId.value),
     leftPanelWidth: leftPanelWidth.value,
     fleetLayout: {
       leftPanelWidth: leftPanelWidth.value,
@@ -3105,7 +3087,7 @@ Explicacion:
 - Guarda filtro de estado.
 - Guarda seccion activa.
 - Guarda busquedas.
-- Guarda activo/geocerca/grupo seleccionado.
+- Guarda activo, geocerca y filtro de ciudad seleccionado.
 - Guarda ancho de panel.
 - Guarda columnas visibles/orden/ancho.
 - Guarda preferencia de direcciones.

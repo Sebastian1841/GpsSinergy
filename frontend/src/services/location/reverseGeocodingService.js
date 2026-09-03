@@ -1,4 +1,4 @@
-import { readJsonStorage, writeJsonStorage } from "../storage/browserStorage.js"
+import { readJsonStorage, readStorageValue, writeJsonStorage } from "../storage/browserStorage.js"
 
 const CACHE_KEY = "sinergy-reverse-geocoding-cache-v1"
 const PROVIDER_OVERRIDE_KEY = "sinergy-reverse-geocoding-url"
@@ -44,7 +44,7 @@ const getRuntimeProviderUrl = () => {
 
   return (
     window.__SINERGY_REVERSE_GEOCODING_URL__ ||
-    window.localStorage?.getItem(PROVIDER_OVERRIDE_KEY) ||
+    readStorageValue(PROVIDER_OVERRIDE_KEY) ||
     import.meta.env?.VITE_REVERSE_GEOCODING_URL ||
     DEFAULT_PROVIDER_URL
   )

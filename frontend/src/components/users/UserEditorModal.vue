@@ -1,35 +1,30 @@
 <template>
   <div
     v-if="modelValue"
-    class="fixed inset-0 z-[900] flex items-end justify-center bg-slate-950/35 p-2 sm:items-center"
+    class="fixed inset-0 z-[900] flex items-end justify-center bg-slate-950/45 p-2 sm:items-center"
     @click.self="$emit('close')"
   >
     <section
-      class="flex max-h-[calc(100%-16px)] w-full max-w-[520px] flex-col overflow-hidden rounded-xl bg-white shadow-[0_24px_80px_rgba(15,23,42,0.34)]"
+      class="flex max-h-[calc(100%-16px)] w-full max-w-[560px] flex-col overflow-hidden rounded-xl bg-white shadow-[0_24px_80px_rgba(15,23,42,0.34)]"
     >
-      <header class="border-b border-[#edf1f5] px-4 py-3">
-        <div class="flex items-center justify-between gap-3">
-          <div class="min-w-0">
-            <p class="text-[10px] font-black uppercase tracking-[0.16em] text-[#ff6600]">
-              {{ mode === "edit" ? "Editar usuario" : "Nuevo usuario" }}
-            </p>
-
-            <h2 class="mt-1 text-[15px] font-black text-[#102372]">
-              {{ mode === "edit" ? "Datos del usuario" : "Crear usuario" }}
-            </h2>
-          </div>
-
-          <button
-            type="button"
-            class="rounded-md px-2 py-1 text-[18px] font-black text-slate-400 transition hover:bg-slate-100 hover:text-[#102372]"
-            @click="$emit('close')"
-          >
-            ×
-          </button>
+      <header class="flex items-start justify-between gap-3 border-b border-[#edf1f5] px-5 py-4">
+        <div class="min-w-0">
+          <h2 class="text-[18px] font-black text-[#102372]">
+            {{ mode === "edit" ? "Editar usuario" : "Nuevo usuario" }}
+          </h2>
+          <p class="mt-0.5 text-[11px] font-semibold text-slate-500">Datos base del perfil.</p>
         </div>
+
+        <button
+          type="button"
+          class="rounded-md px-2 py-1 text-[18px] font-black text-slate-400 transition hover:bg-[#f8fafc] hover:text-[#102372]"
+          @click="$emit('close')"
+        >
+          x
+        </button>
       </header>
 
-      <div class="min-h-0 overflow-auto p-4">
+      <div class="min-h-0 overflow-auto p-5">
         <div class="grid gap-3 sm:grid-cols-2">
           <label class="block">
             <span class="text-[10px] font-black uppercase text-slate-400">Nombre</span>
@@ -64,7 +59,7 @@
 
           <label class="block">
             <span class="text-[10px] font-black uppercase text-slate-400">
-              {{ mode === "edit" ? "Nueva contraseña" : "Contraseña" }}
+              {{ mode === "edit" ? "Nueva contrasena" : "Contrasena" }}
             </span>
             <input
               :value="draftUser.password"
@@ -90,7 +85,7 @@
           </label>
 
           <label class="block">
-            <span class="text-[10px] font-black uppercase text-slate-400">Rol</span>
+            <span class="text-[10px] font-black uppercase text-slate-400">Rol inicial</span>
             <select
               :value="draftUser.initialRole"
               class="mt-1 h-10 w-full cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-3 text-[12px] font-black text-[#102372] outline-none transition focus:border-[#ff6600] focus:ring-2 focus:ring-[#ff6600]/10"
@@ -122,10 +117,10 @@
         </label>
       </div>
 
-      <footer class="flex justify-end gap-2 border-t border-[#edf1f5] bg-[#f8fafc] px-4 py-3">
+      <footer class="flex justify-end gap-2 border-t border-[#edf1f5] bg-[#f8fafc] px-5 py-3">
         <button
           type="button"
-          class="h-9 rounded-lg border border-[#d8dee8] bg-white px-4 text-[11px] font-black text-[#102372] transition hover:bg-[#f8fafc]"
+          class="h-9 rounded-lg border border-[#d8dee8] bg-white px-4 text-[11px] font-black text-[#102372] transition hover:bg-white"
           @click="$emit('close')"
         >
           Cancelar
@@ -133,7 +128,7 @@
 
         <button
           type="button"
-          class="h-9 rounded-lg bg-[#102372] px-4 text-[11px] font-black text-white transition hover:bg-[#0c1b59] disabled:cursor-not-allowed disabled:bg-slate-300"
+          class="h-9 rounded-lg bg-[#ff6600] px-4 text-[11px] font-black text-white transition hover:bg-[#e65c00] disabled:cursor-not-allowed disabled:bg-slate-300"
           :disabled="!canSave"
           @click="$emit('save')"
         >

@@ -1,15 +1,11 @@
-import { computed, ref, watch } from "vue"
+import { computed, ref } from "vue"
 
-import { buildMockGeofenceHistory } from "../../../../data/mockGeofenceHistoryData.js"
 import { DEFAULT_GEOFENCE_COLOR, normalizeGeofenceColor } from "../../../../utils/geofenceUtils.js"
 import { normalizeId } from "../../../../utils/idUtils.js"
 
 export function useMapPanelGeofenceState({ props, emit }) {
   const showGeofenceModal = ref(false)
-  const showGeofenceHistoryModal = ref(false)
   const activeGeofenceId = ref(null)
-  const selectedHistoryGeofence = ref(null)
-  const selectedHistoryEvents = ref([])
   const showGeofences = ref(true)
   const currentDraftType = ref("circle")
 
@@ -77,11 +73,7 @@ export function useMapPanelGeofenceState({ props, emit }) {
     }
   })
 
-  const resetHistoryState = () => {
-    showGeofenceHistoryModal.value = false
-    selectedHistoryGeofence.value = null
-    selectedHistoryEvents.value = []
-  }
+  const resetHistoryState = () => {}
 
   const clearActiveGeofenceSelection = (notifyParent = true) => {
     activeGeofenceId.value = null
@@ -110,39 +102,6 @@ export function useMapPanelGeofenceState({ props, emit }) {
     return true
   }
 
-  const openEditGeofenceModal = () => {
-    if (!props.canEditGeofences) return
-
-    resetHistoryState()
-    showGeofenceModal.value = true
-  }
-
-  const openGeofenceHistorySelector = () => {
-    if (!props.canViewGeofences) return
-
-    resetHistoryState()
-    showGeofenceModal.value = false
-
-    if (!geofenceItems.value.length) {
-      selectedHistoryGeofence.value = null
-      selectedHistoryEvents.value = []
-      showGeofenceHistoryModal.value = true
-      return
-    }
-
-    showGeofenceModal.value = true
-  }
-
-  const openGeofenceHistory = (geofence) => {
-    if (!geofence) return
-
-    selectedHistoryGeofence.value = geofence
-    selectedHistoryEvents.value = buildMockGeofenceHistory(geofence, props.allActivos)
-
-    showGeofenceModal.value = false
-    showGeofenceHistoryModal.value = true
-  }
-
   const toggleGeofenceVisibility = (editingDraft) => {
     const nextValue = !showGeofences.value
 
@@ -157,22 +116,9 @@ export function useMapPanelGeofenceState({ props, emit }) {
     showGeofences.value = nextValue
   }
 
-  watch(
-    () => showGeofenceHistoryModal.value,
-    (isOpen) => {
-      if (isOpen) return
-
-      selectedHistoryGeofence.value = null
-      selectedHistoryEvents.value = []
-    },
-  )
-
   return {
     showGeofenceModal,
-    showGeofenceHistoryModal,
     activeGeofenceId,
-    selectedHistoryGeofence,
-    selectedHistoryEvents,
     showGeofences,
     draftGeofenceForm,
 
@@ -186,9 +132,6 @@ export function useMapPanelGeofenceState({ props, emit }) {
     clearActiveGeofenceSelection,
     handleDraftGeofenceField,
     prepareCreateGeofence,
-    openEditGeofenceModal,
-    openGeofenceHistorySelector,
-    openGeofenceHistory,
     toggleGeofenceVisibility,
   }
 }

@@ -1,27 +1,25 @@
 <template>
-  <header class="shrink-0 border-b border-[#d8dee8] bg-white px-4 py-3">
-    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+  <header class="shrink-0 bg-[#f3f6fa] px-4 pb-3 pt-4 text-slate-900">
+    <div class="flex items-center justify-between gap-4">
       <div class="min-w-0">
-        <h1 class="text-[17px] font-black text-[#102372]">Gestión de usuarios</h1>
-        <p class="mt-0.5 text-[11px] font-semibold text-slate-500">
-          {{ summaryText }}
+        <h1 class="text-[18px] font-black leading-tight text-[#102372]">
+          Usuarios
+        </h1>
+
+        <p class="mt-1 text-[11px] font-semibold text-slate-500">
+          Gestiona y administra los usuarios del sistema
         </p>
       </div>
 
       <button
         v-if="canCreateUsers"
         type="button"
-        class="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#102372] px-4 text-[11px] font-black text-white transition hover:bg-[#0c1b59] active:scale-[0.98] lg:justify-self-end"
+        class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#ff6600] px-4 text-[11px] font-black text-white shadow-[0_8px_20px_rgba(255,102,0,0.18)] transition hover:bg-[#e65c00] active:scale-[0.98]"
         @click="$emit('create-user')"
       >
-        <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" aria-hidden="true">
-          <path
-            d="M12 5v14M5 12h14"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-          />
-        </svg>
+        <span class="text-[18px] font-medium leading-none">
+          +
+        </span>
 
         Nuevo usuario
       </button>
@@ -30,12 +28,14 @@
 </template>
 
 <script setup>
-import { computed } from "vue"
-
-const props = defineProps({
+defineProps({
   summaryItems: {
     type: Array,
     default: () => [],
+  },
+  selectedStatus: {
+    type: String,
+    default: "all",
   },
   canCreateUsers: {
     type: Boolean,
@@ -43,12 +43,8 @@ const props = defineProps({
   },
 })
 
-defineEmits(["create-user"])
-
-const summaryText = computed(() => {
-  const users = props.summaryItems.find((item) => item.key === "all")?.value ?? 0
-  const enabled = props.summaryItems.find((item) => item.key === "active")?.value ?? 0
-
-  return `${users} usuarios · ${enabled} habilitados`
-})
+defineEmits([
+  "create-user",
+  "select-status",
+])
 </script>

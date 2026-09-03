@@ -1,3 +1,5 @@
+import { assetMatchesVehicleGroup } from "../execution/assetReportVehicleGroupUtils.js"
+
 const normalizeText = (value) => {
   return String(value ?? "")
     .trim()
@@ -22,37 +24,30 @@ const firstValue = (...values) => {
   return values.find((value) => value !== undefined && value !== null && value !== "")
 }
 
-const normalizeId = (value) => {
+const normalizeVehicleGroupId = (value) => {
   return String(value ?? "").trim()
 }
 
-const getSourceGroupId = ({ report = {}, asset = {} }) => {
-  return normalizeId(
-    firstValue(
-      asset.sucursalId,
-      asset.groupId,
-      asset.tagId,
-      asset.branchId,
-      report.sucursalId,
-      report.groupId,
-      report.tagId,
-      report.branchId,
-    ),
+const getRuleVehicleGroupIds = (rule = {}) => {
+  const sourceIds = Array.isArray(rule.vehicleGroupIds)
+    ? rule.vehicleGroupIds
+    : Array.isArray(rule.groupIds)
+      ? rule.groupIds
+      : []
+
+  return Array.from(
+    new Set(sourceIds.map(normalizeVehicleGroupId).filter(Boolean)),
   )
 }
 
-const doesRuleApplyToGroup = ({ report, asset, rule }) => {
-  const groupIds = Array.isArray(rule?.groupIds)
-    ? rule.groupIds.map(normalizeId).filter(Boolean)
-    : []
+const doesRuleApplyToVehicleGroup = ({ asset, rule }) => {
+  const vehicleGroupIds = getRuleVehicleGroupIds(rule)
 
-  if (!groupIds.length) return true
+  if (!vehicleGroupIds.length) return true
 
-  const sourceGroupId = getSourceGroupId({ report, asset })
-
-  if (!sourceGroupId) return false
-
-  return groupIds.includes(sourceGroupId)
+  return vehicleGroupIds.some((vehicleGroupId) => {
+    return assetMatchesVehicleGroup(asset, vehicleGroupId)
+  })
 }
 
 const getTimestampValue = ({ report = {}, asset = {} }) => {
@@ -231,7 +226,7 @@ const hasMeaningfulValue = (value) => {
 
   return Boolean(
     normalizedValue &&
-    !["-", "n/a", "na", "null", "undefined", "sin datos", "sin dato"].includes(normalizedValue),
+      !["-", "n/a", "na", "null", "undefined", "sin datos", "sin dato"].includes(normalizedValue),
   )
 }
 
@@ -784,7 +779,7 @@ const compareCondition = ({ value, operator, expectedValue }) => {
 export const doesReportMatchEventRule = ({ report, asset, rule }) => {
   if (!rule || rule.id === "all") return false
   if (rule.active === false) return false
-  if (!doesRuleApplyToGroup({ report, asset, rule })) return false
+  if (!doesRuleApplyToVehicleGroup({ asset, rule })) return false
   if (!doesRuleApplyToSchedule({ report, asset, rule })) return false
   if (isSpeedingEventRule(rule) && !hasSpeedingSignal({ report, asset, rule })) return false
   if (!doesReportHaveDefaultRuleSignal({ report, asset, rule })) return false

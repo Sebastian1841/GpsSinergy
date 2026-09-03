@@ -1,6 +1,6 @@
 <template>
   <div
-    class="absolute left-[68px] top-3 z-[500] max-w-[360px] rounded-xl border border-[#d8dee8] bg-white px-3 py-2 shadow-lg"
+    class="absolute left-3 right-3 top-3 z-[500] max-w-[360px] rounded-xl border border-[#d8dee8] bg-white px-3 py-2 shadow-lg sm:left-[68px] sm:right-auto"
   >
     <p class="text-[11px] font-black text-[#102372]">
       {{ helperTitle }}
@@ -30,13 +30,17 @@
           Grupo
         </span>
 
-        <input
+        <select
           :value="draftGeofenceForm.groupName"
-          type="text"
-          placeholder="Ej: PEAJE"
-          class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#102372]"
-          @input="$emit('update-draft-field', 'groupName', $event.target.value)"
-        />
+          class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-700 outline-none transition focus:border-[#102372]"
+          @change="$emit('update-draft-field', 'groupName', $event.target.value)"
+        >
+          <option value="">Sin grupo</option>
+
+          <option v-for="group in normalizedGeofenceGroups" :key="group.id" :value="group.name">
+            {{ group.label }}
+          </option>
+        </select>
       </label>
 
       <div class="grid grid-cols-2 gap-2">
@@ -108,14 +112,18 @@
           Grupo
         </span>
 
-        <input
+        <select
           :value="editingDraft.groupName"
-          type="text"
-          placeholder="Ej: PEAJE"
-          class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#102372]"
+          class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-700 outline-none transition focus:border-[#102372]"
           @change="$emit('update-editing-meta', 'groupName', $event.target.value)"
           @keydown.enter.prevent="$event.target.blur()"
-        />
+        >
+          <option value="">Sin grupo</option>
+
+          <option v-for="group in normalizedGeofenceGroups" :key="group.id" :value="group.name">
+            {{ group.label }}
+          </option>
+        </select>
       </label>
 
       <div class="grid grid-cols-2 gap-2">
@@ -236,6 +244,10 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  geofenceGroups: {
+    type: Array,
+    default: () => [],
+  },
   draftGeofencePreviewName: {
     type: String,
     default: "",
@@ -272,6 +284,28 @@ const draftColor = computed(() => {
 
 const currentEditingColor = computed(() => {
   return normalizeGeofenceColor(props.editingColor)
+})
+
+const normalizedGeofenceGroups = computed(() => {
+  const groupsByName = new Map()
+
+  props.geofenceGroups.forEach((group) => {
+    const name = String(group?.name || group?.label || group || "").trim()
+
+    if (!name) return
+
+    groupsByName.set(name.toLocaleLowerCase("es"), {
+      id: String(group?.id || name),
+      name,
+      label: group?.label || name,
+    })
+  })
+
+  return Array.from(groupsByName.values()).sort((firstGroup, secondGroup) => {
+    return firstGroup.label.localeCompare(secondGroup.label, "es", {
+      sensitivity: "base",
+    })
+  })
 })
 
 const drawModeLabel = computed(() => {

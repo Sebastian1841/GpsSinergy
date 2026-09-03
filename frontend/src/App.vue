@@ -16,19 +16,51 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue"
+import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 
 import AppHeader from "./components/Layout/AppHeader.vue"
 import AppSidebar from "./components/Layout/AppSidebar.vue"
 import ImpersonationBanner from "./components/auth/ImpersonationBanner.vue"
+import { useAuthSession } from "./composables/auth/useAuthSession.js"
+import { preloadPrivateRouteViews } from "./router"
 
 const route = useRoute()
+const { isAuthenticated } = useAuthSession()
 const showSidebar = ref(false)
+let cancelRouteViewPreload = null
 
 const isPublicRoute = computed(() => route.meta.public === true)
 
 const toggleSidebar = () => {
   showSidebar.value = !showSidebar.value
 }
+
+watch(
+  [isAuthenticated, isPublicRoute, () => route.meta.preloadKey],
+  ([authenticated, publicRoute, currentPreloadKey]) => {
+    if (cancelRouteViewPreload) {
+      cancelRouteViewPreload()
+      cancelRouteViewPreload = null
+    }
+
+    if (!authenticated || publicRoute) return
+
+    cancelRouteViewPreload = preloadPrivateRouteViews({
+      batchDelayMs: 320,
+      exclude: [currentPreloadKey],
+      startDelayMs: 1800,
+    })
+  },
+  {
+    flush: "post",
+    immediate: true,
+  },
+)
+
+onBeforeUnmount(() => {
+  if (cancelRouteViewPreload) {
+    cancelRouteViewPreload()
+  }
+})
 </script>

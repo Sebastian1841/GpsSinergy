@@ -4,6 +4,9 @@ const DEFAULT_INTERVAL_MS = 1000
 const DEFAULT_BATCH_SIZE = 25
 const DEFAULT_BASE_LAT = -33.4489
 const DEFAULT_BASE_LNG = -70.6693
+const STATUS_CHANGE_PROBABILITY = 0.14
+const STOPPED_STATUS_CHANGE_PROBABILITY = 0.018
+const OFFLINE_STATUS_CHANGE_PROBABILITY = 0.06
 
 const TELEMETRY_STATUS = {
   MOVING: "moving",
@@ -230,18 +233,25 @@ const createTelemetryStateFromActivo = (activo, index = 0) => {
   }
 }
 
-const shouldChangeStatus = () => {
-  return Math.random() < 0.08
+const getStatusChangeProbability = (currentStatus) => {
+  if (currentStatus === TELEMETRY_STATUS.STOPPED) return STOPPED_STATUS_CHANGE_PROBABILITY
+  if (currentStatus === TELEMETRY_STATUS.OFFLINE) return OFFLINE_STATUS_CHANGE_PROBABILITY
+
+  return STATUS_CHANGE_PROBABILITY
+}
+
+const shouldChangeStatus = (currentStatus) => {
+  return Math.random() < getStatusChangeProbability(currentStatus)
 }
 
 const getNextStatus = (currentStatus) => {
-  if (!shouldChangeStatus()) return currentStatus || TELEMETRY_STATUS.OFFLINE
+  if (!shouldChangeStatus(currentStatus)) return currentStatus || TELEMETRY_STATUS.OFFLINE
 
   const roll = Math.random()
 
-  if (roll < 0.58) return TELEMETRY_STATUS.MOVING
-  if (roll < 0.78) return TELEMETRY_STATUS.IDLE
-  if (roll < 0.92) return TELEMETRY_STATUS.STOPPED
+  if (roll < 0.48) return TELEMETRY_STATUS.MOVING
+  if (roll < 0.66) return TELEMETRY_STATUS.IDLE
+  if (roll < 0.96) return TELEMETRY_STATUS.STOPPED
 
   return TELEMETRY_STATUS.OFFLINE
 }

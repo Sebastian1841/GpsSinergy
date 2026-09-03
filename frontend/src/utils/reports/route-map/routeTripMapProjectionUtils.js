@@ -3,6 +3,7 @@ import { TILE_SIZE } from "./routeTripMapTileUtils.js"
 const MAP_PADDING = 42
 const MIN_ZOOM = 3
 const MAX_ZOOM = 18
+const CONTEXT_ZOOM_OUT_LEVELS = 1
 const MAX_MERCATOR_LAT = 85.05112878
 
 const clampNumber = (value, min, max) => {
@@ -78,7 +79,9 @@ const getSnapshotZoom = ({ bounds, width, height }) => {
     const routeWidth = Math.abs(southEast.x - northWest.x)
     const routeHeight = Math.abs(southEast.y - northWest.y)
 
-    if (routeWidth <= innerWidth && routeHeight <= innerHeight) return zoom
+    if (routeWidth <= innerWidth && routeHeight <= innerHeight) {
+      return clampNumber(zoom - CONTEXT_ZOOM_OUT_LEVELS, MIN_ZOOM, MAX_ZOOM)
+    }
   }
 
   return MIN_ZOOM

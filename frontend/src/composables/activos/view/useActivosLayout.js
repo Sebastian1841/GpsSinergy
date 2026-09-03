@@ -4,6 +4,9 @@ const clamp = (value, min, max) => {
   return Math.min(Math.max(value, min), max)
 }
 
+const MIN_FLEET_PANEL_WIDTH = 300
+const MIN_MAP_PANEL_WIDTH = 260
+
 export function useActivosLayout({ leftPanelWidth, persistPanelWidth }) {
   const layoutRef = ref(null)
 
@@ -40,10 +43,9 @@ export function useActivosLayout({ leftPanelWidth, persistPanelWidth }) {
     const rect = layoutRef.value.getBoundingClientRect()
     const rawWidth = event.clientX - rect.left
 
-    const minWidth = 300
-    const maxWidth = Math.max(minWidth, rect.width - 360)
+    const maxWidth = Math.max(MIN_FLEET_PANEL_WIDTH, rect.width - MIN_MAP_PANEL_WIDTH)
 
-    leftPanelWidth.value = clamp(rawWidth, minWidth, maxWidth)
+    leftPanelWidth.value = clamp(rawWidth, MIN_FLEET_PANEL_WIDTH, maxWidth)
   }
 
   const scheduleDragResize = (event) => {

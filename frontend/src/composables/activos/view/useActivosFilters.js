@@ -1,5 +1,7 @@
 import { computed, ref } from "vue"
 
+import { useDebouncedValue } from "../../ui/useDebouncedValue.js"
+
 export function useActivosFilters({ onLeaveItinerarios, onFilterChanged, refreshMapLayout }) {
   const statusFilter = ref("all")
   const activeSidebarSection = ref("activos")
@@ -9,8 +11,9 @@ export function useActivosFilters({ onLeaveItinerarios, onFilterChanged, refresh
     reportes: "",
     itinerarios: "",
     geocercas: "",
-    sucursales: "",
+    etiquetas: "",
   })
+  const debouncedSectionSearch = useDebouncedValue(sectionSearch, 180)
 
   const normalizeText = (value) => {
     return String(value || "")
@@ -31,7 +34,7 @@ export function useActivosFilters({ onLeaveItinerarios, onFilterChanged, refresh
   }
 
   const filterActivosByCurrentState = (activos = []) => {
-    const term = normalizeText(sectionSearch.value.activos)
+    const term = normalizeText(debouncedSectionSearch.value.activos)
 
     return activos.filter((activo) => {
       const matchesText =
@@ -77,7 +80,7 @@ export function useActivosFilters({ onLeaveItinerarios, onFilterChanged, refresh
   }
 
   const setSidebarSection = (section) => {
-    const allowedSections = ["activos", "reportes", "itinerarios", "geocercas", "sucursales"]
+    const allowedSections = ["activos", "reportes", "itinerarios", "geocercas", "etiquetas"]
     const nextSection = allowedSections.includes(section) ? section : "activos"
     const previousSection = activeSidebarSection.value
 

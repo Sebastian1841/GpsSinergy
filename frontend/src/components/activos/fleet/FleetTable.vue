@@ -363,7 +363,7 @@ const statusLabel = (estado) => {
   const labels = {
     moving: "Ruta",
     idle: "Espera",
-    stopped: "Alerta",
+    stopped: "Detenido",
     offline: "Offline",
   }
 
@@ -374,7 +374,7 @@ const statusDotClass = (estado) => {
   const classes = {
     moving: "bg-emerald-500",
     idle: "bg-sky-500",
-    stopped: "bg-red-500",
+    stopped: "bg-[#ff6600]",
     offline: "bg-slate-400",
   }
 
@@ -385,7 +385,7 @@ const statusChipClass = (estado) => {
   const classes = {
     moving: "bg-emerald-50 text-emerald-700",
     idle: "bg-sky-50 text-sky-700",
-    stopped: "bg-red-50 text-red-700",
+    stopped: "bg-[#fff3eb] text-[#ff6600]",
     offline: "bg-slate-100 text-slate-500",
   }
 

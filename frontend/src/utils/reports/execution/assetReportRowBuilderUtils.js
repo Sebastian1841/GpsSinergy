@@ -199,6 +199,12 @@ const getReportDateLabel = (timestamp) => {
   return formatTimestamp(timestamp).split(" ")[0] || "-"
 }
 
+const getFirstText = (...values) => {
+  return values
+    .map((value) => String(value ?? "").trim())
+    .find((value) => value && value !== "-")
+}
+
 const normalizeReportStatusKey = (value) => {
   const normalizedValue = normalizeReportText(value)
 
@@ -288,6 +294,20 @@ const getColumnValue = ({ asset, report, rule = null, columnKey, companyName, ti
     odometro: getFleetTelemetryCellValue(telemetrySource, { key: "odometro" }),
     horometro: getFleetTelemetryCellValue(telemetrySource, { key: "horometroTotal" }),
     geocerca: report?.geocerca || asset.geocerca || "-",
+    geofenceEntryTime:
+      getFirstText(
+        report?.geofenceEntryTime,
+        report?.horaEntradaGeocerca,
+        report?.entryTime,
+        report?.entryLabel,
+      ) || "-",
+    geofenceExitTime:
+      getFirstText(
+        report?.geofenceExitTime,
+        report?.horaSalidaGeocerca,
+        report?.exitTime,
+        report?.exitLabel,
+      ) || "-",
     evento: report?.event || report?.evento || asset.evento || asset.choque || "-",
     event: report?.event || report?.evento || asset.evento || asset.choque || "-",
     duracion: report?.duracion || asset.duracion || "-",

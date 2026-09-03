@@ -170,7 +170,7 @@
 }
 
 .sinergy-vehicle-marker.marker-stopped::after {
-  background: #ef4444;
+  background: #ff6600;
 }
 
 .sinergy-vehicle-marker.marker-offline::after {
@@ -217,7 +217,7 @@
 }
 
 .marker-stopped {
-  background: #ef4444;
+  background: #ff6600;
 }
 
 .marker-offline {

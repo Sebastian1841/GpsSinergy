@@ -398,13 +398,13 @@ export function createAssetMarkerController({
 
     const groupedUpdates = Array.from(pendingTelemetryUpdatesById.entries())
 
-    pendingTelemetryUpdatesById.clear()
-
     if (!groupedUpdates.length) return
 
     const map = getMap()
 
     if (!map || !layers.markerLayer) return
+
+    pendingTelemetryUpdatesById.clear()
 
     const shouldCluster = shouldClusterAssetMarkers(map, getRenderableLatestActivos())
 
@@ -573,11 +573,7 @@ export function createAssetMarkerController({
         movementTrails.removeMovementTrail(activoId)
       })
 
-      if (shouldClusterAssetMarkers(map, nextVisibleActivos)) {
-        markerClusters.renderMarkerClusters(getVisibleActivos())
-      } else {
-        markerClusters.renderMarkerClusters(nextVisibleActivos)
-      }
+      markerClusters.renderMarkerClusters(nextVisibleActivos)
 
       if (fit && bounds.length && !props.selectedId && !props.itineraryRoute) {
         map.fitBounds(bounds, {

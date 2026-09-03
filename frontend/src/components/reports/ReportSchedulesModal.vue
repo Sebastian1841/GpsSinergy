@@ -166,6 +166,7 @@
   </Teleport>
 
   <ReportScheduleFormModal
+    v-if="isFormOpen"
     v-model="isFormOpen"
     :schedule="editingSchedule"
     :template="selectedTemplateForForm"
@@ -178,9 +179,10 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue"
+import { computed, defineAsyncComponent, onMounted, ref, watch } from "vue"
 
 import { useAuditTrail } from "../../composables/audit/useAuditTrail.js"
+import { preloadWhenIdle } from "../../composables/ui/useIdlePreload.js"
 import {
   getReportScheduleFormatLabel,
   getReportScheduleFrequencyLabel,
@@ -188,7 +190,10 @@ import {
   getReportScheduleWeekdayLabel,
   normalizeScheduleRecipients,
 } from "../../utils/reports/schedules/reportScheduleUtils.js"
-import ReportScheduleFormModal from "./ReportScheduleFormModal.vue"
+
+const loadReportScheduleFormModal = () => import("./ReportScheduleFormModal.vue")
+
+const ReportScheduleFormModal = defineAsyncComponent(loadReportScheduleFormModal)
 
 const props = defineProps({
   modelValue: {
@@ -477,4 +482,8 @@ function createVisualSchedule(payload) {
     active: payload.active !== false,
   }
 }
+
+onMounted(() => {
+  preloadWhenIdle([loadReportScheduleFormModal])
+})
 </script>

@@ -56,138 +56,26 @@
           </div>
         </div>
 
-        <div
-          v-if="currentUser"
+        <HeaderGlobalSearch
+          :enabled="Boolean(currentUser)"
+          :is-open="showGlobalSearchDropdown"
+          :active-company-id="activeCompanyId"
+          :audit-records="auditRecords"
+          :can-access-function="canAccessFunction"
+          :can-access-module="canAccessModule"
+          :companies="headerCompanies"
+          :get-accessible-company-entry-path="getAccessibleCompanyEntryPath"
+          :report-types="reportTypes"
+          :users="searchableUsers"
+          :visible-assets="visibleAssets"
+          :workspaces="workspaces"
           class="relative z-40 col-span-2 row-start-2 w-full min-w-0 lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:max-w-[460px] lg:justify-self-center xl:max-w-[520px] 2xl:max-w-[560px]"
-        >
-          <form class="relative" @submit.prevent="enterFirstCompanyResult">
-            <span
-              class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/45"
-            >
-              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" aria-hidden="true">
-                <path
-                  d="m20 20-4.35-4.35M18 10.5a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                />
-              </svg>
-            </span>
-
-            <input
-              v-model="companySearch"
-              type="search"
-              autocomplete="off"
-              placeholder="Buscar empresa..."
-              class="h-10 w-full rounded-xl border border-white/10 bg-white/[0.06] pl-9 pr-20 text-sm font-semibold text-white outline-none transition placeholder:text-white/40 focus:border-[#ff6600] focus:bg-white/[0.09] focus:ring-2 focus:ring-[#ff6600]/20"
-              @focus="openCompanyDropdown"
-              @input="openCompanyDropdown"
-            />
-
-            <button
-              v-if="companySearch"
-              type="button"
-              class="absolute right-[70px] top-1/2 -translate-y-1/2 rounded-md px-1.5 py-0.5 text-[15px] leading-none text-white/45 transition hover:bg-white/10 hover:text-white"
-              aria-label="Limpiar busqueda"
-              @click="clearCompanySearch"
-            >
-              ×
-            </button>
-
-            <button
-              type="submit"
-              class="absolute right-1.5 top-1/2 h-7 w-16 -translate-y-1/2 rounded-lg bg-[#ff6600] text-[10px] font-black text-white transition hover:bg-[#e65c00] disabled:cursor-not-allowed disabled:opacity-45"
-              :disabled="!filteredHeaderCompanies.length"
-            >
-              Entrar
-            </button>
-          </form>
-
-          <transition
-            enter-active-class="transition duration-160 ease-out"
-            enter-from-class="opacity-0 translate-y-1 scale-[0.98]"
-            enter-to-class="opacity-100 translate-y-0 scale-100"
-            leave-active-class="transition duration-120 ease-in"
-            leave-from-class="opacity-100 translate-y-0 scale-100"
-            leave-to-class="opacity-0 translate-y-1 scale-[0.98]"
-            @before-enter="raiseHeaderLayer"
-            @before-leave="raiseHeaderLayer"
-            @after-leave="releaseHeaderLayer"
-          >
-            <div
-              v-show="showCompanyDropdown"
-              class="absolute left-0 right-0 top-[46px] z-50 overflow-hidden rounded-xl border border-white/10 bg-[#1b2532]/95 text-white shadow-[0_20px_50px_rgba(0,0,0,0.35)] backdrop-blur-xl"
-              @click.stop
-              @pointerdown.stop
-            >
-              <div
-                class="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2"
-              >
-                <div class="min-w-0">
-                  <p class="text-[10px] font-black uppercase tracking-[0.16em] text-white/45">
-                    Empresas
-                  </p>
-                  <span class="text-[10px] font-black text-[#ff6600]">
-                    {{ filteredHeaderCompanies.length }} mostradas
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  class="shrink-0 rounded-lg px-2.5 py-1 text-[10px] font-black text-white transition hover:brightness-95 active:scale-95"
-                  style="
-                    border: 1px solid #ff6600 !important;
-                    background-color: #ff6600 !important;
-                    color: #ffffff !important;
-                    box-shadow: 0 8px 20px rgba(255, 102, 0, 0.28);
-                  "
-                  @click="closeCompanySearchPanel"
-                >
-                  Cerrar
-                </button>
-              </div>
-
-              <div class="max-h-[330px] overflow-auto p-2">
-                <button
-                  v-for="company in filteredHeaderCompanies"
-                  :key="company.id"
-                  type="button"
-                  class="group grid w-full grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-white/10"
-                  :class="isActiveCompany(company) ? 'bg-[#ff6600]/15' : ''"
-                  @click="enterCompany(company)"
-                >
-                  <span
-                    class="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-[10px] font-black text-white group-hover:bg-[#ff6600]"
-                  >
-                    {{ getCompanyInitials(company.name) }}
-                  </span>
-
-                  <span class="min-w-0">
-                    <span class="block truncate text-[12px] font-black text-white">
-                      {{ company.name }}
-                    </span>
-                    <span class="mt-0.5 block truncate text-[10px] font-semibold text-white/50">
-                      {{ company.rut || "Sin RUT" }} · {{ company.assetsCount || 0 }} activos
-                    </span>
-                  </span>
-
-                  <span
-                    class="shrink-0 rounded-md border border-white/10 px-2 py-1 text-[9px] font-black text-white/65 group-hover:border-[#ff6600]/40 group-hover:text-white"
-                  >
-                    {{ getCompanyStatusLabel(company.status) }}
-                  </span>
-                </button>
-
-                <div v-if="!filteredHeaderCompanies.length" class="px-3 py-7 text-center">
-                  <p class="text-[12px] font-black text-white">Sin empresas encontradas</p>
-                  <p class="mt-1 text-[10px] font-semibold text-white/45">
-                    Prueba por nombre, RUT, ciudad o grupo.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </transition>
-        </div>
+          @open="openGlobalSearchDropdown"
+          @close="closeGlobalSearchDropdown"
+          @before-open="raiseHeaderLayer"
+          @before-close="raiseHeaderLayer"
+          @after-close="releaseHeaderLayer"
+        />
 
         <div
           class="col-start-2 row-start-1 flex min-w-0 shrink-0 items-center justify-end gap-1.5 justify-self-end sm:gap-2 lg:col-start-3"
@@ -213,21 +101,27 @@
             @save-current-view="handleSaveCurrentWorkspace"
           />
 
-          <HeaderPersonalAssetGroupsMenu
+          <HeaderFleetAssetFilterMenu
             class="hidden shrink-0 xl:block"
             :enabled="showPersonalViewsControl"
             :is-open="showPersonalViewsDropdown"
-            :groups="personalAssetGroups"
-            :selected-group-id="selectedPersonalAssetGroupId"
+            :available-assets="headerVisibleAssets"
+            :can-manage-groups="canManageVehicleAssetGroups"
+            :city-groups="cityAssetGroups"
+            :selected-city-group-id="selectedCityAssetGroupId"
+            :selected-vehicle-group-id="selectedVehicleAssetGroupId"
+            :vehicle-groups="vehicleAssetGroups"
             :visible-assets-count="headerVisibleAssets.length"
             @open="openPersonalViewsDropdown"
             @close="closePersonalViewsDropdown"
             @before-open="raiseHeaderLayer"
             @before-close="raiseHeaderLayer"
             @after-close="releaseHeaderLayer"
-            @select-group="selectPersonalAssetGroup"
-            @open-create-modal="openCreatePersonalViewModal"
-            @open-edit-modal="openEditPersonalViewModal"
+            @create-vehicle-group="handleCreateVehicleAssetGroup"
+            @delete-vehicle-group="handleDeleteVehicleAssetGroup"
+            @select-city-group="selectCityAssetGroup"
+            @select-vehicle-group="selectVehicleAssetGroup"
+            @update-vehicle-group="handleUpdateVehicleAssetGroup"
           />
 
           <div v-if="currentUser" class="relative z-40 shrink-0">
@@ -347,35 +241,31 @@
             @save-current-view="handleSaveCurrentWorkspace"
           />
 
-          <HeaderPersonalAssetGroupsMenu
+          <HeaderFleetAssetFilterMenu
             class="shrink-0"
             :enabled="showPersonalViewsControl"
             :is-open="showPersonalViewsDropdown"
-            :groups="personalAssetGroups"
-            :selected-group-id="selectedPersonalAssetGroupId"
+            :available-assets="headerVisibleAssets"
+            :can-manage-groups="canManageVehicleAssetGroups"
+            :city-groups="cityAssetGroups"
+            :selected-city-group-id="selectedCityAssetGroupId"
+            :selected-vehicle-group-id="selectedVehicleAssetGroupId"
+            :vehicle-groups="vehicleAssetGroups"
             :visible-assets-count="headerVisibleAssets.length"
             @open="openPersonalViewsDropdown"
             @close="closePersonalViewsDropdown"
             @before-open="raiseHeaderLayer"
             @before-close="raiseHeaderLayer"
             @after-close="releaseHeaderLayer"
-            @select-group="selectPersonalAssetGroup"
-            @open-create-modal="openCreatePersonalViewModal"
-            @open-edit-modal="openEditPersonalViewModal"
+            @create-vehicle-group="handleCreateVehicleAssetGroup"
+            @delete-vehicle-group="handleDeleteVehicleAssetGroup"
+            @select-city-group="selectCityAssetGroup"
+            @select-vehicle-group="selectVehicleAssetGroup"
+            @update-vehicle-group="handleUpdateVehicleAssetGroup"
           />
         </div>
       </div>
     </header>
-
-    <PersonalAssetGroupModal
-      v-model="showPersonalViewModal"
-      :mode="personalViewModalMode"
-      :group="editingPersonalAssetGroup"
-      :assets="headerVisibleAssets"
-      @create-group="handleCreatePersonalAssetGroup"
-      @update-group="handleUpdatePersonalAssetGroup"
-      @delete-group="handleDeletePersonalAssetGroup"
-    />
   </div>
 </template>
 
@@ -384,61 +274,49 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useAccessControl } from "../../composables/auth/useAccessControl.js"
 import { useAuthSession } from "../../composables/auth/useAuthSession.js"
-import { usePersonalAssetGroups } from "../../composables/activos/fleet/usePersonalAssetGroups.js"
+import { useAssetCityFilter } from "../../composables/activos/fleet/useAssetCityFilter.js"
+import { useAssetVehicleGroupFilter } from "../../composables/activos/fleet/useAssetVehicleGroupFilter.js"
+import { useAssetVehicleGroupManagement } from "../../composables/activos/fleet/useAssetVehicleGroupManagement.js"
+import { useAppHeaderAccessScope } from "../../composables/layout/useAppHeaderAccessScope.js"
 import { useWorkspaceViewState } from "../../composables/workspaces/useWorkspaceViewState.js"
 import { useWorkspaces } from "../../composables/workspaces/useWorkspaces.js"
+import { useAuditService } from "../../services/audit/useAuditService.js"
 import { useCompaniesService } from "../../services/companies/useCompaniesService.js"
+import { useReportsService } from "../../services/reports/useReportsService.js"
 import { useUsersService } from "../../services/users/useUsersService.js"
 import { createCityAssetGroups } from "../../utils/activos/assetCityUtils.js"
 import {
-  getCompanyInitials,
-  getCompanyStatusLabel,
-  getCompanyWorkspacePath,
-} from "../../utils/companies/companyUtils.js"
+  createVehicleAssetGroupId,
+  createVehicleAssetGroups,
+} from "../../utils/activos/assetVehicleGroupUtils.js"
+import { getCompanyWorkspacePath } from "../../utils/companies/companyUtils.js"
 import { normalizeId } from "../../utils/idUtils.js"
-import HeaderPersonalAssetGroupsMenu from "./HeaderPersonalAssetGroupsMenu.vue"
-import PersonalAssetGroupModal from "./PersonalAssetGroupModal.vue"
+import HeaderFleetAssetFilterMenu from "./HeaderFleetAssetFilterMenu.vue"
+import HeaderGlobalSearch from "./HeaderGlobalSearch.vue"
 import WorkspaceSelector from "./WorkspaceSelector.vue"
 import SvgIcon from "../icons/SvgIcon.vue"
 
 const emit = defineEmits(["toggle-sidebar"])
 
-const HEADER_COMPANY_RESULT_LIMIT = 50
-const HEADER_COMPANY_SEARCH_DEBOUNCE_MS = 150
-
 const router = useRouter()
 const route = useRoute()
 const { currentUser, currentRole, logout: logoutSession } = useAuthSession()
-const { accessibleCompanies, visibleAssets, canAccessModule, canAccessFunction } =
+const { accessibleCompanies, visibleAssets, isPlatformAdmin, canAccessModule, canAccessFunction } =
   useAccessControl()
+const { auditRecords } = useAuditService()
 const { companyRecords } = useCompaniesService()
-const { users } = useUsersService()
+const { reportTypes } = useReportsService()
+const { users, accesses, applications } = useUsersService()
 const { currentWorkspaceViewState, requestWorkspaceViewRestore } = useWorkspaceViewState()
 
 const showDropdown = ref(false)
-const showCompanyDropdown = ref(false)
+const showGlobalSearchDropdown = ref(false)
 const showPersonalViewsDropdown = ref(false)
 const showWorkspaceDropdown = ref(false)
-const showPersonalViewModal = ref(false)
-const personalViewModalMode = ref("create")
-const editingPersonalAssetGroupId = ref(null)
 const headerLayerRaised = ref(false)
-const companySearch = ref("")
-const debouncedCompanySearch = ref("")
 const headerRef = ref(null)
 
-let companySearchTimer = null
 let lastAutoRestoredWorkspaceKey = ""
-
-watch(companySearch, (value) => {
-  if (companySearchTimer) {
-    clearTimeout(companySearchTimer)
-  }
-
-  companySearchTimer = setTimeout(() => {
-    debouncedCompanySearch.value = value
-  }, HEADER_COMPANY_SEARCH_DEBOUNCE_MS)
-})
 
 onMounted(() => {
   document.addEventListener("click", handleClickOutside)
@@ -448,10 +326,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener("click", handleClickOutside)
   document.removeEventListener("keydown", handleKeydown)
-
-  if (companySearchTimer) {
-    clearTimeout(companySearchTimer)
-  }
 })
 
 const userName = computed(() => {
@@ -469,23 +343,11 @@ const userRole = computed(() => {
 const showAnyDropdown = computed(() => {
   return (
     showDropdown.value ||
-    showCompanyDropdown.value ||
+    showGlobalSearchDropdown.value ||
     showPersonalViewsDropdown.value ||
     showWorkspaceDropdown.value ||
     headerLayerRaised.value
   )
-})
-
-const accessibleCompanyIds = computed(() => {
-  return new Set(accessibleCompanies.value.map((company) => String(company.id)))
-})
-
-const headerCompanies = computed(() => {
-  return companyRecords.value
-    .filter((company) => accessibleCompanyIds.value.has(String(company.id)))
-    .sort((firstCompany, secondCompany) => {
-      return String(firstCompany.name || "").localeCompare(String(secondCompany.name || ""), "es")
-    })
 })
 
 const activeCompanyId = computed(() => {
@@ -500,13 +362,18 @@ const isActivosContext = computed(() => {
   return route.name === "Activos" || route.name === "AppActivos"
 })
 
-const headerVisibleAssets = computed(() => {
-  if (!activeCompanyId.value) return []
-
-  return visibleAssets.value.filter((asset) => {
-    return String(asset.companyId) === activeCompanyId.value
+const { headerCompanies, headerVisibleAssets, searchableUsers, workspaceUsers } =
+  useAppHeaderAccessScope({
+    activeCompanyId,
+    accessibleCompanies,
+    companyRecords,
+    visibleAssets,
+    users,
+    accesses,
+    applications,
+    canAccessFunction,
+    isPlatformAdmin,
   })
-})
 
 const showPersonalViewsControl = computed(() => {
   return Boolean(
@@ -525,57 +392,105 @@ const showSecondaryHeaderControls = computed(() => {
   return showWorkspacesControl.value || showPersonalViewsControl.value
 })
 
-const workspaceUsers = computed(() => {
-  return users.value.filter((user) => {
-    return user?.status === "active"
-  })
-})
-
 const cityAssetGroups = computed(() => {
   return createCityAssetGroups(headerVisibleAssets.value)
 })
 
-const {
-  personalAssetGroups,
-  selectedPersonalAssetGroupId,
-  selectPersonalAssetGroup,
-  createPersonalAssetGroup,
-  renamePersonalAssetGroup,
-  setPersonalAssetGroupAssets,
-  deletePersonalAssetGroup,
-} = usePersonalAssetGroups({
+const { selectedCityAssetGroupId, selectCityAssetGroup } = useAssetCityFilter({
   userId: currentUserId,
   companyId: activeCompanyId,
   availableActivos: headerVisibleAssets,
-  dynamicGroups: cityAssetGroups,
+  cityGroups: cityAssetGroups,
 })
 
-const editingPersonalAssetGroup = computed(() => {
-  const groupId = normalizeId(editingPersonalAssetGroupId.value)
+const findCompanyById = (companies = [], companyId) => {
+  const normalizedCompanyId = normalizeId(companyId)
 
-  if (!groupId) return null
+  if (!normalizedCompanyId) return null
 
   return (
-    personalAssetGroups.value.find((group) => {
-      return normalizeId(group.id) === groupId
+    companies.find((company) => {
+      return normalizeId(company?.id) === normalizedCompanyId
     }) || null
   )
-})
+}
 
 const activeHeaderCompany = computed(() => {
   if (!activeCompanyId.value) return null
 
-  return companyRecords.value.find((company) => {
-    return String(company.id) === activeCompanyId.value
+  return (
+    findCompanyById(companyRecords.value, activeCompanyId.value) ||
+    findCompanyById(accessibleCompanies.value, activeCompanyId.value)
+  )
+})
+
+const {
+  managedVehicleGroups,
+  createVehicleAssetGroup,
+  updateVehicleAssetGroup,
+  deleteVehicleAssetGroup,
+} = useAssetVehicleGroupManagement({
+  contextId: activeCompanyId,
+  availableActivos: headerVisibleAssets,
+})
+
+const vehicleAssetGroups = computed(() => {
+  return createVehicleAssetGroups({
+    assets: headerVisibleAssets.value,
+    groups: managedVehicleGroups.value,
   })
 })
 
+const { selectedVehicleAssetGroupId, selectVehicleAssetGroup } = useAssetVehicleGroupFilter({
+  userId: currentUserId,
+  contextId: activeCompanyId,
+  availableActivos: headerVisibleAssets,
+  vehicleGroups: vehicleAssetGroups,
+})
+
+const canManageVehicleAssetGroups = computed(() => {
+  return Boolean(
+    showPersonalViewsControl.value &&
+    (canAccessFunction("gps", activeCompanyId.value, "edit") ||
+      canAccessFunction("gps", activeCompanyId.value, "admin")),
+  )
+})
+
+const handleCreateVehicleAssetGroup = (payload) => {
+  if (!canManageVehicleAssetGroups.value) return
+
+  const createdGroup = createVehicleAssetGroup(payload)
+
+  if (createdGroup?.id) {
+    selectVehicleAssetGroup(createVehicleAssetGroupId(createdGroup.id))
+  }
+}
+
+const handleUpdateVehicleAssetGroup = ({ id, changes } = {}) => {
+  if (!canManageVehicleAssetGroups.value) return
+
+  updateVehicleAssetGroup(id, changes)
+}
+
+const handleDeleteVehicleAssetGroup = (groupId) => {
+  if (!canManageVehicleAssetGroups.value) return
+
+  const deleted = deleteVehicleAssetGroup(groupId)
+
+  if (deleted && normalizeId(selectedVehicleAssetGroupId.value) === normalizeId(groupId)) {
+    selectVehicleAssetGroup(null)
+  }
+}
+
 const activeContextLabel = computed(() => {
-  return activeHeaderCompany.value ? "Empresa actual" : "Vista actual"
+  return activeCompanyId.value ? "Empresa actual" : "Vista actual"
 })
 
 const activeContextName = computed(() => {
-  if (activeHeaderCompany.value) return activeHeaderCompany.value.name
+  if (activeCompanyId.value) {
+    return activeHeaderCompany.value?.name || activeCompanyId.value
+  }
+
   if (route.name === "CompanyManagement" || route.name === "AppCompanyManagement") {
     return "Gestión de empresas"
   }
@@ -585,6 +500,10 @@ const activeContextName = computed(() => {
 
   if (route.name === "Audit" || route.name === "AppAudit") {
     return "Auditoria"
+  }
+
+  if (route.name === "Maintenance" || route.name === "AppMaintenance") {
+    return "Mantenciones"
   }
 
   return "Selecciona una empresa"
@@ -608,7 +527,8 @@ const currentWorkspaceRouteName = computed(() => {
 
 const currentWorkspaceViewSettings = computed(() => {
   return {
-    assetGroupId: selectedPersonalAssetGroupId.value || null,
+    selectedCityAssetGroupId: selectedCityAssetGroupId.value || null,
+    selectedVehicleAssetGroupId: selectedVehicleAssetGroupId.value || null,
     ...(activeWorkspaceViewState.value?.settings || {}),
   }
 })
@@ -651,77 +571,40 @@ const {
   currentRoutePath: currentWorkspaceRoutePath,
   currentRouteName: currentWorkspaceRouteName,
   currentCompanyId: activeCompanyId,
-  currentAssetGroupId: selectedPersonalAssetGroupId,
+  currentAssetGroupId: selectedCityAssetGroupId,
   currentViewSettings: currentWorkspaceViewSettings,
 })
 
-const normalizeCompanySearch = (value) => {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-}
-
-const getCompanySearchText = (company) => {
-  return normalizeCompanySearch(
-    [
-      company.name,
-      company.rut,
-      company.city,
-      company.region,
-      company.contactName,
-      company.contactEmail,
-      ...(company.sucursales || []).map((sucursal) => sucursal.name),
-    ]
-      .filter(Boolean)
-      .join(" "),
-  )
-}
-
-const filteredHeaderCompanies = computed(() => {
-  const term = normalizeCompanySearch(debouncedCompanySearch.value)
-  const results = []
-
-  for (const company of headerCompanies.value) {
-    if (!term || getCompanySearchText(company).includes(term)) {
-      results.push(company)
-    }
-
-    if (results.length >= HEADER_COMPANY_RESULT_LIMIT) {
-      break
-    }
+const getAccessibleCompanyEntryPath = (company) => {
+  if (canAccessModule("assets", company.id)) return getCompanyWorkspacePath(company)
+  if (canAccessFunction("reports", company.id, "view")) return `/app/${company.id}/reportes`
+  if (canAccessFunction("maintenance-view", company.id, "view")) {
+    return `/app/${company.id}/mantenciones`
   }
+  if (canAccessFunction("audit-view", company.id, "view")) return `/app/${company.id}/auditoria`
+  if (canAccessFunction("users-view", company.id, "view")) return `/app/${company.id}/usuarios`
 
-  return results
-})
+  return getCompanyWorkspacePath(company)
+}
 
 const toggleDropdown = () => {
   raiseHeaderLayer()
-  showCompanyDropdown.value = false
+  showGlobalSearchDropdown.value = false
   showPersonalViewsDropdown.value = false
   showWorkspaceDropdown.value = false
   showDropdown.value = !showDropdown.value
 }
 
-const openCompanyDropdown = () => {
+function openGlobalSearchDropdown() {
   raiseHeaderLayer()
   showDropdown.value = false
   showPersonalViewsDropdown.value = false
   showWorkspaceDropdown.value = false
-  showCompanyDropdown.value = true
+  showGlobalSearchDropdown.value = true
 }
 
-const closeCompanyDropdown = () => {
-  showCompanyDropdown.value = false
-}
-
-const closeCompanySearchPanel = () => {
-  closeCompanyDropdown()
-
-  if (document.activeElement instanceof HTMLElement) {
-    document.activeElement.blur()
-  }
+const closeGlobalSearchDropdown = () => {
+  showGlobalSearchDropdown.value = false
 }
 
 const closeUserDropdown = () => {
@@ -731,7 +614,7 @@ const closeUserDropdown = () => {
 const openWorkspaceDropdown = () => {
   raiseHeaderLayer()
   showDropdown.value = false
-  showCompanyDropdown.value = false
+  showGlobalSearchDropdown.value = false
   showPersonalViewsDropdown.value = false
   showWorkspaceDropdown.value = true
 }
@@ -743,7 +626,7 @@ const closeWorkspaceDropdown = () => {
 const openPersonalViewsDropdown = () => {
   raiseHeaderLayer()
   showDropdown.value = false
-  showCompanyDropdown.value = false
+  showGlobalSearchDropdown.value = false
   showWorkspaceDropdown.value = false
   showPersonalViewsDropdown.value = true
 }
@@ -753,7 +636,7 @@ const closePersonalViewsDropdown = () => {
 }
 
 const closeAllDropdowns = () => {
-  closeCompanyDropdown()
+  closeGlobalSearchDropdown()
   closeUserDropdown()
   closePersonalViewsDropdown()
   closeWorkspaceDropdown()
@@ -762,7 +645,6 @@ const closeAllDropdowns = () => {
 watch(showPersonalViewsControl, (enabled) => {
   if (!enabled) {
     closePersonalViewsDropdown()
-    showPersonalViewModal.value = false
   }
 })
 
@@ -773,7 +655,7 @@ const raiseHeaderLayer = () => {
 const releaseHeaderLayer = () => {
   if (
     showDropdown.value ||
-    showCompanyDropdown.value ||
+    showGlobalSearchDropdown.value ||
     showPersonalViewsDropdown.value ||
     showWorkspaceDropdown.value
   ) {
@@ -781,40 +663,6 @@ const releaseHeaderLayer = () => {
   }
 
   headerLayerRaised.value = false
-}
-
-const clearCompanySearch = () => {
-  if (companySearchTimer) {
-    clearTimeout(companySearchTimer)
-  }
-
-  companySearch.value = ""
-  debouncedCompanySearch.value = ""
-  openCompanyDropdown()
-}
-
-const getAccessibleCompanyEntryPath = (company) => {
-  if (canAccessModule("assets", company.id)) return getCompanyWorkspacePath(company)
-  if (canAccessFunction("reports", company.id, "view")) return `/app/${company.id}/reportes`
-  if (canAccessFunction("audit-view", company.id, "view")) return `/app/${company.id}/auditoria`
-  if (canAccessFunction("users-view", company.id, "view")) return `/app/${company.id}/usuarios`
-
-  return getCompanyWorkspacePath(company)
-}
-
-const enterCompany = (company) => {
-  if (!company?.id) return
-
-  closeAllDropdowns()
-  router.push(getAccessibleCompanyEntryPath(company))
-}
-
-const enterFirstCompanyResult = () => {
-  const firstCompany = filteredHeaderCompanies.value[0]
-
-  if (firstCompany) {
-    enterCompany(firstCompany)
-  }
 }
 
 const applyWorkspaceAssetGroup = (workspace) => {
@@ -825,7 +673,10 @@ const applyWorkspaceAssetGroup = (workspace) => {
 
   if (workspaceCompanyId && workspaceCompanyId !== currentCompanyId) return
 
-  selectPersonalAssetGroup(workspace?.assetGroupId || null)
+  selectCityAssetGroup(
+    workspace?.viewSettings?.selectedCityAssetGroupId || workspace?.assetGroupId || null,
+  )
+  selectVehicleAssetGroup(workspace?.viewSettings?.selectedVehicleAssetGroupId || null)
 }
 
 const canPersistWorkspace = (workspace) => {
@@ -847,7 +698,7 @@ const currentWorkspaceComparisonSnapshot = computed(() => {
     routePath: currentWorkspaceRoutePath.value,
     routeName: currentWorkspaceRouteName.value,
     companyId: normalizeId(activeCompanyId.value),
-    assetGroupId: normalizeId(selectedPersonalAssetGroupId.value),
+    assetGroupId: normalizeId(selectedCityAssetGroupId.value),
     viewSettings: currentWorkspaceViewSettings.value,
   }
 })
@@ -936,53 +787,6 @@ watch(
     immediate: true,
   },
 )
-
-const isActiveCompany = (company) => {
-  return String(route.params.empresaId || "") === String(company?.id || "")
-}
-
-const openCreatePersonalViewModal = () => {
-  closeAllDropdowns()
-  personalViewModalMode.value = "create"
-  editingPersonalAssetGroupId.value = null
-  showPersonalViewModal.value = true
-}
-
-const openEditPersonalViewModal = (groupId = selectedPersonalAssetGroupId.value) => {
-  const normalizedGroupId = normalizeId(groupId)
-  const groupExists = personalAssetGroups.value.some((group) => {
-    return normalizeId(group.id) === normalizedGroupId
-  })
-
-  if (!groupExists) return
-
-  closeAllDropdowns()
-  personalViewModalMode.value = "edit"
-  editingPersonalAssetGroupId.value = normalizedGroupId
-  showPersonalViewModal.value = true
-}
-
-const handleCreatePersonalAssetGroup = ({ name, assetIds }) => {
-  const group = createPersonalAssetGroup(name, assetIds)
-
-  if (group?.id) {
-    selectPersonalAssetGroup(group.id)
-  }
-}
-
-const handleUpdatePersonalAssetGroup = ({ groupId, name, assetIds }) => {
-  renamePersonalAssetGroup(groupId, name)
-  setPersonalAssetGroupAssets(groupId, assetIds)
-  selectPersonalAssetGroup(groupId)
-}
-
-const handleDeletePersonalAssetGroup = (groupId) => {
-  deletePersonalAssetGroup(groupId)
-
-  if (normalizeId(editingPersonalAssetGroupId.value) === normalizeId(groupId)) {
-    editingPersonalAssetGroupId.value = null
-  }
-}
 
 const handleClickOutside = (event) => {
   if (!headerRef.value) return

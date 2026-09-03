@@ -23,6 +23,8 @@ const BASE_ASSET_REPORT_COLUMN_LABELS = {
   odometro: "Odometro",
   horometro: "Horometro",
   geocerca: "Geocerca",
+  geofenceEntryTime: "Hora entrada",
+  geofenceExitTime: "Hora salida",
   evento: "Evento",
   event: "Evento",
   duracion: "Duracion",
@@ -119,11 +121,20 @@ export const DEFAULT_ASSET_REPORT_COLUMNS = [
 ]
 
 const REQUIRED_ASSET_REPORT_COLUMNS = ["fecha"]
+export const PDF_REPORT_VISIBLE_DATA_COLUMN_LIMIT = 6
 const REPORT_COLUMN_ALIASES = {
   lastPosition: "address",
 }
 const IDLE_REPORT_REQUIRED_COLUMNS = ["fecha", "timestamp", "patente", "duracion"]
-const IDLE_REPORT_OPTIONAL_COLUMNS = new Set(["address"])
+const STOPS_REPORT_REQUIRED_COLUMNS = [
+  "fecha",
+  "timestamp",
+  "patente",
+  "duracion",
+  "address",
+  "lat",
+  "lng",
+]
 const ROUTE_HISTORY_REPORT_COLUMNS = [
   "fecha",
   "patente",
@@ -144,11 +155,13 @@ const GEOFENCE_REPORT_REQUIRED_COLUMNS = [
   "patente",
   "vehiculo",
   "geocerca",
+  "geofenceEntryTime",
+  "geofenceExitTime",
   "evento",
   "duracion",
 ]
 
-export const SESSION_AGGREGATED_EVENT_RULE_IDS = new Set(["idle", "geofence"])
+export const SESSION_AGGREGATED_EVENT_RULE_IDS = new Set(["idle", "geofence", "stops"])
 
 export const normalizeReportId = (value) => String(value ?? "").trim()
 
@@ -167,12 +180,15 @@ export const isIdleReportTemplate = (template = {}) => {
   const ruleIds = normalizeTemplateRuleIds(template)
 
   if (reportTypeId === "route-history") return false
+  if (reportTypeId === "stops") return false
 
-  return (
-    reportTypeId === "idle-time" ||
-    reportTypeId === "stops" ||
-    (ruleIds.includes("idle") && !ruleIds.includes("movement"))
-  )
+  return reportTypeId === "idle-time" || (ruleIds.includes("idle") && !ruleIds.includes("movement"))
+}
+
+export const isStopsReportTemplate = (template = {}) => {
+  const reportTypeId = normalizeReportId(template.reportTypeId)
+
+  return reportTypeId === "stops"
 }
 
 export const isGeofenceReportTemplate = (template = {}) => {
@@ -187,24 +203,24 @@ const isRouteHistoryReportTemplate = (template = {}) => {
 }
 
 const resolveTemplateColumns = (template = {}) => {
-  const templateColumns = template?.columns?.length
-    ? template.columns
-    : DEFAULT_ASSET_REPORT_COLUMNS
+  const hasTemplateColumns = Boolean(template?.columns?.length)
+  const selectedTemplateColumns = hasTemplateColumns ? template.columns : []
+  const templateColumns = hasTemplateColumns ? selectedTemplateColumns : DEFAULT_ASSET_REPORT_COLUMNS
 
   if (isRouteHistoryReportTemplate(template)) {
     return template?.columns?.length ? templateColumns : ROUTE_HISTORY_REPORT_COLUMNS
   }
 
   if (isGeofenceReportTemplate(template)) {
-    return GEOFENCE_REPORT_REQUIRED_COLUMNS
+    return [...GEOFENCE_REPORT_REQUIRED_COLUMNS, ...selectedTemplateColumns]
+  }
+
+  if (isStopsReportTemplate(template)) {
+    return [...STOPS_REPORT_REQUIRED_COLUMNS, ...selectedTemplateColumns]
   }
 
   if (isIdleReportTemplate(template)) {
-    const optionalColumns = templateColumns
-      .map((columnKey) => REPORT_COLUMN_ALIASES[columnKey] || columnKey)
-      .filter((columnKey) => IDLE_REPORT_OPTIONAL_COLUMNS.has(columnKey))
-
-    return [...IDLE_REPORT_REQUIRED_COLUMNS, ...optionalColumns]
+    return [...IDLE_REPORT_REQUIRED_COLUMNS, ...selectedTemplateColumns]
   }
 
   return templateColumns
@@ -224,4 +240,16 @@ export const createReportColumns = (template) => {
       key: columnKey,
       label: ASSET_REPORT_COLUMN_LABELS[columnKey],
     }))
+}
+
+export const getPdfVisibleReportColumns = (reportColumns = []) => {
+  if (!Array.isArray(reportColumns)) return []
+
+  return reportColumns.slice(0, PDF_REPORT_VISIBLE_DATA_COLUMN_LIMIT)
+}
+
+export const getPdfHiddenReportColumns = (reportColumns = []) => {
+  if (!Array.isArray(reportColumns)) return []
+
+  return reportColumns.slice(PDF_REPORT_VISIBLE_DATA_COLUMN_LIMIT)
 }

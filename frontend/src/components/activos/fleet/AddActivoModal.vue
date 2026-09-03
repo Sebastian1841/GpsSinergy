@@ -135,6 +135,7 @@
             </div>
 
             <div class="p-4">
+              <!-- PASO 1: ACTIVO -->
               <div v-if="currentStep === 0" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label class="flex flex-col gap-1">
                   <span class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
@@ -160,27 +161,6 @@
                     class="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-[12px] font-semibold text-[#172033] outline-none transition placeholder:text-slate-400 focus:border-[#FF6600] focus:ring-2 focus:ring-[#FF6600]/10"
                     placeholder="CAMIONETA JAC"
                   />
-                </label>
-
-                <label class="flex flex-col gap-1 sm:col-span-2">
-                  <span class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
-                    Grupo
-                  </span>
-
-                  <select
-                    v-model="form.sucursalId"
-                    class="h-10 cursor-pointer rounded-lg border border-[#cbd5e1] bg-white px-3 text-[12px] font-black text-[#172033] outline-none transition focus:border-[#FF6600] focus:ring-2 focus:ring-[#FF6600]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                    :disabled="!activeGroupOptions.length"
-                  >
-                    <option value="">Sin grupo</option>
-                    <option v-for="group in activeGroupOptions" :key="group.id" :value="group.id">
-                      {{ group.name }}
-                    </option>
-                  </select>
-
-                  <span class="text-[10px] font-semibold text-slate-400">
-                    Puedes dejar el activo sin grupo y asignarlo despues.
-                  </span>
                 </label>
 
                 <div class="flex flex-col gap-1 sm:col-span-2">
@@ -219,6 +199,64 @@
                   </div>
                 </div>
 
+                <div class="rounded-xl border border-[#102372]/15 bg-[#f8fafc] p-3 sm:col-span-2">
+                  <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                      <p class="text-[10px] font-black uppercase tracking-[0.12em] text-[#FF6600]">
+                        Perfil operativo
+                      </p>
+
+                      <h4 class="mt-1 text-[13px] font-black text-[#102372]">
+                        {{ selectedOperationalProfile.label }}
+                      </h4>
+
+                      <p class="mt-1 text-[10px] font-semibold leading-relaxed text-slate-500">
+                        {{ selectedOperationalProfile.summary }}
+                      </p>
+                    </div>
+
+                    <span
+                      class="shrink-0 rounded-full bg-[#102372] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-white"
+                    >
+                      Automatico
+                    </span>
+                  </div>
+
+                  <div class="mt-3 grid gap-2 md:grid-cols-2">
+                    <div class="rounded-lg border border-[#d8dee8] bg-white p-2.5">
+                      <p class="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
+                        Reportes predeterminados
+                      </p>
+
+                      <div class="mt-2 flex flex-wrap gap-1.5">
+                        <span
+                          v-for="report in selectedOperationalProfile.reports"
+                          :key="report.id"
+                          class="rounded-md bg-[#eef3ff] px-2 py-1 text-[9px] font-black text-[#102372]"
+                        >
+                          {{ report.label }}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div class="rounded-lg border border-[#d8dee8] bg-white p-2.5">
+                      <p class="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
+                        KPIs sugeridos
+                      </p>
+
+                      <div class="mt-2 flex flex-wrap gap-1.5">
+                        <span
+                          v-for="kpi in selectedOperationalProfile.kpis"
+                          :key="kpi"
+                          class="rounded-md bg-[#fff7ed] px-2 py-1 text-[9px] font-black text-[#FF6600]"
+                        >
+                          {{ kpi }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <label class="flex flex-col gap-1 sm:col-span-2">
                   <span class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
                     Descripción
@@ -233,7 +271,108 @@
                 </label>
               </div>
 
-              <div v-else-if="currentStep === 1" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <!-- PASO 2: ETIQUETAS -->
+              <div v-else-if="currentStep === 1" class="space-y-3">
+                <div>
+                  <p class="text-[11px] font-black text-[#102372]">Etiquetas del activo</p>
+
+                  <p class="mt-1 text-[10px] font-semibold text-slate-500">
+                    Selecciona una o más etiquetas para organizar este activo.
+                  </p>
+                </div>
+
+                <div
+                  v-if="activeAssetTagOptions.length"
+                  class="overflow-hidden rounded-xl border border-[#d8dee8]"
+                >
+                  <label
+                    v-for="tag in activeAssetTagOptions"
+                    :key="tag.id"
+                    class="flex cursor-pointer items-center gap-3 border-b border-[#edf1f5] px-3 py-3 transition last:border-b-0 hover:bg-[#f8fafc]"
+                    :class="isAssetTagSelected(tag.id) ? 'bg-[#102372]/[0.035]' : 'bg-white'"
+                  >
+                    <input
+                      type="checkbox"
+                      class="h-4 w-4 cursor-pointer rounded border-[#cbd5e1] accent-[#102372]"
+                      :checked="isAssetTagSelected(tag.id)"
+                      @change="toggleAssetTag(tag.id)"
+                    />
+
+                    <span class="min-w-0 flex-1">
+                      <span class="block truncate text-[11px] font-black text-[#102372]">
+                        {{ tag.name }}
+                      </span>
+
+                      <span
+                        v-if="tag.description"
+                        class="mt-0.5 block truncate text-[9px] font-semibold text-slate-500"
+                      >
+                        {{ tag.description }}
+                      </span>
+                    </span>
+
+                    <span
+                      v-if="isAssetTagSelected(tag.id)"
+                      class="shrink-0 rounded-full bg-[#eef3ff] px-2 py-1 text-[9px] font-black text-[#102372]"
+                    >
+                      Seleccionada
+                    </span>
+                  </label>
+                </div>
+
+                <div
+                  v-else
+                  class="rounded-xl border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-4 py-8 text-center"
+                >
+                  <p class="text-[11px] font-black text-[#102372]">No hay etiquetas disponibles</p>
+
+                  <p class="mt-1 text-[10px] font-semibold text-slate-500">
+                    Puedes crear etiquetas desde la sección Etiquetas del módulo de activos.
+                  </p>
+                </div>
+
+                <div class="rounded-xl border border-[#d8dee8] bg-[#f8fafc] p-3">
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <p class="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">
+                        Etiquetas seleccionadas
+                      </p>
+
+                      <p class="mt-1 text-[10px] font-semibold text-slate-500">
+                        {{ selectedAssetTagNames.length }}
+                        {{
+                          selectedAssetTagNames.length === 1
+                            ? "etiqueta seleccionada"
+                            : "etiquetas seleccionadas"
+                        }}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div v-if="selectedAssetTags.length" class="mt-3 flex flex-wrap gap-2">
+                    <button
+                      v-for="tag in selectedAssetTags"
+                      :key="tag.id"
+                      type="button"
+                      class="flex cursor-pointer items-center gap-2 rounded-lg bg-[#eef3ff] px-2.5 py-1.5 text-[10px] font-black text-[#102372] transition hover:bg-[#102372] hover:text-white"
+                      @click="toggleAssetTag(tag.id)"
+                    >
+                      <span>{{ tag.name }}</span>
+                      <span class="text-[12px] leading-none">×</span>
+                    </button>
+                  </div>
+
+                  <p
+                    v-else
+                    class="mt-3 rounded-lg bg-white px-3 py-2 text-[10px] font-semibold text-slate-400"
+                  >
+                    Este activo quedará sin etiquetas.
+                  </p>
+                </div>
+              </div>
+
+              <!-- PASO 3: DISPOSITIVO -->
+              <div v-else-if="currentStep === 2" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label class="flex flex-col gap-1 sm:col-span-2">
                   <span class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
                     Modelo GPS *
@@ -303,7 +442,8 @@
                 </div>
               </div>
 
-              <div v-else-if="currentStep === 2" class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <!-- PASO 4: FECHAS -->
+              <div v-else-if="currentStep === 3" class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <label class="flex flex-col gap-1">
                   <span class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
                     Ingreso
@@ -341,6 +481,7 @@
                 </label>
               </div>
 
+              <!-- PASO 5: MÉTRICAS -->
               <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <label class="flex flex-col gap-1">
                   <span class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
@@ -460,7 +601,7 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  groups: {
+  assetTags: {
     type: Array,
     default: () => [],
   },
@@ -481,7 +622,11 @@ const {
   form,
   selectedTrackerModel,
   selectedAssetType,
-  activeGroupOptions,
+  selectedOperationalProfile,
+  activeAssetTagOptions,
+  selectedAssetTagIds,
+  selectedAssetTags,
+  selectedAssetTagNames,
   canSaveActivo,
   requiredStatus,
   summaryItems,
@@ -489,5 +634,27 @@ const {
   closeModal,
   selectAssetType,
   submitForm,
-} = useFleetCreateForm({ props, emit })
+} = useFleetCreateForm({
+  props,
+  emit,
+})
+
+const isAssetTagSelected = (tagId) => {
+  return selectedAssetTagIds.value.includes(String(tagId))
+}
+
+const toggleAssetTag = (tagId) => {
+  const normalizedTagId = String(tagId)
+  const currentTagIds = [...selectedAssetTagIds.value]
+
+  if (currentTagIds.includes(normalizedTagId)) {
+    form.value.assetTagIds = currentTagIds.filter((currentTagId) => {
+      return currentTagId !== normalizedTagId
+    })
+
+    return
+  }
+
+  form.value.assetTagIds = [...currentTagIds, normalizedTagId]
+}
 </script>

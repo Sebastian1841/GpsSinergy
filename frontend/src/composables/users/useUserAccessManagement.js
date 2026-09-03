@@ -1,4 +1,4 @@
-import { computed, ref, watch } from "vue"
+import { computed, ref, unref, watch } from "vue"
 
 import { useAuthSession } from "../auth/useAuthSession.js"
 import { useUsersService } from "../../services/users/useUsersService.js"
@@ -13,7 +13,7 @@ import {
   normalizeUserAccessKey,
 } from "../../utils/users/userAccessStateUtils.js"
 
-export function useUserAccessManagement() {
+export function useUserAccessManagement({ routeCompanyId = null, assetTags = null } = {}) {
   const { currentUser, isPlatformAdmin } = useAuthSession()
 
   const {
@@ -41,9 +41,19 @@ export function useUserAccessManagement() {
     })
   })
 
+  const resolvedRouteCompanyId = computed(() => {
+    return normalizeUserAccessKey(unref(routeCompanyId))
+  })
+
+  const resolvedAssetTags = computed(() => {
+    const tags = unref(assetTags)
+
+    return Array.isArray(tags) ? tags : []
+  })
+
   const searchTerm = ref("")
   const selectedRole = ref("all")
-  const selectedCompany = ref("all")
+  const selectedCompany = ref(resolvedRouteCompanyId.value || "all")
   const selectedStatus = ref("all")
   const selectedModule = ref("all")
 
@@ -51,6 +61,10 @@ export function useUserAccessManagement() {
 
   const visibleUserLimit = ref(DEFAULT_VISIBLE_USER_LIMIT)
   const selectedUserId = ref(users.value[0]?.id || null)
+
+  const companyFilterLocked = computed(() => {
+    return Boolean(resolvedRouteCompanyId.value)
+  })
 
   const currentUserId = computed(() => {
     return normalizeUserAccessKey(currentUser.value?.id)
@@ -165,6 +179,13 @@ export function useUserAccessManagement() {
         class: "text-[#ff6600]",
       },
       {
+        key: "inactive",
+        label: "Inactivos",
+        value: users.value.filter((user) => user.status === "inactive").length,
+        filter: "inactive",
+        class: "text-slate-500",
+      },
+      {
         key: "accesses",
         label: "Accesos",
         value: accesses.value.length,
@@ -181,6 +202,27 @@ export function useUserAccessManagement() {
     },
   )
 
+  watch(
+    resolvedRouteCompanyId,
+    (companyId) => {
+      if (companyId) {
+        selectedCompany.value = companyId
+        return
+      }
+
+      const currentCompanyExists = companies.value.some((company) => {
+        return company.id === selectedCompany.value
+      })
+
+      if (!currentCompanyExists) {
+        selectedCompany.value = "all"
+      }
+    },
+    {
+      immediate: true,
+    },
+  )
+
   const showMoreUsers = () => {
     visibleUserLimit.value += USER_LIMIT_INCREMENT
   }
@@ -192,7 +234,7 @@ export function useUserAccessManagement() {
   const clearFilters = () => {
     searchTerm.value = ""
     selectedRole.value = "all"
-    selectedCompany.value = "all"
+    selectedCompany.value = resolvedRouteCompanyId.value || "all"
     selectedStatus.value = "all"
     selectedModule.value = "all"
     visibleUserLimit.value = DEFAULT_VISIBLE_USER_LIMIT
@@ -202,6 +244,7 @@ export function useUserAccessManagement() {
     showEditorModal,
     editorMode,
     draftUser,
+    selectedUserIsPlatformAdmin,
     openCreateUserModal,
     openEditUserModal,
     closeEditorModal,
@@ -216,7 +259,7 @@ export function useUserAccessManagement() {
     togglePermission,
     updateOperationalScope,
     toggleScopeAsset,
-    toggleScopeSucursal,
+    toggleScopeAssetTag,
   } = useUserAccessDrafts({
     users,
     accesses,
@@ -224,6 +267,7 @@ export function useUserAccessManagement() {
     modules,
     moduleFunctions,
     assets,
+    assetTags: resolvedAssetTags,
     selectedUserId,
     selectedUser,
     selectedUserAccesses,
@@ -257,6 +301,7 @@ export function useUserAccessManagement() {
     selectedCompany,
     selectedStatus,
     selectedModule,
+    companyFilterLocked,
 
     visibleUserLimit,
     visibleUsers,
@@ -272,6 +317,7 @@ export function useUserAccessManagement() {
     showEditorModal,
     editorMode,
     draftUser,
+    selectedUserIsPlatformAdmin,
 
     selectUser,
     clearFilters,
@@ -292,6 +338,6 @@ export function useUserAccessManagement() {
     togglePermission,
     updateOperationalScope,
     toggleScopeAsset,
-    toggleScopeSucursal,
+    toggleScopeAssetTag,
   }
 }

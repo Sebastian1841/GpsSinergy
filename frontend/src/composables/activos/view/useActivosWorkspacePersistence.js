@@ -5,7 +5,7 @@ import { normalizeId } from "../../../utils/idUtils.js"
 
 const GEOFENCE_LOCATION_ADDRESS_STORAGE_KEY = "sinergy-geofence-location-address-enabled"
 const ACTIVOS_WORKSPACE_MODULE = "activos"
-const ALLOWED_SIDEBAR_SECTIONS = ["activos", "reportes", "itinerarios", "geocercas", "sucursales"]
+const ALLOWED_SIDEBAR_SECTIONS = ["activos", "reportes", "itinerarios", "geocercas", "etiquetas"]
 const ALLOWED_STATUS_FILTERS = ["all", "online", "offline", "moving", "stopped", "alerts"]
 
 const normalizeWorkspaceSidebarSection = (section) => {
@@ -14,6 +14,21 @@ const normalizeWorkspaceSidebarSection = (section) => {
 
 const normalizeWorkspaceStatusFilter = (filter) => {
   return ALLOWED_STATUS_FILTERS.includes(filter) ? filter : "all"
+}
+
+const normalizeWorkspaceSectionSearch = (search = {}) => {
+  if (!search || typeof search !== "object" || Array.isArray(search)) {
+    return {}
+  }
+
+  return ALLOWED_SIDEBAR_SECTIONS.reduce((normalizedSearch, section) => {
+    if (search[section] === undefined) return normalizedSearch
+
+    return {
+      ...normalizedSearch,
+      [section]: String(search[section] || ""),
+    }
+  }, {})
 }
 
 const normalizeWorkspaceColumnKeys = (keys = []) => {
@@ -65,13 +80,17 @@ export function useActivosWorkspacePersistence({
   refreshMapLayout,
   route,
   sectionSearch,
-  selectPersonalAssetGroup,
+  selectCityAssetGroup,
+  selectVehicleAssetGroup,
   selectedGeofenceId,
   selectedId,
-  selectedPersonalAssetGroupId,
+  selectedCityAssetGroupId,
+  selectedVehicleAssetGroupId,
   statusFilter,
 }) {
-  const useGeofenceLocationAddress = ref(readJsonStorage(GEOFENCE_LOCATION_ADDRESS_STORAGE_KEY, true))
+  const useGeofenceLocationAddress = ref(
+    readJsonStorage(GEOFENCE_LOCATION_ADDRESS_STORAGE_KEY, true),
+  )
   const fleetTableColumnPreferences = ref({})
 
   const setUseGeofenceLocationAddress = (enabled) => {
@@ -87,12 +106,11 @@ export function useActivosWorkspacePersistence({
       module: ACTIVOS_WORKSPACE_MODULE,
       statusFilter: statusFilter.value,
       activeSidebarSection: activeSidebarSection.value,
-      sectionSearch: {
-        ...sectionSearch.value,
-      },
+      sectionSearch: normalizeWorkspaceSectionSearch(sectionSearch.value),
       selectedActivoId: normalizeId(selectedId.value),
       selectedGeofenceId: normalizeId(selectedGeofenceId.value),
-      selectedPersonalAssetGroupId: normalizeId(selectedPersonalAssetGroupId.value),
+      selectedCityAssetGroupId: normalizeId(selectedCityAssetGroupId.value),
+      selectedVehicleAssetGroupId: normalizeId(selectedVehicleAssetGroupId.value),
       leftPanelWidth: leftPanelWidth.value,
       fleetLayout: {
         leftPanelWidth: leftPanelWidth.value,
@@ -118,15 +136,24 @@ export function useActivosWorkspacePersistence({
     if (settings.sectionSearch && typeof settings.sectionSearch === "object") {
       sectionSearch.value = {
         ...sectionSearch.value,
-        ...settings.sectionSearch,
+        ...normalizeWorkspaceSectionSearch(settings.sectionSearch),
       }
     }
 
     activeSidebarSection.value = normalizeWorkspaceSidebarSection(settings.activeSidebarSection)
     statusFilter.value = normalizeWorkspaceStatusFilter(settings.statusFilter)
 
-    if (settings.selectedPersonalAssetGroupId !== undefined) {
-      selectPersonalAssetGroup(settings.selectedPersonalAssetGroupId || null)
+    const restoredCityGroupId =
+      settings.selectedCityAssetGroupId ??
+      // Compatibilidad con workspaces guardados antes de renombrar el filtro.
+      settings.selectedPersonalAssetGroupId
+
+    if (restoredCityGroupId !== undefined) {
+      selectCityAssetGroup(restoredCityGroupId || null)
+    }
+
+    if (settings.selectedVehicleAssetGroupId !== undefined) {
+      selectVehicleAssetGroup(settings.selectedVehicleAssetGroupId || null)
     }
 
     const restoredLeftPanelWidth = settings.fleetLayout?.leftPanelWidth ?? settings.leftPanelWidth
@@ -169,7 +196,8 @@ export function useActivosWorkspacePersistence({
       sectionSearch,
       selectedId,
       selectedGeofenceId,
-      selectedPersonalAssetGroupId,
+      selectedCityAssetGroupId,
+      selectedVehicleAssetGroupId,
       leftPanelWidth,
       fleetTableColumnPreferences,
       useGeofenceLocationAddress,

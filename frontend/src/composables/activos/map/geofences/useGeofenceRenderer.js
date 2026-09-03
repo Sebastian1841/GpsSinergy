@@ -42,9 +42,7 @@ export function createGeofenceRendererController({
   getMap,
   layers,
   editingDraft,
-  drawMode,
   normalizeId,
-  onStartEditGeofence,
 }) {
   const geofenceLayerCache = new Map()
 
@@ -87,19 +85,10 @@ export function createGeofenceRendererController({
 
     if (!layer) return null
 
-    layer.bindTooltip(
-      props.canEditGeofences === false ? geofence.name : `${geofence.name} · clic para editar`,
-      {
-        direction: "top",
-        sticky: true,
-        className: "sinergy-geofence-tooltip",
-      },
-    )
-
-    layer.on("click", () => {
-      if (drawMode.value || props.canEditGeofences === false) return
-
-      onStartEditGeofence(geofence.id)
+    layer.bindTooltip(geofence.name, {
+      direction: "top",
+      sticky: true,
+      className: "sinergy-geofence-tooltip",
     })
 
     return layer

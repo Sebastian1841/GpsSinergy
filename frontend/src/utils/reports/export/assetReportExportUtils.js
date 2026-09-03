@@ -1,5 +1,9 @@
 import { normalizeReportText } from "../execution/assetReportExecutionUtils.js"
 import {
+  getPdfHiddenReportColumns,
+  getPdfVisibleReportColumns,
+} from "../execution/assetReportColumnUtils.js"
+import {
   buildReportDataWorksheet,
   getExcelColumnWidth,
   normalizeReportChartData,
@@ -11,14 +15,24 @@ import {
   getReportBehaviorOptionValue,
   isReportBehaviorOptionEnabled,
 } from "../config/reportBehaviorOptions.js"
-import { REPORT_OUTPUT_OPTION_IDS, isReportOutputOptionEnabled } from "../config/reportOutputOptions.js"
-import { buildRouteTripMapImageDataUrl, getRouteTripMapRoutes } from "../route-map/routeTripMapImageUtils.js"
+import {
+  REPORT_OUTPUT_OPTION_IDS,
+  isReportOutputOptionEnabled,
+} from "../config/reportOutputOptions.js"
+import {
+  buildRouteTripMapImageDataUrl,
+  getRouteTripMapRoutes,
+} from "../route-map/routeTripMapImageUtils.js"
 import { getReportBrandImageDataUrl } from "./reportBranding.js"
 import { resolveReverseGeocodedSources } from "../../../services/location/reverseGeocodingService.js"
 
-const ROUTE_HISTORY_MAP_IMAGE_WIDTH = 1200
-const ROUTE_HISTORY_MAP_IMAGE_HEIGHT = 520
+const ROUTE_HISTORY_MAP_PDF_IMAGE_WIDTH = 1200
+const ROUTE_HISTORY_MAP_PDF_IMAGE_HEIGHT = 520
+const ROUTE_HISTORY_MAP_EXCEL_IMAGE_WIDTH = 1100
+const ROUTE_HISTORY_MAP_EXCEL_IMAGE_HEIGHT = 360
 const ROUTE_HISTORY_MAP_IMAGE_CACHE_LIMIT = 6
+const ROUTE_HISTORY_REPORT_TYPE_ID = "route-history"
+const STOPS_REPORT_TYPE_ID = "stops"
 const routeHistoryMapImageCache = new Map()
 
 export const escapeReportHtml = (value) => {
@@ -33,6 +47,10 @@ export const escapeReportHtml = (value) => {
 const asText = (value, fallback = "-") => {
   const text = String(value ?? "").trim()
   return text || fallback
+}
+
+const firstText = (...values) => {
+  return values.map((value) => String(value ?? "").trim()).find((value) => value && value !== "-")
 }
 
 const hasExportAddressColumn = (reportColumns = []) => {
@@ -111,6 +129,12 @@ const getRouteHistoryMapImageCacheKey = ({ reportRows = [], width, height }) => 
     route.points.forEach((point) => {
       hash = updateHash(hash, Number(point.lat).toFixed(6))
       hash = updateHash(hash, Number(point.lng).toFixed(6))
+    })
+    ;(route.stopMarkers || []).forEach((marker) => {
+      hash = updateHash(hash, marker.label)
+      hash = updateHash(hash, marker.address)
+      hash = updateHash(hash, Number(marker.lat).toFixed(6))
+      hash = updateHash(hash, Number(marker.lng).toFixed(6))
     })
   })
 
@@ -210,6 +234,70 @@ const splitReportDateTime = (row) => {
   }
 }
 
+const parseDurationMinutes = (value) => {
+  const text = String(value ?? "")
+    .trim()
+    .toLowerCase()
+
+  if (!text || text === "-") return null
+
+  const hourMatch = text.match(/(\d+(?:[.,]\d+)?)\s*h/)
+  const minuteMatch = text.match(/(\d+(?:[.,]\d+)?)\s*min/)
+  const secondMatch = text.match(/(\d+(?:[.,]\d+)?)\s*(?:seg|s)\b/)
+  const colonMatch = text.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/)
+
+  if (colonMatch) {
+    const [, hours, minutes, seconds = "0"] = colonMatch
+
+    return Number(hours) * 60 + Number(minutes) + Number(seconds) / 60
+  }
+
+  const hours = hourMatch ? Number(hourMatch[1].replace(",", ".")) : 0
+  const minutes = minuteMatch ? Number(minuteMatch[1].replace(",", ".")) : 0
+  const seconds = secondMatch ? Number(secondMatch[1].replace(",", ".")) : 0
+  const totalMinutes = hours * 60 + minutes + seconds / 60
+
+  return Number.isFinite(totalMinutes) && totalMinutes > 0 ? totalMinutes : null
+}
+
+const formatDurationMinutes = (minutes) => {
+  const totalMinutes = Math.max(0, Math.round(Number(minutes || 0)))
+  const hours = Math.floor(totalMinutes / 60)
+  const remainingMinutes = totalMinutes % 60
+
+  if (hours > 0) return `${hours} h ${remainingMinutes} min`
+
+  return `${remainingMinutes} min`
+}
+
+const getStopEndTimeLabel = ({ row, startDate, startTime, duration }) => {
+  const explicitEndTime = firstText(
+    row.values?.endTime,
+    row.values?.horaTermino,
+    row.report?.endTime,
+    row.report?.horaTermino,
+    row.report?.horaFin,
+    row.report?.endedAt,
+  )
+
+  if (explicitEndTime) return explicitEndTime
+
+  const durationMinutes = parseDurationMinutes(duration)
+
+  if (durationMinutes === null || !startDate || !startTime || startTime === "-") return "-"
+
+  const startDateTime = new Date(`${startDate}T${startTime}`)
+
+  if (Number.isNaN(startDateTime.getTime())) return "-"
+
+  const endDateTime = new Date(startDateTime.getTime() + durationMinutes * 60 * 1000)
+
+  return new Intl.DateTimeFormat("es-CL", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(endDateTime)
+}
+
 const normalizeReportStatus = (row) => {
   const statusText = String(
     getReportRowValue(
@@ -277,9 +365,32 @@ const buildItineraryRowsFromReport = (reportRows = []) => {
     const { date, time } = splitReportDateTime(row)
     const { lat, lng } = getReportCoordinates(row)
     const itineraryRow = row?.itineraryRow || {}
+    const duration = getReportRowValue(
+      row,
+      "duracion",
+      getReportSourceValue(
+        row,
+        [
+          "duracion",
+          "durationLabel",
+          "duration",
+          "tiempo",
+          "idleDurationLabel",
+          "ralentiDurationLabel",
+        ],
+        "-",
+      ),
+    )
 
     return {
       index: index + 1,
+      timestamp:
+        row?.timestamp ||
+        itineraryRow.timestamp ||
+        row?.generatedEvent?.timestamp ||
+        row?.report?.timestamp ||
+        row?.report?.reportedAt ||
+        "",
       values: {
         index: index + 1,
         ...(row.values || {}),
@@ -295,6 +406,12 @@ const buildItineraryRowsFromReport = (reportRows = []) => {
         getReportRowValue(row, "deviceId", row?.asset?.deviceId || row?.asset?.imei),
       date: itineraryRow.dateLabel || date,
       time: itineraryRow.timeLabel || time,
+      endTime: getStopEndTimeLabel({
+        row,
+        startDate: date,
+        startTime: itineraryRow.timeLabel || time,
+        duration,
+      }),
       status: normalizeReportStatus(row),
       speed:
         itineraryRow.speedLabel ||
@@ -302,6 +419,7 @@ const buildItineraryRowsFromReport = (reportRows = []) => {
       event:
         itineraryRow.event ||
         getReportRowValue(row, "evento", getReportSourceValue(row, ["event", "evento"])),
+      duration,
       distance: itineraryRow.accumulatedDistanceLabel || getReportDistanceLabel(row),
       address:
         itineraryRow.address ||
@@ -318,6 +436,22 @@ const buildItineraryRowsFromReport = (reportRows = []) => {
       lng: itineraryRow.lng ?? lng,
     }
   })
+}
+
+const getReportTypeId = (template = {}) => {
+  return String(template?.reportTypeId || "").trim()
+}
+
+const isRouteHistoryReportTemplate = (template = {}) => {
+  return getReportTypeId(template) === ROUTE_HISTORY_REPORT_TYPE_ID
+}
+
+const isStopsReportTemplate = (template = {}) => {
+  return getReportTypeId(template) === STOPS_REPORT_TYPE_ID
+}
+
+const isRouteMapReportTemplate = (template = {}) => {
+  return isRouteHistoryReportTemplate(template) || isStopsReportTemplate(template)
 }
 
 const getReportDetailColumns = (reportColumns = []) => {
@@ -426,15 +560,17 @@ const getReportDateRange = ({ dateFrom, dateTo, itineraryRows }) => {
 }
 
 const createRouteHistoryMapImageDataUrl = async ({ template, reportRows, format = "pdf" }) => {
-  if (String(template?.reportTypeId || "") !== "route-history") return ""
+  if (!isRouteMapReportTemplate(template)) return ""
 
   const optionId =
     format === "excel" ? REPORT_OUTPUT_OPTION_IDS.excelTripMap : REPORT_OUTPUT_OPTION_IDS.pdfTripMap
 
   if (!isReportOutputOptionEnabled(template, optionId)) return ""
 
-  const width = ROUTE_HISTORY_MAP_IMAGE_WIDTH
-  const height = ROUTE_HISTORY_MAP_IMAGE_HEIGHT
+  const width =
+    format === "excel" ? ROUTE_HISTORY_MAP_EXCEL_IMAGE_WIDTH : ROUTE_HISTORY_MAP_PDF_IMAGE_WIDTH
+  const height =
+    format === "excel" ? ROUTE_HISTORY_MAP_EXCEL_IMAGE_HEIGHT : ROUTE_HISTORY_MAP_PDF_IMAGE_HEIGHT
   const cacheKey = getRouteHistoryMapImageCacheKey({
     reportRows,
     width,
@@ -466,12 +602,16 @@ const buildItineraryCompatibleReport = ({
   dateFrom = "",
   dateTo = "",
   routeMapImageDataUrl = "",
+  hiddenPdfColumnCount = 0,
+  hiddenPdfColumnLabels = [],
+  hiddenPdfColumns = [],
 }) => {
   const exportReportColumns = Array.isArray(reportColumns) ? reportColumns : []
   const itineraryRows = buildItineraryRowsFromReport(reportRows)
   const assets = buildItineraryAssetsFromReport({ reportRows, itineraryRows })
-  const isRouteHistoryReport = String(template?.reportTypeId || "") === "route-history"
-  const rowsLabel = isRouteHistoryReport ? "viajes" : "eventos"
+  const isRouteHistoryReport = isRouteHistoryReportTemplate(template)
+  const isStopsReport = isStopsReportTemplate(template)
+  const rowsLabel = isRouteHistoryReport ? "viajes" : isStopsReport ? "detenciones" : "eventos"
   const totalDistanceKm = itineraryRows.reduce((total, row) => {
     const distance = parseExcelChartNumber(row.distance)
 
@@ -481,6 +621,12 @@ const buildItineraryCompatibleReport = ({
   const moving = itineraryRows.filter((row) => row.status === "Movimiento").length
   const stopped = itineraryRows.filter((row) => row.status === "Detenido").length
   const offline = itineraryRows.filter((row) => row.status === "Offline").length
+  const totalStoppedMinutes = itineraryRows.reduce((total, row) => {
+    return total + (parseDurationMinutes(row.duration) || 0)
+  }, 0)
+  const stopLocationCount = new Set(
+    itineraryRows.map((row) => String(row.address || "").trim()).filter(Boolean),
+  ).size
   const generatedAt = new Intl.DateTimeFormat("es-CL", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -490,20 +636,83 @@ const buildItineraryCompatibleReport = ({
   return {
     filename: createReportBaseFilename(template?.name),
     headerTitle: template?.name || "Reporte de activos",
+    pdfLayout: isStopsReport ? "stops-operational" : "default",
+    reportTypeId: getReportTypeId(template),
     title: template?.description || "Exportacion operativa de flota",
-    detailTitle: isRouteHistoryReport ? "Detalle de viajes" : "Detalle GPS",
-    detailColumns: getReportDetailColumns(exportReportColumns),
+    detailTitle: isRouteHistoryReport
+      ? "Detalle de viajes"
+      : isStopsReport
+        ? "Detalle de detenciones"
+        : "Detalle GPS",
+    detailColumns: isStopsReport
+      ? [
+          {
+            key: "index",
+            label: "N",
+            width: 8,
+            align: "center",
+          },
+          {
+            key: "time",
+            label: "Hora inicio",
+            width: 16,
+            align: "center",
+          },
+          {
+            key: "endTime",
+            label: "Hora termino",
+            width: 16,
+            align: "center",
+          },
+          {
+            key: "duration",
+            label: "Duracion",
+            width: 16,
+            align: "center",
+          },
+          {
+            key: "address",
+            label: "Ubicacion",
+            width: 58,
+          },
+          {
+            key: "lat",
+            label: "Lat.",
+            width: 16,
+            align: "right",
+          },
+          {
+            key: "lng",
+            label: "Long.",
+            width: 16,
+            align: "right",
+          },
+        ]
+      : getReportDetailColumns(exportReportColumns),
     rowsLabel,
     selectedAssetsSummary: isRouteHistoryReport
       ? `${assets.length} activos con viajes`
-      : `${assets.length} activos con reglas de evento`,
+      : isStopsReport
+        ? `${assets.length} activos con detenciones`
+        : `${assets.length} activos con reglas de evento`,
+    hiddenPdfColumnCount,
+    hiddenPdfColumnLabels,
+    hiddenPdfDetailColumns: hiddenPdfColumns.length ? getReportDetailColumns(hiddenPdfColumns) : [],
     generatedAt,
     fromDate: resolvedRange.fromDate,
     toDate: resolvedRange.toDate,
     summary: {
-      distanceLabel: isRouteHistoryReport ? totalDistanceLabel : `${itineraryRows.length} eventos`,
+      distanceLabel: isRouteHistoryReport
+        ? totalDistanceLabel
+        : isStopsReport
+          ? `${itineraryRows.length} detenciones`
+          : `${itineraryRows.length} eventos`,
       movingLabel: isRouteHistoryReport ? `${itineraryRows.length} viajes` : `${moving} eventos`,
-      stoppedLabel: isRouteHistoryReport ? `${assets.length} activos` : `${stopped} eventos`,
+      stoppedLabel: isRouteHistoryReport
+        ? `${assets.length} activos`
+        : isStopsReport
+          ? formatDurationMinutes(totalStoppedMinutes)
+          : `${stopped} eventos`,
       averageSpeedLabel: getAverageSpeedLabel(itineraryRows),
     },
     metrics: isRouteHistoryReport
@@ -529,32 +738,55 @@ const buildItineraryCompatibleReport = ({
             colorKey: "blue",
           },
         ]
-      : [
-          {
-            label: "Eventos",
-            value: itineraryRows.length,
-            colorKey: "navy",
-          },
-          {
-            label: "Movimiento",
-            value: moving,
-            colorKey: "teal",
-          },
-          {
-            label: "Detenidos",
-            value: stopped,
-            colorKey: "orange",
-          },
-          {
-            label: "Sin senal",
-            value: offline,
-            colorKey: "blue",
-          },
-        ],
+      : isStopsReport
+        ? [
+            {
+              label: "Detenciones",
+              value: itineraryRows.length,
+              colorKey: "navy",
+            },
+            {
+              label: "Activos",
+              value: assets.length,
+              colorKey: "teal",
+            },
+            {
+              label: "Tiempo detenido",
+              value: formatDurationMinutes(totalStoppedMinutes),
+              colorKey: "orange",
+            },
+            {
+              label: "Ubicaciones",
+              value: stopLocationCount,
+              colorKey: "blue",
+            },
+          ]
+        : [
+            {
+              label: "Eventos",
+              value: itineraryRows.length,
+              colorKey: "navy",
+            },
+            {
+              label: "Movimiento",
+              value: moving,
+              colorKey: "teal",
+            },
+            {
+              label: "Detenidos",
+              value: stopped,
+              colorKey: "orange",
+            },
+            {
+              label: "Sin senal",
+              value: offline,
+              colorKey: "blue",
+            },
+          ],
     charts,
-    routeMap: isRouteHistoryReport
+    routeMap: isRouteMapReportTemplate(template)
       ? {
-          title: "Mapa de viajes",
+          title: isStopsReport ? "Mapa de detenciones" : "Mapa de viajes",
           image: routeMapImageDataUrl,
         }
       : null,
@@ -597,10 +829,14 @@ export const createAssetReportExcelWorkbook = async ({
     dateTo,
     routeMapImageDataUrl,
   })
-  const { createItineraryExcelWorkbook } =
+  const { createItineraryExcelWorkbook, getExcelReportWorksheetLayout } =
     await import("../../../services/itinerarios/itineraryExportService.js")
 
   const workbook = await createItineraryExcelWorkbook(itineraryReport, chartData)
+  workbook.sinergyReportChartStartRow = Math.max(
+    0,
+    getExcelReportWorksheetLayout(itineraryReport).chartAnchorRow - 1,
+  )
 
   buildReportDataWorksheet(workbook, {
     template,
@@ -641,6 +877,7 @@ export const createAssetReportExcelBuffer = async ({
     workbookBuffer,
     chartData,
     brandImageDataUrl: await getReportBrandImageDataUrl(),
+    chartStartRow: workbook.sinergyReportChartStartRow,
   })
 }
 
@@ -676,6 +913,8 @@ export const exportAssetReportPdf = async ({
   charts = {},
 }) => {
   const exportReportColumns = Array.isArray(reportColumns) ? reportColumns : []
+  const pdfReportColumns = getPdfVisibleReportColumns(exportReportColumns)
+  const hiddenPdfColumns = getPdfHiddenReportColumns(exportReportColumns)
   const exportReportRows = await resolveReportRowsForExport(reportRows, {
     resolveAddresses:
       hasExportAddressColumn(exportReportColumns) &&
@@ -692,12 +931,15 @@ export const exportAssetReportPdf = async ({
   })
   const itineraryReport = buildItineraryCompatibleReport({
     template,
-    reportColumns: exportReportColumns,
+    reportColumns: pdfReportColumns,
     reportRows: exportReportRows,
     charts,
     dateFrom,
     dateTo,
     routeMapImageDataUrl,
+    hiddenPdfColumnCount: hiddenPdfColumns.length,
+    hiddenPdfColumnLabels: hiddenPdfColumns.map((column) => column.label).filter(Boolean),
+    hiddenPdfColumns,
   })
   const { exportItineraryPdfReport } =
     await import("../../../services/itinerarios/itineraryExportService.js")
