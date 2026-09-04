@@ -4,6 +4,70 @@ Registro simple de los cambios funcionales que se van incorporando a la platafor
 La idea de este archivo es dejar trazabilidad rapida para revisar que se hizo, por que
 se hizo y que partes del proyecto fueron afectadas.
 
+## 2026-09-04 - Empresas
+
+### Objetivo
+
+Reorganizar visualmente el modulo de empresas para acercarlo a una vista de
+gestion administrativa: filtros laterales, indicadores superiores y una tabla
+principal compacta. La version anterior funcionaba como directorio de cards, pero
+ocupaba mas espacio vertical y mezclaba busqueda, filtros y KPIs dentro del
+header.
+
+### Cambios realizados
+
+- Se simplifico la cabecera de Empresas para dejar solo icono, contexto, titulo,
+  descripcion y boton `Nueva empresa`.
+- Se creo un panel lateral de filtros con busqueda, estado, region, ciudad y
+  limpiar filtros.
+- Se creo una franja de resumen con empresas totales, activas, suspendidas e
+  inactivas.
+- Se cambio el catalogo principal para usar tabla como vista principal.
+- Se agrego toolbar de ordenamiento y cambio de vista tabla/grilla.
+- Se reemplazo el patron de `Mostrar mas` por paginacion.
+- Se agregaron filtros por region y ciudad usando opciones derivadas de las
+  empresas disponibles.
+- Se reemplazo el boton de tres puntos en la tabla por una accion explicita
+  `Configurar`, ya que esa accion abre directamente el panel de configuracion de
+  la empresa.
+- Se ajusto el panel lateral de filtros para estirarse con el alto del contenido
+  principal y no quedar visualmente mas corto que la tabla.
+- Se ajusto el filtro visual `Inactivas` para incluir empresas con estado
+  `inactive` e `internal`. El badge `Interna` se conserva en la tabla, pero no se
+  muestra como filtro separado para mantener el panel simple.
+- Se corrigio formato Prettier despues de la implementacion.
+
+### Por que se hizo
+
+La pantalla de Empresas necesitaba sentirse mas parecida a una herramienta de
+administracion que a una grilla de tarjetas. La tabla permite comparar empresas
+por RUT, ubicacion, estado, activos, usuarios y reportes base de forma mas
+rapida. Separar filtros del header reduce ruido visual y deja la cabecera como
+presentacion del modulo.
+
+Tambien se corrigio la diferencia entre el resumen y los filtros: si las empresas
+internas se cuentan como inactivas en el resumen, el filtro `Inactivas` debe
+mostrar tambien esas empresas para no confundir al usuario.
+
+### Archivos modificados
+
+- `frontend/src/views/CompanyManagementView.vue`
+- `frontend/src/components/companies/CompanyManagementHeader.vue`
+- `frontend/src/components/companies/CompanyFiltersPanel.vue`
+- `frontend/src/components/companies/CompanySummaryStrip.vue`
+- `frontend/src/components/companies/CompanyCatalog.vue`
+- `frontend/src/composables/companies/useCompanyManagement.js`
+- `frontend/src/components/companies/README.md`
+- `frontend/src/composables/companies/README.md`
+- `frontend/src/views/README.md`
+
+### Validacion
+
+- Se ejecuto `npm run format:check`.
+- Se ejecuto `npm run lint`.
+- Se ejecuto `node --test --test-reporter=dot "src/**/*.test.js"`.
+- Se ejecuto `npm run build`.
+
 ## 2026-09-04 - Geocercas
 
 ### Objetivo

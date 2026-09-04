@@ -1,18 +1,25 @@
 # Company Components
 
-Componentes para administracion de empresas. El modulo sigue una estructura
-similar a un directorio corporativo: encabezado de gestion, busqueda/filtros/KPIs
-y tarjetas de empresas en dos columnas. La topbar global la entrega el layout
-principal; este modulo no debe replicarla.
+Componentes para administracion de empresas. El modulo sigue una estructura de
+panel administrativo: cabecera simple, filtros laterales, resumen superior y
+catalogo central en tabla. La topbar global la entrega el layout principal; este
+modulo no debe replicarla.
 
 ## Archivos
 
-- `CompanyManagementHeader.vue`: cabecera principal del modulo. Incluye titulo,
-  busqueda, accion de crear empresa, filtros por estado, limpiar filtros y KPIs
-  compactos. No renderiza logo ni usuario porque eso pertenece al header global.
-- `CompanyCatalog.vue`: grilla de tarjetas de empresa. Cada tarjeta resume
-  identidad, estado, ubicacion, activos, usuarios, reportes base y acciones
-  principales.
+- `CompanyManagementHeader.vue`: cabecera principal del modulo. Incluye icono,
+  contexto `Empresas`, titulo, descripcion y accion `Nueva empresa`. No contiene
+  busqueda, filtros ni KPIs para mantener la cabecera limpia.
+- `CompanyFiltersPanel.vue`: panel lateral de filtros. Coordina busqueda por
+  nombre/RUT/ciudad, estado, region, ciudad y accion para limpiar filtros. Debe
+  estirarse con el contenido principal para que no quede visualmente mas corto
+  que la tabla.
+- `CompanySummaryStrip.vue`: franja superior de indicadores. Resume total de
+  empresas, activas, suspendidas e inactivas. Las empresas internas se cuentan
+  visualmente dentro de inactivas, pero mantienen badge propio en la tabla.
+- `CompanyCatalog.vue`: catalogo principal. Muestra toolbar de ordenamiento,
+  cambio de vista tabla/grilla, tabla de empresas, vista grid opcional, estado
+  vacio y paginacion.
 - `CompanyConfigPanel.vue`: panel modal de configuracion profunda. Contiene
   tabs de resumen y reportes. Se carga async y se monta solo cuando el usuario
   abre la configuracion. No administra grupos de vehiculos: esos viven en el
@@ -25,32 +32,33 @@ principal; este modulo no debe replicarla.
 
 ## Criterio visual
 
-Mantener el modulo corporativo y denso, pero no saturado. La pantalla debe
-parecer un directorio de empresas: busqueda arriba, filtros visibles y tarjetas
-claras con acciones. La configuracion avanzada debe seguir viviendo en
-modales/paneles dedicados.
+Mantener el modulo corporativo, denso y facil de escanear. La pantalla debe
+parecer una consola de administracion: filtros a la izquierda, metricas arriba y
+tabla clara para comparar empresas. La configuracion avanzada debe seguir
+viviendo en modales/paneles dedicados.
 
 El scroll vertical lo controla `CompanyManagementView.vue` en el area principal.
-`CompanyCatalog.vue` no debe crear un scroll interno propio, porque eso impide
-bajar de forma natural cuando el usuario mueve la rueda fuera de la grilla.
+`CompanyCatalog.vue` solo puede usar scroll horizontal en la tabla cuando el
+ancho no alcance. No debe crear un scroll vertical interno propio.
 
-Las tarjetas de empresa deben mantenerse compactas: avatar cercano a 48px,
-acciones de 32px de alto y paddings moderados. La prioridad de esta pantalla es
-ver varias empresas al mismo tiempo, no mostrar fichas grandes.
+La tabla debe mantenerse compacta: avatar cercano a 36px, filas de altura
+moderada, textos truncados cuando corresponda y acciones claras. Evitar que la
+accion principal quede solo como tres puntos si abre directamente el panel de
+configuracion; en ese caso debe decir `Configurar` para que se entienda a simple
+vista. La prioridad de esta pantalla es comparar varias empresas rapidamente.
 
-Los bordes de las tarjetas deben ser suaves y consistentes con el resto de la
-plataforma: usar tonos cercanos a `#edf1f7`, divisores internos claros y sombras
-ligeras. Reservar bordes fuertes o rings marcados solo para estado seleccionado
-o foco real. Las tarjetas no deben desplazarse ni levantarse con animaciones en
-hover; solo pueden cambiar levemente borde o sombra.
+Los bordes deben ser suaves y consistentes con el resto de la plataforma: usar
+tonos cercanos a `#dfe5ed` y `#edf1f5`, divisores claros y sombras ligeras.
+Evitar animaciones de desplazamiento o levantamiento; el hover puede cambiar
+levemente fondo o borde.
 
-El buscador del header debe ser claro y compacto: icono en capsula, estado de
-focus visible, boton de limpiar cuando hay texto y espacio reservado para sus
-controles internos para evitar saltos visuales.
+El buscador vive en `CompanyFiltersPanel.vue`, no en el header. Debe ser claro y
+compacto, con icono, boton de limpiar cuando hay texto y estado de focus visible.
 
-Los filtros de estado viven junto al buscador como un control segmentado con
-etiqueta `Estado`. Evitar volver a botones sueltos sin agrupacion, porque se
-lee desordenado en anchos grandes.
+Los filtros de estado viven en el panel lateral. La UI visible usa cuatro
+opciones: `Todas`, `Activas`, `Suspendidas` e `Inactivas`. El estado interno
+`internal` se conserva como dato real, pero cae dentro del filtro visual
+`Inactivas` para mantener el modulo simple.
 
 ## Regla de mantenimiento
 

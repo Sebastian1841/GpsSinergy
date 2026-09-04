@@ -1,29 +1,51 @@
 <template>
-  <section class="h-full min-h-0 bg-[#eef2f7]">
+  <section class="h-full min-h-0 bg-[#f6f8fb]">
     <div class="grid h-full min-h-0 grid-rows-[auto_1fr]">
-      <CompanyManagementHeader
-        :search-term="searchTerm"
-        :selected-status="selectedStatus"
-        :summary-items="summaryItems"
-        @clear-filters="clearFilters"
-        @create-company="openCreateCompanyModal"
-        @select-status="selectedStatus = $event"
-        @update:search-term="searchTerm = $event"
-      />
+      <CompanyManagementHeader @create-company="openCreateCompanyModal" />
 
-      <main class="min-h-0 overflow-y-auto bg-[#f6f8fb] px-4 pb-6 sm:px-8">
-        <CompanyCatalog
-          :companies="visibleCompanies"
-          :selected-company-id="selectedCompanyId || ''"
-          :visible-companies-remaining="visibleCompaniesRemaining"
-          :can-show-more="canShowMoreCompanies"
-          :get-company-health="getCompanyHealth"
-          @configure-company="openCompanyConfigPanel"
-          @enter-company="enterCompanyWorkspace"
-          @clear-filters="clearFilters"
-          @select-company="selectCompany"
-          @show-more="showMoreCompanies"
-        />
+      <main class="min-h-0 overflow-y-auto px-4 pb-6 sm:px-8">
+        <div class="grid min-h-0 items-stretch gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+          <CompanyFiltersPanel
+            :search-term="searchTerm"
+            :selected-status="selectedStatus"
+            :selected-region="selectedRegion"
+            :selected-city="selectedCity"
+            :region-options="regionOptions"
+            :city-options="cityOptions"
+            :summary-items="summaryItems"
+            @update:search-term="searchTerm = $event"
+            @update:selected-status="selectedStatus = $event"
+            @update:selected-region="selectedRegion = $event"
+            @update:selected-city="selectedCity = $event"
+            @clear-filters="clearFilters"
+          />
+
+          <section class="flex min-w-0 flex-col gap-4">
+            <CompanySummaryStrip :summary-items="summaryItems" />
+
+            <CompanyCatalog
+              :companies="paginatedCompanies"
+              :total-companies="filteredCompanies.length"
+              :selected-company-id="selectedCompanyId || ''"
+              :sort-key="sortKey"
+              :sort-direction="sortDirection"
+              :view-mode="viewMode"
+              :current-page="currentPage"
+              :total-pages="totalPages"
+              :page-size="pageSize"
+              @configure-company="openCompanyConfigPanel"
+              @enter-company="enterCompanyWorkspace"
+              @clear-filters="clearFilters"
+              @select-company="selectCompany"
+              @update:sort-key="sortKey = $event"
+              @update:sort-direction="sortDirection = $event"
+              @update:view-mode="viewMode = $event"
+              @previous-page="goToPreviousPage"
+              @next-page="goToNextPage"
+              @go-to-page="goToPage"
+            />
+          </section>
+        </div>
       </main>
     </div>
 
@@ -56,7 +78,9 @@ import { defineAsyncComponent, onMounted, ref } from "vue"
 import { useRouter } from "vue-router"
 
 import CompanyCatalog from "../components/companies/CompanyCatalog.vue"
+import CompanyFiltersPanel from "../components/companies/CompanyFiltersPanel.vue"
 import CompanyManagementHeader from "../components/companies/CompanyManagementHeader.vue"
+import CompanySummaryStrip from "../components/companies/CompanySummaryStrip.vue"
 
 import { useAuditTrail } from "../composables/audit/useAuditTrail.js"
 import { useCompanyManagement } from "../composables/companies/useCompanyManagement.js"
@@ -76,11 +100,23 @@ const {
 
   searchTerm,
   selectedStatus,
+  selectedRegion,
+  selectedCity,
+  regionOptions,
+  cityOptions,
+
+  sortKey,
+  sortDirection,
+  viewMode,
+
+  currentPage,
+  pageSize,
+  totalPages,
+
   selectedCompanyId,
   selectedCompany,
-  visibleCompanies,
-  visibleCompaniesRemaining,
-  canShowMoreCompanies,
+  filteredCompanies,
+  paginatedCompanies,
   summaryItems,
 
   showEditorModal,
@@ -89,7 +125,9 @@ const {
 
   selectCompany,
   clearFilters,
-  showMoreCompanies,
+  goToPage,
+  goToNextPage,
+  goToPreviousPage,
   openCreateCompanyModal,
   openEditCompanyModal,
   closeEditorModal,

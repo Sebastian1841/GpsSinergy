@@ -8,10 +8,11 @@ Pantallas principales conectadas al router.
 - `b.html`: documentacion HTML auxiliar sobre mejora del sistema de mantenciones. No esta conectada al router y debe tratarse como informe de referencia, no como vista Vue.
 - `ActivosView.vue`: vista principal de monitoreo de activos. Tambien acepta `?activoId=`, `?assetId=` o `?asset=` para seleccionar un activo desde navegacion externa, como el buscador global del header. El menu contextual de cada activo puede abrir `Itinerarios` dentro del mismo panel lateral, generar el recorrido del vehiculo, mostrar el resumen diario de solo ese activo o agregarlo al resumen diario actual. La accion `Agregar a resumen diario` se expone solo despues de iniciar un resumen diario, usando el estado `hasActiveDailySummary`, para evitar que aparezca antes de existir un resumen al cual sumar activos. Tambien puede navegar a `Mantenciones` con `assetId`, `patente` y `open=maintenance-detail` para abrir las mantenciones del vehiculo seleccionado. En la seccion `Geocercas`, coordina importacion/exportacion KML, KMZ, GeoJSON, CSV y XML, creacion/renombrado/eliminacion de grupos, auditoria y refresco del mapa. Los grupos se gestionan solo en el panel lateral; el editor del mapa solo los selecciona desde dropdown o deja la geocerca sin grupo.
 - `AuditView.vue`: vista de auditoria.
-- `CompanyManagementView.vue`: vista de administracion de empresas. Usa topbar
-  oscuro, cabecera de gestion, busqueda/filtros/KPIs y tarjetas de empresas en
-  dos columnas. El catalogo debe priorizar acceso rapido a cada empresa y sus
-  acciones principales.
+- `CompanyManagementView.vue`: vista de administracion de empresas. Usa el
+  layout global, cabecera simple del modulo, filtros laterales, resumen superior
+  y catalogo central con tabla como vista principal. El catalogo mantiene cambio
+  tabla/grilla, ordenamiento, paginacion y acceso al panel de configuracion de
+  cada empresa.
 - `LoginView.vue`: vista de inicio de sesion.
 - `MaintenanceView.vue`: vista visual de mantenciones. Conecta router, servicio de acceso, componentes visuales y `useMaintenanceModule`; las pestanas grandes, paneles reutilizables y modal operativo viven en `frontend/src/components/maintenance`. Acepta `assetId`, `activoId`, `asset`, `patente`, `plate` o `ppu` en query para seleccionar un vehiculo; con `open=maintenance-detail` abre directamente el modal de mantenciones del vehiculo.
 - `NoAccessView.vue`: vista de acceso denegado.

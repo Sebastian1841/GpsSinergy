@@ -10,8 +10,7 @@ import {
   getCompanyWorkspacePath,
 } from "../../utils/companies/companyUtils.js"
 
-const DEFAULT_VISIBLE_COMPANY_LIMIT = 50
-const COMPANY_LIMIT_INCREMENT = 50
+const DEFAULT_PAGE_SIZE = 8
 
 const createEmptyDraftCompany = () => ({
   id: null,
@@ -40,6 +39,20 @@ const buildApplicationId = (companiesCount) => {
   return `app-${String(companiesCount + 1).padStart(3, "0")}`
 }
 
+const getEnabledReportsCount = (company) => {
+  return (company?.reports || []).filter((report) => report.enabled !== false).length
+}
+
+const companyMatchesStatusFilter = (company, statusFilter) => {
+  if (statusFilter === "all") return true
+
+  if (statusFilter === "inactive") {
+    return company.status === "inactive" || company.status === "internal"
+  }
+
+  return company.status === statusFilter
+}
+
 export function useCompanyManagement() {
   const {
     companyRecords: companies,
@@ -50,7 +63,16 @@ export function useCompanyManagement() {
 
   const searchTerm = ref("")
   const selectedStatus = ref("all")
-  const visibleCompanyLimit = ref(DEFAULT_VISIBLE_COMPANY_LIMIT)
+  const selectedRegion = ref("all")
+  const selectedCity = ref("all")
+
+  const sortKey = ref("name")
+  const sortDirection = ref("asc")
+  const viewMode = ref("table")
+
+  const currentPage = ref(1)
+  const pageSize = ref(DEFAULT_PAGE_SIZE)
+
   const selectedCompanyId = ref(companies.value[0]?.id || null)
 
   const showEditorModal = ref(false)
@@ -59,6 +81,25 @@ export function useCompanyManagement() {
 
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 180)
 
+  const regionOptions = computed(() => {
+    return Array.from(
+      new Set(companies.value.map((company) => company.region).filter(Boolean)),
+    ).sort((left, right) => left.localeCompare(right, "es"))
+  })
+
+  const cityOptions = computed(() => {
+    const sourceCompanies =
+      selectedRegion.value === "all"
+        ? companies.value
+        : companies.value.filter((company) => {
+            return company.region === selectedRegion.value
+          })
+
+    return Array.from(new Set(sourceCompanies.map((company) => company.city).filter(Boolean))).sort(
+      (left, right) => left.localeCompare(right, "es"),
+    )
+  })
+
   const filteredCompanies = computed(() => {
     return companies.value.filter((company) => {
       const matchesSearch = companyMatchesSearch({
@@ -66,23 +107,58 @@ export function useCompanyManagement() {
         term: debouncedSearchTerm.value,
       })
 
-      const matchesStatus =
-        selectedStatus.value === "all" || company.status === selectedStatus.value
+      const matchesStatus = companyMatchesStatusFilter(company, selectedStatus.value)
 
-      return matchesSearch && matchesStatus
+      const matchesRegion =
+        selectedRegion.value === "all" || company.region === selectedRegion.value
+
+      const matchesCity = selectedCity.value === "all" || company.city === selectedCity.value
+
+      return matchesSearch && matchesStatus && matchesRegion && matchesCity
     })
   })
 
-  const visibleCompanies = computed(() => {
-    return filteredCompanies.value.slice(0, visibleCompanyLimit.value)
+  const sortedCompanies = computed(() => {
+    return [...filteredCompanies.value].sort((left, right) => {
+      let leftValue
+      let rightValue
+
+      if (sortKey.value === "status") {
+        leftValue = left.status || ""
+        rightValue = right.status || ""
+      } else if (sortKey.value === "assets") {
+        leftValue = Number(left.assetsCount) || 0
+        rightValue = Number(right.assetsCount) || 0
+      } else if (sortKey.value === "users") {
+        leftValue = Number(left.usersCount) || 0
+        rightValue = Number(right.usersCount) || 0
+      } else if (sortKey.value === "reports") {
+        leftValue = getEnabledReportsCount(left)
+        rightValue = getEnabledReportsCount(right)
+      } else {
+        leftValue = left.name || ""
+        rightValue = right.name || ""
+      }
+
+      const result =
+        typeof leftValue === "number"
+          ? leftValue - rightValue
+          : String(leftValue).localeCompare(String(rightValue), "es", {
+              sensitivity: "base",
+            })
+
+      return sortDirection.value === "desc" ? -result : result
+    })
   })
 
-  const visibleCompaniesRemaining = computed(() => {
-    return Math.max(filteredCompanies.value.length - visibleCompanies.value.length, 0)
+  const totalPages = computed(() => {
+    return Math.max(1, Math.ceil(sortedCompanies.value.length / pageSize.value))
   })
 
-  const canShowMoreCompanies = computed(() => {
-    return visibleCompaniesRemaining.value > 0
+  const paginatedCompanies = computed(() => {
+    const start = (currentPage.value - 1) * pageSize.value
+
+    return sortedCompanies.value.slice(start, start + pageSize.value)
   })
 
   const selectedCompany = computed(() => {
@@ -105,15 +181,30 @@ export function useCompanyManagement() {
     return [
       { key: "all", label: "Empresas", value: companies.value.length },
       { key: "active", label: "Activas", value: activeCompanies.length },
-      { key: "pending", label: "Pendientes", value: pendingCompanies.length },
-      { key: "inactive", label: "Suspendidas", value: inactiveCompanies.length },
+      { key: "pending", label: "Suspendidas", value: pendingCompanies.length },
+      { key: "inactive", label: "Inactivas", value: inactiveCompanies.length },
       { key: "internal", label: "Internas", value: internalCompanies.length },
       { key: "assets", label: "Activos", value: totalAssets },
     ]
   })
 
-  watch([debouncedSearchTerm, selectedStatus], () => {
-    visibleCompanyLimit.value = DEFAULT_VISIBLE_COMPANY_LIMIT
+  watch(
+    [debouncedSearchTerm, selectedStatus, selectedRegion, selectedCity, sortKey, sortDirection],
+    () => {
+      currentPage.value = 1
+    },
+  )
+
+  watch(selectedRegion, () => {
+    if (selectedCity.value !== "all" && !cityOptions.value.includes(selectedCity.value)) {
+      selectedCity.value = "all"
+    }
+  })
+
+  watch(totalPages, (pages) => {
+    if (currentPage.value > pages) {
+      currentPage.value = pages
+    }
   })
 
   const selectCompany = (companyId) => {
@@ -123,11 +214,21 @@ export function useCompanyManagement() {
   const clearFilters = () => {
     searchTerm.value = ""
     selectedStatus.value = "all"
-    visibleCompanyLimit.value = DEFAULT_VISIBLE_COMPANY_LIMIT
+    selectedRegion.value = "all"
+    selectedCity.value = "all"
+    currentPage.value = 1
   }
 
-  const showMoreCompanies = () => {
-    visibleCompanyLimit.value += COMPANY_LIMIT_INCREMENT
+  const goToPage = (page) => {
+    currentPage.value = Math.min(Math.max(Number(page) || 1, 1), totalPages.value)
+  }
+
+  const goToNextPage = () => {
+    goToPage(currentPage.value + 1)
+  }
+
+  const goToPreviousPage = () => {
+    goToPage(currentPage.value - 1)
   }
 
   const openCreateCompanyModal = () => {
@@ -232,13 +333,26 @@ export function useCompanyManagement() {
 
     searchTerm,
     selectedStatus,
-    visibleCompanyLimit,
+    selectedRegion,
+    selectedCity,
+    regionOptions,
+    cityOptions,
+
+    sortKey,
+    sortDirection,
+    viewMode,
+
+    currentPage,
+    pageSize,
+    totalPages,
+
     selectedCompanyId,
     selectedCompany,
+
     filteredCompanies,
-    visibleCompanies,
-    visibleCompaniesRemaining,
-    canShowMoreCompanies,
+    sortedCompanies,
+    paginatedCompanies,
+
     summaryItems,
 
     showEditorModal,
@@ -247,7 +361,10 @@ export function useCompanyManagement() {
 
     selectCompany,
     clearFilters,
-    showMoreCompanies,
+    goToPage,
+    goToNextPage,
+    goToPreviousPage,
+
     openCreateCompanyModal,
     openEditCompanyModal,
     closeEditorModal,
