@@ -320,6 +320,7 @@ const actionLabels = {
   "event-rule:update": "Regla de evento actualizada",
   "geofence:create": "Geocerca creada",
   "geofence:delete": "Geocerca eliminada",
+  "geofence:delete-bulk": "Geocercas eliminadas",
   "geofence:export": "Geocercas exportadas",
   "geofence-group:create": "Grupo de geocercas creado",
   "geofence-group:delete": "Grupo de geocercas eliminado",

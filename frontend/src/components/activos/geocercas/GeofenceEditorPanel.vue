@@ -199,20 +199,36 @@
 
       <button
         type="button"
-        class="cursor-pointer rounded-md bg-[#102372] px-2 py-1 text-[10px] font-black text-white transition hover:bg-[#0c1b59]"
-        @click="$emit('stop-editing')"
+        class="cursor-pointer rounded-md border border-[#d8dee8] bg-white px-2 py-1 text-[10px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600]"
+        @click="$emit('cancel-editing')"
       >
-        Listo
+        Cancelar
+      </button>
+
+      <button
+        type="button"
+        class="cursor-pointer rounded-md bg-[#102372] px-2 py-1 text-[10px] font-black text-white transition hover:bg-[#0c1b59]"
+        @click="$emit('save-editing')"
+      >
+        Guardar
       </button>
     </div>
 
     <div v-if="editingDraft?.type === 'circle'" class="mt-2 flex gap-2">
       <button
         type="button"
-        class="cursor-pointer rounded-md bg-[#102372] px-2 py-1 text-[10px] font-black text-white transition hover:bg-[#0c1b59]"
-        @click="$emit('stop-editing')"
+        class="cursor-pointer rounded-md border border-[#d8dee8] bg-white px-2 py-1 text-[10px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600]"
+        @click="$emit('cancel-editing')"
       >
-        Listo
+        Cancelar
+      </button>
+
+      <button
+        type="button"
+        class="cursor-pointer rounded-md bg-[#102372] px-2 py-1 text-[10px] font-black text-white transition hover:bg-[#0c1b59]"
+        @click="$emit('save-editing')"
+      >
+        Guardar
       </button>
     </div>
   </div>
@@ -275,7 +291,8 @@ defineEmits([
   "update-editing-meta",
   "update-edit-add-point",
   "remove-last-edit-point",
-  "stop-editing",
+  "save-editing",
+  "cancel-editing",
 ])
 
 const draftColor = computed(() => {

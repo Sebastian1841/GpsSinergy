@@ -42,7 +42,9 @@ diario (solo este)`, `Agregar a resumen diario` y `Mostrar itinerario`. Los
   lista muestra el filtro activo, agrupa por `groupName`, permite
   ordenar por nombre/grupo/tipo, conserva grupos vacios creados por el usuario
   y permite plegar o expandir grupos para revisar importaciones grandes sin
-  mezclar todas las zonas. El boton `Nueva geocerca` solo orienta al usuario
+  mezclar todas las zonas. La seleccion multiple no aparece por defecto: se
+  activa desde `Eliminar varias` y recien ahi muestra checks, contador, limpieza
+  y eliminacion confirmada. El boton `Nueva geocerca` solo orienta al usuario
   hacia las herramientas reales del mapa para no duplicar el flujo de dibujo.
 - `FleetListPanel.vue`: contenedor principal del listado lateral de activos.
   Abre el menu contextual si el usuario puede administrar activos o ver

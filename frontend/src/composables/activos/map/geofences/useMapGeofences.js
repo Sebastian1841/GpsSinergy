@@ -44,17 +44,17 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
 
   const helperText = computed(() => {
     if (editingDraft.value?.type === "circle") {
-      return "Arrastra el punto central para moverla o el punto exterior para cambiar el radio."
+      return "Arrastra el punto central para moverla o el punto exterior para cambiar el radio. Guarda o cancela para salir."
     }
 
     if (editingDraft.value?.type === "polygon") {
       if (editAddPoint.value) return "Haz clic en el mapa para agregar un nuevo punto."
-      return "Arrastra los puntos para ajustar la forma. También puedes agregar o quitar puntos."
+      return "Arrastra los puntos para ajustar la forma. Tambien puedes agregar o quitar puntos. Guarda o cancela para salir."
     }
 
     if (editingDraft.value?.type === "route") {
       if (editAddPoint.value) return "Haz clic en el mapa para agregar un nuevo punto a la ruta."
-      return "Arrastra los puntos para ajustar el recorrido. También puedes agregar o quitar puntos."
+      return "Arrastra los puntos para ajustar el recorrido. Tambien puedes agregar o quitar puntos. Guarda o cancela para salir."
     }
 
     if (drawMode.value === "circle") {
@@ -136,6 +136,13 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
     editAddPoint.value = false
     editing.clearEditLayers()
     renderer.renderGeofences()
+  }
+
+  const saveEditing = () => {
+    if (props.canEditGeofences === false || !editingDraft.value) return
+
+    editing.emitUpdatedGeofence()
+    stopEditing()
   }
 
   const startPolygonDraw = () => {
@@ -338,10 +345,13 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
         return normalizeId(item.id) === normalizeId(editingDraft.value.id)
       })
 
-      if (updated) {
-        editingDraft.value = cloneGeofence(updated)
-        editing.redrawEditLayer()
+      if (!updated) {
+        stopEditing()
+        return
       }
+
+      editingDraft.value = cloneGeofence(updated)
+      editing.redrawEditLayer()
     }
 
     renderer.renderGeofences()
@@ -371,6 +381,7 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
 
     startEditGeofence,
     focusGeofence: focusGeofenceById,
+    saveEditing,
     stopEditing,
     removeLastEditPoint: editing.removeLastEditPoint,
     deleteGeofence,

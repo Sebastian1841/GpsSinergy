@@ -6,12 +6,33 @@ const getGeofenceAuditName = (geofence = {}) => {
   return geofence?.name || geofence?.nombre || geofence?.id || "Geocerca"
 }
 
+const normalizeGeofenceIdList = (geofenceIds = []) => {
+  if (!Array.isArray(geofenceIds)) return []
+
+  const normalizedIds = []
+  const seenIds = new Set()
+
+  geofenceIds.forEach((geofenceId) => {
+    const normalizedId = normalizeId(
+      geofenceId && typeof geofenceId === "object" ? geofenceId.id : geofenceId,
+    )
+
+    if (!normalizedId || seenIds.has(normalizedId)) return
+
+    seenIds.add(normalizedId)
+    normalizedIds.push(normalizedId)
+  })
+
+  return normalizedIds
+}
+
 export function useActivosGeofenceActions({
   activeSidebarSection,
   canEditGeofences,
   createGeofence,
   createGeofenceGroup,
   deleteGeofence,
+  deleteGeofences,
   deleteGeofenceGroup,
   geofences,
   geofenceGroups,
@@ -112,6 +133,56 @@ export function useActivosGeofenceActions({
     })
 
     if (normalizeId(selectedGeofenceId.value) === normalizeId(geofenceId)) {
+      selectedGeofenceId.value = null
+    }
+
+    await refreshMapLayout(true)
+  }
+
+  const handleGeofencesDeleted = async (geofenceIds = []) => {
+    if (!unref(canEditGeofences)) return
+
+    const targetIds = normalizeGeofenceIdList(geofenceIds)
+
+    if (!targetIds.length) return
+
+    const targetIdSet = new Set(targetIds)
+    const targetGeofences = geofences.value.filter((geofence) => {
+      return targetIdSet.has(normalizeId(geofence.id))
+    })
+
+    if (!targetGeofences.length) return
+
+    const deletedIds =
+      typeof deleteGeofences === "function"
+        ? deleteGeofences(targetIds)
+        : targetIds.filter((geofenceId) => {
+            deleteGeofence(geofenceId)
+            return true
+          })
+
+    const deletedIdSet = new Set(deletedIds.map((geofenceId) => normalizeId(geofenceId)))
+    const deletedGeofences = targetGeofences.filter((geofence) => {
+      return deletedIdSet.has(normalizeId(geofence.id))
+    })
+
+    if (!deletedGeofences.length) return
+
+    recordAudit({
+      module: "geocercas",
+      action: "geofence:delete-bulk",
+      entityType: "geocerca",
+      entityName: "Eliminacion multiple de geocercas",
+      severity: "warning",
+      description: `Se eliminaron ${deletedGeofences.length} geocercas.`,
+      metadata: {
+        count: deletedGeofences.length,
+        geofenceIds: deletedGeofences.map((geofence) => geofence.id),
+        geofenceNames: deletedGeofences.map((geofence) => getGeofenceAuditName(geofence)),
+      },
+    })
+
+    if (deletedIdSet.has(normalizeId(selectedGeofenceId.value))) {
       selectedGeofenceId.value = null
     }
 
@@ -269,6 +340,7 @@ export function useActivosGeofenceActions({
   return {
     handleGeofenceCreated,
     handleGeofenceDeleted,
+    handleGeofencesDeleted,
     handleGeofenceExported,
     handleGeofenceGroupCreated,
     handleGeofenceGroupDeleted,

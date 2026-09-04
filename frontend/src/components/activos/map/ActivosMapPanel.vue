@@ -107,7 +107,8 @@
       @update-editing-meta="handleEditingGeofenceMeta"
       @update-edit-add-point="handleUpdateEditAddPoint"
       @remove-last-edit-point="removeLastEditPoint"
-      @stop-editing="handleStopEditing"
+      @save-editing="handleSaveEditing"
+      @cancel-editing="handleCancelEditing"
     />
   </section>
 </template>
@@ -327,6 +328,7 @@ const {
 
   startEditGeofence,
   focusGeofence,
+  saveEditing,
   stopEditing,
   removeLastEditPoint,
   deleteGeofence,
@@ -349,6 +351,7 @@ const mapController = {
   cancelAll,
   startEditGeofence,
   focusGeofence,
+  saveEditing,
   stopEditing,
   deleteGeofence,
   updateEditingGeofenceMeta,
@@ -366,7 +369,8 @@ const {
   handleCreateRoute,
   selectGeofenceToEdit,
   handleExternalGeofenceSelection,
-  handleStopEditing,
+  handleSaveEditing,
+  handleCancelEditing,
   handleCancel,
 } = useMapPanelGeofenceActions({
   props,

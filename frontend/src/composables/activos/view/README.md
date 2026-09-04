@@ -17,9 +17,9 @@ Composables que descomponen `ActivosView.vue`.
   primer click.
 - `useActivosGeofenceActions.js`: acciones de geocercas conectadas con la vista
   principal. Coordina seleccion, edicion en mapa, creacion, actualizacion,
-  eliminacion, grupos de geocercas y auditoria. En importaciones, responde el
-  resultado al panel despues de guardar y refrescar el mapa para cerrar la barra
-  de progreso con un mensaje real de exito o error.
+  eliminacion simple o multiple, grupos de geocercas y auditoria. En
+  importaciones, responde el resultado al panel despues de guardar y refrescar el
+  mapa para cerrar la barra de progreso con un mensaje real de exito o error.
 - `useActivosLayout.js`: layout principal de la vista. Controla el divisor entre
   el panel de flota y el mapa, manteniendo un minimo de `300px` para la tabla y
   `260px` para que el mapa no colapse al mover el separador.

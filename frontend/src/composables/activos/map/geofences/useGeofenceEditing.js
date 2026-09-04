@@ -85,10 +85,6 @@ export function createGeofenceEditingController({
       radiusMarker.setLatLng(getCircleEdgeLatLng(nextCenter, currentRadius))
     })
 
-    centerMarker.on("dragend", () => {
-      emitUpdatedGeofence()
-    })
-
     radiusMarker.on("drag", (event) => {
       const nextEdge = event.target.getLatLng()
       const currentCenter = L.latLng(editingDraft.value.center.lat, editingDraft.value.center.lng)
@@ -97,10 +93,6 @@ export function createGeofenceEditingController({
 
       editingDraft.value.radius = nextRadius
       circle.setRadius(nextRadius)
-    })
-
-    radiusMarker.on("dragend", () => {
-      emitUpdatedGeofence()
     })
 
     centerMarker.addTo(layers.editLayer)
@@ -124,10 +116,6 @@ export function createGeofenceEditingController({
         editingDraft.value.coordinates[index] = normalizePoint(next)
 
         polygon.setLatLngs(editingDraft.value.coordinates.map((item) => [item.lat, item.lng]))
-      })
-
-      marker.on("dragend", () => {
-        emitUpdatedGeofence()
       })
 
       marker
@@ -155,10 +143,6 @@ export function createGeofenceEditingController({
         editingDraft.value.coordinates[index] = normalizePoint(next)
 
         route.setLatLngs(editingDraft.value.coordinates.map((item) => [item.lat, item.lng]))
-      })
-
-      marker.on("dragend", () => {
-        emitUpdatedGeofence()
       })
 
       marker
@@ -209,7 +193,6 @@ export function createGeofenceEditingController({
       color: nextColor,
     }
 
-    emitUpdatedGeofence()
     redrawEditLayer()
   }
 
@@ -225,7 +208,6 @@ export function createGeofenceEditingController({
     }
 
     editingDraft.value.coordinates.pop()
-    emitUpdatedGeofence()
     redrawEditLayer()
   }
 
@@ -237,7 +219,6 @@ export function createGeofenceEditingController({
     editingDraft.value.coordinates.push(normalizePoint(latlng))
 
     editAddPoint.value = false
-    emitUpdatedGeofence()
     redrawEditLayer()
   }
 

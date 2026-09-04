@@ -114,7 +114,12 @@ export function useMapPanelGeofenceActions({ props, state, mapController }) {
     mapController.focusGeofence?.(geofence)
   }
 
-  const handleStopEditing = () => {
+  const handleSaveEditing = () => {
+    state.clearActiveGeofenceSelection()
+    mapController.saveEditing?.()
+  }
+
+  const handleCancelEditing = () => {
     state.clearActiveGeofenceSelection()
     mapController.stopEditing()
   }
@@ -147,7 +152,8 @@ export function useMapPanelGeofenceActions({ props, state, mapController }) {
     handleCreateRoute,
     selectGeofenceToEdit,
     handleExternalGeofenceSelection,
-    handleStopEditing,
+    handleSaveEditing,
+    handleCancelEditing,
     handleCancel,
     handleDeleteGeofence,
   }

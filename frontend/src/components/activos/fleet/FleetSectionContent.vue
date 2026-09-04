@@ -59,6 +59,7 @@
     @select-geofence="emit('select-geofence', $event)"
     @edit-geofence="emit('edit-geofence', $event)"
     @delete-geofence="emit('delete-geofence', $event)"
+    @delete-geofences="emit('delete-geofences', $event)"
     @export-geofences="emit('export-geofences', $event)"
     @import-geofences="emit('import-geofences', $event)"
     @create-geofence-group="emit('create-geofence-group', $event)"
@@ -251,6 +252,7 @@ const emit = defineEmits([
   "select-geofence",
   "edit-geofence",
   "delete-geofence",
+  "delete-geofences",
   "export-geofences",
   "import-geofences",
   "create-geofence-group",

@@ -11,9 +11,11 @@ Estado de geocercas.
   guarda el formato actual con `{ geofences, groups }`. Borrar un grupo no borra
   geocercas: solo limpia su `groupName` para dejarlas `Sin grupo`. Renombrar un
   grupo actualiza el registro del grupo y todas las geocercas que apuntaban al
-  nombre anterior.
+  nombre anterior. `deleteGeofences` permite eliminar varias geocercas en una
+  sola operacion, pero solo dentro de las geocercas visibles para la empresa
+  activa.
 - `useGeofences.test.js`: pruebas del composable de geocercas, incluyendo
-  creacion, borrado, renombrado de grupos e importacion.
+  creacion, borrado simple y multiple, renombrado de grupos e importacion.
 
 ## Regla de mantenimiento
 

@@ -94,6 +94,38 @@ test("createGeofence preserves geofence group names", () => {
   }
 })
 
+test("deleteGeofences removes only selected geofences from the active company", () => {
+  const previousWindow = globalThis.window
+
+  globalThis.window = {
+    localStorage: createMemoryStorage(),
+  }
+
+  try {
+    const { geofences, createGeofence, deleteGeofences } = useGeofences({
+      companyId: "company-001",
+    })
+
+    createGeofence(createCircle(1))
+    createGeofence(createCircle(2))
+    createGeofence(createCircle(3))
+
+    const deletedIds = deleteGeofences(["geofence-1", "missing-geofence", "geofence-3"])
+
+    assert.deepEqual(deletedIds, ["geofence-1", "geofence-3"])
+    assert.deepEqual(
+      geofences.value.map((geofence) => geofence.id),
+      ["geofence-2"],
+    )
+  } finally {
+    if (previousWindow === undefined) {
+      delete globalThis.window
+    } else {
+      globalThis.window = previousWindow
+    }
+  }
+})
+
 test("createGeofenceGroup stores empty groups for the active company", () => {
   const previousWindow = globalThis.window
 

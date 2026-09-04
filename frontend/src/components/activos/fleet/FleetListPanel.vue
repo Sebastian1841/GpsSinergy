@@ -60,6 +60,7 @@
       @select-geofence="handleGeofenceSelect"
       @edit-geofence="handleGeofenceEdit"
       @delete-geofence="confirmDeleteGeofence"
+      @delete-geofences="confirmDeleteGeofences"
       @export-geofences="$emit('geofence-export', $event)"
       @import-geofences="$emit('geofence-import', $event)"
       @create-geofence-group="$emit('geofence-group-create', $event)"
@@ -223,6 +224,7 @@ const emit = defineEmits([
   "geofence-selected",
   "geofence-edit",
   "geofence-delete",
+  "geofence-delete-many",
   "geofence-export",
   "geofence-import",
   "geofence-group-create",
@@ -354,11 +356,15 @@ const {
   activeFilteredGeofences,
   activeSectionGeofences,
   confirmDeleteGeofence,
+  confirmDeleteGeofences,
   handleGeofenceEdit,
   handleGeofenceSelect,
 } = useFleetPanelGeofences({
   emitDeleteGeofence: (geofenceId) => {
     emit("geofence-delete", geofenceId)
+  },
+  emitDeleteGeofences: (geofenceIds) => {
+    emit("geofence-delete-many", geofenceIds)
   },
   emitEditGeofence: (geofence) => {
     emit("geofence-edit", geofence)

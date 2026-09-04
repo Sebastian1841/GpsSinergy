@@ -630,16 +630,34 @@ export function useGeofences({ companyId = "general" } = {}) {
     })
   }
 
-  const deleteGeofence = (geofenceId) => {
-    const visibleGeofenceExists = geofences.value.some((geofence) => {
-      return normalizeGeofenceId(geofence.id) === normalizeGeofenceId(geofenceId)
+  const deleteGeofences = (geofenceIds = []) => {
+    if (!Array.isArray(geofenceIds) || !geofenceIds.length) return []
+
+    const requestedIds = new Set(geofenceIds.map((id) => normalizeGeofenceId(id)).filter(Boolean))
+
+    if (!requestedIds.size) return []
+
+    const removableIds = new Set()
+
+    geofences.value.forEach((geofence) => {
+      const geofenceId = normalizeGeofenceId(geofence.id)
+
+      if (requestedIds.has(geofenceId)) {
+        removableIds.add(geofenceId)
+      }
     })
 
-    if (!visibleGeofenceExists) return
+    if (!removableIds.size) return []
 
     allGeofences.value = allGeofences.value.filter((geofence) => {
-      return normalizeGeofenceId(geofence.id) !== normalizeGeofenceId(geofenceId)
+      return !removableIds.has(normalizeGeofenceId(geofence.id))
     })
+
+    return Array.from(removableIds)
+  }
+
+  const deleteGeofence = (geofenceId) => {
+    deleteGeofences([geofenceId])
   }
 
   const clearGeofences = () => {
@@ -671,6 +689,7 @@ export function useGeofences({ companyId = "general" } = {}) {
     createGeofenceGroup,
     updateGeofence,
     deleteGeofence,
+    deleteGeofences,
     deleteGeofenceGroup,
     renameGeofenceGroup,
     clearGeofences,

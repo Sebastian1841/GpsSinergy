@@ -705,6 +705,7 @@ export function useActivosMap({ props, emit, mapRef }) {
 
     startEditGeofence: geofenceMap.startEditGeofence,
     focusGeofence: geofenceMap.focusGeofence,
+    saveEditing: geofenceMap.saveEditing,
     stopEditing: geofenceMap.stopEditing,
     removeLastEditPoint: geofenceMap.removeLastEditPoint,
     deleteGeofence: geofenceMap.deleteGeofence,

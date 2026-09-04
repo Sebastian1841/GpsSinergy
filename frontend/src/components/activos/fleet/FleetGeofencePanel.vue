@@ -753,8 +753,73 @@
               >
                 {{ areAllGeofenceGroupsExpanded ? "Contraer grupos" : "Expandir grupos" }}
               </button>
+
+              <button
+                v-if="canEditGeofences"
+                type="button"
+                class="h-9 rounded-lg border px-3 text-[10px] font-black transition"
+                :class="
+                  isGeofenceBulkSelectionMode
+                    ? 'border-[#FF6600] bg-[#fff7ed] text-[#FF6600]'
+                    : 'border-[#d8dee8] bg-white text-[#102372] hover:border-[#FF6600] hover:text-[#FF6600]'
+                "
+                @click="toggleGeofenceBulkSelectionMode"
+              >
+                {{ isGeofenceBulkSelectionMode ? "Cancelar selección" : "Eliminar varias" }}
+              </button>
             </div>
           </header>
+
+          <div
+            v-if="canEditGeofences && isGeofenceBulkSelectionMode"
+            class="flex shrink-0 flex-col gap-2 border-b border-[#e8ecf2] bg-[#fbfcff] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <label
+              class="flex cursor-pointer items-center gap-2 text-[10px] font-black text-[#102372]"
+              :class="!visibleSelectableGeofences.length ? 'cursor-not-allowed opacity-50' : ''"
+            >
+              <input
+                type="checkbox"
+                class="h-4 w-4 rounded border-[#cbd5e1] accent-[#FF6600]"
+                :checked="areAllVisibleGeofencesSelected"
+                :disabled="!visibleSelectableGeofences.length"
+                @change="toggleVisibleGeofenceSelection"
+              />
+
+              <span>
+                {{
+                  areAllVisibleGeofencesSelected
+                    ? "Quitar visibles"
+                    : `Seleccionar visibles (${visibleSelectableGeofences.length})`
+                }}
+              </span>
+            </label>
+
+            <div
+              v-if="selectedGeofenceCount"
+              class="flex flex-wrap items-center gap-2 text-[10px] font-black"
+            >
+              <span class="rounded-full bg-[#102372]/10 px-2 py-1 text-[#102372]">
+                {{ selectedGeofenceCount }} seleccionadas
+              </span>
+
+              <button
+                type="button"
+                class="h-8 rounded-lg border border-red-200 bg-red-50 px-3 text-[10px] font-black text-red-600 transition hover:border-red-300 hover:bg-red-100"
+                @click="deleteSelectedGeofences"
+              >
+                Eliminar seleccionadas
+              </button>
+
+              <button
+                type="button"
+                class="h-8 rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600]"
+                @click="clearSelectedGeofences"
+              >
+                Limpiar
+              </button>
+            </div>
+          </div>
 
           <div class="min-h-0 flex-1 overflow-auto p-3">
             <div class="overflow-hidden rounded-xl border border-[#e8ecf2]">
@@ -806,7 +871,9 @@
                     :class="
                       normalizeId(selectedGeofenceId) === normalizeId(geofence.id)
                         ? 'bg-[#fff8f3]'
-                        : 'bg-white hover:bg-[#f8fafc]'
+                        : isGeofenceBulkSelectionMode && isGeofenceSelectedForBulkDelete(geofence)
+                          ? 'bg-[#eef3ff]'
+                          : 'bg-white hover:bg-[#f8fafc]'
                     "
                   >
                     <span
@@ -818,33 +885,50 @@
                       "
                     ></span>
 
-                    <div
-                      class="grid gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-                    >
-                      <button
-                        type="button"
-                        class="flex min-w-0 cursor-pointer items-center gap-3 text-left"
-                        @click="emit('select-geofence', geofence)"
-                      >
-                        <span
-                          class="h-3 w-3 shrink-0 rounded-full ring-4 ring-slate-100"
-                          :style="{ backgroundColor: getGeofenceColor(geofence) }"
-                        ></span>
+                    <div class="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
+                      <div class="flex min-w-0 flex-1 items-center gap-3">
+                        <label
+                          v-if="canEditGeofences && isGeofenceBulkSelectionMode"
+                          class="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-[#d8dee8] bg-white transition hover:border-[#FF6600]"
+                          title="Seleccionar geocerca"
+                          :aria-label="`Seleccionar ${geofence.name}`"
+                          @click.stop
+                        >
+                          <input
+                            type="checkbox"
+                            class="h-4 w-4 rounded border-[#cbd5e1] accent-[#FF6600]"
+                            :checked="isGeofenceSelectedForBulkDelete(geofence)"
+                            @change="toggleGeofenceSelection(geofence)"
+                          />
+                        </label>
 
-                        <span class="min-w-0">
-                          <span class="block truncate text-[12px] font-black text-[#172033]">
-                            {{ geofence.name }}
-                          </span>
-
+                        <button
+                          type="button"
+                          class="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left"
+                          @click="emit('select-geofence', geofence)"
+                        >
                           <span
-                            class="mt-1 block truncate text-[10px] font-semibold text-slate-500"
-                          >
-                            {{ getGeofenceDescription(geofence) }}
-                          </span>
-                        </span>
-                      </button>
+                            class="h-3 w-3 shrink-0 rounded-full ring-4 ring-slate-100"
+                            :style="{ backgroundColor: getGeofenceColor(geofence) }"
+                          ></span>
 
-                      <div class="flex items-center justify-between gap-2 sm:justify-end">
+                          <span class="min-w-0">
+                            <span class="block truncate text-[12px] font-black text-[#172033]">
+                              {{ geofence.name }}
+                            </span>
+
+                            <span
+                              class="mt-1 block truncate text-[10px] font-semibold text-slate-500"
+                            >
+                              {{ getGeofenceDescription(geofence) }}
+                            </span>
+                          </span>
+                        </button>
+                      </div>
+
+                      <div
+                        class="flex items-center justify-between gap-2 sm:shrink-0 sm:justify-end"
+                      >
                         <span
                           class="shrink-0 rounded-md px-2 py-1 text-[8px] font-black uppercase tracking-wide"
                           :class="getGeofenceBadgeClass(geofence)"
@@ -968,6 +1052,7 @@ const emit = defineEmits([
   "select-geofence",
   "edit-geofence",
   "delete-geofence",
+  "delete-geofences",
   "export-geofences",
   "import-geofences",
   "create-geofence-group",
@@ -1001,6 +1086,8 @@ const showGeofenceGroupsModal = ref(false)
 const showGeofenceFileModal = ref(false)
 const showCreateGeofenceHelpModal = ref(false)
 const selectedGeofenceSort = ref("name")
+const isGeofenceBulkSelectionMode = ref(false)
+const selectedGeofenceIds = ref([])
 
 const geofenceSortOptions = [
   {
@@ -1286,6 +1373,41 @@ const visibleFilteredGeofences = computed(() => {
   })
 })
 
+const visibleSelectableGeofences = computed(() => {
+  return visibleFilteredGeofences.value.filter((geofence) => {
+    return Boolean(normalizeId(geofence?.id))
+  })
+})
+
+const selectedGeofenceIdSet = computed(() => {
+  return new Set(
+    selectedGeofenceIds.value.map((geofenceId) => normalizeId(geofenceId)).filter(Boolean),
+  )
+})
+
+const selectedGeofences = computed(() => {
+  return props.geofences.filter((geofence) => {
+    return selectedGeofenceIdSet.value.has(normalizeId(geofence?.id))
+  })
+})
+
+const selectedGeofenceCount = computed(() => {
+  return selectedGeofences.value.length
+})
+
+const visibleSelectedGeofenceCount = computed(() => {
+  return visibleSelectableGeofences.value.filter((geofence) => {
+    return selectedGeofenceIdSet.value.has(normalizeId(geofence?.id))
+  }).length
+})
+
+const areAllVisibleGeofencesSelected = computed(() => {
+  return (
+    visibleSelectableGeofences.value.length > 0 &&
+    visibleSelectedGeofenceCount.value === visibleSelectableGeofences.value.length
+  )
+})
+
 const sortedVisibleFilteredGeofences = computed(() => {
   return [...visibleFilteredGeofences.value].sort((firstGeofence, secondGeofence) => {
     const sortKey = selectedGeofenceSort.value
@@ -1341,6 +1463,66 @@ const getGeofenceSortValue = (geofence, sortKey) => {
   }
 
   return String(geofence?.name || "")
+}
+
+const isGeofenceSelectedForBulkDelete = (geofence) => {
+  return selectedGeofenceIdSet.value.has(normalizeId(geofence?.id))
+}
+
+const toggleGeofenceSelection = (geofence) => {
+  const geofenceId = normalizeId(geofence?.id)
+
+  if (!geofenceId) return
+
+  if (selectedGeofenceIdSet.value.has(geofenceId)) {
+    selectedGeofenceIds.value = selectedGeofenceIds.value.filter((selectedId) => {
+      return normalizeId(selectedId) !== geofenceId
+    })
+    return
+  }
+
+  selectedGeofenceIds.value = [...selectedGeofenceIds.value, geofenceId]
+}
+
+const toggleVisibleGeofenceSelection = () => {
+  const visibleIds = visibleSelectableGeofences.value.map((geofence) => normalizeId(geofence.id))
+
+  if (!visibleIds.length) return
+
+  if (areAllVisibleGeofencesSelected.value) {
+    const visibleIdSet = new Set(visibleIds)
+
+    selectedGeofenceIds.value = selectedGeofenceIds.value.filter((geofenceId) => {
+      return !visibleIdSet.has(normalizeId(geofenceId))
+    })
+    return
+  }
+
+  const nextIds = new Set(selectedGeofenceIds.value.map((geofenceId) => normalizeId(geofenceId)))
+
+  visibleIds.forEach((geofenceId) => {
+    nextIds.add(geofenceId)
+  })
+
+  selectedGeofenceIds.value = Array.from(nextIds)
+}
+
+const clearSelectedGeofences = () => {
+  selectedGeofenceIds.value = []
+}
+
+const toggleGeofenceBulkSelectionMode = () => {
+  isGeofenceBulkSelectionMode.value = !isGeofenceBulkSelectionMode.value
+
+  if (!isGeofenceBulkSelectionMode.value) {
+    clearSelectedGeofences()
+  }
+}
+
+const deleteSelectedGeofences = () => {
+  if (!selectedGeofenceCount.value) return
+
+  emit("delete-geofences", selectedGeofences.value)
 }
 
 const isGeofenceGroupCollapsed = (groupId) => {
@@ -1435,6 +1617,23 @@ watch(
     if (!selectedGroupExists) {
       selectedGeofenceGroup.value = ALL_GEOFENCE_GROUPS
     }
+  },
+  {
+    immediate: true,
+  },
+)
+
+watch(
+  () =>
+    props.geofences.map((geofence) => {
+      return normalizeId(geofence?.id)
+    }),
+  (geofenceIds) => {
+    const validGeofenceIds = new Set(geofenceIds.filter(Boolean))
+
+    selectedGeofenceIds.value = selectedGeofenceIds.value.filter((geofenceId) => {
+      return validGeofenceIds.has(normalizeId(geofenceId))
+    })
   },
   {
     immediate: true,

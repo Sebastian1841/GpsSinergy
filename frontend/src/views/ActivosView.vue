@@ -44,6 +44,7 @@
           @geofence-selected="handleSidebarGeofenceSelected"
           @geofence-edit="handleSidebarGeofenceEdit"
           @geofence-delete="handleGeofenceDeleted"
+          @geofence-delete-many="handleGeofencesDeleted"
           @geofence-export="handleGeofenceExported"
           @geofence-import="handleGeofencesImported"
           @geofence-group-create="handleGeofenceGroupCreated"
@@ -479,6 +480,7 @@ const {
   createGeofenceGroup,
   updateGeofence,
   deleteGeofence,
+  deleteGeofences,
   deleteGeofenceGroup,
   renameGeofenceGroup,
   importGeofences,
@@ -635,6 +637,7 @@ const {
 const {
   handleGeofenceCreated,
   handleGeofenceDeleted,
+  handleGeofencesDeleted,
   handleGeofenceExported,
   handleGeofenceGroupCreated,
   handleGeofenceGroupDeleted,
@@ -649,6 +652,7 @@ const {
   createGeofence,
   createGeofenceGroup,
   deleteGeofence,
+  deleteGeofences,
   deleteGeofenceGroup,
   geofences,
   geofenceGroups,

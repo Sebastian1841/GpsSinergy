@@ -4,6 +4,7 @@ import { getGeofenceBadgeLabel, getGeofenceMeta } from "../../../utils/geofenceU
 
 export function useFleetPanelGeofences({
   emitDeleteGeofence,
+  emitDeleteGeofences,
   emitEditGeofence,
   emitSelectGeofence,
   geofences,
@@ -54,6 +55,37 @@ export function useFleetPanelGeofences({
     emitDeleteGeofence(geofence.id)
   }
 
+  const confirmDeleteGeofences = (geofenceItemsToDelete = []) => {
+    if (!Array.isArray(geofenceItemsToDelete) || !geofenceItemsToDelete.length) return
+
+    const ids = []
+    const seenIds = new Set()
+
+    geofenceItemsToDelete.forEach((geofence) => {
+      const geofenceId = String(geofence?.id ?? geofence ?? "")
+
+      if (!geofenceId || seenIds.has(geofenceId)) return
+
+      seenIds.add(geofenceId)
+      ids.push(geofenceId)
+    })
+
+    if (!ids.length) return
+
+    const confirmed = window.confirm(`Eliminar ${ids.length} geocercas seleccionadas?`)
+
+    if (!confirmed) return
+
+    if (typeof emitDeleteGeofences === "function") {
+      emitDeleteGeofences(ids)
+      return
+    }
+
+    ids.forEach((geofenceId) => {
+      emitDeleteGeofence(geofenceId)
+    })
+  }
+
   const handleGeofenceSelect = (geofence) => {
     if (!geofence?.id) return
 
@@ -72,6 +104,7 @@ export function useFleetPanelGeofences({
     geofenceItems,
 
     confirmDeleteGeofence,
+    confirmDeleteGeofences,
     handleGeofenceEdit,
     handleGeofenceSelect,
   }
