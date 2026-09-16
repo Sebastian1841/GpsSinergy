@@ -79,6 +79,21 @@
     @delete-asset-tag="emit('delete-asset-tag', $event)"
   />
 
+  <div
+    v-else-if="activeSection === 'alertas' && allowedSections.includes('alertas')"
+    class="min-h-0 flex-1 overflow-hidden bg-[#eef2f7]"
+  >
+    <FleetAlertsPanel
+      :alert-rows="alertRows"
+      :alert-summary="alertSummary"
+      :can-manage-alerts="canManageAlerts"
+      class="h-full min-h-0"
+      @view-alert-route="emit('view-alert-route', $event)"
+      @resolve-alert="emit('resolve-alert', $event)"
+      @reopen-alert="emit('reopen-alert', $event)"
+    />
+  </div>
+
   <div v-else class="flex min-h-0 flex-1 items-center justify-center bg-[#eef2f7] p-4 text-center">
     <p class="text-[11px] font-black text-[#102372]">Sin funciones habilitadas</p>
   </div>
@@ -119,6 +134,7 @@ const FleetSectionLoading = {
 }
 
 const loadItineraryPanel = () => import("../itinerarios/ItineraryPanel.vue")
+const loadFleetAlertsPanel = () => import("./FleetAlertsPanel.vue")
 const loadFleetGeofencePanel = () => import("./FleetGeofencePanel.vue")
 const loadFleetReportsPanel = () => import("./FleetReportsPanel.vue")
 
@@ -131,14 +147,20 @@ const createAsyncFleetSection = (loader) =>
   })
 
 const ItineraryPanel = createAsyncFleetSection(loadItineraryPanel)
+const FleetAlertsPanel = createAsyncFleetSection(loadFleetAlertsPanel)
 const FleetGeofencePanel = createAsyncFleetSection(loadFleetGeofencePanel)
 const FleetReportsPanel = createAsyncFleetSection(loadFleetReportsPanel)
 
 const sectionLoaders = {
+  alertas: loadFleetAlertsPanel,
   reportes: loadFleetReportsPanel,
   itinerarios: loadItineraryPanel,
   geocercas: loadFleetGeofencePanel,
 }
+
+const PASSIVE_PRELOAD_SECTION_KEYS = new Set(["alertas", "reportes"])
+const FLEET_SECTION_IDLE_PRELOAD_TIMEOUT_MS = 6500
+const FLEET_SECTION_FALLBACK_PRELOAD_DELAY_MS = 3200
 
 const preloadedSectionKeys = new Set()
 
@@ -206,6 +228,24 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  alertRows: {
+    type: Array,
+    default: () => [],
+  },
+  alertSummary: {
+    type: Object,
+    default: () => ({
+      total: 0,
+      active: 0,
+      open: 0,
+      critical: 0,
+      resolved: 0,
+    }),
+  },
+  canManageAlerts: {
+    type: Boolean,
+    default: false,
+  },
   canManageAssetTags: {
     type: Boolean,
     default: false,
@@ -263,6 +303,9 @@ const emit = defineEmits([
   "delete-asset-tag",
   "update:search",
   "update:use-geofence-location-address",
+  "view-alert-route",
+  "resolve-alert",
+  "reopen-alert",
 ])
 
 const emitResizeColumn = (columnKey, width) => {
@@ -292,7 +335,8 @@ const preloadAllowedSections = () => {
     if (
       sectionKey === "activos" ||
       sectionKey === "etiquetas" ||
-      sectionKey === props.activeSection
+      sectionKey === props.activeSection ||
+      !PASSIVE_PRELOAD_SECTION_KEYS.has(sectionKey)
     ) {
       return
     }
@@ -320,6 +364,7 @@ const scheduleAllowedSectionPreload = () => {
   cancelScheduledPreload()
 
   if (typeof window === "undefined") return
+  if (window.navigator?.connection?.saveData) return
 
   if (typeof window.requestIdleCallback === "function") {
     idlePreloadId = window.requestIdleCallback(
@@ -328,7 +373,7 @@ const scheduleAllowedSectionPreload = () => {
         preloadAllowedSections()
       },
       {
-        timeout: 2200,
+        timeout: FLEET_SECTION_IDLE_PRELOAD_TIMEOUT_MS,
       },
     )
 
@@ -338,7 +383,7 @@ const scheduleAllowedSectionPreload = () => {
   preloadTimer = window.setTimeout(() => {
     preloadTimer = null
     preloadAllowedSections()
-  }, 700)
+  }, FLEET_SECTION_FALLBACK_PRELOAD_DELAY_MS)
 }
 
 watch(

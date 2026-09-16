@@ -10,13 +10,13 @@ Estado reutilizable de interfaz.
   recalculo de filtros.
 - `useFloatingModal.js`: posicion y tamano de modales flotantes.
 - `useIdlePreload.js`: precarga componentes o tareas livianas cuando el navegador
-  queda libre. Se usa para modales async: la vista no paga el costo en el bundle
-  inicial, pero el primer click normalmente encuentra el componente ya descargado.
+  queda libre. Usa una espera conservadora, respeta ahorro de datos y se reserva
+  para modales async que no deben entrar al bundle inicial.
 
 ## Regla de mantenimiento
 
 Estos composables deben ser independientes del dominio para poder usarse en varias pantallas.
 
-Los modales grandes deben preferir `defineAsyncComponent` mas `preloadWhenIdle`.
-Si el modal esta cerrado, montarlo con `v-if` desde el padre para evitar ejecutar
-su `setup` y watchers antes de que el usuario lo abra.
+Los modales grandes deben preferir `defineAsyncComponent` y `v-if` desde el
+padre. Usar `preloadWhenIdle` solo cuando el primer click sea importante y el
+chunk no sea tan pesado como para competir con mapa, tablas o exportaciones.

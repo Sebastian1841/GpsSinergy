@@ -6,12 +6,9 @@ import { useDebouncedValue } from "../ui/useDebouncedValue.js"
 import { useUserAccessDrafts } from "./useUserAccessDrafts.js"
 
 import { userMatchesSearch } from "../../utils/users/userAccessUtils.js"
-import {
-  DEFAULT_VISIBLE_USER_LIMIT,
-  USER_LIMIT_INCREMENT,
-  normalizeAccess,
-  normalizeUserAccessKey,
-} from "../../utils/users/userAccessStateUtils.js"
+import { normalizeAccess, normalizeUserAccessKey } from "../../utils/users/userAccessStateUtils.js"
+
+const DEFAULT_USER_PAGE_SIZE = 8
 
 export function useUserAccessManagement({ routeCompanyId = null, assetTags = null } = {}) {
   const { currentUser, isPlatformAdmin } = useAuthSession()
@@ -57,10 +54,14 @@ export function useUserAccessManagement({ routeCompanyId = null, assetTags = nul
   const selectedCompany = ref(resolvedRouteCompanyId.value || "all")
   const selectedStatus = ref("all")
   const selectedModule = ref("all")
+  const userViewMode = ref("list")
+  const userSortKey = ref("name")
+  const userSortDirection = ref("asc")
+  const currentPage = ref(1)
+  const pageSize = ref(DEFAULT_USER_PAGE_SIZE)
 
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 180)
 
-  const visibleUserLimit = ref(DEFAULT_VISIBLE_USER_LIMIT)
   const selectedUserId = ref(users.value[0]?.id || null)
 
   const companyFilterLocked = computed(() => {
@@ -79,6 +80,10 @@ export function useUserAccessManagement({ routeCompanyId = null, assetTags = nul
     return new Map(companies.value.map((company) => [company.id, company]))
   })
 
+  const rolesById = computed(() => {
+    return new Map(roles.value.map((role) => [role.id, role]))
+  })
+
   const accessesByUserId = computed(() => {
     const groupedAccesses = new Map()
 
@@ -92,6 +97,47 @@ export function useUserAccessManagement({ routeCompanyId = null, assetTags = nul
 
     return groupedAccesses
   })
+
+  const getUserAccesses = (user = {}) => {
+    return accessesByUserId.value.get(user.id) || []
+  }
+
+  const getAccessCompany = (access = {}) => {
+    const application = applicationsById.value.get(access.applicationId)
+    const companyId = application?.companyId || access.companyId || ""
+
+    return companiesById.value.get(companyId) || null
+  }
+
+  const getUserPrimaryRoleLabel = (user = {}) => {
+    const primaryAccess = getUserAccesses(user)[0]
+
+    if (!primaryAccess?.role) return ""
+
+    return rolesById.value.get(primaryAccess.role)?.name || primaryAccess.role
+  }
+
+  const getUserCompanySortLabel = (user = {}) => {
+    const companyNames = new Set(
+      getUserAccesses(user)
+        .map((access) => getAccessCompany(access)?.name)
+        .filter(Boolean),
+    )
+
+    if (companyNames.size === 0) return ""
+    if (companyNames.size === 1) return [...companyNames][0]
+
+    return `${companyNames.size} empresas`
+  }
+
+  const getUserSortValue = (user = {}) => {
+    if (userSortKey.value === "status") return user.status || ""
+    if (userSortKey.value === "role") return getUserPrimaryRoleLabel(user)
+    if (userSortKey.value === "company") return getUserCompanySortLabel(user)
+    if (userSortKey.value === "accesses") return getUserAccesses(user).length
+
+    return user.name || user.email || user.username || ""
+  }
 
   const selectedUser = computed(() => {
     return users.value.find((user) => user.id === selectedUserId.value) || users.value[0] || null
@@ -144,16 +190,30 @@ export function useUserAccessManagement({ routeCompanyId = null, assetTags = nul
     })
   })
 
-  const visibleUsers = computed(() => {
-    return filteredUsers.value.slice(0, visibleUserLimit.value)
+  const sortedUsers = computed(() => {
+    return [...filteredUsers.value].sort((leftUser, rightUser) => {
+      const leftValue = getUserSortValue(leftUser)
+      const rightValue = getUserSortValue(rightUser)
+
+      const result =
+        typeof leftValue === "number" && typeof rightValue === "number"
+          ? leftValue - rightValue
+          : String(leftValue).localeCompare(String(rightValue), "es", {
+              sensitivity: "base",
+            })
+
+      return userSortDirection.value === "desc" ? -result : result
+    })
   })
 
-  const visibleUsersRemaining = computed(() => {
-    return Math.max(filteredUsers.value.length - visibleUsers.value.length, 0)
+  const totalPages = computed(() => {
+    return Math.max(1, Math.ceil(sortedUsers.value.length / pageSize.value))
   })
 
-  const canShowMoreUsers = computed(() => {
-    return visibleUsersRemaining.value > 0
+  const paginatedUsers = computed(() => {
+    const start = (currentPage.value - 1) * pageSize.value
+
+    return sortedUsers.value.slice(start, start + pageSize.value)
   })
 
   const summaryItems = computed(() => {
@@ -197,11 +257,25 @@ export function useUserAccessManagement({ routeCompanyId = null, assetTags = nul
   })
 
   watch(
-    [debouncedSearchTerm, selectedRole, selectedCompany, selectedStatus, selectedModule],
+    [
+      debouncedSearchTerm,
+      selectedRole,
+      selectedCompany,
+      selectedStatus,
+      selectedModule,
+      userSortKey,
+      userSortDirection,
+    ],
     () => {
-      visibleUserLimit.value = DEFAULT_VISIBLE_USER_LIMIT
+      currentPage.value = 1
     },
   )
+
+  watch(totalPages, (pages) => {
+    if (currentPage.value > pages) {
+      currentPage.value = pages
+    }
+  })
 
   watch(
     resolvedRouteCompanyId,
@@ -224,8 +298,16 @@ export function useUserAccessManagement({ routeCompanyId = null, assetTags = nul
     },
   )
 
-  const showMoreUsers = () => {
-    visibleUserLimit.value += USER_LIMIT_INCREMENT
+  const goToPage = (page) => {
+    currentPage.value = Math.min(Math.max(Number(page) || 1, 1), totalPages.value)
+  }
+
+  const goToNextPage = () => {
+    goToPage(currentPage.value + 1)
+  }
+
+  const goToPreviousPage = () => {
+    goToPage(currentPage.value - 1)
   }
 
   const selectUser = (userId) => {
@@ -238,7 +320,7 @@ export function useUserAccessManagement({ routeCompanyId = null, assetTags = nul
     selectedCompany.value = resolvedRouteCompanyId.value || "all"
     selectedStatus.value = "all"
     selectedModule.value = "all"
-    visibleUserLimit.value = DEFAULT_VISIBLE_USER_LIMIT
+    currentPage.value = 1
   }
 
   const {
@@ -302,12 +384,16 @@ export function useUserAccessManagement({ routeCompanyId = null, assetTags = nul
     selectedCompany,
     selectedStatus,
     selectedModule,
+    userViewMode,
+    userSortKey,
+    userSortDirection,
     companyFilterLocked,
 
-    visibleUserLimit,
-    visibleUsers,
-    visibleUsersRemaining,
-    canShowMoreUsers,
+    currentPage,
+    pageSize,
+    totalPages,
+    sortedUsers,
+    paginatedUsers,
 
     selectedUserId,
     selectedUser,
@@ -322,8 +408,9 @@ export function useUserAccessManagement({ routeCompanyId = null, assetTags = nul
 
     selectUser,
     clearFilters,
-    showMoreUsers,
-
+    goToPage,
+    goToNextPage,
+    goToPreviousPage,
     openCreateUserModal,
     openEditUserModal,
     closeEditorModal,

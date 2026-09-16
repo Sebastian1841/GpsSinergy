@@ -69,9 +69,9 @@
       <div class="space-y-2">
         <!-- Buscador + selector de dispositivos + acciones -->
         <section class="relative">
-          <div class="grid grid-cols-[minmax(0,1fr)_auto_auto_auto_auto_auto] items-center gap-1.5">
+          <div class="flex flex-wrap items-center gap-1.5">
             <div
-              class="flex h-8 min-w-0 overflow-hidden rounded-lg border border-[#d8dee8] bg-white transition focus-within:border-[#FF6600] focus-within:ring-2 focus-within:ring-[#FF6600]/15"
+              class="flex min-h-8 min-w-[220px] flex-[1_1_280px] flex-col overflow-hidden rounded-lg border border-[#d8dee8] bg-white transition focus-within:border-[#FF6600] focus-within:ring-2 focus-within:ring-[#FF6600]/15 min-[520px]:h-8 min-[520px]:flex-row max-[420px]:min-w-full"
             >
               <div class="relative min-w-0 flex-1">
                 <span
@@ -100,11 +100,13 @@
                 </button>
               </div>
 
-              <div class="my-1.5 w-px shrink-0 bg-[#edf1f5]"></div>
+              <div
+                class="h-px w-full shrink-0 bg-[#edf1f5] min-[520px]:my-1.5 min-[520px]:h-auto min-[520px]:w-px"
+              ></div>
 
               <button
                 type="button"
-                class="flex h-full w-[124px] shrink-0 cursor-pointer items-center justify-between gap-1.5 px-2 text-left transition hover:bg-[#fff7ed]"
+                class="flex h-8 w-full shrink-0 cursor-pointer items-center justify-between gap-1.5 px-2 text-left transition hover:bg-[#fff7ed] min-[520px]:h-full min-[520px]:w-[124px]"
                 :title="selectedAssetsSummary"
                 @click="showDeviceList = !showDeviceList"
               >
@@ -125,7 +127,7 @@
 
             <button
               type="button"
-              class="h-8 shrink-0 cursor-pointer rounded-lg bg-[#102372] px-3 text-[10px] font-black text-white transition hover:bg-[#0c1b59]"
+              class="h-8 flex-[1_1_78px] cursor-pointer rounded-lg bg-[#102372] px-3 text-[10px] font-black text-white transition hover:bg-[#0c1b59] min-[640px]:flex-none"
               @click="searchItinerary"
             >
               Buscar
@@ -133,7 +135,7 @@
 
             <button
               type="button"
-              class="h-8 shrink-0 cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[#d8dee8] disabled:hover:text-[#102372]"
+              class="h-8 flex-[1_1_92px] cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[#d8dee8] disabled:hover:text-[#102372] min-[640px]:flex-none"
               :disabled="!canRefreshItinerary"
               @click="refreshItinerary"
             >
@@ -142,17 +144,17 @@
 
             <button
               type="button"
-              class="h-8 shrink-0 cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[#d8dee8] disabled:hover:text-[#102372]"
+              class="h-8 flex-[1_1_92px] cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[#d8dee8] disabled:hover:text-[#102372] min-[640px]:flex-none"
               :disabled="!canCompareRoute"
               @click="isRouteComparisonOpen = true"
             >
               Comparar
             </button>
 
-            <div class="relative">
+            <div class="relative flex-[1_1_96px] min-[640px]:flex-none">
               <button
                 type="button"
-                class="flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[#d8dee8] disabled:hover:text-[#102372]"
+                class="flex h-8 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[#d8dee8] disabled:hover:text-[#102372]"
                 :disabled="!canExportItinerary"
                 @click="toggleExportMenu"
               >
@@ -195,7 +197,7 @@
 
             <button
               type="button"
-              class="h-8 shrink-0 cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600]"
+              class="h-8 flex-[1_1_78px] cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600] min-[640px]:flex-none"
               @click="clearResult"
             >
               Limpiar
@@ -204,7 +206,7 @@
 
           <div
             v-if="showDeviceList"
-            class="absolute left-0 right-0 top-[36px] z-30 overflow-hidden rounded-lg border border-[#d8dee8] bg-white shadow-xl"
+            class="absolute left-0 right-0 top-[calc(100%+4px)] z-30 overflow-hidden rounded-lg border border-[#d8dee8] bg-white shadow-xl"
           >
             <div
               class="flex items-center justify-between gap-2 border-b border-[#edf1f5] bg-[#f8fafc] px-2 py-1.5"
@@ -287,7 +289,9 @@
         </section>
 
         <!-- Fechas compartidas -->
-        <div class="grid grid-cols-5 gap-1 rounded-lg border border-[#d8dee8] bg-[#f8fafc] p-1">
+        <div
+          class="grid grid-cols-2 gap-1 rounded-lg border border-[#d8dee8] bg-[#f8fafc] p-1 sm:grid-cols-3 xl:grid-cols-5"
+        >
           <button
             v-for="option in displayRangeOptions"
             :key="option.value"
@@ -304,7 +308,7 @@
           </button>
         </div>
 
-        <div v-if="dateRange === 'custom'" class="grid grid-cols-2 gap-2">
+        <div v-if="dateRange === 'custom'" class="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <input
             v-model="fromDate"
             type="date"
@@ -528,6 +532,32 @@ const normalizeAssetId = (value) => {
   return String(value ?? "").trim()
 }
 
+const normalizeDateInput = (value) => {
+  if (!value) return ""
+
+  const rawText = String(value).trim()
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(rawText)) {
+    return rawText.slice(0, 10)
+  }
+
+  const date = new Date(rawText)
+
+  if (Number.isNaN(date.getTime())) return ""
+
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-")
+}
+
+const getTimestampValue = (value) => {
+  const date = new Date(value || "")
+
+  return Number.isNaN(date.getTime()) ? null : date.getTime()
+}
+
 const {
   activePanelView,
   searchTerm,
@@ -568,6 +598,8 @@ const {
   mockItineraryAssets,
 })
 
+const allowFallbackItineraryPoints = ref(false)
+
 const {
   routeResult,
   selectedPointId,
@@ -588,7 +620,7 @@ const {
   toDate,
   formError,
   applyDateRange,
-  allowFallbackPoints: false,
+  allowFallbackPoints: allowFallbackItineraryPoints,
   filterItineraryPoints,
   buildItineraryResult,
 })
@@ -596,9 +628,141 @@ const {
 const lastHandledContextRequestId = ref("")
 
 const normalizeContextRange = (range) => {
-  const allowedRanges = new Set(["today", "yesterday", "week", "last-week", "month", "last-month"])
+  const allowedRanges = new Set([
+    "today",
+    "yesterday",
+    "week",
+    "last-week",
+    "month",
+    "last-month",
+    "custom",
+  ])
 
   return allowedRanges.has(range) ? range : "today"
+}
+
+const getContextDateRange = (request = {}) => {
+  const dateFrom = normalizeDateInput(
+    request.dateFrom || request.fromDate || request.date || request.fecha || request.triggeredAt,
+  )
+  const dateTo = normalizeDateInput(
+    request.dateTo || request.toDate || request.date || request.fecha || request.triggeredAt,
+  )
+
+  if (!dateFrom) return null
+
+  return {
+    dateFrom,
+    dateTo: dateTo || dateFrom,
+  }
+}
+
+const getRouteRowsForContext = ({ route, targetAssetId }) => {
+  if (!route) return []
+
+  const routes = Array.isArray(route.routes) ? route.routes : []
+  const selectedRoute = routes.find((routeItem) => {
+    return normalizeAssetId(routeItem.asset) === targetAssetId
+  })
+
+  if (Array.isArray(selectedRoute?.rows)) return selectedRoute.rows
+  if (Array.isArray(selectedRoute?.points)) return selectedRoute.points
+
+  const rows = Array.isArray(route.rows) ? route.rows : []
+
+  if (!rows.length) return []
+
+  const rowsHaveAssetIds = rows.some((row) => normalizeAssetId(row.assetId || row.asset))
+
+  if (!rowsHaveAssetIds) return rows
+
+  return rows.filter((row) => {
+    return normalizeAssetId(row.assetId || row.asset) === targetAssetId
+  })
+}
+
+const findClosestRoutePointToAlert = ({ rows, alert }) => {
+  if (!rows.length || !alert) return null
+
+  const alertTime = getTimestampValue(alert.createdAt || alert.triggeredAt || alert.timestamp)
+
+  if (alertTime === null) {
+    return rows[0] || null
+  }
+
+  return rows.reduce((closestPoint, point) => {
+    const pointTime = getTimestampValue(point.timestamp || point.createdAt || point.reportedAt)
+
+    if (pointTime === null) return closestPoint
+
+    const distance = Math.abs(pointTime - alertTime)
+
+    if (!closestPoint) {
+      return {
+        point,
+        distance,
+      }
+    }
+
+    return distance < closestPoint.distance
+      ? {
+          point,
+          distance,
+        }
+      : closestPoint
+  }, null)?.point
+}
+
+const buildFocusedAlertPoint = ({ request, targetAssetId }) => {
+  const alert = request.focusedAlert || request.alert || null
+  const rows = getRouteRowsForContext({
+    route: routeResult.value,
+    targetAssetId,
+  })
+  const closestPoint = findClosestRoutePointToAlert({
+    rows,
+    alert,
+  })
+
+  if (!closestPoint || !alert) return null
+
+  return {
+    ...closestPoint,
+    id: `${closestPoint.id || targetAssetId}-alert-${alert.id || request.id}`,
+    index: "!",
+    event: alert.title || "Alerta",
+    isAlarmPoint: true,
+    alarmId: alert.id || request.alarmId || request.alertId || "",
+    alarmTitle: alert.title || "Alerta",
+    alarmDescription: alert.description || "",
+    alarmStatus: alert.status || "",
+    alarmSeverity: alert.severity || "",
+    alarmCreatedAt: alert.createdAt || alert.triggeredAt || "",
+    alarmTriggerReason: alert.triggerReason || alert.reason || "",
+    alarmMetadata: alert.metadata || {},
+    assetDisplayName:
+      closestPoint.assetDisplayName ||
+      request.activo?.displayName ||
+      request.activo?.vehiculo ||
+      "",
+    assetPatente: closestPoint.assetPatente || request.plate || request.patente || "",
+  }
+}
+
+const focusContextAlertOnRoute = ({ request, targetAssetId }) => {
+  const alertPoint = buildFocusedAlertPoint({
+    request,
+    targetAssetId,
+  })
+
+  if (!alertPoint) return
+
+  selectedPointId.value = alertPoint.id
+
+  emit("point-selected", {
+    point: alertPoint,
+    route: routeResult.value,
+  })
 }
 
 const applyContextRequest = async (request) => {
@@ -620,6 +784,7 @@ const applyContextRequest = async (request) => {
   activePanelView.value = request.panelView === "resumen-dia" ? "resumen-dia" : "itinerarios"
   searchTerm.value = ""
   showDeviceList.value = false
+  allowFallbackItineraryPoints.value = request.allowFallbackPoints === true
 
   const selectedTargetAssetId = String(targetAsset.id)
 
@@ -629,12 +794,26 @@ const applyContextRequest = async (request) => {
       : [selectedTargetAssetId]
 
   if (!request.keepRange) {
-    setDateRange(normalizeContextRange(request.range))
+    const contextDateRange = getContextDateRange(request)
+
+    if (contextDateRange) {
+      dateRange.value = "custom"
+      fromDate.value = contextDateRange.dateFrom
+      toDate.value = contextDateRange.dateTo
+    } else {
+      setDateRange(normalizeContextRange(request.range))
+    }
   }
 
   await nextTick()
 
   handleGenerateRoute()
+  await nextTick()
+
+  focusContextAlertOnRoute({
+    request,
+    targetAssetId: selectedTargetAssetId,
+  })
 }
 
 watch(
@@ -647,12 +826,20 @@ watch(
   },
 )
 
-const searchItinerary = handleGenerateRoute
+const searchItinerary = () => {
+  allowFallbackItineraryPoints.value = false
+  handleGenerateRoute()
+}
+
 const refreshItinerary = handleRefreshRoute
 const selectPoint = handleSelectPoint
-const clearResult = handleClearRoute
+const clearResult = () => {
+  allowFallbackItineraryPoints.value = false
+  handleClearRoute()
+}
 
 const handleDateRangeSelection = async (range) => {
+  allowFallbackItineraryPoints.value = false
   setDateRange(range)
 
   if (!routeResult.value || range === "custom") return

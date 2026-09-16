@@ -49,6 +49,9 @@
       :selected-geofence-id="selectedGeofenceId"
       :can-edit-geofences="canEditGeofences"
       :use-geofence-location-address="useGeofenceLocationAddress"
+      :alert-rows="alertRows"
+      :alert-summary="alertSummary"
+      :can-manage-alerts="canManageAlerts"
       @select="handleRowClick"
       @toggle-sort="handleToggleSort"
       @resize-column="handleSetColumnWidth"
@@ -71,6 +74,9 @@
       @delete-asset-tag="$emit('asset-tag-delete', $event)"
       @update:search="handleSearchUpdate"
       @update:use-geofence-location-address="$emit('update:use-geofence-location-address', $event)"
+      @view-alert-route="$emit('view-alert-route', $event)"
+      @resolve-alert="$emit('resolve-alert', $event)"
+      @reopen-alert="$emit('reopen-alert', $event)"
     />
 
     <div
@@ -152,6 +158,20 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  alertRows: {
+    type: Array,
+    default: () => [],
+  },
+  alertSummary: {
+    type: Object,
+    default: () => ({
+      total: 0,
+      active: 0,
+      open: 0,
+      critical: 0,
+      resolved: 0,
+    }),
+  },
   selectedGeofenceId: {
     type: [String, Number],
     default: null,
@@ -174,7 +194,7 @@ const props = defineProps({
   },
   allowedSections: {
     type: Array,
-    default: () => ["activos", "reportes", "itinerarios", "geocercas", "etiquetas"],
+    default: () => ["activos", "reportes", "itinerarios", "geocercas", "etiquetas", "alertas"],
   },
   canManageAssets: {
     type: Boolean,
@@ -189,6 +209,10 @@ const props = defineProps({
     default: false,
   },
   canViewMaintenance: {
+    type: Boolean,
+    default: false,
+  },
+  canManageAlerts: {
     type: Boolean,
     default: false,
   },
@@ -234,6 +258,9 @@ const emit = defineEmits([
   "asset-tag-update",
   "asset-tag-delete",
   "update:use-geofence-location-address",
+  "view-alert-route",
+  "resolve-alert",
+  "reopen-alert",
   "select-city-asset-group",
   "select-vehicle-asset-group",
   "update:column-preferences",
@@ -314,6 +341,7 @@ const {
   setSection,
 } = useFleetPanelSections({
   activeSection: localActiveSection,
+  alertRows: computed(() => props.alertRows),
   activos: computed(() => props.activos),
   allActivos: computed(() => props.allActivos),
   assetTags: computed(() => props.assetTags),

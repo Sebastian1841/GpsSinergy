@@ -67,11 +67,11 @@ estiramiento vertical para llenar el panel, porque las tarjetas quedan gigantes
 y con aire muerto. Si el viewport no permite mostrar todas las cards, se acepta
 scroll normal antes que aplastar eventos, estado o accion.
 
-Los modales de reportes se cargan con `defineAsyncComponent` desde `ReportsView.vue`
-y `FleetReportsPanel.vue`, y se precargan con `preloadWhenIdle` despues del render
-inicial. Al agregar un modal nuevo de reportes, seguir ese patron para que abrir
-Reportes o la pestana de Reportes en Activos no descargue formularios que aun no
-se han usado.
+Los modales de reportes se cargan con `defineAsyncComponent` desde
+`ReportsView.vue` y `FleetReportsPanel.vue`, pero no se precargan por defecto.
+Al agregar un modal nuevo de reportes, mantenerlo bajo demanda si incluye
+preview, graficos, mapas, ejecucion o exportacion para que abrir Reportes o la
+pestana de Reportes en Activos no descargue trabajo que aun no se ha usado.
 
 El flujo de creacion/edicion de plantillas debe mantenerse como configurador
 guiado. No volver a juntar reglas, columnas, widgets, exportacion y

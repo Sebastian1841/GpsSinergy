@@ -159,32 +159,38 @@
 
     <footer
       v-if="activos.length"
-      class="flex shrink-0 flex-col gap-2 border-t border-[#d8dee8] bg-[#f8fafc] px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+      class="@container shrink-0 border-t border-[#d8dee8] bg-[#f8fafc] px-2 py-2"
     >
-      <div class="flex min-w-0 items-center gap-2">
-        <span class="text-[10px] font-black uppercase tracking-[0.12em] text-[#102372]">
-          Tabla
-        </span>
+      <div class="flex items-center gap-2 @max-[360px]:flex-wrap">
+        <!-- RESUMEN -->
+        <div class="flex min-w-0 flex-1 items-center gap-1 whitespace-nowrap">
+          <span class="text-[11px] font-black text-[#102372]">
+            {{ paginationStart }}–{{ paginationEnd }}
+          </span>
 
-        <span class="truncate text-[11px] font-bold text-slate-500">
-          {{ paginationStart }}-{{ paginationEnd }} de {{ totalItems }} activos
-        </span>
+          <span class="text-[9px] font-semibold text-slate-400"> de </span>
 
-        <span
-          v-if="shouldResolveAddresses"
-          class="hidden text-[10px] font-bold text-slate-400 lg:inline"
-        >
-          {{ reverseGeocodingAttribution }}
-        </span>
-      </div>
+          <span class="text-[11px] font-black text-[#102372]">
+            {{ totalItems }}
+          </span>
 
-      <div class="flex items-center justify-between gap-2 sm:justify-end">
-        <label class="flex items-center gap-2 text-[11px] font-bold text-slate-500">
-          <span class="hidden sm:inline">Filas</span>
+          <span class="text-[9px] font-semibold text-slate-500"> activos </span>
+
+          <span
+            v-if="shouldResolveAddresses"
+            class="ml-1 min-w-0 truncate text-[9px] font-medium text-slate-400 @max-[520px]:hidden"
+          >
+            {{ reverseGeocodingAttribution }}
+          </span>
+        </div>
+
+        <!-- FILAS -->
+        <label class="flex shrink-0 items-center gap-1.5">
+          <span class="text-[9px] font-bold text-slate-500"> Filas </span>
 
           <select
             v-model.number="pageSize"
-            class="h-8 cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-2 text-[11px] font-black text-[#102372] outline-none transition focus:border-[#FF6600] focus:ring-2 focus:ring-[#FF6600]/10"
+            class="h-8 w-[58px] cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-2 text-[11px] font-black text-[#102372] outline-none focus:border-[#FF6600] focus:ring-2 focus:ring-[#FF6600]/10"
           >
             <option v-for="option in pageSizeOptions" :key="option" :value="option">
               {{ option }}
@@ -192,29 +198,48 @@
           </select>
         </label>
 
-        <div class="flex items-center gap-1">
+        <!-- PAGINACIÓN -->
+        <div
+          class="flex shrink-0 items-center gap-1 @max-[360px]:w-full @max-[360px]:justify-center"
+        >
           <button
             type="button"
-            class="h-8 cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-3 text-[11px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[#d8dee8] disabled:hover:text-[#102372]"
             :disabled="currentPage <= 1"
+            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#d8dee8] bg-white text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600] disabled:cursor-not-allowed disabled:text-slate-300"
             @click="goToPreviousPage"
           >
-            Anterior
+            <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none">
+              <path
+                d="M12.5 15 7.5 10l5-5"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
           </button>
 
-          <span
-            class="flex h-8 min-w-[74px] items-center justify-center rounded-lg border border-[#d8dee8] bg-white px-3 text-[11px] font-black text-[#102372]"
+          <div
+            class="flex h-8 min-w-[58px] shrink-0 items-center justify-center whitespace-nowrap rounded-lg border border-[#d8dee8] bg-white px-2 text-[11px] font-black text-[#102372]"
           >
             {{ currentPage }} / {{ totalPages }}
-          </span>
+          </div>
 
           <button
             type="button"
-            class="h-8 cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-3 text-[11px] font-black text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[#d8dee8] disabled:hover:text-[#102372]"
             :disabled="currentPage >= totalPages"
+            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#d8dee8] bg-white text-[#102372] transition hover:border-[#FF6600] hover:text-[#FF6600] disabled:cursor-not-allowed disabled:text-slate-300"
             @click="goToNextPage"
           >
-            Siguiente
+            <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none">
+              <path
+                d="m7.5 5 5 5-5 5"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
           </button>
         </div>
       </div>

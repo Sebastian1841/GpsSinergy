@@ -915,6 +915,12 @@ const mockModuleFunctions = [
     description: "Informes operativos.",
   },
   {
+    id: "alarms",
+    moduleId: "assets",
+    name: "Alertas",
+    description: "Revision y gestion de alertas operativas.",
+  },
+  {
     id: "maintenance-view",
     moduleId: "maintenance",
     name: "Ver mantenciones",
@@ -1057,6 +1063,7 @@ const adminAssetFunctions = [
   createFunctionAccess("itineraries", { view: true, edit: true }),
   createFunctionAccess("branches", { view: true, edit: true, admin: true }),
   createFunctionAccess("reports", { view: true }),
+  createFunctionAccess("alarms", { view: true, edit: true, admin: true }),
 ]
 
 const adminAuditFunctions = [
@@ -1123,6 +1130,7 @@ const mockUserAccesses = [
       createFunctionAccess("gps", { view: true, edit: true }),
       createFunctionAccess("itineraries", { view: true }),
       createFunctionAccess("branches", { view: true }),
+      createFunctionAccess("alarms", { view: true, edit: true }),
       createFunctionAccess("maintenance-view", { view: true }),
     ],
     scope: {
@@ -1143,6 +1151,7 @@ const mockUserAccesses = [
       createFunctionAccess("geofences", { view: true, edit: true }),
       createFunctionAccess("branches", { view: true }),
       createFunctionAccess("reports", { view: true }),
+      createFunctionAccess("alarms", { view: true, edit: true }),
       createFunctionAccess("maintenance-view", { view: true }),
     ],
     scope: {

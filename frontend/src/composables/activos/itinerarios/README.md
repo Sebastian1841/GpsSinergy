@@ -13,8 +13,10 @@ Estado y datos derivados de itinerarios.
 - `useItineraryRoute.js`: calculo y estado de ruta de itinerario. Permite
   desactivar el fallback mock; la vista normal lo usa apagado para que
   `Itinerarios` y `Resumen del dia` no inventen recorridos de dias sin historial
-  real/local. Busca historial usando todos los identificadores del activo
-  disponibles, como `id`, `deviceId`, IMEI o patente.
+  real/local. El contexto externo de Alertas puede encender ese fallback solo
+  para mostrar el recorrido de prototipo del dia de la alerta. Busca historial
+  usando todos los identificadores del activo disponibles, como `id`, `deviceId`,
+  IMEI o patente.
 - `useItineraryFilters.test.js`: pruebas de los rangos rapidos de fechas,
   especialmente semanas calendario.
 - `useItineraryRoute.test.js`: pruebas de ruta de itinerario.

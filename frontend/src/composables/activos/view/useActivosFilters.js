@@ -12,6 +12,7 @@ export function useActivosFilters({ onLeaveItinerarios, onFilterChanged, refresh
     itinerarios: "",
     geocercas: "",
     etiquetas: "",
+    alertas: "",
   })
   const debouncedSectionSearch = useDebouncedValue(sectionSearch, 180)
 
@@ -80,7 +81,14 @@ export function useActivosFilters({ onLeaveItinerarios, onFilterChanged, refresh
   }
 
   const setSidebarSection = (section) => {
-    const allowedSections = ["activos", "reportes", "itinerarios", "geocercas", "etiquetas"]
+    const allowedSections = [
+      "activos",
+      "reportes",
+      "itinerarios",
+      "geocercas",
+      "etiquetas",
+      "alertas",
+    ]
     const nextSection = allowedSections.includes(section) ? section : "activos"
     const previousSection = activeSidebarSection.value
 

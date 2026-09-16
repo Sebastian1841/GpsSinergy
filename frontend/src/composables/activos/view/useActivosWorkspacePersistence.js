@@ -5,7 +5,14 @@ import { normalizeId } from "../../../utils/idUtils.js"
 
 const GEOFENCE_LOCATION_ADDRESS_STORAGE_KEY = "sinergy-geofence-location-address-enabled"
 const ACTIVOS_WORKSPACE_MODULE = "activos"
-const ALLOWED_SIDEBAR_SECTIONS = ["activos", "reportes", "itinerarios", "geocercas", "etiquetas"]
+const ALLOWED_SIDEBAR_SECTIONS = [
+  "activos",
+  "reportes",
+  "itinerarios",
+  "geocercas",
+  "etiquetas",
+  "alertas",
+]
 const ALLOWED_STATUS_FILTERS = ["all", "online", "offline", "moving", "stopped", "alerts"]
 
 const normalizeWorkspaceSidebarSection = (section) => {
@@ -53,6 +60,18 @@ const normalizeWorkspaceColumnWidths = (widthsByKey = {}) => {
       [columnKey]: columnWidth,
     }
   }, {})
+}
+
+const getRouteSelectedActivoId = (route = {}) => {
+  return normalizeId(route.query?.activoId || route.query?.assetId || route.query?.asset)
+}
+
+const getRouteRequestedSidebarSection = (route = {}) => {
+  return normalizeWorkspaceSidebarSection(
+    String(route.query?.section || route.query?.panel || route.query?.view || "")
+      .trim()
+      .toLowerCase(),
+  )
 }
 
 export const normalizeFleetTableColumnPreferences = (preferences = {}) => {
@@ -133,26 +152,47 @@ export function useActivosWorkspacePersistence({
   const applyActivosWorkspaceSettings = async (settings = {}) => {
     if (!settings || (settings.module && settings.module !== ACTIVOS_WORKSPACE_MODULE)) return
 
-    if (settings.sectionSearch && typeof settings.sectionSearch === "object") {
+    const routeSelectedActivoId = getRouteSelectedActivoId(route)
+    const hasRouteSelectedActivo = Boolean(routeSelectedActivoId)
+    const routeRequestedSidebarSection = getRouteRequestedSidebarSection(route)
+
+    if (
+      !hasRouteSelectedActivo &&
+      settings.sectionSearch &&
+      typeof settings.sectionSearch === "object"
+    ) {
       sectionSearch.value = {
         ...sectionSearch.value,
         ...normalizeWorkspaceSectionSearch(settings.sectionSearch),
       }
+    } else if (hasRouteSelectedActivo) {
+      sectionSearch.value = {
+        ...sectionSearch.value,
+        activos: "",
+        [routeRequestedSidebarSection]: "",
+      }
     }
 
-    activeSidebarSection.value = normalizeWorkspaceSidebarSection(settings.activeSidebarSection)
-    statusFilter.value = normalizeWorkspaceStatusFilter(settings.statusFilter)
+    activeSidebarSection.value = hasRouteSelectedActivo
+      ? routeRequestedSidebarSection
+      : normalizeWorkspaceSidebarSection(settings.activeSidebarSection)
+    statusFilter.value = hasRouteSelectedActivo
+      ? "all"
+      : normalizeWorkspaceStatusFilter(settings.statusFilter)
 
     const restoredCityGroupId =
       settings.selectedCityAssetGroupId ??
       // Compatibilidad con workspaces guardados antes de renombrar el filtro.
       settings.selectedPersonalAssetGroupId
 
-    if (restoredCityGroupId !== undefined) {
+    if (hasRouteSelectedActivo) {
+      selectCityAssetGroup(null)
+      selectVehicleAssetGroup(null)
+    } else if (restoredCityGroupId !== undefined) {
       selectCityAssetGroup(restoredCityGroupId || null)
     }
 
-    if (settings.selectedVehicleAssetGroupId !== undefined) {
+    if (!hasRouteSelectedActivo && settings.selectedVehicleAssetGroupId !== undefined) {
       selectVehicleAssetGroup(settings.selectedVehicleAssetGroupId || null)
     }
 
@@ -170,11 +210,14 @@ export function useActivosWorkspacePersistence({
       setUseGeofenceLocationAddress(settings.useGeofenceLocationAddress)
     }
 
-    if (settings.selectedGeofenceId !== undefined) {
+    if (!hasRouteSelectedActivo && settings.selectedGeofenceId !== undefined) {
       selectedGeofenceId.value = normalizeId(settings.selectedGeofenceId) || null
+    } else if (hasRouteSelectedActivo) {
+      selectedGeofenceId.value = null
     }
 
-    const nextSelectedActivoId = normalizeId(settings.selectedActivoId || settings.selectedId)
+    const nextSelectedActivoId =
+      routeSelectedActivoId || normalizeId(settings.selectedActivoId || settings.selectedId)
 
     if (nextSelectedActivoId) {
       selectedId.value = nextSelectedActivoId

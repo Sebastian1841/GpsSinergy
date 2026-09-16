@@ -594,7 +594,7 @@
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, onMounted, ref, watch } from "vue"
+import { computed, defineAsyncComponent, ref, watch } from "vue"
 
 import { useAuditTrail } from "../../../composables/audit/useAuditTrail.js"
 import { useReportEventRules } from "../../../composables/reports/useReportEventRules.js"
@@ -604,7 +604,6 @@ import {
   normalizeReportTemplateStoredEventRuleIds,
   useReportTemplates,
 } from "../../../composables/reports/useReportTemplates.js"
-import { preloadWhenIdle } from "../../../composables/ui/useIdlePreload.js"
 import { useReportsService } from "../../../services/reports/useReportsService.js"
 import {
   getOperationalProfileReportPriority,
@@ -1012,13 +1011,4 @@ const saveReportTemplate = ({ templateId, payload }) => {
 
   closeReportTemplateModal()
 }
-
-onMounted(() => {
-  preloadWhenIdle([
-    loadReportExecutionModal,
-    loadReportTemplateModal,
-    loadReportEventRulesModal,
-    loadReportSchedulesModal,
-  ])
-})
 </script>

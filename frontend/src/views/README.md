@@ -6,7 +6,19 @@ Pantallas principales conectadas al router.
 
 - `a.html`: documentacion HTML auxiliar usada aparte por el usuario. Debe mantenerse sincronizada con los cambios grandes de arquitectura, flujos, reportes y organizacion del frontend. No eliminar sin confirmacion explicita.
 - `b.html`: documentacion HTML auxiliar sobre mejora del sistema de mantenciones. No esta conectada al router y debe tratarse como informe de referencia, no como vista Vue.
-- `ActivosView.vue`: vista principal de monitoreo de activos. Tambien acepta `?activoId=`, `?assetId=` o `?asset=` para seleccionar un activo desde navegacion externa, como el buscador global del header. El menu contextual de cada activo puede abrir `Itinerarios` dentro del mismo panel lateral, generar el recorrido del vehiculo, mostrar el resumen diario de solo ese activo o agregarlo al resumen diario actual. La accion `Agregar a resumen diario` se expone solo despues de iniciar un resumen diario, usando el estado `hasActiveDailySummary`, para evitar que aparezca antes de existir un resumen al cual sumar activos. Tambien puede navegar a `Mantenciones` con `assetId`, `patente` y `open=maintenance-detail` para abrir las mantenciones del vehiculo seleccionado. En la seccion `Geocercas`, coordina importacion/exportacion KML, KMZ, GeoJSON, CSV y XML, creacion/renombrado/eliminacion de grupos, auditoria y refresco del mapa. Los grupos se gestionan solo en el panel lateral; el editor del mapa solo los selecciona desde dropdown o deja la geocerca sin grupo.
+- `ActivosView.vue`: vista principal de monitoreo de activos. Tambien acepta `?activoId=`, `?assetId=` o `?asset=` para seleccionar un activo desde navegacion externa, como el buscador global del header. Si la URL incluye `section=itinerarios`, `date` y `alarmId`, abre Itinerarios, selecciona el activo autorizado, genera el recorrido del dia y destaca la alerta sobre el punto GPS mas cercano. Cuando la URL trae un activo, limpia filtros visuales de busqueda/estado/ciudad/grupo y prioriza ese activo sobre el workspace guardado. El activo solo se fuerza si ya pertenece al universo autorizado por `visibleAssets`; no salta permisos. El panel lateral de Fleet incluye `Alertas` como historial por empresa y activos autorizados, con accion para abrir el recorrido del dia. El menu contextual de cada activo puede abrir `Itinerarios` dentro del mismo panel lateral, generar el recorrido del vehiculo, mostrar el resumen diario de solo ese activo o agregarlo al resumen diario actual. La accion `Agregar a resumen diario` se expone solo despues de iniciar un resumen diario, usando el estado `hasActiveDailySummary`, para evitar que aparezca antes de existir un resumen al cual sumar activos. Tambien puede navegar a `Mantenciones` con `assetId`, `patente` y `open=maintenance-detail` para abrir las mantenciones del vehiculo seleccionado. En la seccion `Geocercas`, coordina importacion/exportacion KML, KMZ, GeoJSON, CSV y XML, creacion/renombrado/eliminacion de grupos, auditoria y refresco del mapa. Los grupos se gestionan solo en el panel lateral; el editor del mapa solo los selecciona desde dropdown o deja la geocerca sin grupo.
+- `AlarmsView.vue`: vista principal de alertas operativas. Toma alertas desde
+  `useAlarmsService`, cruza cada alerta contra `visibleAssets` antes de
+  renderizar y luego aplica filtros visuales por busqueda, estado, empresa y
+  fecha. Se divide en dos paneles: `Historial`, que lista alertas ya activadas,
+  y `Configuracion`, que administra reglas automaticas con tabla y modal de
+  creacion/edicion. La configuracion de reglas de geocerca recibe geocercas y grupos
+  reales desde `useGeofences` para aplicar por todas, por grupo o por seleccion
+  especifica. En historial usa tabs superiores `Historial/Activas/Resueltas`,
+  bandeja de filas a la izquierda y panel de detalle a la derecha para resolver,
+  reabrir y navegar al recorrido del dia de la alerta con
+  `section=itinerarios`, `activoId`, `date`, `from=alertas` y `alarmId`, sin
+  exponer alertas de activos no autorizados.
 - `AuditView.vue`: vista de auditoria.
 - `CompanyManagementView.vue`: vista de administracion de empresas. Usa el
   layout global, cabecera simple del modulo, filtros laterales, resumen superior
@@ -31,16 +43,20 @@ Pantallas principales conectadas al router.
   `h-full` ni filas fijas en escritorio grande porque agranda las cards
   innecesariamente. Si no caben todas, es preferible scroll normal antes que
   cortar eventos, estado o accion.
-- `UserManagementView.vue`: vista de administracion de usuarios. Orquesta un panel administrativo: topbar con buscador, KPIs filtrables sin iconos, filtros/directorio a la izquierda y detalle con tabs a la derecha.
+- `UserManagementView.vue`: vista de administracion de usuarios. Orquesta un
+  panel administrativo: topbar con buscador, KPIs filtrables sin iconos, filtros
+  superiores, directorio con ordenamiento, cambio lista/cards, paginacion y
+  drawer de detalle con tabs.
 
 ## Regla de mantenimiento
 
 Las vistas deben orquestar componentes y composables. Si una vista crece demasiado, extraer secciones visuales a `components` y estado a `composables`.
 
 Los modales pesados de vistas principales deben cargarse con `defineAsyncComponent`
-y precargarse con `preloadWhenIdle` despues del primer render. Mantener `v-if`
-en el padre cuando el modal esta cerrado para no ejecutar formularios, watchers
-o calculos de preview hasta que realmente se usen.
+y montarse con `v-if` solo cuando se abren. Evitar precargarlos por defecto si
+contienen preview, formularios grandes, graficos, mapas o exportacion; usar
+`preloadWhenIdle` solo para modales pequenos donde el primer click sea mas
+importante que el costo de descarga en segundo plano.
 
 `LoginView.vue` usa `frontend/public/login-dashboard-hero.jpg` como hero visual activo. Es una version optimizada del PNG original para bajar la carga inicial del login. La imagen se mantiene completa con `background-size: contain` y alineada a la derecha para evitar espacio negro en el borde derecho; el sobrante queda bajo la zona del formulario. El logo del login se carga desde `frontend/public/logo-sinergy.html` mediante un `iframe` dentro de `.login-logo-frame`, para usar la animacion HTML local sin duplicarla dentro de la vista; el iframe se desplaza levemente dentro del marco para compensar el margen transparente interno del SVG y alinear el borde visual del logo con el formulario. Si se cambia esa imagen o animacion, el archivo referenciado en `LoginView.vue` debe existir realmente en `public` y se debe actualizar el query de cache en `loginHeroImagePath` cuando corresponda.
 
@@ -64,4 +80,10 @@ El modal de mantenciones del vehiculo usa una grilla de fichas compactas similar
 
 La pestaña `Ordenes de trabajo` tiene layout propio para acercarse a la referencia de OT: encabezado compacto, KPI filtrables por estado, filtros especificos de orden (`orderSearchTerm`, `selectedOrderStatus`, `selectedOrderPriority`, `selectedOrderWorkshop`), tabla principal con maximo visual de 10 filas y panel lateral de detalle. No usa los filtros genericos de mantencion para evitar mezclar estados de vehiculo con estados de OT. Al seleccionar una orden se sincroniza `selectedVehicleId` con el vehiculo de esa OT, de modo que el detalle, historial y costos sigan apuntando al activo correcto. El boton de ojo de una OT no reemplaza la seleccion de fila: abre el modal de mantenciones del vehiculo asociado para revisar sus planes y crear una OT desde una mantencion si corresponde. Los iconos de estado de OT reutilizan `SvgIcon.vue` mediante `getOrderStatusIcon`. El formulario de OT permite elegir una mantencion origen; al seleccionarla autocompleta trabajo, tipo, lectura e intervalo, y el detalle muestra si la orden es `Mantencion` o `Manual`.
 
-`UserManagementView.vue` bloquea el filtro de empresa cuando entra desde `/app/:empresaId/usuarios`, para mantener el contexto del panel de Fleet. El layout se divide en topbar/KPIs, filtros, directorio y detalle con tabs. El detalle visual del modulo esta documentado en `frontend/src/components/users/README.md` y la logica de filtros en `frontend/src/composables/users/README.md`.
+`UserManagementView.vue` bloquea el filtro de empresa cuando entra desde
+`/app/:empresaId/usuarios`, para mantener el contexto del panel de Fleet. El
+layout se divide en topbar/KPIs, filtros, directorio y detalle con tabs. El
+directorio permite ordenar, paginar y cambiar entre lista y cards sin modificar
+el resultado filtrado ni la apertura del drawer. El detalle visual del modulo
+esta documentado en `frontend/src/components/users/README.md` y la logica de
+filtros en `frontend/src/composables/users/README.md`.

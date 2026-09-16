@@ -1,5 +1,6 @@
-export const preloadWhenIdle = (loaders = [], { timeout = 2500, delay = 800 } = {}) => {
+export const preloadWhenIdle = (loaders = [], { timeout = 7000, delay = 3000 } = {}) => {
   if (typeof window === "undefined" || !Array.isArray(loaders) || !loaders.length) return
+  if (window.navigator?.connection?.saveData) return
 
   const preload = () => {
     const preloadJobs = loaders

@@ -2,6 +2,7 @@ import { computed, watch } from "vue"
 
 export function useFleetPanelSections({
   activeSection,
+  alertRows,
   allActivos,
   activos,
   assetTags,
@@ -25,6 +26,7 @@ export function useFleetPanelSections({
   const isItinerariosSection = computed(() => activeSection.value === "itinerarios")
   const isGeocercasSection = computed(() => activeSection.value === "geocercas")
   const isEtiquetasSection = computed(() => activeSection.value === "etiquetas")
+  const isAlertasSection = computed(() => activeSection.value === "alertas")
 
   const menuSections = computed(() => {
     const allowedSectionSet = new Set(allowedSections.value)
@@ -54,6 +56,11 @@ export function useFleetPanelSections({
         key: "etiquetas",
         label: "Etiquetas",
         count: assetTags?.value?.length || 0,
+      },
+      {
+        key: "alertas",
+        label: "Alertas",
+        count: alertRows?.value?.length || 0,
       },
     ].filter((section) => allowedSectionSet.has(section.key))
   })
@@ -165,6 +172,7 @@ export function useFleetPanelSections({
     activeSortedActivos,
     activeTableVisibleColumns,
     isActivosSection,
+    isAlertasSection,
     isEtiquetasSection,
     isGeocercasSection,
     isItinerariosSection,

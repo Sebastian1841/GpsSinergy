@@ -5,6 +5,7 @@ Hooks Vue que coordinan estado, efectos, watchers y flujos de pantalla.
 ## Carpetas
 
 - `activos/`: estado de activos, mapa, flota, geocercas, rutas e itinerarios.
+- `alarms/`: estado y calculos del CRUD de reglas automaticas de alertas.
 - `audit/`: historial de auditoria en cliente.
 - `auth/`: sesion y control de acceso.
 - `companies/`: gestion de empresas.

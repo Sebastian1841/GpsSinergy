@@ -20,7 +20,37 @@ import {
   getItineraryRoutePalette,
 } from "./itinerary/itineraryStyles.js"
 
+const escapeHtml = (value) => {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;")
+}
+
 const buildItineraryTooltip = (point, label = "Punto") => {
+  if (point?.isAlarmPoint) {
+    const title = escapeHtml(point.alarmTitle || point.event || "Alerta")
+    const time = escapeHtml(point.timeLabel || "-")
+    const speed = escapeHtml(point.speedLabel || `${point.speed || 0} km/h`)
+    const asset = escapeHtml(point.assetPatente || point.assetPlate || point.patente || "")
+    const reason = escapeHtml(point.alarmTriggerReason || point.alarmReason || "")
+    const description = escapeHtml(point.alarmDescription || "Alerta activada en este recorrido.")
+    const address = escapeHtml(point.address || "Sin direccion")
+    const reasonLine = reason ? `<strong>Motivo:</strong> ${reason}<br />` : ""
+
+    return `
+      <div>
+        <strong>${title}</strong><br />
+        ${asset ? `${asset} · ` : ""}${time} · ${speed}<br />
+        ${reasonLine}
+        ${description}<br />
+        ${address}
+      </div>
+    `
+  }
+
   const time = point.timeLabel || "-"
   const speed = point.speedLabel || `${point.speed || 0} km/h`
   const address = point.address || "Sin dirección"
@@ -140,16 +170,26 @@ export function createItineraryMapController({ props, getMap, getRenderer, layer
       icon: createItineraryIcon({
         L,
         type: "selected",
-        label: selectedPoint.index ?? "•",
+        label: selectedPoint.isAlarmPoint ? "!" : (selectedPoint.index ?? "•"),
         selected: true,
       }),
       zIndexOffset: 1200,
-    }).bindTooltip(buildItineraryTooltip(selectedPoint, "Punto seleccionado"), {
-      direction: "top",
-      className: "sinergy-geofence-tooltip",
-    })
+    }).bindTooltip(
+      buildItineraryTooltip(
+        selectedPoint,
+        selectedPoint.isAlarmPoint ? "Alerta activada" : "Punto seleccionado",
+      ),
+      {
+        direction: "top",
+        className: "sinergy-geofence-tooltip",
+      },
+    )
 
     selectedItineraryPointLayer.addTo(layers.itineraryLayer)
+
+    if (selectedPoint.isAlarmPoint) {
+      selectedItineraryPointLayer.openTooltip()
+    }
   }
 
   const renderMovingRoutePoints = ({ points, routeColor }) => {

@@ -502,6 +502,10 @@ const activeContextName = computed(() => {
     return "Auditoria"
   }
 
+  if (route.name === "Alarms" || route.name === "AppAlarms") {
+    return "Alertas"
+  }
+
   if (route.name === "Maintenance" || route.name === "AppMaintenance") {
     return "Mantenciones"
   }
@@ -578,6 +582,7 @@ const {
 const getAccessibleCompanyEntryPath = (company) => {
   if (canAccessModule("assets", company.id)) return getCompanyWorkspacePath(company)
   if (canAccessFunction("reports", company.id, "view")) return `/app/${company.id}/reportes`
+  if (canAccessFunction("alarms", company.id, "view")) return `/app/${company.id}/alertas`
   if (canAccessFunction("maintenance-view", company.id, "view")) {
     return `/app/${company.id}/mantenciones`
   }

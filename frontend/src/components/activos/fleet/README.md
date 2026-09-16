@@ -21,6 +21,12 @@ diario (solo este)`, `Agregar a resumen diario` y `Mostrar itinerario`. Los
   contexto.
 - `FleetEditModal.vue`: modal para editar un activo existente. Mantiene visible
   el perfil operativo que se recalcula al cambiar el tipo de activo.
+- `FleetAlertsPanel.vue`: historial compacto de alertas dentro de Fleet. Recibe
+  filas ya autorizadas desde `ActivosView.vue`, muestra KPIs, tipo, razon de
+  disparo, permite abrir el recorrido del dia y, con permiso de edicion,
+  resolver o reabrir una alerta sin incluir configuracion de reglas. Por defecto
+  muestra solo alertas activas; las resueltas quedan disponibles desde el filtro
+  de estado.
 - `FleetGeofencePanel.vue`: panel de geocercas asociadas a flota. Permite
   importar y exportar geocercas en KML, KMZ, GeoJSON, CSV y XML usando
   utilidades puras de `utils/geofenceImportExportUtils.js`. Es el unico punto
@@ -60,13 +66,19 @@ diario (solo este)`, `Agregar a resumen diario` y `Mostrar itinerario`. Los
 - `FleetReportsPanel.vue`: panel de reportes relacionados con flota. Destaca y
   ordena primero los reportes recomendados por el perfil operativo de los
   activos visibles sin ocultar el resto del catalogo. Sus modales de ejecutar,
-  crear/editar, reglas y programaciones se cargan async y se precargan en reposo
-  para que la pestana de reportes no bloquee la interaccion inicial.
-- `FleetSectionContent.vue`: cambia el contenido segun seccion activa.
+  crear/editar, reglas y programaciones se cargan async y bajo demanda, sin
+  precarga pasiva, para no traer previews ni flujo de exportacion antes del
+  primer uso.
+- `FleetSectionContent.vue`: cambia el contenido segun seccion activa. Las
+  secciones pesadas se mantienen lazy; la precarga pasiva solo puede cargar
+  secciones livianas como `Alertas` y `Reportes`, mientras `Itinerarios` y
+  `Geocercas` se descargan cuando el usuario entra a esas pestanas.
 - `FleetTable.vue`: tabla de activos y telemetria. Cuando la columna
   `Direccion` esta visible y el uso de geocercas como direccion esta activo,
   cruza la posicion del activo con las geocercas disponibles antes de resolver
-  direcciones por geocodificacion inversa.
+  direcciones por geocodificacion inversa. La tabla se mantiene como vista unica
+  de activos en todos los tamanos; el responsive se resuelve con contenedores
+  scrollables, paginacion compacta y cabecera flexible.
 - `FleetTerminalModal.vue`: terminal visual de telemetria.
 - `terminal/`: piezas internas de la terminal.
 
@@ -87,6 +99,11 @@ y `utils/users/userAssetTagUtils.js`.
 En la tabla, `stopped` se etiqueta como `Detenido`. No reutilizar ese estado
 para alertas; si se agrega alerta real, debe venir en un campo o regla propia.
 
+La seccion `Alertas` de Fleet es solo historial operativo por empresa y activos
+autorizados. La configuracion de reglas automaticas se mantiene en el modulo
+principal de `Alertas` para no duplicar flujos de administracion dentro de
+Activos.
+
 Los grupos de vehiculos no se administran desde el panel lateral ni desde
 Empresas. El unico punto visual de gestion es el menu del header de Activos,
 donde se combinan ciudades y grupos como filtros posteriores a permisos.
@@ -95,3 +112,8 @@ La escala visual del panel se maneja desde `FleetListPanel.vue` con
 `fleet-readable`. Si se agregan nuevos textos de 8 a 13 px dentro de Fleet,
 deben mantener esa lectura minima para que tabla, tabs y acciones contextuales
 no queden demasiado pequenas.
+
+En `ActivosView.vue`, antes de `xl` el panel de Fleet y el mapa se apilan en dos
+filas proporcionales. No volver a dejar la grilla responsive sin filas definidas:
+eso permite que el panel de activos consuma todo el alto y deje el mapa fuera de
+la vista.

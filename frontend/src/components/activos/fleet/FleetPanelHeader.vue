@@ -63,6 +63,15 @@
             />
 
             <path
+              v-else-if="section.key === 'alertas'"
+              d="M12 4.5 4.75 18h14.5L12 4.5ZM12 9v4M12 16h.01"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+
+            <path
               v-else
               d="M4 20V8l8-4 8 4v12M8 20v-6h8v6M9 10h.01M15 10h.01"
               stroke="currentColor"
@@ -91,8 +100,8 @@
       </div>
     </div>
 
-    <div v-if="canShowSearchActions" class="mt-3 flex items-center gap-2">
-      <div class="relative min-w-0 flex-1">
+    <div v-if="canShowSearchActions" class="mt-3 flex flex-wrap items-center gap-2">
+      <div class="relative min-w-[180px] flex-[1_1_220px]">
         <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
           <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" aria-hidden="true">
             <path
@@ -125,7 +134,7 @@
       <button
         v-if="activeSection === 'activos' && sortColumnKey"
         type="button"
-        class="flex h-[36px] shrink-0 cursor-pointer items-center justify-center rounded-lg border border-[#FF6600]/30 bg-[#fff7ed] px-3 text-[10px] font-black text-[#FF6600] transition hover:border-[#FF6600] hover:bg-white"
+        class="flex h-[36px] flex-[1_1_118px] cursor-pointer items-center justify-center rounded-lg border border-[#FF6600]/30 bg-[#fff7ed] px-3 text-[10px] font-black text-[#FF6600] transition hover:border-[#FF6600] hover:bg-white min-[460px]:flex-none"
         title="Limpiar ordenamiento"
         @click="$emit('clear-sort')"
       >
@@ -135,7 +144,7 @@
       <button
         v-if="activeSection === 'activos' && canCreateAssets"
         type="button"
-        class="flex h-[36px] shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#102372]/20 bg-[#102372] px-3 text-[10px] font-black text-white shadow-sm transition hover:border-[#FF6600] hover:bg-[#0c1b59]"
+        class="flex h-[36px] flex-[1_1_136px] cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#102372]/20 bg-[#102372] px-3 text-[10px] font-black text-white shadow-sm transition hover:border-[#FF6600] hover:bg-[#0c1b59] min-[460px]:flex-none"
         title="Agregar activo"
         @click="$emit('open-add-activo')"
       >

@@ -355,7 +355,68 @@ Riesgo:
 
 - La definicion de viaje debe ser consistente. Si se cambia la regla de cierre de viaje, cambia todo el reporte.
 
-## 11. Mantenciones
+## 11. Alertas
+
+Entrada:
+
+- `frontend/src/views/AlarmsView.vue`
+
+Flujo:
+
+1. `useAutomaticAlertRulesService.js` administra reglas automaticas persistidas
+   en `localStorage`.
+2. `AlarmConfigPanel.vue` permite configurar tipo, condicion, empresa, alcance,
+   horario, notificaciones, estado y activos afectados desde la pestaña
+   `Configuracion`. Si el tipo es geocerca, recibe `geofences` y
+   `geofenceGroups` desde `useGeofences` y permite aplicar la regla a todas, a
+   un grupo o a geocercas especificas.
+3. `useAlarmsService.js` entrega alertas mock persistidas en `localStorage`.
+4. `useAccessControl.js` entrega `visibleAssets` segun permisos y etiquetas de
+   acceso.
+5. `getAuthorizedAlarmRows` cruza alertas contra esos activos autorizados.
+6. La vista aplica filtros visuales por busqueda, estado, empresa y fecha.
+7. Las acciones resolver y reabrir actualizan el servicio y registran auditoria
+   local.
+8. Ver recorrido navega a
+   `/app/:empresaId/activos?section=itinerarios&activoId=...&date=...&alarmId=...`.
+9. `ActivosView.vue` valida el activo contra su universo autorizado y crea un
+   `itineraryContextRequest`.
+10. `ItineraryPanel.vue` genera el recorrido del dia y selecciona el punto GPS
+    mas cercano a la hora de la alerta.
+11. `useMapItinerary.js` muestra el tooltip de alerta sobre ese punto.
+
+Archivos clave:
+
+- `frontend/src/views/AlarmsView.vue`
+- `frontend/src/components/alarms/AlarmSummaryHeader.vue`
+- `frontend/src/components/alarms/AlarmFilters.vue`
+- `frontend/src/components/alarms/AlarmList.vue`
+- `frontend/src/components/alarms/AlarmDetailPanel.vue`
+- `frontend/src/components/alarms/AlarmConfigPanel.vue`
+- `frontend/src/services/alarms/useAlarmsService.js`
+- `frontend/src/services/alarms/useAutomaticAlertRulesService.js`
+- `frontend/src/utils/alarms/alarmUtils.js`
+- `frontend/src/utils/alarms/automaticAlertRuleUtils.js`
+- `frontend/src/data/mockAlarms.js`
+- `frontend/src/data/mockAutomaticAlertRules.js`
+
+Modelo mental:
+
+```js
+automatic alert rules -> company/assets available -> config panel -> future alarm generation
+alarms -> visibleAssets -> authorized alarm rows -> visual filters -> history/detail/actions -> itinerary focus
+```
+
+Riesgo:
+
+- No filtrar alertas solo por `companyId`; una alerta debe mostrarse solo si su
+  activo esta dentro de `visibleAssets`.
+- No mezclar reglas automaticas con alertas ya ocurridas. Una regla define la
+  condicion; una alerta representa un evento detectado.
+- Las acciones actuales son de prototipo local. En produccion deben validarse y
+  auditarse desde backend.
+
+## 12. Mantenciones
 
 Entrada:
 
@@ -398,7 +459,7 @@ Riesgo:
 - Mientras sea prototipo local, no presentar automatizaciones de backend,
   correo, WhatsApp o n8n como integraciones reales.
 
-## 12. Espacios de trabajo
+## 13. Espacios de trabajo
 
 Entrada:
 
@@ -422,7 +483,7 @@ Riesgo:
 
 - Un workspace debe modificar la visualizacion, no los datos operativos.
 
-## 13. Auditoria
+## 14. Auditoria
 
 Entrada:
 
@@ -447,7 +508,7 @@ Riesgo:
 
 - Auditoria local no es confiable para produccion. Sirve como modulo visual de prototipo.
 
-## 14. Mocks, storage y servicios
+## 15. Mocks, storage y servicios
 
 Entrada:
 

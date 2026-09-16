@@ -12,9 +12,8 @@ Composables que descomponen `ActivosView.vue`.
   actualiza inmediato, pero la lista/tabla/mapa filtran con debounce para no
   recalcular la flota en cada tecla.
 - `useActivosFleetModals.js`: estado de modales de flota. Define los modales
-  como async components y los precarga con `preloadWhenIdle` despues de montar
-  Activos, para que crear/editar/terminal no castiguen el render inicial ni el
-  primer click.
+  como async components y los monta bajo demanda cuando se abre crear, editar o
+  terminal, para no descargar formularios ni terminal antes del primer uso.
 - `useActivosGeofenceActions.js`: acciones de geocercas conectadas con la vista
   principal. Coordina seleccion, edicion en mapa, creacion, actualizacion,
   eliminacion simple o multiple, grupos de geocercas y auditoria. En
@@ -34,7 +33,10 @@ Composables que descomponen `ActivosView.vue`.
 - `useActivosTelemetrySync.test.js`: pruebas de sincronizacion.
 - `useActivosWorkspacePersistence.js`: persistencia de preferencias por espacio
   de trabajo, incluyendo filtros visuales de ciudad y grupo de vehiculos sin
-  mezclarlos con permisos.
+  mezclarlos con permisos. Si la ruta trae `activoId`, `assetId` o `asset`,
+  respeta esa seleccion por encima del activo, filtros y seccion guardados en el
+  workspace. Si ademas la ruta trae `section=itinerarios`, mantiene abierta esa
+  seccion para no volver automaticamente a la tabla de activos.
 
 ## Regla de mantenimiento
 
@@ -44,3 +46,13 @@ La vista de Activos debe partir siempre desde `visibleAssets`, que ya aplica
 permisos y etiquetas de acceso. Los grupos de vehiculos gestionados desde el
 header y las ciudades son filtros organizativos posteriores y solo pueden
 reducir ese universo visible.
+
+Las navegaciones externas hacia un activo concreto pueden limpiar filtros
+visuales para que el usuario vea el activo solicitado. Ese foco nunca debe
+buscar en todos los activos de la empresa: solo puede resolver contra listas ya
+autorizadas por la vista.
+
+Cuando la navegacion externa viene desde Alertas, `ActivosView.vue` crea un
+`itineraryContextRequest` con empresa, activo, fecha y alerta. Itinerarios
+genera el recorrido del dia y el mapa usa `selectedItineraryPoint` para mostrar
+la ocurrencia con tooltip sobre el punto GPS mas cercano.

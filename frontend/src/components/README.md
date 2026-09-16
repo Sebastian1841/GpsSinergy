@@ -5,6 +5,8 @@ Componentes Vue reutilizables y piezas visuales por dominio.
 ## Carpetas
 
 - `activos/`: UI de flota, mapa, geocercas, itinerarios y rutas.
+- `alarms/`: historial, filtros, KPIs, detalle y configuracion de reglas
+  automaticas de alertas.
 - `audit/`: modulo visual de auditoria.
 - `auth/`: componentes ligados a autenticacion o sesion.
 - `companies/`: administracion de empresas.

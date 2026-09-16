@@ -24,10 +24,10 @@ diario`, la accion de agregar al resumen diario y los datos del activo cuando
   `Reportes` y `Geocercas`: en `Activos` alimenta el reemplazo de la columna
   `Direccion` cuando el usuario activa `Usar geocerca como direccion`.
 - `useFleetPanelSearch.js`: busqueda local con debounce y placeholder por
-  seccion del panel lateral.
+  seccion del panel lateral, incluyendo `Alertas`.
 - `useFleetPanelSections.js`: coordinacion de tabs del panel lateral. Calcula
-  secciones visibles, columnas activas, datos de reportes e itinerarios y
-  sincroniza la seccion externa enviada por la vista.
+  secciones visibles, columnas activas, datos de reportes, itinerarios y
+  alertas, y sincroniza la seccion externa enviada por la vista.
 - `useFleetAssetTagModal.js`: estado interno del modal de etiquetas de activos.
   Maneja nombre, busqueda con debounce, filtros de seleccion, paginacion,
   seleccion por pagina, bloqueo de scroll del body y cierre con Escape.

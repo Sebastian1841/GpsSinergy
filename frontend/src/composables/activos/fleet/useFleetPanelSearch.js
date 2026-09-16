@@ -8,6 +8,7 @@ const searchPlaceholders = {
   itinerarios: "Buscar activo o itinerario...",
   geocercas: "Buscar geocerca o zona...",
   etiquetas: "Buscar etiqueta...",
+  alertas: "Buscar alerta, activo o patente...",
 }
 
 export function useFleetPanelSearch({

@@ -6,6 +6,8 @@ Capa de acceso a datos, adaptadores mock y servicios externos.
 
 - `access/`: empresas y permisos disponibles para la sesion.
 - `activos/`: acceso a datos de activos.
+- `alarms/`: servicios locales de alertas y reglas automaticas con persistencia
+  mock en `localStorage`.
 - `audit/`: registros de auditoria.
 - `auth/`: autenticacion.
 - `companies/`: empresas.

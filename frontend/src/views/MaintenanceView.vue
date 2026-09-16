@@ -350,7 +350,7 @@
 </template>
 
 <script setup>
-import { defineAsyncComponent, onMounted } from "vue"
+import { defineAsyncComponent } from "vue"
 import { useRoute } from "vue-router"
 
 import MaintenanceCalendarTab from "../components/maintenance/MaintenanceCalendarTab.vue"
@@ -359,7 +359,6 @@ import MaintenanceHistoryTab from "../components/maintenance/MaintenanceHistoryT
 import MaintenanceOverviewTab from "../components/maintenance/MaintenanceOverviewTab.vue"
 import MaintenanceWorkOrdersTab from "../components/maintenance/MaintenanceWorkOrdersTab.vue"
 import { useMaintenanceModule } from "../composables/maintenance/useMaintenanceModule.js"
-import { preloadWhenIdle } from "../composables/ui/useIdlePreload.js"
 import "../components/maintenance/maintenance.css"
 import { useAccessService } from "../services/access/useAccessService.js"
 
@@ -466,9 +465,5 @@ const {
   assets,
   companies,
   route,
-})
-
-onMounted(() => {
-  preloadWhenIdle([loadMaintenanceActionModal])
 })
 </script>

@@ -9,7 +9,12 @@ Componentes visuales del modulo de mantenciones. La regla es mantener aqui rende
 - `MaintenanceCalendarTab.vue`: renderiza `Calendario OT`: grilla mensual, eventos por dia y panel lateral de proximas ordenes. Recibe dias ya calculados y no decide agenda.
 - `MaintenanceHistoryTab.vue`: renderiza `Historial`: ficha del vehiculo, trazabilidad del ciclo y tabla historica de servicios. Emite navegacion a OT, costos o exportacion.
 - `MaintenanceCostsTab.vue`: renderiza `Costos y facturas`: formulario visual de costo, KPI financieros y tabla de facturas. Emite la apertura del modal de costo o exportacion.
-- `MaintenanceActionModal.vue`: modal unico para crear/editar mantenciones, crear tipos, ver planes del vehiculo, crear/editar/reprogramar/asignar/cancelar/cerrar OT, registrar costos y exportar. Mantiene solo render y eventos; la mutacion real sigue en la vista. Se carga async desde `MaintenanceView.vue` y se precarga en reposo porque concentra varios formularios.
+- `MaintenanceActionModal.vue`: modal unico para crear/editar mantenciones, crear
+  tipos, ver planes del vehiculo, crear/editar/reprogramar/asignar/cancelar/cerrar
+  OT, registrar costos y exportar. Mantiene solo render y eventos; la mutacion
+  real sigue en la vista. Se carga async desde `MaintenanceView.vue` y se descarga
+  bajo demanda al abrir una accion para no cargar varios formularios al entrar al
+  modulo.
 - `MaintenanceUpcomingOrdersPanel.vue`: panel compacto de proximas ordenes usado por el calendario. Solo lista eventos ya preparados por la vista.
 - `MaintenanceVehicleHeaderCard.vue`: ficha reutilizable del vehiculo seleccionado para `Historial` y `Costos y facturas`. Expone accesos a ordenes y costos mediante eventos.
 - `maintenance.css`: estilos compartidos del modulo. Se mantiene separado para evitar duplicar los mismos selectores en cada tab extraida y para conservar una sola fuente visual.

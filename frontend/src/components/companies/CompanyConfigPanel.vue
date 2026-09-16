@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="modelValue && company"
-    class="fixed inset-0 z-[770] flex items-center justify-center bg-[#102372]/45 p-2 sm:p-4"
+    class="fixed inset-0 z-[770] flex items-center justify-center bg-black/35 p-2 sm:p-4"
     @click.self="$emit('close')"
   >
     <section
@@ -117,7 +117,7 @@
           </div>
         </aside>
 
-        <main class="min-h-0 overflow-auto bg-[#eef2f7] p-3 sm:p-4">
+        <main class="min-h-0 overflow-auto bg-[#f8fafc] p-3 sm:p-4">
           <div v-if="activeTab === 'summary'" class="grid gap-4">
             <section>
               <div class="mb-2 flex items-end justify-between gap-3">
@@ -155,7 +155,7 @@
             </section>
 
             <section class="overflow-hidden rounded-lg border border-[#d9d9d9] bg-white">
-              <header class="border-b border-[#d9d9d9] bg-[#eef2f7] px-3 py-2.5">
+              <header class="border-b border-[#d9d9d9] bg-[#f8fafc] px-3 py-2.5">
                 <h3 class="text-[12px] font-black text-[#102372]">Informacion de la empresa</h3>
               </header>
 

@@ -1,6 +1,6 @@
 <template>
   <section class="rounded-xl border border-[#d8dee8] bg-white p-3 shadow-sm">
-    <div class="mb-3 flex min-w-0 items-start justify-between gap-3">
+    <div class="mb-3 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div class="min-w-0">
         <h3 class="truncate text-[12px] font-black text-[#102372]">{{ title }}</h3>
 
@@ -13,7 +13,7 @@
         </p>
       </div>
 
-      <div class="flex shrink-0 items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
         <span
           class="rounded-md bg-slate-100 px-2 py-1 text-[9px] font-black text-slate-500 ring-1 ring-slate-200"
         >
@@ -22,7 +22,7 @@
 
         <button
           type="button"
-          class="flex h-8 cursor-pointer items-center gap-1.5 rounded-md bg-[#102372] px-3 text-[9px] font-black text-white transition hover:bg-[#182f8c] disabled:cursor-not-allowed disabled:bg-slate-300"
+          class="flex h-8 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-[#102372] px-3 text-[9px] font-black text-white transition hover:bg-[#182f8c] disabled:cursor-not-allowed disabled:bg-slate-300 sm:flex-none"
           :disabled="chartConfigs.length >= MAX_CHARTS"
           @click="addChart"
         >
@@ -65,10 +65,10 @@
             </div>
           </div>
 
-          <div class="flex min-w-0 items-center gap-1.5">
+          <div class="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:justify-end">
             <select
               v-model="config.type"
-              class="h-8 rounded-md border border-[#cbd5e1] bg-white px-2 text-[9px] font-black text-[#102372] outline-none focus:border-[#FF6600]"
+              class="h-8 min-w-[110px] flex-1 rounded-md border border-[#cbd5e1] bg-white px-2 text-[9px] font-black text-[#102372] outline-none focus:border-[#FF6600] sm:flex-none"
               :aria-label="`Tipo del grafico ${index + 1}`"
               @change="handleChartTypeChange(config)"
             >
@@ -79,7 +79,7 @@
 
             <select
               v-model="config.variableKey"
-              class="h-8 min-w-0 max-w-[180px] rounded-md border border-[#cbd5e1] bg-white px-2 text-[9px] font-black text-[#102372] outline-none focus:border-[#FF6600]"
+              class="h-8 min-w-[130px] flex-1 rounded-md border border-[#cbd5e1] bg-white px-2 text-[9px] font-black text-[#102372] outline-none focus:border-[#FF6600] sm:max-w-[180px] sm:flex-none"
               :aria-label="`Variable del grafico ${index + 1}`"
               @change="scheduleChartRender"
             >
@@ -104,7 +104,7 @@
           </div>
         </div>
 
-        <div class="h-[240px] min-h-[240px]">
+        <div class="h-[210px] min-h-[210px] sm:h-[240px] sm:min-h-[240px]">
           <canvas
             :ref="(element) => setCanvasRef(config.id, element)"
             class="h-full w-full"

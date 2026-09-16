@@ -14,12 +14,13 @@ Raiz del codigo Vue del frontend. La organizacion se mantiene por tipo de respon
 - `main.js`: punto de entrada de Vue.
 - `style.css`: estilos globales base.
 
-`App.vue` tambien coordina la precarga diferida de vistas privadas despues del login mediante `preloadPrivateRouteViews()`. Esto mantiene el login liviano y reduce la espera del primer acceso a modulos como Reportes, Auditoria, Usuarios y Empresas.
+`App.vue` tambien coordina la precarga diferida de vistas privadas despues del login mediante `preloadPrivateRouteViews()`. Esto mantiene el login liviano y reduce la espera del primer acceso a modulos como Reportes, Alertas, Auditoria, Usuarios y Empresas.
 
 Los flujos activos mas sensibles del prototipo estan documentados con mas
 detalle en `../docs/flujos-principales.md`: permisos y etiquetas de acceso,
 busqueda global, filtros visuales de ciudades/grupos de vehiculos, geocercas
-con importacion/exportacion, reportes configurables y mantenciones.
+con importacion/exportacion, reportes configurables, alertas operativas,
+alertas automaticas y mantenciones.
 
 ## Regla de arquitectura
 

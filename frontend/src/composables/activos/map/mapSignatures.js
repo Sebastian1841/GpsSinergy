@@ -17,6 +17,10 @@ const buildPointSignature = (point) => {
     point.address,
     point.event,
     point.isCurrentLocation,
+    point.isAlarmPoint,
+    point.alarmId,
+    point.alarmTitle,
+    point.alarmDescription,
   ]
     .map(normalizeSignatureValue)
     .join(":")

@@ -135,7 +135,7 @@
               </div>
             </div>
 
-            <div class="h-[260px]">
+            <div class="h-[220px] sm:h-[260px]">
               <canvas ref="distanceChartCanvas" class="h-full w-full"></canvas>
             </div>
           </div>
@@ -185,7 +185,74 @@
         </span>
       </div>
 
-      <div class="overflow-auto">
+      <div class="grid gap-2 p-2 md:hidden">
+        <article
+          v-for="summaryRow in summaryRows"
+          :key="summaryRow.id"
+          class="rounded-lg border border-[#d8dee8] bg-white p-3"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="truncate text-[12px] font-black text-[#102372]">
+                {{ summaryRow.assetLabel }}
+              </p>
+
+              <p class="mt-0.5 text-[10px] font-semibold text-slate-500">
+                {{ summaryRow.dateLabel }}
+              </p>
+            </div>
+
+            <span
+              class="shrink-0 rounded-md bg-[#102372]/10 px-2 py-1 text-[10px] font-black text-[#102372]"
+            >
+              {{ summaryRow.distanceLabel }}
+            </span>
+          </div>
+
+          <dl class="mt-3 grid grid-cols-2 gap-2 border-t border-[#edf1f5] pt-3">
+            <div>
+              <dt class="text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
+                Inicio
+              </dt>
+              <dd class="mt-0.5 text-[11px] font-bold text-slate-700">
+                {{ summaryRow.startLabel }}
+              </dd>
+            </div>
+
+            <div>
+              <dt class="text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">Fin</dt>
+              <dd class="mt-0.5 text-[11px] font-bold text-slate-700">
+                {{ summaryRow.endLabel }}
+              </dd>
+            </div>
+
+            <div>
+              <dt class="text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
+                Movimiento
+              </dt>
+              <dd class="mt-0.5 text-[11px] font-bold text-slate-700">
+                {{ summaryRow.movingLabel }}
+              </dd>
+            </div>
+
+            <div>
+              <dt class="text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">GPS</dt>
+              <dd class="mt-0.5 text-[11px] font-bold text-slate-700">
+                {{ summaryRow.pointsLabel }}
+              </dd>
+            </div>
+          </dl>
+        </article>
+
+        <div
+          v-if="!summaryRows.length"
+          class="px-3 py-8 text-center text-[11px] font-semibold text-slate-500"
+        >
+          No hay actividad para resumir en este rango.
+        </div>
+      </div>
+
+      <div class="hidden overflow-auto md:block">
         <table class="min-w-full border-collapse text-left text-[10px]">
           <thead>
             <tr class="bg-[#f8fafc] text-[#102372]">

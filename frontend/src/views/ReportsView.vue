@@ -458,7 +458,7 @@
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, onMounted, ref, watch } from "vue"
+import { computed, defineAsyncComponent, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 
 import { useGeofences } from "../composables/activos/geocercas/useGeofences.js"
@@ -467,7 +467,6 @@ import { useAccessControl } from "../composables/auth/useAccessControl.js"
 import { useReportEventRules } from "../composables/reports/useReportEventRules.js"
 import { useReportTemplates } from "../composables/reports/useReportTemplates.js"
 import { useDebouncedValue } from "../composables/ui/useDebouncedValue.js"
-import { preloadWhenIdle } from "../composables/ui/useIdlePreload.js"
 import { useReportsService } from "../services/reports/useReportsService.js"
 import SvgIcon from "../components/icons/SvgIcon.vue"
 
@@ -777,13 +776,4 @@ const deleteReport = (templateId) => {
     }
   }
 }
-
-onMounted(() => {
-  preloadWhenIdle([
-    loadReportTemplateModal,
-    loadReportExecutionModal,
-    loadReportEventRulesModal,
-    loadReportSchedulesModal,
-  ])
-})
 </script>

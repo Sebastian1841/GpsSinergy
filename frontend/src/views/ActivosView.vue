@@ -2,12 +2,12 @@
   <section class="h-full min-h-0 overflow-hidden bg-[#eef2f7]">
     <div
       ref="layoutRef"
-      class="grid h-full min-h-0 grid-cols-1 xl:grid-cols-[var(--fleet-grid)]"
+      class="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(0,48%)_minmax(0,52%)] xl:grid-cols-[var(--fleet-grid)] xl:grid-rows-1"
       :style="{
         '--fleet-grid': `${leftPanelWidth}px 8px minmax(0, 1fr)`,
       }"
     >
-      <div class="relative flex min-h-0 flex-col overflow-hidden bg-white">
+      <div class="relative flex min-h-0 min-w-0 flex-col overflow-hidden bg-white">
         <FleetListPanel
           :activos="personalFilteredActivos"
           :all-activos="personalTableActivos"
@@ -31,6 +31,9 @@
           :use-geofence-location-address="useGeofenceLocationAddress"
           :column-preferences="fleetTableColumnPreferences"
           :itinerary-context-request="itineraryContextRequest"
+          :alert-rows="fleetAlertRows"
+          :alert-summary="fleetAlertSummary"
+          :can-manage-alerts="canManageAlerts"
           class="min-h-0 flex-1"
           @select="selectActivo"
           @select-filter="setStatusFilter"
@@ -57,6 +60,9 @@
           @select-city-asset-group="selectCityAssetGroup"
           @select-vehicle-asset-group="selectVehicleAssetGroup"
           @update:column-preferences="setFleetTableColumnPreferences"
+          @view-alert-route="handleViewFleetAlertRoute"
+          @resolve-alert="handleResolveFleetAlert"
+          @reopen-alert="handleReopenFleetAlert"
         />
       </div>
 
@@ -77,7 +83,7 @@
         </div>
       </div>
 
-      <div class="flex min-h-0 flex-col overflow-hidden bg-[#eef2f7]">
+      <div class="flex min-h-0 min-w-0 flex-col overflow-hidden bg-[#eef2f7]">
         <div class="relative grid min-h-0 flex-1 overflow-hidden p-3">
           <ActivosMapPanel
             ref="mapPanelRef"
@@ -164,6 +170,14 @@ import { useAccessControl } from "../composables/auth/useAccessControl.js"
 import { useAuthSession } from "../composables/auth/useAuthSession.js"
 import { useMockDatabase } from "../composables/mock/useMockDatabase.js"
 import { useActivosService } from "../services/activos/useActivosService.js"
+import { useAlarmsService } from "../services/alarms/useAlarmsService.js"
+import {
+  buildAlarmSummary,
+  filterAlarmRows,
+  getAlarmTriggerReason,
+  getAuthorizedAlarmRows,
+  sortAlarmRows,
+} from "../utils/alarms/alarmUtils.js"
 
 import { useActivosCrud } from "../composables/activos/view/useActivosCrud.js"
 import { useActivosDeviceActions } from "../composables/activos/view/useActivosDeviceActions.js"
@@ -198,10 +212,11 @@ const props = defineProps({
 const route = useRoute()
 const router = useRouter()
 const { currentUser } = useAuthSession()
-const { visibleAssets, canAccessFunction } = useAccessControl()
+const { isPlatformAdmin, visibleAssets, canAccessFunction } = useAccessControl()
 const { isRouteComparisonModalOpen } = useRouteComparisonUiState()
 
-const { assetTags, createAssetTag, updateAssetTag, deleteAssetTag } = useMockDatabase()
+const { companies, assets, assetTags, createAssetTag, updateAssetTag, deleteAssetTag } =
+  useMockDatabase()
 
 const MOCK_TELEMETRY_ENABLED =
   import.meta.env.DEV && import.meta.env.VITE_MOCK_TELEMETRY !== "false"
@@ -215,6 +230,8 @@ const {
   updateActivo: updateActivoRecord,
   deleteActivo: deleteActivoRecord,
 } = useActivosService()
+
+const { alarms: alarmRecords, resolveAlarm, reopenAlarm } = useAlarmsService()
 
 const activeCompanyId = computed(() => String(route.params.empresaId || ""))
 
@@ -234,9 +251,64 @@ const baseMockActivos = computed(() => {
   })
 })
 
+const fleetAlertScopeAssets = computed(() => {
+  const companyId = activeCompanyId.value
+  const visibleCompanyAssets = visibleAssets.value.filter((activo) => {
+    return !companyId || normalizeId(activo.companyId) === companyId
+  })
+
+  if (visibleCompanyAssets.length || !isPlatformAdmin.value) {
+    return visibleCompanyAssets
+  }
+
+  return assets.value.filter((activo) => {
+    return !companyId || normalizeId(activo.companyId) === companyId
+  })
+})
+
 const getRouteSelectedActivoId = () => {
   return normalizeId(route.query.activoId || route.query.assetId || route.query.asset)
 }
+
+const routeSelectedActivoId = computed(() => getRouteSelectedActivoId())
+
+const normalizeRouteSection = (section) => {
+  const normalizedSection = String(section || "")
+    .trim()
+    .toLowerCase()
+
+  return normalizedSection === "itinerarios" || normalizedSection === "itinerary"
+    ? "itinerarios"
+    : ""
+}
+
+const getRouteDateInput = (value) => {
+  if (!value) return ""
+
+  const rawText = String(value).trim()
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(rawText)) {
+    return rawText.slice(0, 10)
+  }
+
+  const date = new Date(rawText)
+
+  if (Number.isNaN(date.getTime())) return ""
+
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-")
+}
+
+const routeRequestedSection = computed(() => {
+  return normalizeRouteSection(route.query.section || route.query.panel || route.query.view)
+})
+
+const routeAlarmId = computed(() => {
+  return normalizeId(route.query.alarmId || route.query.alertId)
+})
 
 const { recordAudit } = useAuditTrail({
   companyId: activeCompanyId,
@@ -266,6 +338,53 @@ const {
 } = useActivosPermissions({
   activeCompanyId,
   canAccessFunction,
+})
+
+const canManageAlerts = computed(() => {
+  const companyId = activeCompanyId.value || null
+
+  return (
+    canAccessFunction("alarms", companyId, "edit") ||
+    canAccessFunction("alarms", companyId, "admin")
+  )
+})
+
+const currentActorName = computed(() => {
+  return currentUser.value?.name || currentUser.value?.username || "Usuario"
+})
+
+const shouldOpenRouteItinerary = computed(() => {
+  return (
+    Boolean(routeSelectedActivoId.value) &&
+    routeRequestedSection.value === "itinerarios" &&
+    canViewItineraries.value
+  )
+})
+
+const routeFocusedAlarm = computed(() => {
+  const alarmId = routeAlarmId.value
+  const assetId = routeSelectedActivoId.value
+
+  if (!alarmId || !assetId) return null
+
+  return (
+    alarmRecords.value.find((alarm) => {
+      return (
+        normalizeId(alarm.id) === alarmId &&
+        normalizeId(alarm.assetId) === assetId &&
+        (!activeCompanyId.value || normalizeId(alarm.companyId) === activeCompanyId.value)
+      )
+    }) || null
+  )
+})
+
+const routeItineraryDate = computed(() => {
+  return getRouteDateInput(
+    route.query.date ||
+      route.query.fecha ||
+      route.query.dateFrom ||
+      routeFocusedAlarm.value?.createdAt,
+  )
 })
 
 const normalizeAssetTagIds = (assetTagIds = []) => {
@@ -574,6 +693,106 @@ const {
   setStatusFilter,
 } = filters
 
+const fleetAlertRows = computed(() => {
+  const rows = getAuthorizedAlarmRows({
+    alarms: alarmRecords.value,
+    visibleAssets: fleetAlertScopeAssets.value,
+    companies: companies.value,
+    companyId: activeCompanyId.value,
+  })
+
+  return sortAlarmRows(
+    filterAlarmRows({
+      rows,
+      searchTerm: sectionSearch.value.alertas,
+      selectedStatus: "all",
+    }),
+  )
+})
+
+const fleetAlertSummary = computed(() => buildAlarmSummary(fleetAlertRows.value))
+
+const recordFleetAlertAudit = ({ alert, action, description, severity = "info" }) => {
+  if (!alert) return
+
+  recordAudit({
+    companyId: alert.companyId,
+    companyName: alert.companyName,
+    module: "alertas",
+    action,
+    entityType: "alerta",
+    entityName: alert.title,
+    severity,
+    description,
+    metadata: {
+      alarmId: alert.id,
+      assetId: alert.assetId,
+      assetPlate: alert.assetPlate,
+      alarmType: alert.type,
+      alarmSeverity: alert.severity,
+      source: "fleet",
+    },
+  })
+}
+
+const handleResolveFleetAlert = (alert = {}) => {
+  if (!canManageAlerts.value) return
+
+  const alarmId = normalizeId(alert.id)
+  if (!alarmId) return
+
+  const updatedAlarm = resolveAlarm(alarmId, currentActorName.value)
+  if (!updatedAlarm) return
+
+  recordFleetAlertAudit({
+    alert,
+    action: "alarm:resolve",
+    description: "Se resolvio una alerta operativa desde Fleet.",
+  })
+}
+
+const handleReopenFleetAlert = (alert = {}) => {
+  if (!canManageAlerts.value) return
+
+  const alarmId = normalizeId(alert.id)
+  if (!alarmId) return
+
+  const updatedAlarm = reopenAlarm(alarmId)
+  if (!updatedAlarm) return
+
+  recordFleetAlertAudit({
+    alert,
+    action: "alarm:reopen",
+    description: "Se reabrio una alerta operativa desde Fleet.",
+    severity: "warning",
+  })
+}
+
+const handleViewFleetAlertRoute = (alert = {}) => {
+  if (!canViewItineraries.value) return
+
+  const assetId = normalizeId(alert.assetId)
+  const companyId = normalizeId(alert.companyId || activeCompanyId.value)
+
+  if (!assetId || !companyId) return
+
+  const date = getRouteDateInput(alert.createdAt)
+
+  void router.push({
+    name: "AppActivos",
+    params: {
+      empresaId: companyId,
+    },
+    query: {
+      section: "itinerarios",
+      from: "alertas",
+      activoId: assetId,
+      alarmId: normalizeId(alert.id),
+      ...(date ? { date } : {}),
+    },
+  })
+}
+
 selection = useActivosSelection({
   baseSelectedId: getRouteSelectedActivoId() || baseMockActivos.value[0]?.id || null,
   getMapActivos: () => personalMapActivos?.value || telemetrySync?.mapActivos.value || [],
@@ -596,14 +815,45 @@ const {
 } = selection
 
 watch(
-  () => route.query.activoId || route.query.assetId || route.query.asset,
+  () => [
+    route.params.empresaId,
+    route.query.activoId,
+    route.query.assetId,
+    route.query.asset,
+    route.query.section,
+    route.query.panel,
+    route.query.view,
+    route.query.from,
+  ],
   async () => {
-    const routeActivoId = getRouteSelectedActivoId()
+    const routeActivoId = routeSelectedActivoId.value
 
-    if (!routeActivoId || normalizeId(selectedId.value) === routeActivoId) return
+    if (!routeActivoId) return
 
-    selectedId.value = routeActivoId
+    setSidebarSection(shouldOpenRouteItinerary.value ? "itinerarios" : "activos")
+    statusFilter.value = "all"
+    sectionSearch.value = {
+      ...sectionSearch.value,
+      activos: "",
+      ...(shouldOpenRouteItinerary.value
+        ? {
+            itinerarios: "",
+          }
+        : {}),
+    }
+
+    selectCityAssetGroup(null)
+    selectVehicleAssetGroup(null)
+    selectedGeofenceId.value = null
+
+    if (normalizeId(selectedId.value) !== routeActivoId) {
+      selectedId.value = routeActivoId
+    }
+
     await refreshMapLayout(true)
+  },
+  {
+    immediate: true,
   },
 )
 
@@ -766,7 +1016,6 @@ const {
   hasMountedActivoModal,
   hasMountedEditActivoModal,
   hasMountedTerminalModal,
-  preloadFleetModals,
 } = useActivosFleetModals({
   showActivoModal,
   showEditActivoModal,
@@ -808,6 +1057,90 @@ const {
   setSidebarSection,
 })
 
+const buildRouteAlarmContextId = () => {
+  return [
+    "alarm-itinerary",
+    activeCompanyId.value,
+    routeSelectedActivoId.value,
+    routeItineraryDate.value,
+    routeAlarmId.value,
+    routeFocusedAlarm.value?.status || "",
+  ]
+    .filter(Boolean)
+    .join(":")
+}
+
+const getRouteContextAsset = () => {
+  const routeActivoId = routeSelectedActivoId.value
+
+  if (!routeActivoId) return null
+
+  return (
+    baseNormalizedActivos.value.find((activo) => {
+      return normalizeId(activo?.id) === routeActivoId
+    }) || null
+  )
+}
+
+const syncRouteItineraryContext = () => {
+  if (!shouldOpenRouteItinerary.value) return
+
+  const routeActivoId = routeSelectedActivoId.value
+  const targetActivo = getRouteContextAsset()
+
+  if (!targetActivo) return
+
+  const focusedAlarm = routeFocusedAlarm.value
+  const requestDate = routeItineraryDate.value || getRouteDateInput(focusedAlarm?.createdAt)
+
+  itineraryContextRequest.value = {
+    id: buildRouteAlarmContextId(),
+    source: "alarm-history",
+    panelView: "itinerarios",
+    activo: targetActivo,
+    assetId: routeActivoId,
+    plate: targetActivo.patente || targetActivo.plate || "",
+    range: requestDate ? "custom" : "today",
+    date: requestDate,
+    dateFrom: requestDate,
+    dateTo: requestDate,
+    allowFallbackPoints: true,
+    focusedAlert: focusedAlarm
+      ? {
+          id: focusedAlarm.id,
+          title: focusedAlarm.title,
+          description: focusedAlarm.description,
+          status: focusedAlarm.status,
+          severity: focusedAlarm.severity,
+          type: focusedAlarm.type,
+          createdAt: focusedAlarm.createdAt,
+          triggerReason: getAlarmTriggerReason(focusedAlarm),
+          metadata: focusedAlarm.metadata || {},
+        }
+      : null,
+  }
+}
+
+watch(
+  () => [
+    activeCompanyId.value,
+    routeRequestedSection.value,
+    routeSelectedActivoId.value,
+    routeItineraryDate.value,
+    routeAlarmId.value,
+    routeFocusedAlarm.value?.status || "",
+    baseNormalizedActivos.value
+      .map((activo) => {
+        return normalizeId(activo?.id)
+      })
+      .join("|"),
+  ],
+  syncRouteItineraryContext,
+  {
+    immediate: true,
+  },
+)
+
 telemetrySync = useActivosTelemetrySync({
   telemetryActivos,
   baseNormalizedActivos,
@@ -819,11 +1152,13 @@ telemetrySync = useActivosTelemetrySync({
   stopMockTelemetry,
   appendTelemetryPulses,
   ensureSelectedActivo,
+
   getPriorityTelemetryIds: () => {
     const terminalActivoId = normalizeId(terminalActivo.value?.id)
 
     return terminalActivoId ? [terminalActivoId] : []
   },
+
   recordTelemetryReports: false,
 
   onTelemetryBatch: (batch) => {
@@ -839,18 +1174,70 @@ telemetrySync = useActivosTelemetrySync({
 const { normalizedActivos, tableActivos, mapActivos, filteredActivos, cleanupTelemetrySync } =
   telemetrySync
 
+const isRouteSelectedActivoIncluded = (activos = []) => {
+  const selectedRouteId = routeSelectedActivoId.value
+
+  if (!selectedRouteId) return true
+
+  return activos.some((activo) => {
+    return normalizeId(activo?.id) === selectedRouteId
+  })
+}
+
+const findRouteSelectedActivo = (...assetSources) => {
+  const selectedRouteId = routeSelectedActivoId.value
+
+  if (!selectedRouteId) return null
+
+  for (const assetSource of assetSources) {
+    const routeActivo = (assetSource || []).find((activo) => {
+      return normalizeId(activo?.id) === selectedRouteId
+    })
+
+    if (routeActivo) return routeActivo
+  }
+
+  return null
+}
+
+const includeRouteSelectedActivo = (activos = [], ...assetSources) => {
+  if (isRouteSelectedActivoIncluded(activos)) return activos
+
+  const routeActivo = findRouteSelectedActivo(...assetSources)
+
+  return routeActivo ? [routeActivo, ...activos] : activos
+}
+
 personalMapActivos = computed(() => {
-  return filterActivosBySelectedCityGroup(filterActivosBySelectedVehicleGroup(mapActivos.value))
+  const filteredMapActivos = filterActivosBySelectedCityGroup(
+    filterActivosBySelectedVehicleGroup(mapActivos.value),
+  )
+
+  return includeRouteSelectedActivo(filteredMapActivos, normalizedActivos.value)
 })
 
 const personalFilteredActivos = computed(() => {
-  return filterActivosBySelectedCityGroup(
+  const filteredListActivos = filterActivosBySelectedCityGroup(
     filterActivosBySelectedVehicleGroup(filteredActivos.value),
+  )
+
+  return includeRouteSelectedActivo(
+    filteredListActivos,
+    tableActivos.value,
+    normalizedActivos.value,
   )
 })
 
 const personalTableActivos = computed(() => {
-  return filterActivosBySelectedCityGroup(filterActivosBySelectedVehicleGroup(tableActivos.value))
+  const filteredTableActivos = filterActivosBySelectedCityGroup(
+    filterActivosBySelectedVehicleGroup(tableActivos.value),
+  )
+
+  return includeRouteSelectedActivo(
+    filteredTableActivos,
+    tableActivos.value,
+    normalizedActivos.value,
+  )
 })
 
 const personalMapActivoIdsSignature = computed(() => {
@@ -868,12 +1255,22 @@ const permittedMapStatsActivos = computed(() => {
   return canViewGps.value ? personalTableActivos.value : []
 })
 
-watch(personalMapActivoIdsSignature, () => {
+watch(personalMapActivoIdsSignature, async () => {
+  const routeActivoId = routeSelectedActivoId.value
+
+  if (routeActivoId && isRouteSelectedActivoIncluded(personalMapActivos.value)) {
+    if (normalizeId(selectedId.value) !== routeActivoId) {
+      selectedId.value = routeActivoId
+    }
+
+    await refreshMapLayout(true)
+    return
+  }
+
   ensureSelectedActivo()
 })
 
 onMounted(() => {
-  preloadFleetModals()
   flushPendingMapTelemetryBatch()
 })
 

@@ -2,7 +2,9 @@
   <section
     class="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[#d8dee8] bg-white shadow-sm"
   >
-    <div class="flex items-center justify-between gap-2 border-b border-[#edf0f5] px-3 py-2.5">
+    <div
+      class="flex flex-col gap-2 border-b border-[#edf0f5] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+    >
       <div class="flex min-w-0 items-center gap-2">
         <p class="shrink-0 text-[11px] font-black text-[#102372]">Eventos del recorrido</p>
 
@@ -17,7 +19,7 @@
         </p>
       </div>
 
-      <div class="flex shrink-0 items-center gap-1.5">
+      <div class="flex flex-wrap items-center gap-1.5 sm:justify-end">
         <label
           v-if="rows.length"
           class="flex h-[36px] shrink-0 items-center gap-1.5 rounded-lg border border-[#d8dee8] bg-white px-2 text-[10px] font-black"
@@ -106,7 +108,58 @@
       </p>
     </div>
 
-    <div v-else class="min-h-0 max-h-[420px] overflow-auto">
+    <div v-else class="min-h-0 max-h-[360px] overflow-auto lg:hidden">
+      <div class="grid gap-2 p-2">
+        <article
+          v-for="row in mobileRows"
+          :key="row.key"
+          role="button"
+          tabindex="0"
+          class="rounded-lg border bg-white p-3 text-left shadow-sm transition hover:border-[#FF6600]/40 hover:bg-[#fffaf6]"
+          :class="
+            selectedPointId === row.source.id
+              ? 'border-[#FF6600] ring-2 ring-[#FF6600]/10'
+              : 'border-[#d8dee8]'
+          "
+          @click="$emit('select-point', row.source)"
+          @keydown.enter.prevent="$emit('select-point', row.source)"
+          @keydown.space.prevent="$emit('select-point', row.source)"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="truncate text-[13px] font-black text-[#102372]">
+                {{ row.title }}
+              </p>
+
+              <p class="mt-0.5 truncate text-[10px] font-semibold text-slate-500">
+                {{ row.subtitle }}
+              </p>
+            </div>
+
+            <span
+              class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black"
+              :class="getMobileStatusClass(row.source.status)"
+            >
+              {{ statusLabel(row.source.status) }}
+            </span>
+          </div>
+
+          <dl class="mt-3 grid grid-cols-2 gap-2 border-t border-[#edf0f5] pt-3">
+            <div v-for="cell in row.cells" :key="cell.column.key" class="min-w-0">
+              <dt class="truncate text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
+                {{ cell.column.label }}
+              </dt>
+
+              <dd class="mt-0.5 truncate text-[11px] font-bold text-slate-700" :title="cell.value">
+                {{ cell.value }}
+              </dd>
+            </div>
+          </dl>
+        </article>
+      </div>
+    </div>
+
+    <div v-if="rows.length" class="hidden min-h-0 max-h-[420px] overflow-auto lg:block">
       <table class="w-max min-w-full border-collapse text-left text-[11px]">
         <colgroup>
           <col
@@ -268,6 +321,23 @@ const draggedColumnKey = ref("")
 
 let resizeState = null
 
+const MOBILE_COLUMN_PRIORITY = [
+  "speed",
+  "accumulatedDistanceKm",
+  "address",
+  "ignition",
+  "gpsSatellites",
+  "combustible",
+]
+
+const MOBILE_EXCLUDED_COLUMN_KEYS = new Set([
+  "timestamp",
+  "status",
+  "assetDisplayName",
+  "assetPatente",
+  "assetDeviceId",
+])
+
 const {
   columnSearch,
   visibleColumnKeys,
@@ -329,6 +399,68 @@ const { rowsWithResolvedAddresses: paginatedRowsWithAddresses, reverseGeocodingA
   useReverseGeocodedRows(paginatedRows, {
     enabled: shouldResolveAddresses,
   })
+
+const getMobileStatusClass = (status) => {
+  if (status === "moving") return "bg-emerald-50 text-emerald-700"
+  if (status === "idle") return "bg-sky-50 text-sky-700"
+  if (status === "offline") return "bg-slate-100 text-slate-500"
+
+  return "bg-[#fff3eb] text-[#FF6600]"
+}
+
+const buildMobileCells = (row) => {
+  const visibleCells = visibleColumns.value
+    .filter((column) => !MOBILE_EXCLUDED_COLUMN_KEYS.has(column.key))
+    .map((column) => ({
+      column,
+      value: getCellValue(row, column),
+    }))
+
+  const cellsByKey = new Map(visibleCells.map((cell) => [cell.column.key, cell]))
+  const priorityCells = MOBILE_COLUMN_PRIORITY.map((key) => cellsByKey.get(key)).filter(Boolean)
+  const fallbackCells = visibleCells.filter((cell) => {
+    return !MOBILE_COLUMN_PRIORITY.includes(cell.column.key)
+  })
+
+  return [...priorityCells, ...fallbackCells].slice(0, 6)
+}
+
+const getMobileAssetLabel = (row) => {
+  const assetColumn = columnsByKey.value.get("assetDisplayName")
+  const plateColumn = columnsByKey.value.get("assetPatente")
+
+  return (
+    (assetColumn && getCellValue(row, assetColumn)) ||
+    (plateColumn && getCellValue(row, plateColumn)) ||
+    "Activo"
+  )
+}
+
+const getMobileSubtitle = (row) => {
+  const dateColumn = columnsByKey.value.get("dateLabel")
+  const plateColumn = columnsByKey.value.get("assetPatente")
+  const deviceColumn = columnsByKey.value.get("assetDeviceId")
+  const subtitleParts = [
+    getRowTimeLabel(row),
+    dateColumn ? getCellValue(row, dateColumn) : "",
+    plateColumn ? getCellValue(row, plateColumn) : "",
+    deviceColumn ? getCellValue(row, deviceColumn) : "",
+  ].filter((value) => value && value !== "-")
+
+  return subtitleParts.join(" - ") || "Reporte GPS"
+}
+
+const mobileRows = computed(() => {
+  return paginatedRowsWithAddresses.value.map((row, index) => {
+    return {
+      key: getRowKey(row, paginationStart.value + index),
+      source: row,
+      title: getMobileAssetLabel(row),
+      subtitle: getMobileSubtitle(row),
+      cells: buildMobileCells(row),
+    }
+  })
+})
 
 const toggleColumnKey = (columnKey) => {
   const column = columnsByKey.value.get(columnKey)

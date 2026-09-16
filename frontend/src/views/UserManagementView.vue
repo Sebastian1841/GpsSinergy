@@ -33,18 +33,28 @@
           />
 
           <UserListPanel
-            :users="visibleUsers"
+            :users="paginatedUsers"
+            :total-users="filteredUsers.length"
             :accesses="accesses"
             :applications="applications"
             :companies="companies"
             :roles="roles"
             :selected-company="selectedCompany"
             :selected-user-id="selectedUserId"
-            :visible-users-remaining="visibleUsersRemaining"
-            :can-show-more="canShowMoreUsers"
+            :view-mode="userViewMode"
+            :sort-key="userSortKey"
+            :sort-direction="userSortDirection"
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            :page-size="pageSize"
             @select-user="handleSelectUser"
             @clear-filters="clearFilters"
-            @show-more="showMoreUsers"
+            @update:view-mode="userViewMode = $event"
+            @update:sort-key="userSortKey = $event"
+            @update:sort-direction="userSortDirection = $event"
+            @previous-page="goToPreviousPage"
+            @next-page="goToNextPage"
+            @go-to-page="goToPage"
           />
         </div>
       </div>
@@ -195,14 +205,19 @@ const {
   selectedCompany,
   selectedStatus,
   selectedModule,
+  userViewMode,
+  userSortKey,
+  userSortDirection,
   companyFilterLocked,
 
   selectedUserId,
   selectedUser,
   selectedUserAccesses,
-  visibleUsers,
-  visibleUsersRemaining,
-  canShowMoreUsers,
+  filteredUsers,
+  paginatedUsers,
+  currentPage,
+  pageSize,
+  totalPages,
   summaryItems,
 
   showEditorModal,
@@ -212,7 +227,9 @@ const {
 
   selectUser,
   clearFilters,
-  showMoreUsers,
+  goToPage,
+  goToNextPage,
+  goToPreviousPage,
 
   openCreateUserModal,
   openEditUserModal,

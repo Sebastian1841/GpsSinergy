@@ -54,3 +54,17 @@ src/
 - `docs/guia-frontend.md`
 
 Los README locales dentro de `src` explican responsabilidades por carpeta.
+
+## Modulos actuales
+
+- `Activos`: monitoreo de flota, mapa, geocercas, itinerarios, rutas y reportes
+  desde Fleet.
+- `Reportes`: biblioteca de plantillas, reglas de evento, ejecucion, preview,
+  PDF y Excel.
+- `Alertas`: historial de alertas activadas por activo autorizado, con filtros,
+  detalle, accion para abrir el recorrido del dia en Itinerarios, panel de
+  configuracion de reglas automaticas y acciones para resolver o reabrir.
+- `Mantenciones`: planes, ordenes de trabajo, historial y costos del prototipo.
+- `Usuarios`: roles, permisos, alcances operativos y etiquetas de acceso.
+- `Empresas`: administracion global de empresas para administradores.
+- `Auditoria`: registro local de acciones del prototipo.

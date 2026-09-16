@@ -60,6 +60,12 @@ export function useActivosPermissions({ activeCompanyId, canAccessFunction }) {
     )
   })
 
+  const canViewAlerts = computed(() => {
+    return Boolean(
+      activeCompanyId.value && canAccessFunction("alarms", permissionCompanyId.value, "view"),
+    )
+  })
+
   const allowedSidebarSections = computed(() => {
     const sections = []
 
@@ -68,6 +74,7 @@ export function useActivosPermissions({ activeCompanyId, canAccessFunction }) {
     if (canViewItineraries.value) sections.push("itinerarios")
     if (canViewGeofences.value) sections.push("geocercas")
     if (canViewAssetTags.value) sections.push("etiquetas")
+    if (canViewAlerts.value) sections.push("alertas")
 
     return sections
   })
@@ -78,6 +85,7 @@ export function useActivosPermissions({ activeCompanyId, canAccessFunction }) {
     canEditGeofences,
     canManageAssets,
     canManageAssetTags,
+    canViewAlerts,
     canViewAssetTags,
     canViewGeofences,
     canViewGps,

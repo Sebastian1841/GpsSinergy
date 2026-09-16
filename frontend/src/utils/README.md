@@ -28,6 +28,8 @@ Funciones puras y helpers compartidos.
 ## Carpetas
 
 - `activos/`: helpers de activos.
+- `alarms/`: helpers puros de alcance, filtros, orden y resumen de alertas y
+  reglas automaticas.
 - `companies/`: helpers de empresas.
 - `maintenance/`: configuracion, formato y helpers visuales de mantenciones.
 - `pdf/`: dependencias opcionales de PDF.

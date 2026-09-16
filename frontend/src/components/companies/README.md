@@ -23,7 +23,8 @@ modulo no debe replicarla.
 - `CompanyConfigPanel.vue`: panel modal de configuracion profunda. Contiene
   tabs de resumen y reportes. Se carga async y se monta solo cuando el usuario
   abre la configuracion. No administra grupos de vehiculos: esos viven en el
-  header de Activos como filtros organizativos.
+  header de Activos como filtros organizativos. El overlay debe ser neutro
+  (`black` translucido) para no colorear de azul la pantalla de fondo.
 - `CompanyEditorModal.vue`: modal de creacion y edicion de datos generales.
   Tambien se carga async para que el directorio de empresas abra sin cargar el
   formulario antes de usarlo.

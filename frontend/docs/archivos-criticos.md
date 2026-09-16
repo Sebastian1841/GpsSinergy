@@ -351,6 +351,77 @@ Riesgo:
 - Crear una mantencion no debe crear una OT automaticamente.
 - No presentar acciones locales como persistencia real de backend.
 
+## Alertas
+
+### `frontend/src/views/AlarmsView.vue`
+
+Responsabilidad:
+
+- Orquestar el modulo de alertas.
+- Aplicar alcance real desde `visibleAssets`.
+- Conectar filtros, resumen, tabla, detalle y acciones de estado.
+- Navegar a Itinerarios con `section=itinerarios`, `activoId`, `date` y
+  `alarmId` para revisar el recorrido del dia de la alerta.
+- Alternar entre historial de alertas ocurridas y configuracion de reglas
+  automaticas sin mezclar ambos flujos.
+- Entregar geocercas y grupos desde `useGeofences` al panel de configuracion
+  para que las reglas de tipo geocerca usen selecciones reales.
+
+Riesgo:
+
+- Si se filtra por empresa sin cruzar contra activos autorizados, un usuario
+  podria ver alertas de vehiculos fuera de sus etiquetas de acceso.
+- La navegacion al recorrido debe seguir validando el activo en `ActivosView.vue`
+  y no confiar solo en los parametros de URL.
+
+### `frontend/src/utils/alarms/alarmUtils.js`
+
+Responsabilidad:
+
+- Construir filas de alerta desde alertas, activos y empresas.
+- Recortar alertas contra activos autorizados.
+- Aplicar filtros visuales, orden y resumen.
+
+Funciones criticas:
+
+- `getAuthorizedAlarmRows`
+- `filterAlarmRows`
+- `sortAlarmRows`
+- `buildAlarmSummary`
+
+Riesgo:
+
+- El orden correcto es `visibleAssets` primero y filtros despues. No usar
+  `companyId` como unica condicion de visibilidad.
+
+### `frontend/src/services/alarms/useAutomaticAlertRulesService.js`
+
+Responsabilidad:
+
+- Persistir reglas automaticas mock en `localStorage`.
+- Crear, actualizar, activar/pausar y eliminar reglas.
+
+Riesgo:
+
+- No debe crear alertas directamente. La evaluacion real de condiciones pertenece
+  a backend/telemetria.
+
+### `frontend/src/utils/alarms/automaticAlertRuleUtils.js`
+
+Responsabilidad:
+
+- Normalizar reglas automaticas.
+- Resolver empresa, activos afectados, etiquetas de acceso, horario,
+  notificaciones y resumen.
+- Filtrar y ordenar reglas dentro del alcance disponible.
+
+Riesgo:
+
+- Las reglas automaticas deben mantenerse separadas de permisos reales. Definen
+  condiciones operativas, no acceso a activos.
+- Las reglas de geocerca deben guardar alcance estructurado (`all`, `group` o
+  `specific`) y no volver a texto libre.
+
 ## Reportes
 
 ### `frontend/src/composables/reports/useReportTemplates.js`

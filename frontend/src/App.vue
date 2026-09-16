@@ -23,7 +23,7 @@ import AppHeader from "./components/Layout/AppHeader.vue"
 import AppSidebar from "./components/Layout/AppSidebar.vue"
 import ImpersonationBanner from "./components/auth/ImpersonationBanner.vue"
 import { useAuthSession } from "./composables/auth/useAuthSession.js"
-import { preloadPrivateRouteViews } from "./router"
+import { LIGHT_PRIVATE_ROUTE_VIEW_KEYS, preloadPrivateRouteViews } from "./router"
 
 const route = useRoute()
 const { isAuthenticated } = useAuthSession()
@@ -47,9 +47,12 @@ watch(
     if (!authenticated || publicRoute) return
 
     cancelRouteViewPreload = preloadPrivateRouteViews({
-      batchDelayMs: 320,
+      batchDelayMs: 1800,
       exclude: [currentPreloadKey],
-      startDelayMs: 1800,
+      idleTimeoutMs: 7000,
+      include: LIGHT_PRIVATE_ROUTE_VIEW_KEYS,
+      maxPreloads: 2,
+      startDelayMs: 5500,
     })
   },
   {

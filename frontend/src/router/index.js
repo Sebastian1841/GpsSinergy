@@ -12,6 +12,7 @@ import {
 // ==================
 const routeViewLoaders = {
   activos: () => import("../views/ActivosView.vue"),
+  alarms: () => import("../views/AlarmsView.vue"),
   audit: () => import("../views/AuditView.vue"),
   companies: () => import("../views/CompanyManagementView.vue"),
   login: () => import("../views/LoginView.vue"),
@@ -21,20 +22,46 @@ const routeViewLoaders = {
   users: () => import("../views/UserManagementView.vue"),
 }
 
-const PRIVATE_ROUTE_VIEW_KEYS = ["activos", "reports", "maintenance", "audit", "users", "companies"]
+const PRIVATE_ROUTE_VIEW_KEYS = [
+  "activos",
+  "alarms",
+  "reports",
+  "maintenance",
+  "audit",
+  "users",
+  "companies",
+]
+export const LIGHT_PRIVATE_ROUTE_VIEW_KEYS = ["reports", "companies"]
 const preloadedRouteViewKeys = new Set()
 
 export const preloadPrivateRouteViews = ({
-  batchDelayMs = 280,
+  batchDelayMs = 1200,
   exclude = [],
-  startDelayMs = 1200,
+  idleTimeoutMs = 6000,
+  include = LIGHT_PRIVATE_ROUTE_VIEW_KEYS,
+  maxPreloads = 2,
+  startDelayMs = 5000,
 } = {}) => {
   if (typeof window === "undefined") return () => {}
 
   const excludedKeys = new Set(exclude.filter(Boolean))
-  const pendingKeys = PRIVATE_ROUTE_VIEW_KEYS.filter((key) => {
-    return !excludedKeys.has(key) && !preloadedRouteViewKeys.has(key)
-  })
+  const requestedKeys = Array.isArray(include) ? include : LIGHT_PRIVATE_ROUTE_VIEW_KEYS
+  const connection = window.navigator?.connection
+
+  if (connection?.saveData) return () => {}
+
+  const preloadLimit = Number(maxPreloads)
+  const resolvedPreloadLimit = Number.isFinite(preloadLimit)
+    ? Math.max(0, preloadLimit)
+    : requestedKeys.length
+  const pendingKeys = requestedKeys
+    .filter((key) => {
+      return PRIVATE_ROUTE_VIEW_KEYS.includes(key)
+    })
+    .filter((key) => {
+      return !excludedKeys.has(key) && !preloadedRouteViewKeys.has(key)
+    })
+    .slice(0, resolvedPreloadLimit)
 
   let cancelled = false
   let idleId = null
@@ -63,7 +90,7 @@ export const preloadPrivateRouteViews = ({
 
     if (typeof window.requestIdleCallback === "function") {
       idleId = window.requestIdleCallback(loadNextView, {
-        timeout: 1800,
+        timeout: idleTimeoutMs,
       })
       return
     }
@@ -155,6 +182,13 @@ const getLastAccessibleMaintenanceCompany = ({ accessibleCompanies, canAccessFun
   })
 }
 
+const getLastAccessibleAlarmsCompany = ({ accessibleCompanies, canAccessFunction }) => {
+  return getLastAccessibleCompany({
+    accessibleCompanies,
+    canAccess: (company) => canAccessFunction("alarms", company.id, "view"),
+  })
+}
+
 // ==================
 // RUTAS
 // ==================
@@ -203,6 +237,20 @@ const routes = [
     component: routeViewLoaders.reports,
     meta: {
       preloadKey: "reports",
+      requiresPlatformAdmin: true,
+    },
+  },
+
+  // ==================
+  // ALERTAS GENERAL
+  // ==================
+  {
+    path: "/alertas",
+    alias: "/alarmas",
+    name: "Alarms",
+    component: routeViewLoaders.alarms,
+    meta: {
+      preloadKey: "alarms",
       requiresPlatformAdmin: true,
     },
   },
@@ -283,6 +331,23 @@ const routes = [
       preloadKey: "reports",
       requiresFunction: {
         id: "reports",
+        permission: "view",
+      },
+    },
+  },
+
+  // ==================
+  // ALERTAS EMPRESA
+  // ==================
+  {
+    path: "/app/:empresaId/alertas",
+    alias: "/app/:empresaId/alarmas",
+    name: "AppAlarms",
+    component: routeViewLoaders.alarms,
+    meta: {
+      preloadKey: "alarms",
+      requiresFunction: {
+        id: "alarms",
         permission: "view",
       },
     },
@@ -444,6 +509,17 @@ router.beforeEach((to) => {
 
     if (targetCompany) {
       return `/app/${targetCompany.id}/mantenciones`
+    }
+  }
+
+  if (to.path === "/alertas" || to.path === "/alarmas") {
+    const targetCompany = getLastAccessibleAlarmsCompany({
+      accessibleCompanies,
+      canAccessFunction,
+    })
+
+    if (targetCompany && !isPlatformAdmin.value) {
+      return `/app/${targetCompany.id}/alertas`
     }
   }
 

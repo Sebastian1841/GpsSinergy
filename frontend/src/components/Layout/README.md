@@ -13,7 +13,10 @@ Componentes estructurales de la aplicacion.
   acotados por permisos. Permite filtrar por tipo de resultado (`Todo`,
   `Empresas`, `Activos`, `Reportes`, `Usuarios`, `Espacios`, `Auditoria`) y
   navega al resultado seleccionado.
-- `AppSidebar.vue`: navegacion lateral. Incluye accesos a Activos, Reportes, Auditoria, Mantenciones y modulos administrativos segun permisos. El acceso a Mantenciones conserva la empresa activa cuando la ruta actual tiene `empresaId`, o usa una empresa accesible como respaldo.
+- `AppSidebar.vue`: navegacion lateral. Incluye accesos a Activos, Reportes,
+  Alertas, Auditoria, Mantenciones y modulos administrativos segun permisos.
+  Los accesos por empresa conservan la empresa activa cuando la ruta actual
+  tiene `empresaId`, o usan una empresa accesible como respaldo.
 - `HeaderFleetAssetFilterMenu.vue`: selector unico del header para la vista
   Activos. Contiene dos conceptos visuales: ciudades calculadas por GPS y
   grupos de vehiculos. Desde la pestana de grupos se pueden crear, eliminar y
@@ -27,7 +30,7 @@ Layout puede coordinar navegacion y controles globales, pero no debe contener re
 
 `App.vue` monta este layout para rutas privadas y dispara `preloadPrivateRouteViews()` cuando hay sesion autenticada. Ese precalentamiento evita que el primer cambio hacia Reportes, Auditoria, Usuarios o Empresas tenga que descargar el modulo completo justo al hacer click.
 
-`AppHeader.vue` debe reconocer el contexto textual de cada vista nueva. Mantenciones usa la etiqueta `Mantenciones` cuando no hay empresa activa; si la ruta incluye `empresaId`, el header muestra `Empresa actual` y resuelve el nombre desde `companyRecords` con fallback a `accessibleCompanies`, evitando que una carga parcial vuelva a `Vista actual`.
+`AppHeader.vue` debe identificar el contexto textual de cada vista nueva. Mantenciones usa la etiqueta `Mantenciones` cuando no hay empresa activa; si la ruta incluye `empresaId`, el header muestra `Empresa actual` y resuelve el nombre desde `companyRecords` con fallback a `accessibleCompanies`, evitando que una carga parcial vuelva a `Vista actual`.
 
 El filtro por tipo del buscador global debe pasarse como `typeFilter` a
 `useGlobalSearch.js`. No filtrar solo en el template: el composable debe aplicar

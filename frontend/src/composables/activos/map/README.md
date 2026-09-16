@@ -7,7 +7,10 @@ Integracion del mapa de activos con Leaflet.
 - `mapSignatures.js`: firmas para detectar cambios relevantes.
 - `useActivosMap.js`: inicializacion y ciclo de vida del mapa.
 - `useMapAssetMarkers.js`: coordinacion de marcadores de activos.
-- `useMapItinerary.js`: capa de itinerarios en mapa.
+- `useMapItinerary.js`: capa de itinerarios en mapa. Tambien muestra tooltip
+  especial cuando el punto seleccionado viene desde una alerta activada, abre el
+  tooltip automaticamente y muestra el motivo de activacion recibido desde
+  Alertas.
 - `useMapMovementTrails.js`: trazas de movimiento.
 - `useMapPanelFullscreen.js`: estado de pantalla completa.
 - `useMapPanelGeofences.js`: geocercas visibles en mapa.

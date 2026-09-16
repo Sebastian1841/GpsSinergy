@@ -1,5 +1,5 @@
 <template>
-  <section class="grid grid-cols-2 gap-2 lg:grid-cols-4">
+  <section class="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 lg:grid-cols-4">
     <article
       v-for="item in summaryItems"
       :key="item.label"

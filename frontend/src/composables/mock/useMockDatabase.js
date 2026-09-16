@@ -338,13 +338,48 @@ const createPlatformAdminAccess = ({ userId, applicationId, id = null }) => {
   }
 }
 
-const normalizeAccessModules = (items = []) => {
+const cloneAccessEntry = (entry = null) => {
+  if (!entry) return null
+
+  return {
+    ...entry,
+    permissions: entry.permissions ? { ...entry.permissions } : entry.permissions,
+  }
+}
+
+const findSeedAccessForAccess = (access = {}) => {
+  const accessId = normalizeKey(access.id)
+  const userId = normalizeKey(access.userId)
+  const applicationId = normalizeKey(access.applicationId)
+
+  return (
+    mockDatabaseSeed.accesses.find((seedAccess) => normalizeKey(seedAccess.id) === accessId) ||
+    mockDatabaseSeed.accesses.find((seedAccess) => {
+      return (
+        normalizeKey(seedAccess.userId) === userId &&
+        normalizeKey(seedAccess.applicationId) === applicationId
+      )
+    }) ||
+    null
+  )
+}
+
+const normalizeAccessModules = (items = [], seedItems = []) => {
   const modulesById = new Map(
     items.map((moduleAccess) => [normalizeKey(moduleAccess.moduleId), moduleAccess]),
   )
+  const seedModulesById = new Map(
+    seedItems.map((moduleAccess) => [normalizeKey(moduleAccess.moduleId), moduleAccess]),
+  )
   const seedModuleIds = new Set(mockDatabaseSeed.modules.map((module) => normalizeKey(module.id)))
   const normalizedSeedModules = mockDatabaseSeed.modules.map((module) => {
-    return modulesById.get(normalizeKey(module.id)) || createDisabledModuleAccess(module.id)
+    const moduleId = normalizeKey(module.id)
+
+    return (
+      modulesById.get(moduleId) ||
+      cloneAccessEntry(seedModulesById.get(moduleId)) ||
+      createDisabledModuleAccess(module.id)
+    )
   })
   const extraModules = items.filter((moduleAccess) => {
     return !seedModuleIds.has(normalizeKey(moduleAccess.moduleId))
@@ -353,16 +388,22 @@ const normalizeAccessModules = (items = []) => {
   return [...normalizedSeedModules, ...extraModules]
 }
 
-const normalizeAccessFunctions = (items = []) => {
+const normalizeAccessFunctions = (items = [], seedItems = []) => {
   const functionsById = new Map(
     items.map((functionAccess) => [normalizeKey(functionAccess.functionId), functionAccess]),
+  )
+  const seedFunctionsById = new Map(
+    seedItems.map((functionAccess) => [normalizeKey(functionAccess.functionId), functionAccess]),
   )
   const seedFunctionIds = new Set(
     mockDatabaseSeed.moduleFunctions.map((moduleFunction) => normalizeKey(moduleFunction.id)),
   )
   const normalizedSeedFunctions = mockDatabaseSeed.moduleFunctions.map((moduleFunction) => {
+    const functionId = normalizeKey(moduleFunction.id)
+
     return (
-      functionsById.get(normalizeKey(moduleFunction.id)) ||
+      functionsById.get(functionId) ||
+      cloneAccessEntry(seedFunctionsById.get(functionId)) ||
       createDisabledFunctionAccess(moduleFunction.id)
     )
   })
@@ -386,11 +427,18 @@ const normalizeAccess = (
     companyItems,
     applicationItems,
   })
+  const seedAccess = findSeedAccessForAccess(access)
 
   return {
     ...access,
-    modules: normalizeAccessModules(Array.isArray(access?.modules) ? access.modules : []),
-    functions: normalizeAccessFunctions(Array.isArray(access?.functions) ? access.functions : []),
+    modules: normalizeAccessModules(
+      Array.isArray(access?.modules) ? access.modules : [],
+      Array.isArray(seedAccess?.modules) ? seedAccess.modules : [],
+    ),
+    functions: normalizeAccessFunctions(
+      Array.isArray(access?.functions) ? access.functions : [],
+      Array.isArray(seedAccess?.functions) ? seedAccess.functions : [],
+    ),
     scope: normalizeAccessScope(access?.scope, {
       applicationId: access?.applicationId,
       assetItems,
