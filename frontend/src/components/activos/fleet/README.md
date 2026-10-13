@@ -113,6 +113,30 @@ La escala visual del panel se maneja desde `FleetListPanel.vue` con
 deben mantener esa lectura minima para que tabla, tabs y acciones contextuales
 no queden demasiado pequenas.
 
+La pestana `Activos` de `FleetPanelHeader.vue` reutiliza `SvgIcon` con el nombre
+`activos`, igual que la navegacion lateral. No mantener una segunda version
+dibujada localmente para esa misma accion.
+
+La pestana `Reportes` reutiliza `fleet-reports` del mismo catalogo. Este icono
+representa un documento relleno con grafico de barras y se limita a la
+navegacion interna de Fleet.
+
+La pestana `Itinerarios` usa `fleet-itineraries`, una version optimizada para
+14px del trazado con ruta y marcadores entregado como referencia.
+
+La pestana `Geocercas` reutiliza `alarm-geofence-exit`, el mismo icono de
+geocerca empleado por las reglas del modulo de Alertas.
+
+La pestana `Alertas` reutiliza `alertas`, la misma campana con ondas empleada
+por el modulo en la navegacion lateral.
+
+La pestana `Etiquetas` usa `fleet-tags`, una version optimizada para 14px de las
+etiquetas superpuestas entregadas como referencia.
+
+Los iconos compartidos de las pestanas viven dentro de
+`fleet-tab-shared-icon`, que fija una caja de `14x14px`. Esto evita que SVG de
+alta resolucion adopten el tamano intrinseco del navegador y deformen la barra.
+
 En `ActivosView.vue`, antes de `xl` el panel de Fleet y el mapa se apilan en dos
 filas proporcionales. No volver a dejar la grilla responsive sin filas definidas:
 eso permite que el panel de activos consuma todo el alto y deje el mapa fuera de

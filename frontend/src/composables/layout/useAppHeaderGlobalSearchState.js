@@ -100,6 +100,15 @@ export function useAppHeaderGlobalSearchState({ openDropdown } = {}) {
     openDropdown?.()
   }
 
+  const flushGlobalSearchQuery = () => {
+    if (globalSearchTimer) {
+      clearTimeout(globalSearchTimer)
+      globalSearchTimer = null
+    }
+
+    debouncedGlobalSearchQuery.value = globalSearchQuery.value
+  }
+
   return {
     globalSearchType,
     globalSearchQuery,
@@ -109,5 +118,6 @@ export function useAppHeaderGlobalSearchState({ openDropdown } = {}) {
     globalSearchTypeOptions,
     selectGlobalSearchType,
     clearGlobalSearch,
+    flushGlobalSearchQuery,
   }
 }

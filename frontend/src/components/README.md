@@ -16,6 +16,7 @@ Componentes Vue reutilizables y piezas visuales por dominio.
 - `reports/`: modales y formularios de reportes.
 - `ui/`: componentes genericos de interfaz.
 - `users/`: administracion de usuarios y permisos.
+- `unreported/`: graficos del modulo Sin reportar.
 
 ## Regla de mantenimiento
 

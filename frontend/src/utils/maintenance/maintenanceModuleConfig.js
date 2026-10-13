@@ -1,9 +1,7 @@
 export const MAINTENANCE_TABS = [
-  { id: "overview", label: "Resumen" },
-  { id: "orders", label: "Ordenes de trabajo" },
-  { id: "calendar", label: "Calendario OT" },
-  { id: "history", label: "Historial" },
-  { id: "costs", label: "Costos y facturas" },
+  { id: "overview", label: "Flota" },
+  { id: "costs", label: "Analisis" },
+  { id: "orders", label: "Ordenes" },
 ]
 
 export const DEFAULT_MAINTENANCE_TYPES = [
@@ -14,7 +12,7 @@ export const DEFAULT_MAINTENANCE_TYPES = [
   "Revision de frenos",
 ]
 
-export const MAINTENANCE_READING_SOURCES = ["Odometro", "Horometro", "Fecha/Hora", "Valor manual"]
+export const MAINTENANCE_READING_SOURCES = ["Odometro", "Horometro", "Fecha/Hora"]
 
 export const DEFAULT_MAINTENANCE_TYPE_READING_SOURCES = {
   "Cambio de aceite y filtros": "Odometro",
@@ -86,11 +84,11 @@ export const MAINTENANCE_TEMPLATES = [
 ]
 
 export const MAINTENANCE_STATUS_FILTERS = [
+  { value: "renewal-pending", label: "Sin renovar", dotClass: "bg-violet-500" },
   { value: "current", label: "Al dia", dotClass: "bg-emerald-500" },
   { value: "due", label: "Proximas", dotClass: "bg-amber-500" },
   { value: "overdue", label: "Vencidas", dotClass: "bg-rose-500" },
   { value: "unconfigured", label: "Sin configurar", dotClass: "bg-slate-400" },
-  { value: "workshop", label: "En taller", dotClass: "bg-blue-500" },
 ]
 
 export const WORK_ORDER_STATUS_FILTERS = [
@@ -154,11 +152,11 @@ export const MAINTENANCE_COST_FORM_FIELDS = [
 
 export const MAINTENANCE_MODAL_COPY_BY_TYPE = {
   maintenance: {
-    action: "Crear mantencion",
+    action: "Crear plan",
     description:
-      "Selecciona un tipo existente, el vehiculo y configura intervalo/alerta. La OT se crea aparte cuando haya ejecucion real.",
-    kicker: "Plan de mantencion",
-    title: "Nueva mantencion",
+      "Configura una regla recurrente para el vehículo. La OT se crea aparte cuando corresponda ejecutar el trabajo.",
+    kicker: "Plan de mantención",
+    title: "Nuevo plan de mantención",
   },
   "maintenance-type": {
     action: "Crear tipo",
@@ -179,6 +177,13 @@ export const MAINTENANCE_MODAL_COPY_BY_TYPE = {
     kicker: "Plan de mantencion",
     title: "Eliminar mantencion",
   },
+  "renew-maintenance": {
+    action: "Renovar mantencion",
+    description:
+      "Confirma el nuevo ciclo del plan o edita sus parametros antes de calcular el proximo vencimiento.",
+    kicker: "Continuidad del plan",
+    title: "Renovar mantencion",
+  },
   "maintenance-detail": {
     action: "Ir a ordenes",
     description:
@@ -186,17 +191,23 @@ export const MAINTENANCE_MODAL_COPY_BY_TYPE = {
     kicker: "Mantenciones del vehiculo",
     title: "Detalle de mantenciones",
   },
-  order: {
-    action: "Crear orden",
-    description: "Crea una ejecucion concreta; puede quedar asociada a una mantencion origen.",
-    kicker: "Orden de trabajo",
-    title: "Nueva orden de trabajo",
-  },
   "edit-order": {
     action: "Guardar cambios",
     description: "Actualiza los datos principales de la orden seleccionada.",
     kicker: "Editar OT",
     title: "Modificar orden",
+  },
+  "create-order": {
+    action: "Crear OT",
+    description: "Crea una ejecución concreta para un plan de mantención del vehículo.",
+    kicker: "Nueva OT",
+    title: "Nueva orden de trabajo",
+  },
+  "order-detail": {
+    action: "Cerrar",
+    description: "Consulta la informacion y trazabilidad de la orden de trabajo.",
+    kicker: "Orden de trabajo",
+    title: "Detalle de la OT",
   },
   "reprogram-order": {
     action: "Reprogramar",

@@ -7,10 +7,12 @@
         v-model:selected-status="selectedStatus"
         v-model:selected-type="selectedType"
         :company-options="companyOptions"
+        :can-manage="canManage"
         :feedback-message="feedbackMessage"
         :is-company-locked="isCompanyLocked"
         :type-options="typeOptions"
         @clear="clearFilters"
+        @create="startNewRule"
       />
 
       <AlarmRuleTable

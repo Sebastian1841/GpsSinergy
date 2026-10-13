@@ -1,24 +1,59 @@
 # Maintenance Components
 
-Componentes visuales del modulo de mantenciones. La regla es mantener aqui render, props y eventos; la logica de negocio se coordina desde `frontend/src/composables/maintenance/useMaintenanceModule.js`.
+UI del modulo de mantenciones. `MaintenanceView.vue` conecta estas piezas con
+`useMaintenanceModule.js`; los datos y cambios operativos no se guardan en los
+componentes de tabla.
 
-## Archivos
+## Pantallas En Uso
 
-- `MaintenanceOverviewTab.vue`: renderiza la pestana `Resumen`: KPI por estado, filtros compactos, tabla de vehiculos y acciones para abrir mantenciones o costos del activo. No calcula estados; recibe listas, funciones de clases y handlers desde la vista.
-- `MaintenanceWorkOrdersTab.vue`: renderiza la pestana `Ordenes de trabajo`: cabecera, KPI de OT, filtros especificos, tabla de ordenes y panel lateral de detalle. Emite acciones para crear, editar, reprogramar, asignar, cancelar o cerrar OT, pero no modifica el estado directamente.
-- `MaintenanceCalendarTab.vue`: renderiza `Calendario OT`: grilla mensual, eventos por dia y panel lateral de proximas ordenes. Recibe dias ya calculados y no decide agenda.
-- `MaintenanceHistoryTab.vue`: renderiza `Historial`: ficha del vehiculo, trazabilidad del ciclo y tabla historica de servicios. Emite navegacion a OT, costos o exportacion.
-- `MaintenanceCostsTab.vue`: renderiza `Costos y facturas`: formulario visual de costo, KPI financieros y tabla de facturas. Emite la apertura del modal de costo o exportacion.
-- `MaintenanceActionModal.vue`: modal unico para crear/editar mantenciones, crear
-  tipos, ver planes del vehiculo, crear/editar/reprogramar/asignar/cancelar/cerrar
-  OT, registrar costos y exportar. Mantiene solo render y eventos; la mutacion
-  real sigue en la vista. Se carga async desde `MaintenanceView.vue` y se descarga
-  bajo demanda al abrir una accion para no cargar varios formularios al entrar al
-  modulo.
-- `MaintenanceUpcomingOrdersPanel.vue`: panel compacto de proximas ordenes usado por el calendario. Solo lista eventos ya preparados por la vista.
-- `MaintenanceVehicleHeaderCard.vue`: ficha reutilizable del vehiculo seleccionado para `Historial` y `Costos y facturas`. Expone accesos a ordenes y costos mediante eventos.
-- `maintenance.css`: estilos compartidos del modulo. Se mantiene separado para evitar duplicar los mismos selectores en cada tab extraida y para conservar una sola fuente visual.
+- `MaintenanceFleetTab.vue`: Flota, filtros laterales, listado ordenable,
+  columnas configurables, paginacion y planes expandibles por vehiculo. Expone
+  `getExportRows` para el reporte de flota.
+- `fleetOrderIndex.js`: indice de OT abiertas por vehiculo y plan/nombre.
+  Evita buscar todas las OT al renderizar cada plan; pruebas en su archivo test.
+- `MaintenanceWorkOrdersTab.vue`: OT y pendientes de OT, KPI, filtros, tabla
+  con scroll interno y paginacion. Recibe acciones desde la vista.
+- `MaintenanceCostsTab.vue`: pestana Analisis; proyeccion por uso, costos,
+  pendientes sin OT, cumplimiento, vencimientos, composicion y ranking.
+  Usa ejecuciones cerradas para costos/cumplimiento, no porcentajes de muestra.
+- `MaintenanceActionModal.vue`: formularios y detalle del vehiculo, cargado
+  bajo demanda. Crear y editar planes comparten el mismo flujo. El catalogo de
+  tipos tiene busqueda, criterio, origen, orden y paginacion.
 
-## Criterio de uso
+## Detalle Del Vehiculo
 
-Si una seccion visual de `MaintenanceView.vue` crece o se repite, debe moverse a esta carpeta. Si una funcion calcula reglas de mantencion, estados, fechas, costos u ordenes, debe pasar primero a un composable o util antes de mezclarla con componentes.
+- Planes: plan principal y listado de otras mantenciones; filtros incluyen
+  Sin renovar. Las acciones dependen del plan y de su OT asociada.
+- Historial: ejecuciones finalizadas del vehiculo, fechas, responsable, lectura
+  y costo real. Tiene filtros, orden por encabezado y paginacion.
+- En Historial, el header reemplaza Agregar mantencion/Nuevo tipo por
+  Exportar historial. Un menu Excel/PDF descarga todos los registros filtrados,
+  no solo la pagina, sin abrir otro modal.
+- El pie del detalle tiene Cerrar; ya no navega al listado general de OT.
+  Ver OT sigue disponible por ejecucion.
+- El tamano exterior del modal se conserva al alternar Planes/Historial.
+
+## Exportacion
+
+- `MaintenanceFleetExportModal.vue`: modal activo de seleccion de vehiculos y
+  filtros de empresa, estado de plan, criterio y OT. Exporta solo los planes
+  que coinciden con los filtros y los vehiculos seleccionados.
+- `MaintenanceHistoryExportModal.vue`: implementacion conservada pero no
+  utilizada por el flujo actual. No confundirla con el menu de descarga directa.
+
+## Componentes Conservados
+
+`MaintenanceCalendarTab.vue`, `MaintenanceHistoryTab.vue`,
+`MaintenanceUpcomingOrdersPanel.vue` y `MaintenanceVehicleHeaderCard.vue`
+siguen en la carpeta. No representan pestanas principales adicionales del
+flujo actual Flota/Analisis/Ordenes. `MaintenanceOverviewTab.vue` fue reemplazado
+por `MaintenanceFleetTab.vue` y ya no existe.
+
+`maintenance.css` concentra estilos compartidos, altura y scroll de tablas.
+Los iconos se obtienen de `../icons/SvgIcon.vue`.
+
+## Validacion
+
+Las reglas de negocio tienen pruebas en composables, utils y services;
+`fleetOrderIndex.test.js` cubre el indice de OT. Build/lint no sustituyen una
+revision visual de tablas, tooltips, PDF y Excel en sus aplicaciones reales.

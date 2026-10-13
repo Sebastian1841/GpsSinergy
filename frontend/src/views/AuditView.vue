@@ -1,16 +1,10 @@
 <template>
-  <section class="flex h-full min-h-0 flex-col bg-[#f7f9fc] text-slate-900 antialiased">
+  <section
+    class="audit-readable flex h-full min-h-0 flex-col bg-[#f7f9fc] text-slate-900 antialiased"
+  >
     <main class="flex h-full min-h-0 flex-col gap-4 p-4 sm:p-5">
-      <!-- CABECERA + CONTROLES -->
-      <div class="grid shrink-0 gap-4 xl:grid-cols-[minmax(300px,1fr)_auto] xl:items-end">
-        <AuditSummaryHeader
-          :active-metric-key="activeSummaryMetricKey"
-          :current-company="currentCompany"
-          :get-metric-dot-class="getMetricDotClass"
-          :summary-metrics="summaryMetrics"
-          @select-metric="selectSummaryMetric"
-        />
-
+      <!-- CONTROLES -->
+      <div class="shrink-0">
         <AuditFilters
           :can-export="canExportAudit"
           :action-options="actionOptions"
@@ -62,57 +56,16 @@
                   class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md"
                   :class="getCategoryIconClass(category.key)"
                 >
-                  <!-- TODOS -->
-                  <svg
-                    v-if="category.key === 'all'"
-                    class="h-3.5 w-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                  <span
+                    v-if="['all', 'alerts', 'failed', 'tags'].includes(category.key)"
+                    class="audit-category-shared-icon flex h-3.5 w-3.5 items-center justify-center overflow-hidden"
                   >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M5 5h14v14H5zM8 2v6M16 2v6M8 12h8M8 16h5"
-                    />
-                  </svg>
-
-                  <!-- ALERTAS -->
-                  <svg
-                    v-else-if="category.key === 'alerts'"
-                    class="h-3.5 w-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M12 9v4m0 4h.01M10.3 3.9L2.6 17.2A2 2 0 004.3 20h15.4a2 2 0 001.7-2.8L13.7 3.9a2 2 0 00-3.4 0z"
-                    />
-                  </svg>
-
-                  <!-- FALLIDOS -->
-                  <svg
-                    v-else-if="category.key === 'failed'"
-                    class="h-3.5 w-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M15 9l-6 6m0-6l6 6M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
+                    <SvgIcon :name="getCategoryIconName(category.key)" />
+                  </span>
 
                   <!-- ACCESOS -->
                   <svg
-                    v-else-if="category.key === 'access'"
+                    v-if="category.key === 'access'"
                     class="h-3.5 w-3.5"
                     fill="none"
                     stroke="currentColor"
@@ -126,25 +79,9 @@
                     />
                   </svg>
 
-                  <!-- ETIQUETAS -->
-                  <svg
-                    v-else-if="category.key === 'tags'"
-                    class="h-3.5 w-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M20 13l-7 7-9-9V4h7l9 9zM8 8h.01"
-                    />
-                  </svg>
-
                   <!-- USUARIOS -->
                   <svg
-                    v-else
+                    v-if="category.key === 'users'"
                     class="h-3.5 w-3.5"
                     fill="none"
                     stroke="currentColor"
@@ -257,7 +194,7 @@ import { useRoute } from "vue-router"
 
 import AuditActivityTable from "../components/audit/AuditActivityTable.vue"
 import AuditFilters from "../components/audit/AuditFilters.vue"
-import AuditSummaryHeader from "../components/audit/AuditSummaryHeader.vue"
+import SvgIcon from "../components/icons/SvgIcon.vue"
 import { useAccessControl } from "../composables/auth/useAccessControl.js"
 import { useDebouncedValue } from "../composables/ui/useDebouncedValue.js"
 import { preloadWhenIdle } from "../composables/ui/useIdlePreload.js"
@@ -277,7 +214,6 @@ const searchTerm = ref("")
 const selectedAction = ref("")
 const selectedModule = ref("")
 const selectedStatus = ref("")
-const selectedSeverity = ref("")
 const selectedCategory = ref("all")
 const selectedStartDate = ref("")
 const selectedEndDate = ref("")
@@ -368,10 +304,6 @@ const companiesById = computed(() => {
   return new Map(companies.value.map((company) => [String(company.id), company]))
 })
 
-const currentCompany = computed(() => {
-  return companiesById.value.get(currentCompanyId.value) || null
-})
-
 const visibleRecords = computed(() => {
   if (!currentCompanyId.value) return auditRecords.value
 
@@ -456,21 +388,10 @@ const hasActiveFilters = computed(() => {
     selectedAction.value ||
     selectedModule.value ||
     selectedStatus.value ||
-    selectedSeverity.value ||
     selectedCategory.value !== "all" ||
     selectedStartDate.value ||
     selectedEndDate.value,
   )
-})
-
-const activeSummaryMetricKey = computed(() => {
-  if (selectedCategory.value !== "all") return ""
-  if (selectedSeverity.value === "warning") return "warning"
-  if (selectedStatus.value === "success") return "success"
-  if (selectedStatus.value === "failed") return "failed"
-  if (!selectedStatus.value && !selectedSeverity.value) return "all"
-
-  return ""
 })
 
 const filteredRecords = computed(() => {
@@ -485,8 +406,6 @@ const filteredRecords = computed(() => {
     if (selectedAction.value && record.action !== selectedAction.value) return false
     if (selectedModule.value && record.module !== selectedModule.value) return false
     if (selectedStatus.value && record.status !== selectedStatus.value) return false
-    if (selectedSeverity.value && record.severity !== selectedSeverity.value) return false
-
     if (startTime !== null || endTime !== null) {
       const recordTime = new Date(record.timestamp).getTime()
 
@@ -580,36 +499,6 @@ const selectedRecordDetailSections = computed(() => {
   ]
 })
 
-const summaryMetrics = computed(() => {
-  const records = visibleRecords.value
-  const successCount = records.filter((record) => record.status === "success").length
-  const warningCount = records.filter((record) => record.severity === "warning").length
-  const failedCount = records.filter((record) => record.status === "failed").length
-
-  return [
-    {
-      key: "all",
-      label: "Total",
-      value: records.length,
-    },
-    {
-      key: "success",
-      label: "Correctos",
-      value: successCount,
-    },
-    {
-      key: "warning",
-      label: "Acciones sensibles",
-      value: warningCount,
-    },
-    {
-      key: "failed",
-      label: "Fallidos",
-      value: failedCount,
-    },
-  ]
-})
-
 const canExportAudit = computed(() => {
   return canAccessFunction("audit-export", currentCompanyId.value || null, "view")
 })
@@ -619,7 +508,6 @@ const clearFilters = () => {
   selectedAction.value = ""
   selectedModule.value = ""
   selectedStatus.value = ""
-  selectedSeverity.value = ""
   selectedCategory.value = "all"
   selectedStartDate.value = ""
   selectedEndDate.value = ""
@@ -628,7 +516,6 @@ const clearFilters = () => {
 
 const updateSelectedStatus = (status) => {
   selectedStatus.value = status
-  selectedSeverity.value = ""
   currentPage.value = 1
 }
 
@@ -637,32 +524,6 @@ const selectCategory = (categoryKey) => {
   selectedRecordId.value = ""
   showDetailModal.value = false
   currentPage.value = 1
-}
-
-const selectSummaryMetric = (metricKey) => {
-  currentPage.value = 1
-  selectedCategory.value = "all"
-
-  if (metricKey === "success") {
-    selectedStatus.value = selectedStatus.value === "success" ? "" : "success"
-    selectedSeverity.value = ""
-    return
-  }
-
-  if (metricKey === "failed") {
-    selectedStatus.value = selectedStatus.value === "failed" ? "" : "failed"
-    selectedSeverity.value = ""
-    return
-  }
-
-  if (metricKey === "warning") {
-    selectedSeverity.value = selectedSeverity.value === "warning" ? "" : "warning"
-    selectedStatus.value = ""
-    return
-  }
-
-  selectedStatus.value = ""
-  selectedSeverity.value = ""
 }
 
 const goToPreviousAuditPage = () => {
@@ -697,14 +558,6 @@ const getRecordCompanyName = (record) => {
   return record.companyName
 }
 
-const getMetricDotClass = (label) => {
-  if (label === "Correctos") return "bg-emerald-500"
-  if (label === "Acciones sensibles") return "bg-amber-500"
-  if (label === "Fallidos") return "bg-rose-500"
-
-  return "bg-slate-400"
-}
-
 const getStatusClass = (status) => {
   if (status === "failed") return "bg-rose-50 text-rose-700"
   if (status === "pending") return "bg-amber-50 text-amber-700"
@@ -724,9 +577,17 @@ const getCategoryIconClass = (categoryKey) => {
   if (categoryKey === "failed") return "bg-rose-50 text-rose-500"
   if (categoryKey === "access") return "bg-slate-100 text-slate-500"
   if (categoryKey === "tags") return "bg-violet-50 text-violet-500"
-  if (categoryKey === "users") return "bg-sky-50 text-sky-500"
+  if (categoryKey === "users") return "bg-sky-100 text-sky-700"
 
   return "bg-[#eef1ff] text-[#102372]"
+}
+
+const getCategoryIconName = (categoryKey) => {
+  if (categoryKey === "all") return "menu"
+  if (categoryKey === "alerts") return "audit-shield-alert"
+  if (categoryKey === "failed") return "audit-circle-x"
+
+  return "fleet-tags"
 }
 
 const selectRecord = (recordId) => {
@@ -933,7 +794,6 @@ watch(
     selectedAction,
     selectedModule,
     selectedStatus,
-    selectedSeverity,
     selectedCategory,
     selectedStartDate,
     selectedEndDate,
@@ -963,3 +823,29 @@ onMounted(() => {
   preloadWhenIdle([loadAuditDetailModal])
 })
 </script>
+
+<style>
+.audit-readable .audit-date-input,
+.audit-readable .filter-select,
+.audit-readable .detail-value {
+  font-size: 13px !important;
+}
+
+.audit-readable .filter-label,
+.audit-readable .detail-label,
+.audit-readable .change-value {
+  font-size: 12px !important;
+}
+
+.audit-readable .change-label {
+  font-size: 11px !important;
+}
+
+.audit-category-shared-icon svg {
+  display: block;
+  width: 0.875rem;
+  height: 0.875rem;
+  max-width: 0.875rem;
+  max-height: 0.875rem;
+}
+</style>

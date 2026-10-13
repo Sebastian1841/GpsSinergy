@@ -7,9 +7,8 @@ modulo no debe replicarla.
 
 ## Archivos
 
-- `CompanyManagementHeader.vue`: cabecera principal del modulo. Incluye icono,
-  contexto `Empresas`, titulo, descripcion y accion `Nueva empresa`. No contiene
-  busqueda, filtros ni KPIs para mantener la cabecera limpia.
+- `CompanyManagementHeader.vue`: cabecera local heredada. Ya no se monta en la
+  vista porque el contexto del modulo lo entrega el header global.
 - `CompanyFiltersPanel.vue`: panel lateral de filtros. Coordina busqueda por
   nombre/RUT/ciudad, estado, region, ciudad y accion para limpiar filtros. Debe
   estirarse con el contenido principal para que no quede visualmente mas corto
@@ -18,8 +17,8 @@ modulo no debe replicarla.
   empresas, activas, suspendidas e inactivas. Las empresas internas se cuentan
   visualmente dentro de inactivas, pero mantienen badge propio en la tabla.
 - `CompanyCatalog.vue`: catalogo principal. Muestra toolbar de ordenamiento,
-  cambio de vista tabla/grilla, tabla de empresas, vista grid opcional, estado
-  vacio y paginacion.
+  cambio de vista tabla/grilla y la accion `Nueva empresa`, seguida por la tabla
+  de empresas, vista grid opcional, estado vacio y paginacion.
 - `CompanyConfigPanel.vue`: panel modal de configuracion profunda. Contiene
   tabs de resumen y reportes. Se carga async y se monta solo cuando el usuario
   abre la configuracion. No administra grupos de vehiculos: esos viven en el
@@ -47,6 +46,10 @@ moderada, textos truncados cuando corresponda y acciones claras. Evitar que la
 accion principal quede solo como tres puntos si abre directamente el panel de
 configuracion; en ese caso debe decir `Configurar` para que se entienda a simple
 vista. La prioridad de esta pantalla es comparar varias empresas rapidamente.
+
+La accion `Nueva empresa` debe permanecer en la toolbar del catalogo, despues
+de los controles de orden y vista. La vista no debe agregar una cabecera local
+encima del contenido porque el header global ya identifica el modulo.
 
 Los bordes deben ser suaves y consistentes con el resto de la plataforma: usar
 tonos cercanos a `#dfe5ed` y `#edf1f5`, divisores claros y sombras ligeras.

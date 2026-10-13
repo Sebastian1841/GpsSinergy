@@ -171,10 +171,6 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
-  appSidebarOpen: {
-    type: Boolean,
-    default: false,
-  },
   backgroundPaused: {
     type: Boolean,
     default: false,
@@ -215,7 +211,7 @@ const {
   togglePlannedRoutePanelHidden,
 } = usePlannedRouteMapEditor()
 
-let pendingSidebarBatch = null
+let pendingTelemetryBatch = null
 let skipNextSelectedGeofenceFocusId = null
 
 const { isFullscreen, toggleFullscreen } = useMapPanelFullscreen(panelRef)
@@ -401,19 +397,19 @@ const handleTelemetryBatch = (batch = []) => {
 }
 
 const shouldQueueMapTelemetry = () => {
-  return props.appSidebarOpen || props.backgroundPaused
+  return props.backgroundPaused
 }
 
 const flushPendingTelemetryBatch = () => {
-  if (shouldQueueMapTelemetry() || !pendingSidebarBatch) return
+  if (shouldQueueMapTelemetry() || !pendingTelemetryBatch) return
 
-  handleTelemetryBatch(pendingSidebarBatch)
-  pendingSidebarBatch = null
+  handleTelemetryBatch(pendingTelemetryBatch)
+  pendingTelemetryBatch = null
 }
 
 const applyTelemetryBatchFromOutside = (batch = []) => {
   if (shouldQueueMapTelemetry()) {
-    pendingSidebarBatch = batch
+    pendingTelemetryBatch = batch
     return []
   }
 
@@ -443,13 +439,6 @@ watch(
   },
   {
     deep: false,
-  },
-)
-
-watch(
-  () => props.appSidebarOpen,
-  () => {
-    flushPendingTelemetryBatch()
   },
 )
 

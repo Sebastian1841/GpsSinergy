@@ -27,9 +27,15 @@
       >
         <span class="flex items-center justify-start md:justify-center">
           <span
-            class="h-3.5 w-3.5 rounded-full shadow-[0_0_0_3px_rgb(255_255_255)]"
-            :class="getAlarmToneClass(alarm)"
-          ></span>
+            class="alarm-history-icon relative flex h-7 w-7 items-center justify-center rounded-md"
+            :class="getAlarmTypeTone(alarm.type)"
+          >
+            <SvgIcon :name="getAlarmTypeIcon(alarm.type)" />
+            <span
+              class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white"
+              :class="getAlarmStatusTone(alarm)"
+            ></span>
+          </span>
         </span>
 
         <span class="min-w-0">
@@ -90,6 +96,8 @@
 </template>
 
 <script setup>
+import SvgIcon from "../icons/SvgIcon.vue"
+
 defineProps({
   rows: {
     type: Array,
@@ -120,8 +128,28 @@ const getStartOfDay = (date) => {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
 }
 
-const getAlarmToneClass = (alarm) => {
+const getAlarmStatusTone = (alarm) => {
   return alarm.status === "resolved" ? "bg-[#16a34a]" : "bg-[#ef1b23]"
+}
+
+const getAlarmTypeIcon = (type) => {
+  if (type === "speeding") return "alarm-speeding"
+  if (type === "battery") return "alarm-low-battery"
+  if (type === "no_signal") return "alarm-no-signal"
+  if (type === "geofence") return "alarm-geofence-exit"
+  if (type === "fuel") return "alarm-fuel-variation"
+  if (type === "stop_time") return "alarm-long-stop"
+  if (type === "ignition") return "alarm-after-hours"
+
+  return "alertas"
+}
+
+const getAlarmTypeTone = (type) => {
+  if (type === "speeding" || type === "fuel") return "is-danger"
+  if (type === "battery") return "is-warning"
+  if (type === "geofence") return "is-purple"
+
+  return "is-blue"
 }
 
 const getLocationText = (alarm) => {
@@ -152,3 +180,33 @@ const formatRelativeDateTime = (value) => {
   return `${dateFormatter.format(date)}, ${timeLabel}`
 }
 </script>
+
+<style scoped>
+.alarm-history-icon :deep(svg) {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+  max-width: 1rem;
+  max-height: 1rem;
+}
+
+.alarm-history-icon.is-blue {
+  color: #2563eb;
+  background: #eef5ff;
+}
+
+.alarm-history-icon.is-warning {
+  color: #d97706;
+  background: #fff7e8;
+}
+
+.alarm-history-icon.is-purple {
+  color: #7c3aed;
+  background: #f3edff;
+}
+
+.alarm-history-icon.is-danger {
+  color: #ef1b23;
+  background: #fff0f0;
+}
+</style>

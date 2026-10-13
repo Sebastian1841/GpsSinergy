@@ -17,7 +17,6 @@
         :key="rule.id"
         class="alarm-rule-row"
         :class="selectedRuleId === rule.id && !isCreatingRule ? 'is-selected' : ''"
-        @click="$emit('select-rule', rule.id)"
       >
         <div class="flex min-w-0 items-center gap-3">
           <span class="alarm-rule-icon" :class="getTypeTone(rule.type)">
@@ -28,9 +27,7 @@
             <span class="block truncate text-[12px] font-black text-[#102372]">
               {{ rule.name }}
             </span>
-            <span class="mt-0.5 block truncate text-[10px] font-bold uppercase text-[#8aa0bd]">
-              {{ rule.severityLabel }}
-            </span>
+            <AlarmStatusBadge class="mt-1" variant="severity" :value="rule.severity" />
           </span>
         </div>
 
@@ -51,8 +48,12 @@
 
         <div class="hidden min-w-0 items-center justify-between gap-2 md:flex">
           <span
-            class="inline-flex w-[104px] items-center justify-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-black"
-            :class="rule.enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+            class="inline-flex w-[104px] items-center justify-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-black"
+            :class="
+              rule.enabled
+                ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+                : 'border-slate-200 bg-slate-100 text-slate-500'
+            "
           >
             <span
               class="h-2 w-2 rounded-full"
@@ -110,6 +111,7 @@
 
 <script setup>
 import SvgIcon from "../icons/SvgIcon.vue"
+import AlarmStatusBadge from "./AlarmStatusBadge.vue"
 
 defineProps({
   rows: {
@@ -133,11 +135,13 @@ defineProps({
 defineEmits(["delete-rule", "select-rule", "toggle-rule"])
 
 const getTypeIcon = (type) => {
-  if (type === "speeding") return "alertas"
-  if (type === "battery") return "dispositivos"
-  if (type === "no_signal") return "bell"
-  if (type === "geofence") return "mapa"
-  if (type === "fuel") return "fuentes"
+  if (type === "speeding") return "alarm-speeding"
+  if (type === "battery") return "alarm-low-battery"
+  if (type === "no_signal") return "alarm-no-signal"
+  if (type === "geofence") return "alarm-geofence-exit"
+  if (type === "fuel") return "alarm-fuel-variation"
+  if (type === "stop_time") return "alarm-long-stop"
+  if (type === "ignition") return "alarm-after-hours"
 
   return "configuracion"
 }
@@ -156,7 +160,6 @@ const getTypeTone = (type) => {
 .alarm-rule-row {
   display: grid;
   min-width: 0;
-  cursor: pointer;
   grid-template-columns:
     minmax(220px, 1.15fr) 140px minmax(120px, 0.8fr) minmax(180px, 1fr)
     160px 168px;
@@ -171,12 +174,12 @@ const getTypeTone = (type) => {
     box-shadow 0.16s ease;
 }
 
-.alarm-rule-row:hover,
-.alarm-rule-row.is-selected {
+.alarm-rule-row:hover {
   background: #f8fbff;
 }
 
 .alarm-rule-row.is-selected {
+  background: #fbfcff;
   box-shadow: inset 3px 0 0 #102372;
 }
 

@@ -9,4 +9,8 @@ Estado de autenticacion y permisos.
 
 ## Regla de mantenimiento
 
+El alcance por etiquetas reutiliza un Set normalizado al evaluar la lista de
+activos mediante `assetMatchesNormalizedTagIds`; evita normalizacion repetida por
+fila sin cambiar los permisos. Los filtros de pantalla nunca amplian ese alcance.
+
 La UI debe consultar permisos a traves de estos composables. La fuente de datos real debe provenir de `services/auth` y `services/access`.

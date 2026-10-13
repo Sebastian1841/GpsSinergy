@@ -59,15 +59,7 @@
         class="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#d8e0eb] bg-white px-3 text-[12px] font-black text-[#102372] transition hover:border-[#ff6600] hover:text-[#ff6600]"
         @click="$emit('clear-filters')"
       >
-        <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" aria-hidden="true">
-          <path
-            d="M4 12a8 8 0 0 1 13.66-5.66M20 12a8 8 0 0 1-13.66 5.66M8 5H4V1M16 19h4v4"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
+        <SvgIcon name="filter-clear" class="h-[18px] w-[18px]" />
         Limpiar
       </button>
     </div>

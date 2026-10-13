@@ -5,7 +5,7 @@
     <article
       v-for="(item, index) in summaryCards"
       :key="item.key"
-      class="flex min-h-[82px] items-center px-5 py-4"
+      class="flex min-h-[92px] items-center px-5 py-4"
       :class="{
         'border-b border-[#edf1f5] sm:border-b-0': index < 2,
         'sm:border-l sm:border-[#edf1f5]': index % 2 !== 0,
@@ -13,15 +13,15 @@
       }"
     >
       <div class="min-w-0">
-        <p class="text-[23px] font-black leading-none text-[#102372]">
+        <p class="text-[25px] font-black leading-none text-[#102372]">
           {{ item.value }}
         </p>
 
-        <p class="mt-1 text-[12px] font-black leading-tight text-[#102372]">
+        <p class="mt-1 text-[13px] font-black leading-tight text-[#102372]">
           {{ item.label }}
         </p>
 
-        <p class="mt-0.5 text-[10px] font-semibold text-slate-500">
+        <p class="mt-0.5 text-[11px] font-semibold text-slate-500">
           {{ item.description }}
         </p>
       </div>

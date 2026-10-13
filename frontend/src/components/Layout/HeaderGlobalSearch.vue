@@ -17,7 +17,7 @@
         type="search"
         autocomplete="off"
         :placeholder="globalSearchPlaceholder"
-        class="h-10 w-full rounded-xl border border-white/10 bg-white/[0.06] pl-9 pr-20 text-sm font-semibold text-white outline-none transition placeholder:text-white/40 focus:border-[#ff6600] focus:bg-white/[0.09] focus:ring-2 focus:ring-[#ff6600]/20"
+        class="h-10 w-full rounded-xl border border-white/10 bg-white/[0.06] pl-9 pr-10 text-sm font-semibold text-white outline-none transition placeholder:text-white/40 focus:border-[#ff6600] focus:bg-white/[0.09] focus:ring-2 focus:ring-[#ff6600]/20"
         @focus="openDropdown"
         @input="openDropdown"
       />
@@ -25,19 +25,11 @@
       <button
         v-if="globalSearchQuery"
         type="button"
-        class="absolute right-[70px] top-1/2 -translate-y-1/2 rounded-md px-1.5 py-0.5 text-[15px] leading-none text-white/45 transition hover:bg-white/10 hover:text-white"
+        class="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md px-1.5 py-0.5 text-[15px] leading-none text-white/45 transition hover:bg-white/10 hover:text-white"
         aria-label="Limpiar busqueda"
         @click="clearGlobalSearch"
       >
         x
-      </button>
-
-      <button
-        type="submit"
-        class="absolute right-1.5 top-1/2 h-7 w-16 -translate-y-1/2 rounded-lg bg-[#ff6600] text-[10px] font-black text-white transition hover:bg-[#e65c00] disabled:cursor-not-allowed disabled:opacity-45"
-        :disabled="!firstGlobalSearchResult"
-      >
-        Abrir
       </button>
     </form>
 
@@ -146,7 +138,7 @@
 </template>
 
 <script setup>
-import { computed } from "vue"
+import { computed, nextTick } from "vue"
 import { useRouter } from "vue-router"
 
 import {
@@ -223,6 +215,7 @@ const {
   globalSearchEmptyMessage,
   selectGlobalSearchType,
   clearGlobalSearch,
+  flushGlobalSearchQuery,
 } = useAppHeaderGlobalSearchState({
   openDropdown,
 })
@@ -293,7 +286,15 @@ const openGlobalSearchResult = (result) => {
   router.push(result.path)
 }
 
-const openFirstGlobalSearchResult = () => {
+const openFirstGlobalSearchResult = async () => {
+  if (!globalSearchQuery.value.trim()) {
+    openDropdown()
+    return
+  }
+
+  flushGlobalSearchQuery()
+  await nextTick()
+
   const firstResult = firstGlobalSearchResult.value
 
   if (firstResult) {

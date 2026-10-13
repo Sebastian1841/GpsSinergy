@@ -1,550 +1,348 @@
 <template>
-  <div>
-    <!-- Overlay en todos los tamaños -->
+  <aside
+    class="relative z-[2000] hidden h-full shrink-0 md:block"
+    :class="compactEnabled ? 'w-[76px]' : 'w-0'"
+  >
     <div
-      v-if="isOpen"
-      class="fixed inset-0 z-40 bg-slate-950/30 [contain:paint]"
-      @click="$emit('update:isOpen', false)"
+      class="sidebar-overlay fixed inset-0 z-[1990] bg-slate-950"
+      :class="isOpen ? 'pointer-events-auto opacity-40' : 'pointer-events-none opacity-0'"
+      aria-hidden="true"
+      @click="close"
     />
 
-    <aside
-      :class="[
-        'fixed left-0 top-0 z-50 h-full w-72',
-        'flex flex-col overflow-hidden text-white',
-        'bg-[#1c2634]',
-        'border-r border-white/10 shadow-lg',
-        'transform-gpu transition-transform duration-150 ease-out',
-        '[contain:layout_paint] [backface-visibility:hidden]',
-        isOpen ? 'translate-x-0 will-change-transform' : '-translate-x-full',
-      ]"
+    <nav
+      v-if="compactEnabled"
+      class="absolute inset-y-0 left-0 z-[2000] flex w-[76px] flex-col border-r border-white/10 bg-[#1c2937] px-2 py-3 text-white"
+      aria-label="Navegacion compacta"
     >
-      <!-- Header -->
-      <header class="relative z-10 border-b border-white/10 px-4 py-4">
-        <div class="flex items-center justify-between gap-3">
-          <button
-            class="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white transition-colors duration-100 hover:bg-white/10 active:scale-95"
-            type="button"
-            aria-label="Cerrar menú"
-            @click="$emit('update:isOpen', false)"
+      <ul class="min-h-0 flex-1 space-y-2 overflow-visible">
+        <li v-for="item in navigationItems" :key="item.to">
+          <RouterLink
+            :to="item.to"
+            class="rail-link group relative mx-auto flex h-12 w-12 items-center justify-center rounded-md text-slate-300 hover:bg-white/[0.08] hover:text-white"
+            :class="{ active: isActive(item) }"
+            :aria-label="item.label"
+            :title="item.label"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
+            <SvgIcon :name="item.icon" class="sidebar-navigation-icon" />
+            <span class="tooltip">{{ item.label }}</span>
+          </RouterLink>
+        </li>
+      </ul>
+      <button
+        type="button"
+        class="mx-auto mt-3 grid h-10 w-10 place-items-center rounded-md text-slate-400 hover:bg-white/[0.08] hover:text-white"
+        title="Ocultar barra compacta"
+        aria-label="Ocultar barra compacta"
+        @click="setCompact(false)"
+      >
+        <SvgIcon name="panel-close" />
+      </button>
+    </nav>
+
+    <section
+      class="sidebar-panel fixed inset-y-0 left-0 z-[2000] flex w-[292px] max-w-[calc(100vw-20px)] flex-col border-r border-white/10 bg-[#1c2937] text-white"
+      :class="isOpen ? 'sidebar-panel--open' : 'sidebar-panel--closed'"
+      :aria-hidden="!isOpen"
+      :inert="!isOpen"
+      aria-label="Navegacion principal"
+    >
+      <header class="flex h-[78px] items-center justify-between border-b border-white/10 px-5">
+        <div>
+          <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Navegacion</p>
+          <h2 class="mt-1 text-lg font-extrabold">Modulos</h2>
+        </div>
+        <div class="flex items-center gap-1">
+          <button
+            type="button"
+            class="grid h-10 w-10 place-items-center rounded-md text-slate-300 hover:bg-white/10 hover:text-white"
+            aria-label="Cerrar navegacion"
+            @click="close"
+          >
+            <SvgIcon name="close" />
           </button>
-
-          <div class="min-w-0 flex-1">
-            <p class="text-[10px] font-black uppercase tracking-[0.22em] text-white/45">
-              Plataforma
-            </p>
-            <h2 class="mt-1 truncate text-sm font-bold text-white">Sistema</h2>
-          </div>
-
-          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#ff6600]">
-            <span class="text-xs font-black">SG</span>
-          </div>
         </div>
       </header>
 
-      <!-- Menú -->
-      <nav class="custom-scrollbar relative z-10 flex-1 overflow-y-auto px-3 py-4">
-        <div class="mb-2 px-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/35">
-          Navegación
-        </div>
-
-        <ul class="space-y-1.5">
-          <li v-for="item in assetNavigationItems" :key="item.to">
+      <nav class="sidebar-scrollbar min-h-0 flex-1 overflow-y-auto px-3 py-4">
+        <ul class="space-y-1">
+          <li v-for="item in navigationItems" :key="item.to">
             <RouterLink
               :to="item.to"
-              class="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-white/75 transition-colors duration-100 hover:bg-white/[0.08] hover:text-white"
-              :class="isNavigationItemActive(item) ? 'sidebar-link-active' : ''"
-              active-class="sidebar-link-active"
-              @click="$emit('update:isOpen', false)"
+              class="menu-link flex min-h-12 items-center gap-3 rounded-md px-3 text-sm font-semibold text-slate-300 hover:bg-white/[0.07] hover:text-white"
+              :class="{ active: isActive(item) }"
+              @click="close"
             >
-              <div
-                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/70 transition-colors duration-100 group-hover:bg-[#ff6600] group-hover:text-white"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M3 7h18M5 7v11a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"
-                  />
-                </svg>
-              </div>
-
-              <span class="min-w-0 flex-1 truncate">
-                {{ item.label }}
+              <span class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-white/[0.06]">
+                <SvgIcon :name="item.icon" class="sidebar-navigation-icon" />
               </span>
-
-              <span
-                class="h-2 w-2 rounded-full bg-transparent transition-colors duration-100 group-hover:bg-[#ff6600]"
-              ></span>
-            </RouterLink>
-          </li>
-
-          <li v-if="reportsNavigationItem">
-            <RouterLink
-              :to="reportsNavigationItem.to"
-              class="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-white/75 transition-colors duration-100 hover:bg-white/[0.08] hover:text-white"
-              :class="isReportsRouteActive ? 'sidebar-link-active' : ''"
-              active-class="sidebar-link-active"
-              @click="$emit('update:isOpen', false)"
-            >
-              <div
-                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/70 transition-colors duration-100 group-hover:bg-[#ff6600] group-hover:text-white"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M4 19V5m0 14h16M8 15v-4m4 4V7m4 8V9"
-                  />
-                </svg>
-              </div>
-
-              <span class="min-w-0 flex-1 truncate">
-                {{ reportsNavigationItem.label }}
-              </span>
-
-              <span
-                class="h-2 w-2 rounded-full bg-transparent transition-colors duration-100 group-hover:bg-[#ff6600]"
-              ></span>
-            </RouterLink>
-          </li>
-
-          <li v-if="alarmsNavigationItem">
-            <RouterLink
-              :to="alarmsNavigationItem.to"
-              class="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-white/75 transition-colors duration-100 hover:bg-white/[0.08] hover:text-white"
-              :class="isAlarmsRouteActive ? 'sidebar-link-active' : ''"
-              active-class="sidebar-link-active"
-              @click="$emit('update:isOpen', false)"
-            >
-              <div
-                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/70 transition-colors duration-100 group-hover:bg-[#ff6600] group-hover:text-white"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 0 0-4-5.7V5a2 2 0 1 0-4 0v.3A6 6 0 0 0 6 11v3.2a2 2 0 0 1-.6 1.4L4 17h5m6 0a3 3 0 0 1-6 0"
-                  />
-                </svg>
-              </div>
-
-              <span class="min-w-0 flex-1 truncate">
-                {{ alarmsNavigationItem.label }}
-              </span>
-
-              <span
-                class="h-2 w-2 rounded-full bg-transparent transition-colors duration-100 group-hover:bg-[#ff6600]"
-              ></span>
-            </RouterLink>
-          </li>
-
-          <li v-if="auditNavigationItem">
-            <RouterLink
-              :to="auditNavigationItem.to"
-              class="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-white/75 transition-colors duration-100 hover:bg-white/[0.08] hover:text-white"
-              :class="isAuditRouteActive ? 'sidebar-link-active' : ''"
-              active-class="sidebar-link-active"
-              @click="$emit('update:isOpen', false)"
-            >
-              <div
-                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/70 transition-colors duration-100 group-hover:bg-[#ff6600] group-hover:text-white"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M9 12l2 2 4-4M12 3l7 4v5c0 5-3 8-7 9-4-1-7-4-7-9V7l7-4Z"
-                  />
-                </svg>
-              </div>
-
-              <span class="min-w-0 flex-1 truncate">
-                {{ auditNavigationItem.label }}
-              </span>
-
-              <span
-                class="h-2 w-2 rounded-full bg-transparent transition-colors duration-100 group-hover:bg-[#ff6600]"
-              ></span>
-            </RouterLink>
-          </li>
-
-          <li v-if="maintenanceNavigationItem">
-            <RouterLink
-              :to="maintenanceNavigationItem.to"
-              class="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-white/75 transition-colors duration-100 hover:bg-white/[0.08] hover:text-white"
-              :class="isMaintenanceRouteActive ? 'sidebar-link-active' : ''"
-              active-class="sidebar-link-active"
-              @click="$emit('update:isOpen', false)"
-            >
-              <div
-                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/70 transition-colors duration-100 group-hover:bg-[#ff6600] group-hover:text-white"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 0 0 5.4-5.4l-2.4 2.4-3-3 2.4-2.4Z"
-                  />
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 19h5M17.5 16.5v5" />
-                </svg>
-              </div>
-
-              <span class="min-w-0 flex-1 truncate">
-                {{ maintenanceNavigationItem.label }}
-              </span>
-
-              <span
-                class="h-2 w-2 rounded-full bg-transparent transition-colors duration-100 group-hover:bg-[#ff6600]"
-              ></span>
-            </RouterLink>
-          </li>
-
-          <li v-if="isPlatformAdmin">
-            <RouterLink
-              to="/empresas"
-              class="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-white/75 transition-colors duration-100 hover:bg-white/[0.08] hover:text-white"
-              active-class="sidebar-link-active"
-              @click="$emit('update:isOpen', false)"
-            >
-              <div
-                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/70 transition-colors duration-100 group-hover:bg-[#ff6600] group-hover:text-white"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M4 20h16M6 20V7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13M9 9h1M14 9h1M9 13h1M14 13h1M11 20v-3h2v3"
-                  />
-                </svg>
-              </div>
-
-              <span class="min-w-0 flex-1 truncate"> Empresas </span>
-
-              <span
-                class="h-2 w-2 rounded-full bg-transparent transition-colors duration-100 group-hover:bg-[#ff6600]"
-              ></span>
-            </RouterLink>
-          </li>
-
-          <li v-if="isPlatformAdmin">
-            <RouterLink
-              to="/usuarios"
-              class="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-white/75 transition-colors duration-100 hover:bg-white/[0.08] hover:text-white"
-              active-class="sidebar-link-active"
-              @click="$emit('update:isOpen', false)"
-            >
-              <div
-                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/70 transition-colors duration-100 group-hover:bg-[#ff6600] group-hover:text-white"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0ZM4.5 20a7.5 7.5 0 0 1 15 0M18.5 8.5a3 3 0 0 1 0 5M21 20a5.5 5.5 0 0 0-3-4.9"
-                  />
-                </svg>
-              </div>
-
-              <span class="min-w-0 flex-1 truncate"> Gestión de usuarios </span>
-
-              <span
-                class="h-2 w-2 rounded-full bg-transparent transition-colors duration-100 group-hover:bg-[#ff6600]"
-              ></span>
+              <span class="min-w-0 flex-1 truncate">{{ item.label }}</span>
+              <span v-if="item.notice" class="h-2 w-2 shrink-0 rounded-full bg-[#ff6600]" />
             </RouterLink>
           </li>
         </ul>
       </nav>
 
-      <!-- Footer -->
-      <footer class="relative z-10 border-t border-white/10 px-4 py-3">
-        <div class="flex items-center justify-between rounded-2xl bg-black/10 px-3 py-2">
-          <div>
-            <p class="text-[10px] font-black uppercase tracking-[0.16em] text-white/35">Sinergy</p>
-            <p class="text-xs text-white/60">Sistema corporativo</p>
-          </div>
-
-          <div class="h-2.5 w-2.5 rounded-full bg-[#ff6600]"></div>
+      <footer class="shrink-0 border-t border-white/10 p-3">
+        <button
+          type="button"
+          class="mb-2 grid min-h-11 w-full grid-cols-[36px_minmax(0,1fr)] items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-300 hover:bg-white/[0.07] hover:text-white"
+          @click="toggleCompact"
+        >
+          <span class="grid h-9 w-9 place-items-center rounded-md bg-white/[0.06]">
+            <SvgIcon :name="compactEnabled ? 'panel-close' : 'panel-open'" />
+          </span>
+          <span class="min-w-0 whitespace-nowrap">
+            {{ compactEnabled ? "Ocultar barra compacta" : "Mostrar barra compacta" }}
+          </span>
+        </button>
+        <div class="flex min-h-14 items-center gap-3 rounded-md bg-black/15 px-3 py-3">
+          <img
+            src="../../assets/branding/sinergy-group.png"
+            alt="Sinergy Group"
+            class="h-8 w-auto max-w-[150px] shrink-0 object-contain brightness-0 invert"
+          />
+          <span class="ml-auto h-2 w-2 rounded-full bg-[#ff6600]" />
         </div>
       </footer>
-    </aside>
-  </div>
+    </section>
+  </aside>
 </template>
 
 <script setup>
-import { computed } from "vue"
+import { computed, ref } from "vue"
 import { useRoute } from "vue-router"
-
 import { useAccessControl } from "../../composables/auth/useAccessControl.js"
+import { readStorageValue, writeStorageValue } from "../../services/storage/browserStorage.js"
+import SvgIcon from "../icons/SvgIcon.vue"
 
+const STORAGE_KEY = "sinergy-sidebar-compact"
 const route = useRoute()
 const { isPlatformAdmin, accessibleCompanies, canAccessModule, canAccessFunction } =
   useAccessControl()
+const compactEnabled = ref(readStorageValue(STORAGE_KEY) !== "false")
+const isOpen = ref(false)
+const companyId = computed(() => String(route.params.empresaId || ""))
 
-const assetNavigationItems = computed(() => {
-  if (isPlatformAdmin.value) {
+const assetItems = computed(() => {
+  if (isPlatformAdmin.value)
     return [
-      {
-        to: "/activos",
-        label: "Activos",
-      },
+      { to: "/activos", label: "Activos", icon: "activos", routes: ["Activos", "AppActivos"] },
     ]
-  }
-
   return accessibleCompanies.value
     .filter((company) => canAccessModule("assets", company.id))
     .map((company) => ({
       to: `/app/${company.id}/activos`,
       label: company.name,
+      icon: "activos",
+      routes: ["AppActivos"],
+      exact: true,
     }))
 })
 
-const currentRouteCompanyId = computed(() => {
-  return String(route.params.empresaId || "")
-})
+const moduleItem = (options) => {
+  if (isPlatformAdmin.value) return { ...options, to: options.platformPath }
+  const companies = accessibleCompanies.value
+  const company =
+    companies.find(
+      (candidate) =>
+        String(candidate.id) === companyId.value &&
+        canAccessFunction(options.permission, candidate.id, "view"),
+    ) || companies.find((candidate) => canAccessFunction(options.permission, candidate.id, "view"))
+  return company ? { ...options, to: `/app/${company.id}/${options.segment}` } : null
+}
 
-const reportsNavigationItem = computed(() => {
+const unreportedItem = () => {
   if (isPlatformAdmin.value) {
     return {
-      to: "/reportes",
+      to: "/sin-reportar",
+      label: "Sin reportar",
+      icon: "unreported",
+      routes: ["Unreported", "AppUnreported"],
+    }
+  }
+
+  const company =
+    accessibleCompanies.value.find(
+      (candidate) =>
+        String(candidate.id) === companyId.value && canAccessModule("assets", candidate.id),
+    ) || accessibleCompanies.value.find((candidate) => canAccessModule("assets", candidate.id))
+
+  return company
+    ? {
+        to: `/app/${company.id}/sin-reportar`,
+        label: "Sin reportar",
+        icon: "unreported",
+        routes: ["Unreported", "AppUnreported"],
+      }
+    : null
+}
+
+const navigationItems = computed(() => {
+  const modules = [
+    moduleItem({
       label: "Reportes",
-    }
-  }
-
-  const currentCompany = accessibleCompanies.value.find((company) => {
-    return String(company.id) === currentRouteCompanyId.value
-  })
-
-  const fallbackCompany = currentCompany || accessibleCompanies.value[0]
-
-  if (!fallbackCompany) return null
-
-  if (!canAccessFunction("reports", fallbackCompany.id, "view")) {
-    return null
-  }
-
-  return {
-    to: `/app/${fallbackCompany.id}/reportes`,
-    label: "Reportes",
-  }
-})
-
-const getAccessibleAlarmsCompany = () => {
-  const currentCompany = accessibleCompanies.value.find((company) => {
-    return (
-      String(company.id) === currentRouteCompanyId.value &&
-      canAccessFunction("alarms", company.id, "view")
-    )
-  })
-
-  if (currentCompany) return currentCompany
-
-  return (
-    accessibleCompanies.value.find((company) => {
-      return canAccessFunction("alarms", company.id, "view")
-    }) || null
-  )
-}
-
-const alarmsNavigationItem = computed(() => {
-  if (isPlatformAdmin.value) {
-    return {
-      to: "/alertas",
+      icon: "reportes",
+      permission: "reports",
+      segment: "reportes",
+      platformPath: "/reportes",
+      routes: ["Reports", "AppReports"],
+    }),
+    moduleItem({
       label: "Alertas",
-    }
-  }
-
-  const targetCompany = getAccessibleAlarmsCompany()
-
-  if (!targetCompany) return null
-
-  return {
-    to: `/app/${targetCompany.id}/alertas`,
-    label: "Alertas",
-  }
-})
-
-const auditNavigationItem = computed(() => {
-  if (isPlatformAdmin.value) {
-    return {
-      to: "/auditoria",
+      icon: "alertas",
+      permission: "alarms",
+      segment: "alertas",
+      platformPath: "/alertas",
+      routes: ["Alarms", "AppAlarms"],
+      notice: true,
+    }),
+    moduleItem({
       label: "Auditoria",
-    }
-  }
-
-  const currentCompany = accessibleCompanies.value.find((company) => {
-    return String(company.id) === currentRouteCompanyId.value
-  })
-
-  const fallbackCompany = currentCompany || accessibleCompanies.value[0]
-
-  if (!fallbackCompany) return null
-
-  if (!canAccessFunction("audit-view", fallbackCompany.id, "view")) {
-    return null
-  }
-
-  return {
-    to: `/app/${fallbackCompany.id}/auditoria`,
-    label: "Auditoria",
-  }
-})
-
-const getAccessibleMaintenanceCompany = () => {
-  const currentCompany = accessibleCompanies.value.find((company) => {
-    return (
-      String(company.id) === currentRouteCompanyId.value &&
-      canAccessFunction("maintenance-view", company.id, "view")
-    )
-  })
-
-  if (currentCompany) return currentCompany
-
-  return (
-    accessibleCompanies.value.find((company) => {
-      return canAccessFunction("maintenance-view", company.id, "view")
-    }) || null
-  )
-}
-
-const maintenanceNavigationItem = computed(() => {
-  const targetCompany = getAccessibleMaintenanceCompany()
-
-  if (!targetCompany && isPlatformAdmin.value) {
-    return {
-      to: "/mantenciones",
+      icon: "auditoria",
+      permission: "audit-view",
+      segment: "auditoria",
+      platformPath: "/auditoria",
+      routes: ["Audit", "AppAudit"],
+    }),
+    moduleItem({
       label: "Mantenciones",
-    }
-  }
-
-  if (!targetCompany) return null
-
-  return {
-    to: `/app/${targetCompany.id}/mantenciones`,
-    label: "Mantenciones",
-  }
+      icon: "mantenciones",
+      permission: "maintenance-view",
+      segment: "mantenciones",
+      platformPath: "/mantenciones",
+      routes: ["Maintenance", "AppMaintenance"],
+    }),
+    unreportedItem(),
+  ].filter(Boolean)
+  const admin = isPlatformAdmin.value
+    ? [
+        { to: "/empresas", label: "Empresas", icon: "empresas", routes: ["CompanyManagement"] },
+        {
+          to: "/usuarios",
+          label: "Gestion de usuarios",
+          icon: "usuarios",
+          routes: ["UserManagement"],
+        },
+      ]
+    : []
+  return [...assetItems.value, ...modules, ...admin]
 })
 
-const isReportsRouteActive = computed(() => {
-  return route.name === "Reports" || route.name === "AppReports"
-})
-
-const isAlarmsRouteActive = computed(() => {
-  return route.name === "Alarms" || route.name === "AppAlarms"
-})
-
-const isAuditRouteActive = computed(() => {
-  return route.name === "Audit" || route.name === "AppAudit"
-})
-
-const isMaintenanceRouteActive = computed(() => {
-  return route.name === "Maintenance" || route.name === "AppMaintenance"
-})
-
-const isNavigationItemActive = (item) => {
-  if (item.to === "/activos") {
-    return route.name === "Activos" || route.name === "AppActivos"
-  }
-
-  return route.path === item.to
+const isActive = (item) =>
+  item.exact
+    ? route.path === item.to
+    : item.routes?.includes(String(route.name)) || route.path === item.to
+const close = () => {
+  isOpen.value = false
+}
+const open = () => {
+  isOpen.value = true
+}
+const toggle = () => {
+  isOpen.value = !isOpen.value
+}
+const setCompact = (enabled) => {
+  compactEnabled.value = enabled
+  writeStorageValue(STORAGE_KEY, enabled)
+}
+const toggleCompact = () => {
+  setCompact(!compactEnabled.value)
+  close()
 }
 
-defineProps({
-  isOpen: { type: Boolean, default: false },
-})
-
-defineEmits(["update:isOpen"])
+defineExpose({ close, open, toggle })
 </script>
 
 <style scoped>
-.sidebar-link-active {
+.rail-link,
+.menu-link {
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
+}
+.sidebar-navigation-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  max-width: 1.25rem;
+  max-height: 1.25rem;
+  flex-shrink: 0;
+}
+.rail-link.active {
   background: #ff6600;
-  color: white;
+  color: #fff;
+  box-shadow: 0 7px 16px rgb(255 102 0/24%);
+}
+.menu-link.active {
+  background: #ff6600;
+  color: #fff;
   font-weight: 800;
 }
-
-.sidebar-link-active > div {
-  background: rgba(255, 255, 255, 0.18);
-  color: white;
+.menu-link.active > span:first-child {
+  background: rgb(255 255 255/16%);
 }
-
-.sidebar-link-active > span:last-child {
-  background: white;
+.tooltip {
+  pointer-events: none;
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  z-index: 70;
+  width: max-content;
+  max-width: 220px;
+  transform: translate(-4px, -50%);
+  border-radius: 4px;
+  background: #111827;
+  padding: 6px 9px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0;
+  box-shadow: 0 8px 22px rgb(0 0 0/28%);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
 }
-
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+.rail-link:hover .tooltip,
+.rail-link:focus-visible .tooltip {
+  transform: translate(0, -50%);
+  opacity: 1;
 }
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+.sidebar-panel {
+  contain: layout paint style;
+  will-change: transform;
+  backface-visibility: hidden;
+  transition: transform 140ms cubic-bezier(0.2, 0, 0, 1);
 }
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
+.sidebar-panel--open {
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0);
 }
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.28);
+.sidebar-panel--closed {
+  pointer-events: none;
+  transform: translate3d(-100%, 0, 0);
+}
+.sidebar-overlay {
+  contain: strict;
+  will-change: opacity;
+  transition: opacity 100ms linear;
+}
+.sidebar-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255/18%) transparent;
+}
+@media (max-width: 767px) {
+  aside {
+    display: block;
+    width: 0 !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-panel,
+  .sidebar-overlay,
+  .rail-link,
+  .menu-link,
+  .tooltip {
+    transition: none;
+  }
 }
 </style>

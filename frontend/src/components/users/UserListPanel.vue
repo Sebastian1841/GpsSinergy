@@ -22,43 +22,18 @@
         </span>
 
         <select
-          :value="sortKey"
-          class="h-8 min-w-[132px] cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-2.5 text-[10px] font-bold text-[#102372] outline-none transition focus:border-[#102372]"
-          @change="$emit('update:sort-key', $event.target.value)"
+          :value="`${sortKey}:${sortDirection}`"
+          class="h-8 min-w-[150px] cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-2.5 text-[10px] font-bold text-[#102372] outline-none transition focus:border-[#102372]"
+          @change="handleSortSelection($event.target.value)"
         >
-          <option value="name">Nombre</option>
-          <option value="role">Rol</option>
-          <option value="company">Empresa</option>
-          <option value="accesses">Accesos</option>
-          <option value="status">Estado</option>
+          <option value="name:asc">Nombre (A-Z)</option>
+          <option value="name:desc">Nombre (Z-A)</option>
+          <option value="role:asc">Rol (A-Z)</option>
+          <option value="company:asc">Empresa (A-Z)</option>
+          <option value="accesses:desc">Mas accesos</option>
+          <option value="accesses:asc">Menos accesos</option>
+          <option value="status:asc">Estado</option>
         </select>
-
-        <button
-          type="button"
-          class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#d8dee8] bg-white text-[#102372] transition hover:bg-[#f6f8fb]"
-          :aria-label="sortDirection === 'asc' ? 'Orden descendente' : 'Orden ascendente'"
-          :title="sortDirection === 'asc' ? 'Orden descendente' : 'Orden ascendente'"
-          @click="$emit('update:sort-direction', sortDirection === 'asc' ? 'desc' : 'asc')"
-        >
-          <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" aria-hidden="true">
-            <path
-              v-if="sortDirection === 'asc'"
-              d="M8 18V5m0 0L4.5 8.5M8 5l3.5 3.5M16 6h4M16 11h3M16 16h2"
-              stroke="currentColor"
-              stroke-width="1.9"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-            <path
-              v-else
-              d="M8 6v13m0 0-3.5-3.5M8 19l3.5-3.5M16 6h2M16 11h3M16 16h4"
-              stroke="currentColor"
-              stroke-width="1.9"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-        </button>
 
         <div class="flex overflow-hidden rounded-lg border border-[#d8dee8] bg-white">
           <button
@@ -108,46 +83,38 @@
       </div>
     </header>
 
-    <!-- CABECERA TABLA -->
-    <div
-      v-if="userRows.length && viewMode === 'list'"
-      class="hidden h-11 shrink-0 grid-cols-[minmax(320px,1.6fr)_minmax(170px,0.8fr)_130px_130px_24px] items-center gap-5 border-b border-[#edf1f5] bg-[#fafbfc] px-5 lg:grid"
-    >
-      <span class="table-header">Usuario</span>
-
-      <span class="table-header">Rol</span>
-
-      <span class="table-header">Accesos</span>
-
-      <span class="table-header">Estado</span>
-
-      <span></span>
-    </div>
-
     <!-- USUARIOS -->
     <div class="min-h-0 flex-1 overflow-auto">
       <section
         v-if="userRows.length && viewMode === 'list'"
-        class="border-b border-[#edf1f5] last:border-b-0"
+        class="min-w-[1120px] border-b border-[#edf1f5] last:border-b-0"
       >
-        <button
+        <div
+          class="grid h-11 grid-cols-[minmax(270px,1.35fr)_minmax(145px,0.7fr)_minmax(220px,1fr)_minmax(135px,0.65fr)_minmax(170px,0.8fr)_130px_100px] items-center gap-4 border-b border-[#edf1f5] bg-[#fafbfc] px-5"
+        >
+          <span class="table-header">Usuario</span>
+          <span class="table-header">Rol</span>
+          <span class="table-header">Empresa</span>
+          <span class="table-header">Accesos</span>
+          <span class="table-header">Ultimo acceso</span>
+          <span class="table-header">Estado</span>
+          <span class="table-header text-right">Acciones</span>
+        </div>
+
+        <div
           v-for="row in userRows"
           :key="row.key"
-          type="button"
-          class="group relative grid w-full cursor-pointer grid-cols-[42px_minmax(0,1fr)_24px] items-center gap-3 border-b border-[#edf1f5] px-5 py-3 text-left transition last:border-b-0 hover:bg-[#fafbfc] lg:min-h-[70px] lg:grid-cols-[minmax(320px,1.6fr)_minmax(170px,0.8fr)_130px_130px_24px] lg:gap-5 lg:py-2"
+          class="group relative grid min-h-[72px] grid-cols-[minmax(270px,1.35fr)_minmax(145px,0.7fr)_minmax(220px,1fr)_minmax(135px,0.65fr)_minmax(170px,0.8fr)_130px_100px] items-center gap-4 border-b border-[#edf1f5] px-5 text-left transition last:border-b-0 hover:bg-[#fafbfc]"
           :class="isSelectedUser(row.user.id) ? 'bg-[#f7f9ff]' : 'bg-white'"
-          @click="$emit('select-user', row.user.id)"
         >
-          <!-- SELECCION -->
           <span
             v-if="isSelectedUser(row.user.id)"
             class="absolute inset-y-0 left-0 w-[3px] bg-[#102372]"
           ></span>
 
-          <!-- USUARIO DESKTOP -->
-          <span class="hidden min-w-0 items-center gap-3 lg:flex">
+          <span class="flex min-w-0 items-center gap-3">
             <span
-              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-white"
+              class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[12px] font-black text-white"
               :class="getAvatarClass(row.user.status)"
             >
               {{ getUserInitials(row.user.name) }}
@@ -164,159 +131,181 @@
             </span>
           </span>
 
-          <!-- USUARIO MOBILE -->
           <span
-            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-white lg:hidden"
-            :class="getAvatarClass(row.user.status)"
+            class="w-fit max-w-full truncate rounded-md bg-[#eef3ff] px-2.5 py-1 text-[11px] font-black text-[#1751c0]"
           >
-            {{ getUserInitials(row.user.name) }}
-          </span>
-
-          <span class="min-w-0 lg:hidden">
-            <span class="flex min-w-0 items-center gap-2">
-              <span class="truncate text-[13px] font-black text-[#172033]">
-                {{ row.user.name }}
-              </span>
-
-              <span
-                class="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-black"
-                :class="getStatusClass(row.user.status)"
-              >
-                {{ getStatusLabel(row.user.status) }}
-              </span>
-            </span>
-
-            <span class="mt-0.5 block truncate text-[11px] font-semibold text-slate-400">
-              {{ row.user.email }}
-            </span>
-
-            <span class="mt-1 block truncate text-[11px] font-semibold text-slate-500">
-              {{ getPrimaryRoleLabel(row) }}
-              -
-              {{ getAccessLabel(row) }}
-            </span>
-          </span>
-
-          <!-- ROL -->
-          <span class="hidden truncate text-[12px] font-semibold text-[#334155] lg:block">
             {{ getPrimaryRoleLabel(row) }}
           </span>
 
-          <!-- ACCESOS -->
-          <span class="hidden text-[12px] font-semibold text-[#334155] lg:block">
+          <span class="flex min-w-0 items-center gap-2 text-[12px] text-[#263f76]">
+            <SvgIcon name="empresas" class="h-5 w-5 shrink-0 text-[#102372]" />
+            <span class="min-w-0">
+              <strong class="block truncate font-black">{{ getCompanySummaryLabel(row) }}</strong>
+              <small
+                v-if="row.companyId === 'all'"
+                class="mt-0.5 block truncate text-[10px] text-slate-400"
+              >
+                {{ getCompanySummaryLabel(row) }}
+              </small>
+            </span>
+          </span>
+
+          <span class="flex items-center gap-2 text-[12px] font-semibold text-[#263f76]">
+            <SvgIcon name="llave" class="h-5 w-5 shrink-0 text-[#102372]" />
             {{ getAccessLabel(row) }}
           </span>
 
-          <!-- ESTADO -->
-          <span class="hidden lg:block">
-            <span
-              class="inline-flex rounded-md px-2.5 py-1 text-[10px] font-black"
-              :class="getStatusClass(row.user.status)"
-            >
-              {{ getStatusLabel(row.user.status) }}
-            </span>
-          </span>
-
-          <!-- ABRIR -->
-          <span
-            class="flex items-center justify-end text-[20px] font-light text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#102372]"
-          >
-            &gt;
-          </span>
-        </button>
-      </section>
-
-      <section
-        v-else-if="userRows.length && viewMode === 'cards'"
-        class="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3"
-      >
-        <button
-          v-for="row in userRows"
-          :key="row.key"
-          type="button"
-          class="group relative flex min-h-[178px] flex-col rounded-xl border bg-white p-4 text-left transition hover:border-[#102372]/25 hover:bg-[#fbfcff]"
-          :class="
-            isSelectedUser(row.user.id)
-              ? 'border-[#102372]/35 ring-2 ring-[#102372]/10'
-              : 'border-[#e3e9f2]'
-          "
-          @click="$emit('select-user', row.user.id)"
-        >
-          <div class="flex min-w-0 items-start justify-between gap-3">
-            <span class="flex min-w-0 items-center gap-3">
-              <span
-                class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[12px] font-black text-white"
-                :class="getAvatarClass(row.user.status)"
-              >
-                {{ getUserInitials(row.user.name) }}
-              </span>
-
-              <span class="min-w-0">
-                <span class="block truncate text-[14px] font-black text-[#172033]">
-                  {{ row.user.name }}
-                </span>
-
-                <span class="mt-0.5 block truncate text-[11px] font-semibold text-slate-400">
-                  {{ row.user.email }}
-                </span>
-              </span>
-            </span>
-
-            <span
-              class="shrink-0 rounded-md px-2 py-1 text-[10px] font-black"
-              :class="getStatusClass(row.user.status)"
-            >
-              {{ getStatusLabel(row.user.status) }}
-            </span>
-          </div>
-
-          <dl class="mt-4 grid gap-2 border-t border-[#edf1f5] pt-3">
-            <div class="flex items-center justify-between gap-3">
-              <dt class="text-[10px] font-black uppercase tracking-[0.06em] text-slate-400">Rol</dt>
-              <dd class="min-w-0 truncate text-[12px] font-black text-[#102372]">
-                {{ getPrimaryRoleLabel(row) }}
-              </dd>
-            </div>
-
-            <div class="flex items-center justify-between gap-3">
-              <dt class="text-[10px] font-black uppercase tracking-[0.06em] text-slate-400">
-                Accesos
-              </dt>
-              <dd class="text-[12px] font-black text-[#102372]">
-                {{ getAccessLabel(row) }}
-              </dd>
-            </div>
-
-            <div class="flex items-center justify-between gap-3">
-              <dt class="text-[10px] font-black uppercase tracking-[0.06em] text-slate-400">
-                Empresa
-              </dt>
-              <dd class="min-w-0 truncate text-[12px] font-black text-[#102372]">
-                {{ getCompanySummaryLabel(row) }}
-              </dd>
-            </div>
-          </dl>
-
-          <span
-            class="mt-auto flex items-center justify-end gap-1 pt-4 text-[11px] font-black text-[#102372]"
-          >
-            Ver detalle
+          <span class="flex min-w-0 items-center gap-2 text-[12px] font-semibold text-[#52698f]">
             <svg
               viewBox="0 0 24 24"
-              class="h-3.5 w-3.5 transition group-hover:translate-x-0.5"
+              class="h-5 w-5 shrink-0 text-[#102372]"
               fill="none"
               aria-hidden="true"
             >
+              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" />
               <path
-                d="m9 6 6 6-6 6"
+                d="M12 7v5l3 2"
                 stroke="currentColor"
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
               />
             </svg>
+            <span class="truncate">{{ getLastAccessLabel(row.user) }}</span>
           </span>
-        </button>
+
+          <span>
+            <span
+              class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-black"
+              :class="getStatusClass(row.user.status)"
+            >
+              <span class="h-2 w-2 rounded-full bg-current" />
+              {{ getStatusLabel(row.user.status) }}
+            </span>
+          </span>
+
+          <span class="flex items-center justify-end gap-2">
+            <button
+              v-if="canEditUsers"
+              type="button"
+              class="grid h-9 w-9 cursor-pointer place-items-center rounded-md border border-[#d8dee8] bg-white text-[#102372] transition hover:bg-[#eef3ff]"
+              aria-label="Editar usuario"
+              title="Editar usuario"
+              @click="$emit('edit-user', row.user.id)"
+            >
+              <SvgIcon name="pencil" class="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              class="grid h-9 w-9 cursor-pointer place-items-center rounded-md border border-[#d8dee8] bg-white text-[#102372] transition hover:bg-[#eef3ff]"
+              aria-label="Ver detalle"
+              title="Ver detalle"
+              @click="$emit('select-user', row.user.id)"
+            >
+              <span class="text-lg font-black leading-none">⋮</span>
+            </button>
+          </span>
+        </div>
+      </section>
+
+      <section
+        v-else-if="userRows.length && viewMode === 'cards'"
+        class="grid content-start gap-4 p-4 md:grid-cols-2 xl:grid-cols-3"
+      >
+        <article
+          v-for="row in userRows"
+          :key="row.key"
+          class="relative flex min-h-[214px] flex-col rounded-lg border bg-white p-4 text-left transition hover:border-[#102372]/25 hover:shadow-sm"
+          :class="
+            isSelectedUser(row.user.id)
+              ? 'border-[#102372]/35 ring-2 ring-[#102372]/10'
+              : 'border-[#e3e9f2]'
+          "
+        >
+          <div class="flex min-w-0 items-start justify-between gap-3">
+            <span class="flex min-w-0 items-center gap-3">
+              <span
+                class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-[13px] font-black text-white"
+                :class="getAvatarClass(row.user.status)"
+              >
+                {{ getUserInitials(row.user.name) }}
+              </span>
+
+              <span class="min-w-0">
+                <span class="block truncate text-[13px] font-black text-[#172033]">
+                  {{ row.user.name }}
+                </span>
+
+                <span class="mt-0.5 block truncate text-[11px] font-semibold text-slate-400">
+                  {{ row.user.email }}
+                </span>
+
+                <span
+                  class="mt-2 inline-flex rounded bg-[#eef3ff] px-2 py-1 text-[9px] font-black text-[#102372]"
+                >
+                  {{ getPrimaryRoleLabel(row) }}
+                </span>
+              </span>
+            </span>
+
+            <span
+              class="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-[9px] font-black"
+              :class="getStatusClass(row.user.status)"
+            >
+              <span class="h-2 w-2 rounded-full bg-current" />
+              {{ getStatusLabel(row.user.status) }}
+            </span>
+          </div>
+
+          <dl class="mt-4 grid grid-cols-2 border-t border-[#edf1f5] pt-3">
+            <div class="flex min-w-0 items-start gap-2 border-r border-[#edf1f5] pr-3">
+              <SvgIcon name="empresas" class="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />
+              <div class="min-w-0">
+                <dt class="text-[9px] font-black uppercase tracking-[0.06em] text-slate-400">
+                  Empresa
+                </dt>
+                <dd class="mt-1 truncate text-[11px] font-black text-[#172033]">
+                  {{ getCompanySummaryLabel(row) }}
+                </dd>
+              </div>
+            </div>
+
+            <div class="flex min-w-0 items-start gap-2 pl-4">
+              <SvgIcon name="llave" class="mt-0.5 h-5 w-5 shrink-0 text-[#102372]" />
+              <div class="min-w-0">
+                <dt class="text-[9px] font-black uppercase tracking-[0.06em] text-slate-400">
+                  Accesos
+                </dt>
+                <dd class="mt-1 truncate text-[11px] font-black text-[#172033]">
+                  {{ getAccessLabel(row) }}
+                </dd>
+              </div>
+            </div>
+          </dl>
+
+          <div
+            class="mt-auto grid gap-2 pt-4"
+            :class="canEditUsers ? 'grid-cols-2' : 'grid-cols-1'"
+          >
+            <button
+              v-if="canEditUsers"
+              type="button"
+              class="inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-md border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#102372] transition hover:bg-[#f7f9fc]"
+              @click="$emit('select-user', row.user.id)"
+            >
+              <SvgIcon name="eye" class="h-4 w-4" />
+              Ver detalle
+            </button>
+            <button
+              type="button"
+              class="inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-md bg-[#183568] px-3 text-[10px] font-black text-white transition hover:bg-[#102372]"
+              @click="$emit('edit-user', row.user.id)"
+            >
+              <SvgIcon name="pencil" class="h-4 w-4" />
+              Editar
+            </button>
+          </div>
+        </article>
       </section>
 
       <!-- VACIO -->
@@ -353,7 +342,7 @@
         usuarios
       </p>
 
-      <div class="flex items-center gap-1">
+      <div class="flex flex-wrap items-center justify-end gap-2">
         <button
           type="button"
           class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#d8dee8] text-slate-400 transition hover:text-[#102372] disabled:cursor-not-allowed disabled:opacity-40"
@@ -406,6 +395,21 @@
             />
           </svg>
         </button>
+
+        <label class="ml-2 flex items-center gap-2 text-[10px] font-semibold text-slate-500">
+          Mostrar
+          <select
+            :value="pageSize"
+            class="h-8 cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-2 text-[10px] font-black text-[#102372] outline-none focus:border-[#102372]"
+            aria-label="Usuarios por pagina"
+            @change="$emit('update:page-size', Number($event.target.value))"
+          >
+            <option :value="5">5</option>
+            <option :value="10">10</option>
+            <option :value="20">20</option>
+          </select>
+          por pagina
+        </label>
       </div>
     </footer>
   </section>
@@ -413,6 +417,7 @@
 
 <script setup>
 import { computed } from "vue"
+import SvgIcon from "../icons/SvgIcon.vue"
 
 import {
   getAvatarClass,
@@ -476,12 +481,17 @@ const props = defineProps({
   },
   pageSize: {
     type: Number,
-    default: 8,
+    default: 10,
+  },
+  canEditUsers: {
+    type: Boolean,
+    default: false,
   },
 })
 
-defineEmits([
+const emit = defineEmits([
   "select-user",
+  "edit-user",
   "clear-filters",
   "update:sort-key",
   "update:sort-direction",
@@ -489,7 +499,15 @@ defineEmits([
   "previous-page",
   "next-page",
   "go-to-page",
+  "update:page-size",
 ])
+
+const handleSortSelection = (selection) => {
+  const [nextSortKey, nextSortDirection = "asc"] = String(selection).split(":")
+
+  emit("update:sort-key", nextSortKey)
+  emit("update:sort-direction", nextSortDirection)
+}
 
 const totalUsersLabel = computed(() => {
   const total = props.totalUsers
@@ -628,6 +646,12 @@ const getAccessLabel = (row) => {
   const count = row.accesses.length
 
   return `${count} ${count === 1 ? "acceso" : "accesos"}`
+}
+
+const getLastAccessLabel = (user) => {
+  const value = String(user?.lastAccess || "").trim()
+
+  return value && value !== "-" ? value : "Sin acceso aun"
 }
 
 const getPrimaryRoleLabel = (row) => {

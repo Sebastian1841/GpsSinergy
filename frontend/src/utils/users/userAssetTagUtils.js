@@ -126,10 +126,13 @@ export const buildAssetTagOptions = (assets = []) => {
   })
 }
 
-export const assetMatchesTagIds = (asset = {}, tagIds = []) => {
-  const selectedTagIds = new Set(tagIds.map(normalizeAssetTagId).filter(Boolean))
-
-  if (!selectedTagIds.size) return false
+export const assetMatchesNormalizedTagIds = (asset = {}, selectedTagIds) => {
+  if (!selectedTagIds?.size) return false
 
   return getAssetTagIds(asset).some((tagId) => selectedTagIds.has(tagId))
+}
+
+export const assetMatchesTagIds = (asset = {}, tagIds = []) => {
+  const selectedTagIds = new Set(tagIds.map(normalizeAssetTagId).filter(Boolean))
+  return assetMatchesNormalizedTagIds(asset, selectedTagIds)
 }

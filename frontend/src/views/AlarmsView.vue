@@ -2,7 +2,7 @@
   <section class="h-full min-h-0 bg-[#f4f7fb] text-slate-900">
     <div class="grid h-full min-h-0 grid-rows-[auto_1fr]">
       <header class="shrink-0 px-4 pb-3 pt-3 xl:px-5">
-        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div class="flex flex-wrap items-end gap-1 border-b border-[#d8e0eb]">
           <div class="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -10,7 +10,6 @@
               :class="activeAlarmPanel === 'config' ? 'is-active' : ''"
               @click="activeAlarmPanel = 'config'"
             >
-              <SvgIcon name="configuracion" class="h-4 w-4" />
               Configuracion de alertas
             </button>
 
@@ -20,48 +19,9 @@
               :class="activeAlarmPanel === 'history' ? 'is-active' : ''"
               @click="activeAlarmPanel = 'history'"
             >
-              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" aria-hidden="true">
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="9"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-                <path
-                  d="M12 7v5l3 2"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
               Historial de alertas
             </button>
           </div>
-
-          <button
-            v-if="activeAlarmPanel === 'config'"
-            type="button"
-            class="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#ff6600] px-5 text-[12px] font-black text-white shadow-sm transition hover:bg-[#e65c00] disabled:cursor-not-allowed disabled:bg-slate-300"
-            :disabled="!canManageAlarms"
-            @click="openNewAutomaticAlert"
-          >
-            <SvgIcon name="plus" class="h-4 w-4" />
-            Nueva alerta
-          </button>
-
-          <div v-else class="hidden lg:block"></div>
-        </div>
-
-        <div v-if="activeAlarmPanel === 'history'" class="mt-4">
-          <AlarmSummaryHeader
-            :items="summaryItems"
-            :selected-status="selectedStatus"
-            @select-summary="handleSummaryFilter"
-          />
         </div>
 
         <div
@@ -117,7 +77,6 @@
 
       <main v-else class="min-h-0 overflow-hidden px-4 pb-4 xl:px-5">
         <AlarmConfigPanel
-          ref="configPanelRef"
           :company-id="currentCompanyId"
           :companies="companiesForScope"
           :assets="assetsForScope"
@@ -139,8 +98,6 @@ import AlarmConfigPanel from "../components/alarms/AlarmConfigPanel.vue"
 import AlarmDetailPanel from "../components/alarms/AlarmDetailPanel.vue"
 import AlarmFilters from "../components/alarms/AlarmFilters.vue"
 import AlarmList from "../components/alarms/AlarmList.vue"
-import AlarmSummaryHeader from "../components/alarms/AlarmSummaryHeader.vue"
-import SvgIcon from "../components/icons/SvgIcon.vue"
 import { useAuditTrail } from "../composables/audit/useAuditTrail.js"
 import { useAccessControl } from "../composables/auth/useAccessControl.js"
 import { useGeofences } from "../composables/activos/geocercas/useGeofences.js"
@@ -149,7 +106,6 @@ import { useMockDatabase } from "../composables/mock/useMockDatabase.js"
 import { useDebouncedValue } from "../composables/ui/useDebouncedValue.js"
 import { useAlarmsService } from "../services/alarms/useAlarmsService.js"
 import {
-  buildAlarmSummary,
   filterAlarmRows,
   getAuthorizedAlarmRows,
   sortAlarmRows,
@@ -184,7 +140,6 @@ const selectedAlarmId = ref("")
 const feedbackMessage = ref("")
 
 const activeAlarmPanel = ref("config")
-const configPanelRef = ref(null)
 
 const debouncedSearchTerm = useDebouncedValue(searchTerm, 180)
 
@@ -363,35 +318,6 @@ const visibleRows = computed(() => {
   return sortAlarmRows(filteredRows.value)
 })
 
-const summary = computed(() => {
-  return buildAlarmSummary(authorizedRows.value)
-})
-
-const summaryItems = computed(() => {
-  return [
-    {
-      key: "all",
-      status: "all",
-      label: "Todas",
-      value: summary.value.total,
-    },
-    {
-      key: "active",
-      status: "active",
-      label: "Activas",
-      value: summary.value.active,
-      tone: "danger",
-    },
-    {
-      key: "resolved",
-      status: "resolved",
-      label: "Resueltas",
-      value: summary.value.resolved,
-      tone: "success",
-    },
-  ]
-})
-
 const selectedAlarm = computed(() => {
   if (!selectedAlarmId.value) {
     return null
@@ -458,15 +384,6 @@ const clearFilters = () => {
   selectedStatus.value = "all"
   selectedCompanyId.value = "all"
   selectedDateRange.value = "all"
-}
-
-const openNewAutomaticAlert = () => {
-  activeAlarmPanel.value = "config"
-  configPanelRef.value?.startNewRule()
-}
-
-const handleSummaryFilter = (item = {}) => {
-  selectedStatus.value = item.status || "all"
 }
 
 const handleResolveAlarm = (alarmId) => {
@@ -576,36 +493,36 @@ watch(
 
 <style scoped>
 .alarm-panel-tab {
+  position: relative;
   display: inline-flex;
-  height: 2.75rem;
-  min-width: 13.25rem;
+  height: 3.25rem;
   align-items: center;
   justify-content: center;
-  gap: 0.625rem;
-  border-radius: 0.5rem;
-  border: 1px solid #d8e0eb;
-  background: #ffffff;
-  padding: 0 1.125rem;
-  font-size: 0.75rem;
+  border: 0;
+  background: transparent;
+  padding: 0 1.25rem;
+  font-size: 0.8125rem;
   font-weight: 900;
-  color: #102372;
-  box-shadow: 0 1px 3px rgb(15 35 70 / 0.08);
-  transition:
-    border-color 0.16s ease,
-    background-color 0.16s ease,
-    color 0.16s ease,
-    box-shadow 0.16s ease;
+  color: #64748b;
+  cursor: pointer;
+  transition: color 0.15s ease;
 }
 
 .alarm-panel-tab:hover {
-  border-color: #9eb3d1;
-  background: #f8fbff;
+  color: #102372;
 }
 
 .alarm-panel-tab.is-active {
-  border-color: #102372;
-  background: #102372;
-  color: #ffffff;
-  box-shadow: 0 8px 18px rgb(16 35 114 / 0.16);
+  color: #102372;
+}
+
+.alarm-panel-tab.is-active::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: #ff6600;
+  content: "";
 }
 </style>

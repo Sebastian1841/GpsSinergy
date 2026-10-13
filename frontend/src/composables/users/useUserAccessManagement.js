@@ -8,7 +8,7 @@ import { useUserAccessDrafts } from "./useUserAccessDrafts.js"
 import { userMatchesSearch } from "../../utils/users/userAccessUtils.js"
 import { normalizeAccess, normalizeUserAccessKey } from "../../utils/users/userAccessStateUtils.js"
 
-const DEFAULT_USER_PAGE_SIZE = 8
+const DEFAULT_USER_PAGE_SIZE = 10
 
 export function useUserAccessManagement({ routeCompanyId = null, assetTags = null } = {}) {
   const { currentUser, isPlatformAdmin } = useAuthSession()

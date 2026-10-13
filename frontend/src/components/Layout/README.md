@@ -14,9 +14,17 @@ Componentes estructurales de la aplicacion.
   `Empresas`, `Activos`, `Reportes`, `Usuarios`, `Espacios`, `Auditoria`) y
   navega al resultado seleccionado.
 - `AppSidebar.vue`: navegacion lateral. Incluye accesos a Activos, Reportes,
-  Alertas, Auditoria, Mantenciones y modulos administrativos segun permisos.
+  Alertas, Auditoria, Mantenciones, Sin reportar y modulos administrativos segun permisos.
   Los accesos por empresa conservan la empresa activa cuando la ruta actual
-  tiene `empresaId`, o usan una empresa accesible como respaldo.
+  tiene `empresaId`, o usan una empresa accesible como respaldo. En escritorio
+  ofrece una barra compacta de `76px` y un panel expandido de `292px`; ambos
+  consumen la misma lista autorizada de modulos. La preferencia de mostrar la
+  barra compacta se guarda en `localStorage` bajo `sinergy-sidebar-compact`.
+  En pantallas pequenas la barra compacta se oculta y el panel se abre desde el
+  boton del header. Cada icono compacto muestra el nombre de su modulo mediante
+  tooltip visual y conserva `title` como respaldo nativo. Los SVG de navegacion
+  usan una caja fija de `20x20px` para evitar que trazados sin dimensiones
+  propias desborden la barra.
 - `HeaderFleetAssetFilterMenu.vue`: selector unico del header para la vista
   Activos. Contiene dos conceptos visuales: ciudades calculadas por GPS y
   grupos de vehiculos. Desde la pestana de grupos se pueden crear, eliminar y
@@ -51,6 +59,10 @@ devolver todos los resultados de ese tipo disponibles para los permisos actuales
 El header no debe administrar editores secundarios. Si una accion requiere un
 modal o flujo de configuracion, mantenerlo dentro del modulo dueno y dejar el
 header solo como punto de navegacion o seleccion global.
+
+Cuando no hay empresa activa, `activeContextName` debe reconocer explicitamente
+las rutas generales de cada modulo. `Reports` muestra `Reportes` y no debe caer
+en el respaldo `Selecciona una empresa`.
 
 Los filtros de flota del header deben aplicarse siempre sobre `visibleAssets`.
 La cadena esperada es: permisos/etiquetas de acceso -> activos autorizados ->

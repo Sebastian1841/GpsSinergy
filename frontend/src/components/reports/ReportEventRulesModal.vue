@@ -3,65 +3,111 @@
     <Teleport to="body">
       <div
         v-if="modelValue"
-        class="fixed inset-0 z-[930] flex items-end justify-center bg-slate-950/55 p-2 sm:items-center sm:p-4"
+        class="fixed inset-0 z-[930] flex items-end justify-center bg-slate-950/60 p-2 sm:items-center sm:p-5"
         @click.self="closeModal"
       >
         <section
-          class="flex max-h-[calc(100vh-16px)] w-full max-w-[680px] flex-col overflow-hidden rounded-t-xl bg-white shadow-[0_24px_80px_rgba(15,23,42,0.34)] sm:max-h-[calc(100vh-32px)] sm:rounded-xl"
+          class="flex max-h-[calc(100vh-16px)] w-full max-w-[1120px] flex-col overflow-hidden rounded-t-xl bg-white shadow-[0_28px_90px_rgba(15,23,42,0.38)] sm:max-h-[88vh] sm:rounded-xl"
         >
-          <header class="shrink-0 border-b border-white/10 bg-[#102372] px-4 py-3">
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <p class="text-[10px] font-black uppercase tracking-[0.16em] text-white/55">
-                  Reportes
-                </p>
+          <header
+            class="relative shrink-0 overflow-hidden border-b-2 border-[#ff6600] bg-[#102372] px-6 py-3.5 sm:px-8"
+          >
+            <div
+              class="pointer-events-none absolute inset-y-0 right-[18%] hidden w-40 -skew-x-[28deg] bg-white/[0.025] sm:block"
+            ></div>
+            <div
+              class="pointer-events-none absolute inset-y-0 right-[7%] hidden w-24 -skew-x-[28deg] bg-white/[0.035] sm:block"
+            ></div>
 
-                <h2 class="mt-0.5 truncate text-[15px] font-black text-white">Reglas de evento</h2>
+            <div class="relative z-10 flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="h-0.5 w-5 rounded-full bg-[#ff6600]"></span>
+                  <p class="text-[9px] font-black uppercase tracking-[0.16em] text-white/65">
+                    Reportes
+                  </p>
+                </div>
+
+                <h2
+                  class="mt-1 truncate text-[19px] font-black leading-tight text-white sm:text-[21px]"
+                >
+                  Reglas de evento
+                </h2>
+
+                <p class="mt-1 text-[10px] font-semibold text-white/70 sm:text-[11px]">
+                  Gestiona las reglas utilizadas en la generación de reportes y alertas.
+                </p>
               </div>
 
               <button
                 type="button"
-                class="rounded-lg px-2 py-1 text-[18px] font-black leading-none text-white/65 transition hover:bg-white/10 hover:text-white"
+                class="flex h-9 w-9 items-center justify-center rounded-lg text-white/65 transition hover:bg-white/10 hover:text-white"
+                aria-label="Cerrar reglas de evento"
                 @click="closeModal"
               >
-                x
+                <svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" aria-hidden="true">
+                  <path
+                    d="M6 6l12 12M18 6 6 18"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                </svg>
               </button>
             </div>
           </header>
 
           <div
-            class="grid shrink-0 gap-2 border-b border-slate-200/80 bg-[#f6f8fb] p-3 sm:grid-cols-[minmax(0,1fr)_auto]"
+            class="grid shrink-0 items-center gap-3 border-b border-slate-200/80 bg-[#f6f8fb] px-5 py-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_180px_auto]"
           >
-            <label class="min-w-0">
+            <label class="relative min-w-0">
               <span class="sr-only">Buscar regla</span>
+              <svg
+                viewBox="0 0 24 24"
+                class="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="m20 20-4.35-4.35M18 10.5a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              </svg>
               <input
                 v-model="ruleSearch"
                 type="search"
-                class="h-9 w-full rounded-lg border border-[#d8dee8] bg-white px-3 text-[11px] font-bold text-[#102372] outline-none placeholder:text-slate-400 focus:border-[#ff6600] focus:ring-2 focus:ring-[#ff6600]/10"
+                class="h-10 w-full rounded-lg border border-[#cfd8e6] bg-white pl-11 pr-4 text-[11px] font-semibold text-[#102372] outline-none placeholder:text-slate-400 focus:border-[#ff6600] focus:ring-2 focus:ring-[#ff6600]/10"
                 placeholder="Buscar regla de evento..."
               />
             </label>
 
             <button
               type="button"
-              class="h-9 rounded-lg bg-[#ff6600] px-4 text-[10px] font-black uppercase tracking-[0.08em] text-white transition hover:bg-[#e65c00]"
+              class="h-10 rounded-lg bg-[#ff6600] px-5 text-[11px] font-black text-white shadow-sm transition hover:bg-[#e65c00]"
               @click="openCreateForm"
             >
               Nueva regla
             </button>
+
+            <p class="text-center text-[10px] font-black text-slate-500 lg:min-w-[70px]">
+              {{ filteredRules.length }}
+              {{ filteredRules.length === 1 ? "regla" : "reglas" }}
+            </p>
           </div>
 
-          <div class="min-h-0 flex-1 overflow-auto bg-[#f6f8fb] p-3">
-            <div v-if="filteredRules.length" class="grid gap-2">
+          <div class="min-h-0 flex-1 overflow-auto bg-[#f6f8fb] p-4 sm:p-6">
+            <div v-if="filteredRules.length" class="grid gap-3 lg:grid-cols-2 lg:gap-4">
               <article
                 v-for="rule in filteredRules"
                 :key="rule.id"
-                class="rounded-lg bg-white p-3 shadow-[0_1px_3px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70"
+                class="flex min-h-[138px] flex-col rounded-lg border border-[#dfe5ed] bg-white p-5 shadow-[0_4px_18px_rgba(15,35,114,0.04)]"
               >
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
                     <div class="flex min-w-0 items-center gap-2">
-                      <h3 class="truncate text-[12px] font-black text-[#102372]">
+                      <h3 class="truncate text-[15px] font-black text-[#102372]">
                         {{ rule.label }}
                       </h3>
 
@@ -85,22 +131,16 @@
                     </div>
 
                     <p
-                      class="mt-1 line-clamp-2 text-[11px] font-semibold leading-relaxed text-slate-500"
+                      class="mt-1.5 line-clamp-2 text-[11px] font-semibold leading-relaxed text-slate-500"
                     >
                       {{ rule.description || "Sin descripcion." }}
-                    </p>
-
-                    <p
-                      class="mt-2 text-[10px] font-black uppercase tracking-[0.04em] text-slate-400"
-                    >
-                      {{ getRuleSummary(rule) }}
                     </p>
                   </div>
 
                   <div class="flex shrink-0 gap-1.5">
                     <button
                       type="button"
-                      class="h-8 rounded-lg border border-[#d8dee8] bg-white px-3 text-[9px] font-black uppercase tracking-[0.06em] text-[#102372] transition hover:border-[#ff6600] hover:text-[#ff6600]"
+                      class="h-8 rounded-lg border border-[#cfd8e6] bg-white px-4 text-[10px] font-black text-[#102372] transition hover:border-[#ff6600] hover:text-[#ff6600]"
                       @click="openEditForm(rule.id)"
                     >
                       Editar
@@ -109,13 +149,19 @@
                     <button
                       v-if="rule.source === 'custom'"
                       type="button"
-                      class="h-8 rounded-lg border border-red-200 bg-white px-3 text-[9px] font-black uppercase tracking-[0.06em] text-red-600 transition hover:bg-red-50"
+                      class="h-8 rounded-lg border border-red-200 bg-white px-3 text-[9px] font-black text-red-600 transition hover:bg-red-50"
                       @click="deleteRule(rule)"
                     >
                       Eliminar
                     </button>
                   </div>
                 </div>
+
+                <p
+                  class="mt-auto border-t border-[#e8edf3] pt-3 text-[9px] font-black uppercase tracking-[0.08em] text-slate-500"
+                >
+                  {{ getRuleSummary(rule) }}
+                </p>
               </article>
             </div>
 
@@ -127,20 +173,34 @@
             </div>
           </div>
 
-          <footer class="shrink-0 border-t border-[#edf1f5] bg-white px-3 py-3">
+          <footer
+            class="flex shrink-0 flex-col gap-3 border-t border-[#edf1f5] bg-white px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6"
+          >
             <button
               type="button"
-              class="h-9 rounded-lg border border-[#d8dee8] bg-white px-4 text-[10px] font-black uppercase tracking-[0.08em] text-slate-500 transition hover:border-[#ff6600] hover:text-[#ff6600]"
+              class="h-9 rounded-lg border border-[#cfd8e6] bg-white px-5 text-[10px] font-black text-[#102372] transition hover:border-[#ff6600] hover:text-[#ff6600]"
               @click="closeModal"
             >
               Cerrar
             </button>
+
+            <div
+              class="flex max-w-[360px] items-start gap-2.5 rounded-lg bg-[#f6f8fb] px-3 py-2.5 text-[9px] font-semibold leading-relaxed text-slate-500"
+            >
+              <span
+                class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#102372] text-[11px] font-black text-[#102372]"
+              >
+                i
+              </span>
+              <span>Las reglas de evento se aplican en la generación de reportes y alertas.</span>
+            </div>
           </footer>
         </section>
       </div>
     </Teleport>
 
     <ReportEventRuleFormModal
+      v-if="isFormModalOpen"
       v-model="isFormModalOpen"
       :rule-id="selectedRuleId"
       :groups="groups"
@@ -149,11 +209,14 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue"
+import { computed, defineAsyncComponent, ref, watch } from "vue"
 
 import { useAuditTrail } from "../../composables/audit/useAuditTrail.js"
 import { useReportEventRules } from "../../composables/reports/useReportEventRules.js"
-import ReportEventRuleFormModal from "./ReportEventRuleFormModal.vue"
+import { preloadWhenIdle } from "../../composables/ui/useIdlePreload.js"
+
+const loadReportEventRuleFormModal = () => import("./ReportEventRuleFormModal.vue")
+const ReportEventRuleFormModal = defineAsyncComponent(loadReportEventRuleFormModal)
 
 const props = defineProps({
   modelValue: {
@@ -191,7 +254,13 @@ const filteredRules = computed(() => {
 watch(
   () => props.modelValue,
   (isOpen) => {
-    if (isOpen) return
+    if (isOpen) {
+      preloadWhenIdle([loadReportEventRuleFormModal], {
+        delay: 800,
+        timeout: 2500,
+      })
+      return
+    }
 
     isFormModalOpen.value = false
     selectedRuleId.value = ""

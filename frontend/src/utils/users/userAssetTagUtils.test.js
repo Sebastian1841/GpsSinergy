@@ -3,6 +3,7 @@ import test from "node:test"
 
 import {
   assetMatchesTagIds,
+  assetMatchesNormalizedTagIds,
   buildAssetTagOptions,
   getAssetTagIds,
   groupAssetTagsByCompany,
@@ -23,6 +24,24 @@ test("asset scope matches assets with selected tag ids", () => {
   assert.equal(assetMatchesTagIds(asset, ["asset-tag-001"]), true)
   assert.equal(assetMatchesTagIds(asset, ["Faena Norte"]), true)
   assert.equal(assetMatchesTagIds(asset, ["otra-etiqueta"]), false)
+})
+
+test("indexed tag matching preserves array matching without rebuilding or iterating the permission set", () => {
+  const permissions = ["Faena Norte", "Área_1", "", null, "Faena Norte"]
+  const selected = new Set(permissions.map(normalizeAssetTagId).filter(Boolean))
+  selected[Symbol.iterator] = () => { throw new Error("Permission set must not be copied") }
+  for (const asset of [
+    { assetTagIds: ["FAENA NORTE"] },
+    { assetTags: [{ id: "Área_1", name: "Area" }] },
+    { assetTagIds: ["otra-etiqueta"] },
+    { tags: ["faena-norte"], labels: ["area-1"] },
+    {},
+  ]) {
+    assert.equal(assetMatchesNormalizedTagIds(asset, selected), assetMatchesTagIds(asset, permissions))
+  }
+  assert.equal(selected.size, 2)
+  assert.equal(assetMatchesNormalizedTagIds({ assetTagIds: ["faena-norte"] }, new Set()), false)
+  assert.equal(assetMatchesNormalizedTagIds({ assetTagIds: ["faena-norte"] }, undefined), false)
 })
 
 test("asset access tags ignore generic visual tag fields", () => {

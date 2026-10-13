@@ -15,8 +15,10 @@ export function useMaintenanceDerivedData({
   workOrders,
 }) {
   const orderSummaryMetrics = computed(() => {
+    const statusCounts = new Map()
+    for (const order of workOrders.value) statusCounts.set(order.status, (statusCounts.get(order.status) || 0) + 1)
     const countOrdersByStatus = (status) => {
-      return workOrders.value.filter((order) => order.status === status).length
+      return statusCounts.get(status) || 0
     }
     const total = workOrders.value.length || 1
     const percent = (status) =>

@@ -9,7 +9,7 @@
 
     <div class="rounded-lg border border-[#d8e0eb] bg-white p-2.5 shadow-sm">
       <div
-        class="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(280px,1fr)_150px_170px_150px_104px]"
+        class="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(280px,1fr)_150px_170px_150px_104px_140px]"
       >
         <label class="group relative min-w-0">
           <span
@@ -60,16 +60,18 @@
           class="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#d8e0eb] bg-white px-3 text-[12px] font-black text-[#102372] shadow-sm transition hover:border-[#ff6600] hover:text-[#ff6600]"
           @click="$emit('clear')"
         >
-          <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" aria-hidden="true">
-            <path
-              d="M4 12a8 8 0 0 1 13.66-5.66M20 12a8 8 0 0 1-13.66 5.66M8 5H4V1M16 19h4v4"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
+          <SvgIcon name="filter-clear" class="h-[18px] w-[18px]" />
           Limpiar
+        </button>
+
+        <button
+          type="button"
+          class="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#ff6600] px-4 text-[12px] font-black text-white shadow-sm transition-colors hover:bg-[#e65c00] disabled:cursor-not-allowed disabled:bg-slate-300"
+          :disabled="!canManage"
+          @click="$emit('create')"
+        >
+          <SvgIcon name="plus" class="h-4 w-4" />
+          Nueva alerta
         </button>
       </div>
     </div>
@@ -114,10 +116,15 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  canManage: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits([
   "clear",
+  "create",
   "update:searchTerm",
   "update:selectedType",
   "update:selectedCompanyId",

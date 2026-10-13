@@ -1,27 +1,29 @@
 <template>
-  <section class="overflow-hidden rounded-xl border border-[#dfe5ed] bg-white">
+  <section
+    class="flex min-h-[420px] flex-col overflow-hidden rounded-xl border border-[#dfe5ed] bg-white"
+  >
     <!-- TOOLBAR -->
     <header
       class="flex flex-col gap-3 border-b border-[#edf1f5] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
     >
       <div>
-        <p class="text-[12px] font-black text-[#102372]">
+        <p class="text-[13px] font-black text-[#102372]">
           {{ totalCompanies }} {{ totalCompanies === 1 ? "empresa" : "empresas" }}
         </p>
 
-        <p class="mt-0.5 text-[9px] font-semibold text-slate-400">
+        <p class="mt-0.5 text-[10px] font-semibold text-slate-400">
           Listado de empresas disponibles en la plataforma.
         </p>
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
-        <span class="text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
+        <span class="text-[10px] font-black uppercase tracking-[0.08em] text-slate-400">
           Ordenar por
         </span>
 
         <select
           :value="sortKey"
-          class="h-8 cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-2.5 text-[10px] font-bold text-[#102372] outline-none transition focus:border-[#102372]"
+          class="h-9 cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-3 text-[11px] font-bold text-[#102372] outline-none transition focus:border-[#102372]"
           @change="$emit('update:sort-key', $event.target.value)"
         >
           <option value="name">Nombre</option>
@@ -33,7 +35,7 @@
 
         <button
           type="button"
-          class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#d8dee8] bg-white text-[#102372] transition hover:bg-[#f6f8fb]"
+          class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#d8dee8] bg-white text-[#102372] transition hover:bg-[#f6f8fb]"
           :aria-label="sortDirection === 'asc' ? 'Orden descendente' : 'Orden ascendente'"
           @click="$emit('update:sort-direction', sortDirection === 'asc' ? 'desc' : 'asc')"
         >
@@ -60,7 +62,7 @@
         <div class="flex overflow-hidden rounded-lg border border-[#d8dee8]">
           <button
             type="button"
-            class="flex h-8 w-8 items-center justify-center transition"
+            class="flex h-9 w-9 items-center justify-center transition"
             :class="
               viewMode === 'table'
                 ? 'bg-[#102372] text-white'
@@ -81,7 +83,7 @@
 
           <button
             type="button"
-            class="flex h-8 w-8 items-center justify-center border-l border-[#d8dee8] transition"
+            class="flex h-9 w-9 items-center justify-center border-l border-[#d8dee8] transition"
             :class="
               viewMode === 'grid'
                 ? 'bg-[#102372] text-white'
@@ -100,58 +102,75 @@
             </svg>
           </button>
         </div>
+
+        <button
+          type="button"
+          class="ml-0 inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#ff6600] px-4 text-[11px] font-black text-white shadow-sm transition-colors hover:bg-[#e65c00] sm:ml-3"
+          @click="$emit('create-company')"
+        >
+          <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" aria-hidden="true">
+            <path
+              d="M12 5v14M5 12h14"
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+            />
+          </svg>
+
+          Nueva empresa
+        </button>
       </div>
     </header>
 
     <!-- TABLA -->
-    <div v-if="companies.length && viewMode === 'table'" class="overflow-x-auto">
+    <div v-if="companies.length && viewMode === 'table'" class="min-h-0 flex-1 overflow-x-auto">
       <table class="w-full min-w-[920px] border-collapse">
         <thead>
           <tr class="border-b border-[#edf1f5] bg-[#f8fafc]">
             <th
-              class="px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.08em] text-slate-400"
+              class="px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-[0.08em] text-slate-400"
             >
               Empresa
             </th>
 
             <th
-              class="px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.08em] text-slate-400"
+              class="px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-[0.08em] text-slate-400"
             >
               RUT
             </th>
 
             <th
-              class="px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.08em] text-slate-400"
+              class="px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-[0.08em] text-slate-400"
             >
               Ubicación
             </th>
 
             <th
-              class="px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.08em] text-slate-400"
+              class="px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-[0.08em] text-slate-400"
             >
               Estado
             </th>
 
             <th
-              class="px-4 py-3 text-center text-[9px] font-black uppercase tracking-[0.08em] text-slate-400"
+              class="px-4 py-3.5 text-center text-[10px] font-black uppercase tracking-[0.08em] text-slate-400"
             >
               Activos
             </th>
 
             <th
-              class="px-4 py-3 text-center text-[9px] font-black uppercase tracking-[0.08em] text-slate-400"
+              class="px-4 py-3.5 text-center text-[10px] font-black uppercase tracking-[0.08em] text-slate-400"
             >
               Usuarios
             </th>
 
             <th
-              class="px-4 py-3 text-center text-[9px] font-black uppercase tracking-[0.08em] text-slate-400"
+              class="px-4 py-3.5 text-center text-[10px] font-black uppercase tracking-[0.08em] text-slate-400"
             >
               Reportes base
             </th>
 
             <th
-              class="w-[124px] px-4 py-3 text-center text-[9px] font-black uppercase tracking-[0.08em] text-slate-400"
+              class="w-[132px] px-4 py-3.5 text-center text-[10px] font-black uppercase tracking-[0.08em] text-slate-400"
             >
               Acciones
             </th>
@@ -167,10 +186,10 @@
             @click="$emit('select-company', company.id)"
           >
             <!-- EMPRESA -->
-            <td class="px-4 py-3.5">
+            <td class="px-4 py-4">
               <div class="flex min-w-[180px] items-center gap-3">
                 <div
-                  class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-white"
+                  class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[12px] font-black text-white"
                   :class="getCompanyAvatarClass(company.status)"
                 >
                   {{ getCompanyInitials(company.name) }}
@@ -178,13 +197,13 @@
 
                 <div class="min-w-0">
                   <p
-                    class="max-w-[210px] truncate text-[11px] font-black"
+                    class="max-w-[210px] truncate text-[12px] font-black"
                     :class="company.status === 'inactive' ? 'text-slate-500' : 'text-[#102372]'"
                   >
                     {{ company.name }}
                   </p>
 
-                  <p class="mt-0.5 text-[9px] font-semibold text-slate-400">
+                  <p class="mt-0.5 text-[10px] font-semibold text-slate-400">
                     {{ company.shortName || "Empresa" }}
                   </p>
                 </div>
@@ -192,12 +211,12 @@
             </td>
 
             <!-- RUT -->
-            <td class="px-4 py-3.5 text-[10px] font-semibold text-slate-600">
+            <td class="px-4 py-4 text-[11px] font-semibold text-slate-600">
               {{ company.rut || "Sin RUT" }}
             </td>
 
             <!-- UBICACION -->
-            <td class="px-4 py-3.5">
+            <td class="px-4 py-4">
               <div class="flex min-w-[150px] items-center gap-1.5 text-slate-500">
                 <svg
                   viewBox="0 0 24 24"
@@ -218,16 +237,16 @@
                   />
                 </svg>
 
-                <span class="truncate text-[10px] font-semibold">
+                <span class="truncate text-[11px] font-semibold">
                   {{ locationLabel(company) }}
                 </span>
               </div>
             </td>
 
             <!-- ESTADO -->
-            <td class="px-4 py-3.5">
+            <td class="px-4 py-4">
               <span
-                class="inline-flex rounded-full px-2.5 py-1 text-[9px] font-black"
+                class="inline-flex rounded-full px-2.5 py-1 text-[10px] font-black"
                 :class="getStatusPillClass(company.status)"
               >
                 {{ getStatusLabel(company.status) }}
@@ -235,26 +254,26 @@
             </td>
 
             <!-- ACTIVOS -->
-            <td class="px-4 py-3.5 text-center text-[11px] font-black text-[#102372]">
+            <td class="px-4 py-4 text-center text-[12px] font-black text-[#102372]">
               {{ company.assetsCount || 0 }}
             </td>
 
             <!-- USUARIOS -->
-            <td class="px-4 py-3.5 text-center text-[11px] font-black text-[#102372]">
+            <td class="px-4 py-4 text-center text-[12px] font-black text-[#102372]">
               {{ company.usersCount || 0 }}
             </td>
 
             <!-- REPORTES -->
-            <td class="px-4 py-3.5 text-center text-[11px] font-black text-[#102372]">
+            <td class="px-4 py-4 text-center text-[12px] font-black text-[#102372]">
               {{ getEnabledReportsCount(company) }}
             </td>
 
             <!-- ACCIONES -->
-            <td class="px-4 py-3.5">
+            <td class="px-4 py-4">
               <div class="flex justify-center">
                 <button
                   type="button"
-                  class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-[#d8dee8] bg-white px-3 text-[9px] font-black text-[#102372] transition hover:border-[#102372]/25 hover:bg-[#eef3ff]"
+                  class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#102372] transition hover:border-[#102372]/25 hover:bg-[#eef3ff]"
                   aria-label="Configurar empresa"
                   title="Configurar empresa"
                   @click.stop="$emit('configure-company', company.id)"
@@ -280,7 +299,7 @@
     <!-- GRID OPCIONAL -->
     <div
       v-else-if="companies.length && viewMode === 'grid'"
-      class="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3"
+      class="grid flex-1 content-start gap-3 p-4 md:grid-cols-2 xl:grid-cols-3"
     >
       <article
         v-for="company in companies"
@@ -292,62 +311,62 @@
         <div class="flex items-start justify-between gap-3">
           <div class="flex min-w-0 items-center gap-3">
             <div
-              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-white"
+              class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[12px] font-black text-white"
               :class="getCompanyAvatarClass(company.status)"
             >
               {{ getCompanyInitials(company.name) }}
             </div>
 
             <div class="min-w-0">
-              <h3 class="truncate text-[11px] font-black text-[#102372]">
+              <h3 class="truncate text-[13px] font-black text-[#102372]">
                 {{ company.name }}
               </h3>
 
-              <p class="mt-0.5 text-[9px] font-semibold text-slate-400">
+              <p class="mt-0.5 text-[10px] font-semibold text-slate-400">
                 {{ company.rut || "Sin RUT" }}
               </p>
             </div>
           </div>
 
           <span
-            class="shrink-0 rounded-full px-2 py-1 text-[8px] font-black"
+            class="shrink-0 rounded-full px-2.5 py-1 text-[9px] font-black"
             :class="getStatusPillClass(company.status)"
           >
             {{ getStatusLabel(company.status) }}
           </span>
         </div>
 
-        <p class="mt-3 text-[9px] font-semibold text-slate-500">
+        <p class="mt-3 text-[11px] font-semibold text-slate-500">
           {{ locationLabel(company) }}
         </p>
 
         <div class="mt-4 grid grid-cols-3 border-t border-[#edf1f5] pt-3 text-center">
           <div>
-            <p class="text-[12px] font-black text-[#102372]">
+            <p class="text-[14px] font-black text-[#102372]">
               {{ company.assetsCount || 0 }}
             </p>
-            <p class="mt-0.5 text-[8px] font-bold text-slate-400">Activos</p>
+            <p class="mt-0.5 text-[9px] font-bold text-slate-400">Activos</p>
           </div>
 
           <div class="border-x border-[#edf1f5]">
-            <p class="text-[12px] font-black text-[#102372]">
+            <p class="text-[14px] font-black text-[#102372]">
               {{ company.usersCount || 0 }}
             </p>
-            <p class="mt-0.5 text-[8px] font-bold text-slate-400">Usuarios</p>
+            <p class="mt-0.5 text-[9px] font-bold text-slate-400">Usuarios</p>
           </div>
 
           <div>
-            <p class="text-[12px] font-black text-[#102372]">
+            <p class="text-[14px] font-black text-[#102372]">
               {{ getEnabledReportsCount(company) }}
             </p>
-            <p class="mt-0.5 text-[8px] font-bold text-slate-400">Reportes</p>
+            <p class="mt-0.5 text-[9px] font-bold text-slate-400">Reportes</p>
           </div>
         </div>
 
         <div class="mt-4 flex gap-2">
           <button
             type="button"
-            class="h-8 flex-1 rounded-lg bg-[#102372] px-3 text-[9px] font-black text-white transition hover:bg-[#0c1b59]"
+            class="h-9 flex-1 rounded-lg bg-[#102372] px-3 text-[10px] font-black text-white transition hover:bg-[#0c1b59]"
             @click.stop="$emit('enter-company', company)"
           >
             Abrir empresa
@@ -355,7 +374,7 @@
 
           <button
             type="button"
-            class="h-8 rounded-lg border border-[#d8dee8] px-3 text-[9px] font-black text-[#102372] transition hover:bg-[#f6f8fb]"
+            class="h-9 rounded-lg border border-[#d8dee8] px-3 text-[10px] font-black text-[#102372] transition hover:bg-[#f6f8fb]"
             @click.stop="$emit('configure-company', company.id)"
           >
             Configurar
@@ -365,7 +384,10 @@
     </div>
 
     <!-- VACIO -->
-    <div v-else class="flex min-h-[260px] flex-col items-center justify-center p-6 text-center">
+    <div
+      v-else
+      class="flex min-h-[260px] flex-1 flex-col items-center justify-center p-6 text-center"
+    >
       <p class="text-[13px] font-black text-[#102372]">Sin empresas encontradas</p>
 
       <p class="mt-1 text-[10px] font-semibold text-slate-400">
@@ -386,7 +408,7 @@
       v-if="totalCompanies"
       class="flex flex-col gap-3 border-t border-[#edf1f5] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
     >
-      <p class="text-[9px] font-semibold text-slate-400">
+      <p class="text-[10px] font-semibold text-slate-400">
         Mostrando
         <span class="font-black text-slate-600"> {{ paginationFrom }}-{{ paginationTo }} </span>
         de
@@ -399,7 +421,7 @@
       <div class="flex items-center gap-1">
         <button
           type="button"
-          class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#d8dee8] text-slate-400 transition hover:text-[#102372] disabled:cursor-not-allowed disabled:opacity-40"
+          class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#d8dee8] text-slate-400 transition hover:text-[#102372] disabled:cursor-not-allowed disabled:opacity-40"
           :disabled="currentPage <= 1"
           aria-label="Página anterior"
           @click="$emit('previous-page')"
@@ -419,7 +441,7 @@
           v-for="page in visiblePages"
           :key="page"
           type="button"
-          class="flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-[9px] font-black transition"
+          class="flex h-9 min-w-9 items-center justify-center rounded-lg px-2 text-[10px] font-black transition"
           :class="
             currentPage === page
               ? 'bg-[#102372] text-white'
@@ -432,7 +454,7 @@
 
         <button
           type="button"
-          class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#d8dee8] text-slate-400 transition hover:text-[#102372] disabled:cursor-not-allowed disabled:opacity-40"
+          class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#d8dee8] text-slate-400 transition hover:text-[#102372] disabled:cursor-not-allowed disabled:opacity-40"
           :disabled="currentPage >= totalPages"
           aria-label="Página siguiente"
           @click="$emit('next-page')"
@@ -497,6 +519,7 @@ const props = defineProps({
 })
 
 defineEmits([
+  "create-company",
   "configure-company",
   "enter-company",
   "select-company",

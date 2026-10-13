@@ -498,6 +498,10 @@ const activeContextName = computed(() => {
     return "Gestión de usuarios"
   }
 
+  if (route.name === "Reports" || route.name === "AppReports") {
+    return "Reportes"
+  }
+
   if (route.name === "Audit" || route.name === "AppAudit") {
     return "Auditoria"
   }
@@ -508,6 +512,10 @@ const activeContextName = computed(() => {
 
   if (route.name === "Maintenance" || route.name === "AppMaintenance") {
     return "Mantenciones"
+  }
+
+  if (route.name === "Unreported" || route.name === "AppUnreported") {
+    return "Sin reportar"
   }
 
   return "Selecciona una empresa"

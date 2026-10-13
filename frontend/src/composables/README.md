@@ -17,6 +17,7 @@ Hooks Vue que coordinan estado, efectos, watchers y flujos de pantalla.
 - `search/`: busquedas transversales usadas por controles globales.
 - `ui/`: estado de UI reutilizable.
 - `users/`: gestion de usuarios y accesos.
+- `unreported/`: paginacion reactiva de equipos sin reporte.
 - `workspaces/`: espacios de trabajo y persistencia visual.
 
 ## Regla de mantenimiento

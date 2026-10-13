@@ -1,18 +1,8 @@
 <template>
-  <section
-    class="users-management-readable h-full min-h-0 overflow-hidden bg-[#f3f6fa] text-slate-900"
-  >
-    <div class="grid h-full min-h-0 grid-rows-[auto_1fr]">
-      <UserManagementHeader
-        :summary-items="summaryItems"
-        :can-create-users="canCreateUsersForRoute"
-        :selected-status="selectedStatus"
-        @create-user="handleOpenCreateUserModal"
-        @select-status="selectedStatus = $event"
-      />
-
+  <section class="h-full min-h-0 overflow-hidden bg-[#f3f6fa] text-slate-900">
+    <div class="h-full min-h-0">
       <!-- VISTA PRINCIPAL -->
-      <div class="min-h-0 overflow-hidden px-4 pb-4">
+      <div class="h-full min-h-0 overflow-hidden px-4 py-4">
         <div class="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden">
           <UserFiltersBar
             :search-term="searchTerm"
@@ -24,12 +14,14 @@
             :roles="roles"
             :companies="companies"
             :modules="modules"
+            :can-create-users="canCreateUsersForRoute"
             @update:search-term="searchTerm = $event"
             @update:selected-role="selectedRole = $event"
             @update:selected-company="selectedCompany = $event"
             @update:selected-status="selectedStatus = $event"
             @update:selected-module="selectedModule = $event"
             @clear-filters="clearFilters"
+            @create-user="handleOpenCreateUserModal"
           />
 
           <UserListPanel
@@ -47,7 +39,9 @@
             :current-page="currentPage"
             :total-pages="totalPages"
             :page-size="pageSize"
+            :can-edit-users="canEditUsersForRoute"
             @select-user="handleSelectUser"
+            @edit-user="handleEditUserFromCatalog"
             @clear-filters="clearFilters"
             @update:view-mode="userViewMode = $event"
             @update:sort-key="userSortKey = $event"
@@ -55,6 +49,7 @@
             @previous-page="goToPreviousPage"
             @next-page="goToNextPage"
             @go-to-page="goToPage"
+            @update:page-size="handlePageSizeChange"
           />
         </div>
       </div>
@@ -64,7 +59,7 @@
     <Teleport to="body">
       <div
         v-if="showUserDrawer"
-        class="users-management-readable fixed inset-0 z-[2147483000]"
+        class="fixed inset-0 z-[2147483000]"
         role="dialog"
         aria-modal="true"
       >
@@ -161,7 +156,6 @@ import { useRoute, useRouter } from "vue-router"
 import UserAccessDetail from "../components/users/UserAccessDetail.vue"
 import UserFiltersBar from "../components/users/UserFiltersBar.vue"
 import UserListPanel from "../components/users/UserListPanel.vue"
-import UserManagementHeader from "../components/users/UserManagementHeader.vue"
 
 import { useAccessControl } from "../composables/auth/useAccessControl.js"
 import { useAuthSession } from "../composables/auth/useAuthSession.js"
@@ -218,8 +212,6 @@ const {
   currentPage,
   pageSize,
   totalPages,
-  summaryItems,
-
   showEditorModal,
   editorMode,
   draftUser,
@@ -387,6 +379,18 @@ const handleOpenEditUserModal = () => {
   if (!canEditUsersForRoute.value) return
 
   openEditUserModal()
+}
+
+const handleEditUserFromCatalog = (userId) => {
+  if (!canEditUsersForRoute.value) return
+
+  selectUser(userId)
+  openEditUserModal()
+}
+
+const handlePageSizeChange = (nextPageSize) => {
+  pageSize.value = Number(nextPageSize) || 10
+  goToPage(1)
 }
 
 const handleSaveUserFromModal = () => {
@@ -750,57 +754,3 @@ onBeforeUnmount(() => {
   }
 })
 </script>
-
-<style scoped>
-.users-management-readable :deep(.text-\[8px\]) {
-  font-size: 10px !important;
-  line-height: 1rem !important;
-}
-
-.users-management-readable :deep(.text-\[9px\]) {
-  font-size: 11px !important;
-  line-height: 1rem !important;
-}
-
-.users-management-readable :deep(.text-\[10px\]) {
-  font-size: 12px !important;
-  line-height: 1.1rem !important;
-}
-
-.users-management-readable :deep(.text-\[11px\]),
-.users-management-readable :deep(.text-xs) {
-  font-size: 13px !important;
-  line-height: 1.25rem !important;
-}
-
-.users-management-readable :deep(.text-\[12px\]) {
-  font-size: 14px !important;
-  line-height: 1.35rem !important;
-}
-
-.users-management-readable :deep(.text-\[13px\]),
-.users-management-readable :deep(.text-sm) {
-  font-size: 15px !important;
-  line-height: 1.45rem !important;
-}
-
-.users-management-readable :deep(.text-\[14px\]) {
-  font-size: 16px !important;
-  line-height: 1.45rem !important;
-}
-
-.users-management-readable :deep(.text-\[15px\]) {
-  font-size: 17px !important;
-  line-height: 1.5rem !important;
-}
-
-.users-management-readable :deep(.text-\[17px\]) {
-  font-size: 19px !important;
-  line-height: 1.55rem !important;
-}
-
-.users-management-readable :deep(.text-\[18px\]) {
-  font-size: 20px !important;
-  line-height: 1.7rem !important;
-}
-</style>

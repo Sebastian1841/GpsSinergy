@@ -54,6 +54,7 @@ export const getOrderStatusIconClass = (status) => {
 }
 
 export const getStatusLabel = (status) => {
+  if (status === "renewal-pending") return "Sin renovar"
   if (status === "current") return "Al dia"
   if (status === "due") return "Proxima"
   if (status === "overdue") return "Vencida"
@@ -64,6 +65,7 @@ export const getStatusLabel = (status) => {
 }
 
 export const getStatusClass = (status) => {
+  if (status === "renewal-pending") return "bg-violet-50 text-violet-700"
   if (status === "current") return "bg-emerald-50 text-emerald-700"
   if (status === "due") return "bg-amber-50 text-amber-700"
   if (status === "overdue") return "bg-rose-50 text-rose-700"
@@ -74,6 +76,7 @@ export const getStatusClass = (status) => {
 }
 
 export const getMaintenancePlanPillClass = (status) => {
+  if (status === "renewal-pending") return "bg-violet-600 text-white"
   if (status === "current") return "bg-emerald-600 text-white"
   if (status === "due") return "bg-[#0f7cff] text-white"
   if (status === "overdue") return "bg-rose-600 text-white"
@@ -83,6 +86,7 @@ export const getMaintenancePlanPillClass = (status) => {
 }
 
 export const getMaintenancePlanStatusClass = (status) => {
+  if (status === "renewal-pending") return "text-violet-700"
   if (status === "current") return "text-emerald-700"
   if (status === "due") return "text-amber-700"
   if (status === "overdue") return "text-rose-700"
@@ -92,6 +96,7 @@ export const getMaintenancePlanStatusClass = (status) => {
 }
 
 export const getMaintenancePlanStatusMessage = (status) => {
+  if (status === "renewal-pending") return "Pendiente de renovacion"
   if (status === "current") return "Al dia"
   if (status === "due") return "Requiere revision"
   if (status === "overdue") return "Requiere mantencion"
@@ -102,6 +107,7 @@ export const getMaintenancePlanStatusMessage = (status) => {
 }
 
 export const getStatusTextClass = (status) => {
+  if (status === "renewal-pending") return "text-violet-700"
   if (status === "overdue") return "text-rose-600"
   if (status === "due") return "text-amber-600"
   if (status === "workshop") return "text-blue-600"

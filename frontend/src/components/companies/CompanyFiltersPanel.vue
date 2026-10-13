@@ -1,11 +1,11 @@
 <template>
   <aside
-    class="flex min-h-[420px] flex-col self-stretch overflow-hidden rounded-xl border border-[#dfe5ed] bg-white"
+    class="flex min-h-[450px] flex-col self-stretch overflow-hidden rounded-xl border border-[#dfe5ed] bg-white"
   >
     <header class="border-b border-[#edf1f5] px-4 py-3.5">
-      <h2 class="text-[12px] font-black text-[#102372]">Filtros</h2>
+      <h2 class="text-[14px] font-black text-[#102372]">Filtros</h2>
 
-      <p class="mt-0.5 text-[9px] font-semibold text-slate-400">Refina el listado de empresas.</p>
+      <p class="mt-0.5 text-[10px] font-semibold text-slate-400">Refina el listado de empresas.</p>
     </header>
 
     <div class="flex flex-1 flex-col p-4">
@@ -14,7 +14,7 @@
         <div>
           <label
             for="company-filter-search"
-            class="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-500"
+            class="mb-1.5 block text-[10px] font-black uppercase tracking-[0.08em] text-slate-500"
           >
             Buscar
           </label>
@@ -39,7 +39,7 @@
               :value="searchTerm"
               type="text"
               placeholder="Nombre, RUT o ciudad..."
-              class="h-9 w-full rounded-lg border border-[#d8dee8] bg-white pl-9 pr-8 text-[10px] font-semibold text-[#172033] outline-none transition placeholder:text-slate-400 focus:border-[#102372] focus:ring-2 focus:ring-[#102372]/5"
+              class="h-10 w-full rounded-lg border border-[#d8dee8] bg-white pl-9 pr-8 text-[11px] font-semibold text-[#172033] outline-none transition placeholder:text-slate-400 focus:border-[#102372] focus:ring-2 focus:ring-[#102372]/5"
               @input="$emit('update:search-term', $event.target.value)"
             />
 
@@ -64,7 +64,7 @@
 
         <!-- ESTADO -->
         <div>
-          <p class="mb-2 text-[9px] font-black uppercase tracking-[0.08em] text-slate-500">
+          <p class="mb-2 text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
             Estado
           </p>
 
@@ -73,7 +73,7 @@
               v-for="status in statusOptions"
               :key="status.id"
               type="button"
-              class="flex h-9 w-full items-center justify-between rounded-lg px-2.5 text-left transition"
+              class="flex h-10 w-full items-center justify-between rounded-lg px-2.5 text-left transition"
               :class="
                 selectedStatus === status.id
                   ? 'bg-[#eef3ff] text-[#102372]'
@@ -92,13 +92,13 @@
                   />
                 </span>
 
-                <span class="truncate text-[10px] font-bold">
+                <span class="truncate text-[11px] font-bold">
                   {{ status.label }}
                 </span>
               </span>
 
               <span
-                class="ml-2 min-w-[24px] rounded-md bg-[#f5f7fa] px-1.5 py-0.5 text-center text-[9px] font-black text-slate-500"
+                class="ml-2 min-w-[24px] rounded-md bg-[#f5f7fa] px-1.5 py-0.5 text-center text-[10px] font-black text-slate-500"
               >
                 {{ status.count }}
               </span>
@@ -110,7 +110,7 @@
         <div>
           <label
             for="company-region-filter"
-            class="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-500"
+            class="mb-1.5 block text-[10px] font-black uppercase tracking-[0.08em] text-slate-500"
           >
             Región
           </label>
@@ -118,7 +118,7 @@
           <select
             id="company-region-filter"
             :value="selectedRegion"
-            class="h-9 w-full cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-2.5 text-[10px] font-bold text-[#172033] outline-none transition focus:border-[#102372] focus:ring-2 focus:ring-[#102372]/5"
+            class="h-10 w-full cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-2.5 text-[11px] font-bold text-[#172033] outline-none transition focus:border-[#102372] focus:ring-2 focus:ring-[#102372]/5"
             @change="$emit('update:selected-region', $event.target.value)"
           >
             <option value="all">Todas las regiones</option>
@@ -133,7 +133,7 @@
         <div>
           <label
             for="company-city-filter"
-            class="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-500"
+            class="mb-1.5 block text-[10px] font-black uppercase tracking-[0.08em] text-slate-500"
           >
             Ciudad
           </label>
@@ -141,7 +141,7 @@
           <select
             id="company-city-filter"
             :value="selectedCity"
-            class="h-9 w-full cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-2.5 text-[10px] font-bold text-[#172033] outline-none transition focus:border-[#102372] focus:ring-2 focus:ring-[#102372]/5"
+            class="h-10 w-full cursor-pointer rounded-lg border border-[#d8dee8] bg-white px-2.5 text-[11px] font-bold text-[#172033] outline-none transition focus:border-[#102372] focus:ring-2 focus:ring-[#102372]/5"
             @change="$emit('update:selected-city', $event.target.value)"
           >
             <option value="all">Todas las ciudades</option>
@@ -156,7 +156,7 @@
       <!-- LIMPIAR -->
       <button
         type="button"
-        class="mt-auto flex h-9 w-full items-center justify-center rounded-lg border border-[#d8dee8] bg-white text-[10px] font-black text-slate-500 transition hover:border-[#102372]/30 hover:bg-[#f8faff] hover:text-[#102372]"
+        class="mt-auto flex h-10 w-full items-center justify-center rounded-lg border border-[#d8dee8] bg-white text-[11px] font-black text-slate-500 transition hover:border-[#102372]/30 hover:bg-[#f8faff] hover:text-[#102372]"
         @click="$emit('clear-filters')"
       >
         Limpiar filtros

@@ -5,12 +5,30 @@ import { normalizeText } from "../../utils/maintenance/maintenanceFormatUtils.js
 import { getOrderStatusLabel } from "../../utils/maintenance/maintenanceUiUtils.js"
 
 export function useMaintenanceOverviewFilters({
+  maintenancePlanOrderStates,
+  manualMaintenancePlans,
   maintenanceItems,
   searchTerm,
   selectedStatus,
   selectedType,
   selectedWorkshop,
 }) {
+  const hasPendingRenewal = (item) => {
+    return Object.entries(maintenancePlanOrderStates.value).some(([planId, state]) => {
+      if (typeof state !== "object" || state.status !== "pending-renewal") return false
+      if (planId === `base-${item.id}` || planId.startsWith(`base-${item.id}-`)) return true
+
+      return manualMaintenancePlans.value.some(
+        (plan) => String(plan.id) === String(planId) && String(plan.vehicleId) === String(item.id),
+      )
+    })
+  }
+
+  const matchesStatus = (item, status) => {
+    if (status === "renewal-pending") return hasPendingRenewal(item)
+    return item.status === status
+  }
+
   const workshopOptions = computed(() => {
     return [...new Set(maintenanceItems.value.map((item) => item.workshop))].sort()
   })
@@ -20,7 +38,7 @@ export function useMaintenanceOverviewFilters({
     const query = normalizeText(debouncedSearchTerm.value)
 
     return maintenanceItems.value.filter((item) => {
-      if (selectedStatus.value !== "all" && item.status !== selectedStatus.value) return false
+      if (selectedStatus.value !== "all" && !matchesStatus(item, selectedStatus.value)) return false
       if (selectedType.value !== "all" && item.type !== selectedType.value) return false
       if (selectedWorkshop.value !== "all" && item.workshop !== selectedWorkshop.value) {
         return false
@@ -51,7 +69,7 @@ export function useMaintenanceOverviewFilters({
   })
 
   const countByStatus = (status) => {
-    return maintenanceItems.value.filter((item) => item.status === status).length
+    return maintenanceItems.value.filter((item) => matchesStatus(item, status)).length
   }
 
   const maintenanceSummaryMetrics = computed(() => [
@@ -86,14 +104,6 @@ export function useMaintenanceOverviewFilters({
       detail: "vehiculos",
       dotClass: "bg-slate-400",
       filter: "unconfigured",
-    },
-    {
-      key: "workshop",
-      label: "En taller",
-      value: countByStatus("workshop"),
-      detail: "vehiculos",
-      dotClass: "bg-blue-500",
-      filter: "workshop",
     },
   ])
 

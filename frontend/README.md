@@ -32,6 +32,7 @@ src/
   components/   componentes Vue por dominio
   composables/  estado y coordinacion de flujos
   data/         datos mock y configuracion estatica
+  fixtures/     datos sinteticos para validar mantenciones e historial
   router/       rutas y guards de acceso
   services/     adaptadores, storage y servicios mock
   utils/        helpers puros, calculos y exportadores
@@ -64,7 +65,8 @@ Los README locales dentro de `src` explican responsabilidades por carpeta.
 - `Alertas`: historial de alertas activadas por activo autorizado, con filtros,
   detalle, accion para abrir el recorrido del dia en Itinerarios, panel de
   configuracion de reglas automaticas y acciones para resolver o reabrir.
-- `Mantenciones`: planes, ordenes de trabajo, historial y costos del prototipo.
+- `Mantenciones`: Flota, Analisis y Ordenes; planes renovables, historial por vehiculo, persistencia local y exportacion PDF/Excel de flota e historial.
+- `Sin reportar`: listado y graficos mock, filtros, paginacion y exportacion Excel.
 - `Usuarios`: roles, permisos, alcances operativos y etiquetas de acceso.
 - `Empresas`: administracion global de empresas para administradores.
 - `Auditoria`: registro local de acciones del prototipo.

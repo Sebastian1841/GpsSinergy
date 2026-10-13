@@ -2,7 +2,7 @@ import { computed } from "vue"
 
 import { useAuthSession } from "./useAuthSession.js"
 import { useAccessService } from "../../services/access/useAccessService.js"
-import { assetMatchesTagIds, normalizeAssetTagId } from "../../utils/users/userAssetTagUtils.js"
+import { assetMatchesNormalizedTagIds, normalizeAssetTagId } from "../../utils/users/userAssetTagUtils.js"
 
 const normalizeKey = (value) => String(value ?? "")
 
@@ -187,7 +187,7 @@ export function useAccessControl() {
     }
 
     if (scope.type === "asset-tags") {
-      return assetMatchesTagIds(asset, Array.from(scopeIndexes?.assetTagIds || []))
+      return assetMatchesNormalizedTagIds(asset, scopeIndexes?.assetTagIds)
     }
 
     return false

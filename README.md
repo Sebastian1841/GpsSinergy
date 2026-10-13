@@ -1,7 +1,7 @@
 # Sinergy Group Fleet Platform
 
 Frontend Vue para un prototipo funcional de gestion de flota GPS en entorno
-multiempresa. La plataforma cubre activos, mapa, geocercas, reportes,
+multiempresa. La plataforma cubre activos, mapa, geocercas, reportes, alertas,
 mantenciones, usuarios, permisos, empresas y auditoria.
 
 El objetivo del proyecto es modelar una operacion real de flota: primero se
@@ -36,41 +36,44 @@ Emulador/
 
 ## Mapa rapido de carpetas
 
-| Necesitas revisar | Ubicacion principal |
-| --- | --- |
-| Rutas y permisos de navegacion | `frontend/src/router/index.js` |
-| Pantallas principales | `frontend/src/views/` |
-| Header, sidebar, buscador global y selector de vistas | `frontend/src/components/Layout/` |
-| Login y sesion | `frontend/src/views/LoginView.vue`, `frontend/src/composables/auth/`, `frontend/src/services/auth/` |
-| Permisos, empresas accesibles y activos visibles | `frontend/src/composables/auth/useAccessControl.js` |
-| Datos mock de empresas, usuarios, activos y permisos | `frontend/src/data/mockDatabase.js` |
-| Activos/Fleet | `frontend/src/views/ActivosView.vue`, `frontend/src/components/activos/`, `frontend/src/composables/activos/` |
-| Mapa GPS | `frontend/src/components/activos/map/`, `frontend/src/composables/activos/map/` |
-| Geocercas | `frontend/src/components/activos/geocercas/`, `frontend/src/composables/activos/geocercas/`, `frontend/src/utils/geofence*.js` |
-| Filtros de ciudad y grupos de vehiculos | `frontend/src/components/Layout/HeaderFleetAssetFilterMenu.vue`, `frontend/src/composables/activos/fleet/`, `frontend/src/utils/activos/assetVehicleGroupUtils.js` |
-| Etiquetas de acceso de activos | `frontend/src/components/activos/fleet/FleetAssetTagsPanel.vue`, `frontend/src/components/users/UserAssetTagScopeSelector.vue`, `frontend/src/utils/users/userAssetTagUtils.js` |
-| Reportes | `frontend/src/views/ReportsView.vue`, `frontend/src/components/reports/`, `frontend/src/composables/reports/`, `frontend/src/utils/reports/` |
-| Reglas de evento de reportes | `frontend/src/components/reports/ReportEventRulesModal.vue`, `frontend/src/utils/reports/event-rules/` |
-| Ejecucion de reportes | `frontend/src/components/reports/ReportExecutionModal.vue`, `frontend/src/composables/reports/useAssetReportExecution.js`, `frontend/src/utils/reports/execution/` |
-| Exportacion PDF/Excel | `frontend/src/utils/reports/export/`, `frontend/src/utils/reports/route-map/` |
-| Mantenciones | `frontend/src/views/MaintenanceView.vue`, `frontend/src/components/maintenance/`, `frontend/src/composables/maintenance/`, `frontend/src/utils/maintenance/` |
-| Usuarios y permisos | `frontend/src/views/UserManagementView.vue`, `frontend/src/components/users/`, `frontend/src/composables/users/`, `frontend/src/utils/users/` |
-| Empresas | `frontend/src/views/CompanyManagementView.vue`, `frontend/src/components/companies/`, `frontend/src/composables/companies/`, `frontend/src/services/companies/` |
-| Auditoria | `frontend/src/views/AuditView.vue`, `frontend/src/components/audit/`, `frontend/src/composables/audit/`, `frontend/src/services/audit/` |
-| Storage/localStorage | `frontend/src/services/storage/browserStorage.js` |
-| Documentacion tecnica | `frontend/docs/` y los `README.md` dentro de `frontend/src/` |
+| Necesitas revisar                                     | Ubicacion principal                                                                                                                                                                                                       |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rutas y permisos de navegacion                        | `frontend/src/router/index.js`                                                                                                                                                                                            |
+| Pantallas principales                                 | `frontend/src/views/`                                                                                                                                                                                                     |
+| Header, sidebar, buscador global y selector de vistas | `frontend/src/components/Layout/`                                                                                                                                                                                         |
+| Login y sesion                                        | `frontend/src/views/LoginView.vue`, `frontend/src/composables/auth/`, `frontend/src/services/auth/`                                                                                                                       |
+| Permisos, empresas accesibles y activos visibles      | `frontend/src/composables/auth/useAccessControl.js`                                                                                                                                                                       |
+| Datos mock de empresas, usuarios, activos y permisos  | `frontend/src/data/mockDatabase.js`                                                                                                                                                                                       |
+| Activos/Fleet                                         | `frontend/src/views/ActivosView.vue`, `frontend/src/components/activos/`, `frontend/src/composables/activos/`                                                                                                             |
+| Mapa GPS                                              | `frontend/src/components/activos/map/`, `frontend/src/composables/activos/map/`                                                                                                                                           |
+| Geocercas                                             | `frontend/src/components/activos/geocercas/`, `frontend/src/composables/activos/geocercas/`, `frontend/src/utils/geofence*.js`                                                                                            |
+| Filtros de ciudad y grupos de vehiculos               | `frontend/src/components/Layout/HeaderFleetAssetFilterMenu.vue`, `frontend/src/composables/activos/fleet/`, `frontend/src/utils/activos/assetVehicleGroupUtils.js`                                                        |
+| Etiquetas de acceso de activos                        | `frontend/src/components/activos/fleet/FleetAssetTagsPanel.vue`, `frontend/src/components/users/UserAssetTagScopeSelector.vue`, `frontend/src/utils/users/userAssetTagUtils.js`                                           |
+| Reportes                                              | `frontend/src/views/ReportsView.vue`, `frontend/src/components/reports/`, `frontend/src/composables/reports/`, `frontend/src/utils/reports/`                                                                              |
+| Reglas de evento de reportes                          | `frontend/src/components/reports/ReportEventRulesModal.vue`, `frontend/src/utils/reports/event-rules/`                                                                                                                    |
+| Ejecucion de reportes                                 | `frontend/src/components/reports/ReportExecutionModal.vue`, `frontend/src/composables/reports/useAssetReportExecution.js`, `frontend/src/utils/reports/execution/`                                                        |
+| Exportacion PDF/Excel                                 | `frontend/src/utils/reports/export/`, `frontend/src/utils/reports/route-map/`                                                                                                                                             |
+| Alertas                                               | `frontend/src/views/AlarmsView.vue`, `frontend/src/components/alarms/`, `frontend/src/services/alarms/`, `frontend/src/utils/alarms/`, `frontend/src/data/mockAlarms.js` y `frontend/src/data/mockAutomaticAlertRules.js` |
+| Mantenciones                                          | `frontend/src/views/MaintenanceView.vue`, `frontend/src/components/maintenance/`, `frontend/src/composables/maintenance/`, `frontend/src/utils/maintenance/`                                                              |
+| Usuarios y permisos                                   | `frontend/src/views/UserManagementView.vue`, `frontend/src/components/users/`, `frontend/src/composables/users/`, `frontend/src/utils/users/`                                                                             |
+| Empresas                                              | `frontend/src/views/CompanyManagementView.vue`, `frontend/src/components/companies/`, `frontend/src/composables/companies/`, `frontend/src/services/companies/`                                                           |
+| Auditoria                                             | `frontend/src/views/AuditView.vue`, `frontend/src/components/audit/`, `frontend/src/composables/audit/`, `frontend/src/services/audit/`                                                                                   |
+| Storage/localStorage                                  | `frontend/src/services/storage/browserStorage.js`                                                                                                                                                                         |
+| Documentacion tecnica                                 | `frontend/docs/` y los `README.md` dentro de `frontend/src/`                                                                                                                                                              |
 
 ## Modulos y rutas principales
 
-| Modulo | Ruta principal | Proposito |
-| --- | --- | --- |
-| Login | `/login` | Inicio de sesion contra usuarios mock. |
-| Activos | `/app/:empresaId/activos` | Monitoreo de flota, mapa, tabla, geocercas, itinerarios y acciones de vehiculo. |
-| Reportes | `/app/:empresaId/reportes` | Biblioteca, creacion, reglas, ejecucion, preview, PDF y Excel. |
-| Mantenciones | `/app/:empresaId/mantenciones` | Planes, ordenes de trabajo, historial y costos por activo. |
-| Auditoria | `/app/:empresaId/auditoria` | Registro visual de acciones y filtros de actividad. |
-| Usuarios | `/app/:empresaId/usuarios` | Gestion de usuarios, roles, permisos y alcance operativo. |
-| Empresas | `/empresas` | Gestion global de empresas para administradores de plataforma. |
+| Modulo       | Ruta principal                 | Proposito                                                                       |
+| ------------ | ------------------------------ | ------------------------------------------------------------------------------- |
+| Login        | `/login`                       | Inicio de sesion contra usuarios mock.                                          |
+| Activos      | `/app/:empresaId/activos`      | Monitoreo de flota, mapa, tabla, geocercas, itinerarios y acciones de vehiculo. |
+| Reportes     | `/app/:empresaId/reportes`     | Biblioteca, creacion, reglas, ejecucion, preview, PDF y Excel.                  |
+| Alertas      | `/app/:empresaId/alertas`      | Historial de alertas activadas y configuracion de reglas automaticas.           |
+| Mantenciones | `/app/:empresaId/mantenciones` | Planes, ordenes de trabajo, historial y costos por activo.                      |
+| Sin reportar | `/app/:empresaId/sin-reportar` | Listado/graficos mock y exportacion Excel de equipos sin reporte.               |
+| Auditoria    | `/app/:empresaId/auditoria`    | Registro visual de acciones y filtros de actividad.                             |
+| Usuarios     | `/app/:empresaId/usuarios`     | Gestion de usuarios, roles, permisos y alcance operativo.                       |
+| Empresas     | `/empresas`                    | Gestion global de empresas para administradores de plataforma.                  |
 
 Las rutas generales como `/activos`, `/reportes` o `/mantenciones` redirigen o
 validan segun el usuario autenticado y la ultima empresa accesible.
@@ -109,8 +112,12 @@ Incluye:
 - geocercas y grupos de geocercas;
 - plantillas y reglas de reportes;
 - exportacion PDF/Excel;
+- historial de alertas activadas con filtros, detalle, acciones de estado,
+  recorrido en Itinerarios y panel de configuracion de reglas automaticas;
 - usuarios, roles y alcances;
-- mantenciones de demostracion;
+- mantenciones con Flota/Analisis/Ordenes, cierre y renovacion de planes,
+  historial por vehiculo, evidencias locales y reportes PDF/Excel;
+- Sin reportar con listado/graficos mock y exportacion Excel;
 - auditoria local.
 
 Para produccion, la sesion, permisos, auditoria, activos visibles y
@@ -133,37 +140,37 @@ Empresas de demo:
 
 Cuentas mock principales:
 
-| Usuario | Clave | Perfil |
-| --- | --- | --- |
-| `admin@sinergy.cl` | `admin1234` | Administrador de plataforma |
-| `operador.norte@sinergy.cl` | `operador1234` | Operador |
-| `supervisor.geo@sinergy.cl` | `supervisor1234` | Supervisor |
-| `cliente@sinergy.cl` | `cliente1234` | Visualizador |
-| `soporte@sinergy.cl` | `soporte1234` | Tecnico |
+| Usuario                     | Clave            | Perfil                      |
+| --------------------------- | ---------------- | --------------------------- |
+| `admin@sinergy.cl`          | `admin1234`      | Administrador de plataforma |
+| `operador.norte@sinergy.cl` | `operador1234`   | Operador                    |
+| `supervisor.geo@sinergy.cl` | `supervisor1234` | Supervisor                  |
+| `cliente@sinergy.cl`        | `cliente1234`    | Visualizador                |
+| `soporte@sinergy.cl`        | `soporte1234`    | Tecnico                     |
 
 ## Tecnologia y librerias
 
 Versiones segun `frontend/package.json`.
 
-| Paquete | Version | Uso |
-| --- | --- | --- |
-| `vue` | `^3.5.34` | Componentes e interfaz principal. |
-| `vue-router` | `^4.6.4` | Rutas, redirecciones y guards. |
-| `vite` | `^8.0.12` | Servidor local y build. |
-| `@vitejs/plugin-vue` | `^6.0.6` | Soporte Vue en Vite. |
-| `tailwindcss` | `^4.3.0` | Estilos utilitarios. |
-| `@tailwindcss/vite` | `^4.3.0` | Integracion Tailwind con Vite. |
-| `leaflet` | `^1.9.4` | Mapa, marcadores, geocercas y rutas. |
-| `chart.js` | `^4.5.1` | Graficos en vistas y reportes. |
-| `exceljs` | `^4.4.0` | Generacion de Excel. |
-| `jspdf` | `^4.2.1` | Generacion de PDF. |
-| `jspdf-autotable` | `^5.0.8` | Tablas dentro de PDF. |
-| `html2canvas` | `^1.4.1` | Capturas visuales para exportacion. |
-| `jszip` | `^3.10.1` | Archivos comprimidos e importacion/exportacion. |
-| `dompurify` | `^3.4.11` | Sanitizacion de HTML generado. |
-| `eslint` | `^10.4.0` | Revision de codigo. |
-| `eslint-plugin-vue` | `^10.9.1` | Reglas Vue para ESLint. |
-| `prettier` | `^3.8.3` | Formato de codigo. |
+| Paquete              | Version   | Uso                                             |
+| -------------------- | --------- | ----------------------------------------------- |
+| `vue`                | `^3.5.34` | Componentes e interfaz principal.               |
+| `vue-router`         | `^4.6.4`  | Rutas, redirecciones y guards.                  |
+| `vite`               | `^8.0.12` | Servidor local y build.                         |
+| `@vitejs/plugin-vue` | `^6.0.6`  | Soporte Vue en Vite.                            |
+| `tailwindcss`        | `^4.3.0`  | Estilos utilitarios.                            |
+| `@tailwindcss/vite`  | `^4.3.0`  | Integracion Tailwind con Vite.                  |
+| `leaflet`            | `^1.9.4`  | Mapa, marcadores, geocercas y rutas.            |
+| `chart.js`           | `^4.5.1`  | Graficos en vistas y reportes.                  |
+| `exceljs`            | `^4.4.0`  | Generacion de Excel.                            |
+| `jspdf`              | `^4.2.1`  | Generacion de PDF.                              |
+| `jspdf-autotable`    | `^5.0.8`  | Tablas dentro de PDF.                           |
+| `html2canvas`        | `^1.4.1`  | Capturas visuales para exportacion.             |
+| `jszip`              | `^3.10.1` | Archivos comprimidos e importacion/exportacion. |
+| `dompurify`          | `^3.4.11` | Sanitizacion de HTML generado.                  |
+| `eslint`             | `^10.4.0` | Revision de codigo.                             |
+| `eslint-plugin-vue`  | `^10.9.1` | Reglas Vue para ESLint.                         |
+| `prettier`           | `^3.8.3`  | Formato de codigo.                              |
 
 ## Como esta organizado el codigo
 
@@ -203,6 +210,23 @@ plantilla + activos autorizados + fechas + reglas
 -> executeReport
 -> reportRows
 -> preview / Excel / PDF
+```
+
+Alertas:
+
+```txt
+mockAutomaticAlertRules/localStorage
+-> reglas automaticas por empresa
+-> configuracion por tipo, condicion, alcance, horario y notificaciones
+-> geocercas por todas, grupo o seleccion especifica cuando el tipo lo requiere
+-> futura generacion de alertas operativas
+
+mockAlarms/localStorage
+-> visibleAssets por permisos/etiquetas
+-> alertas autorizadas
+-> filtros visuales
+-> historial, detalle y acciones
+-> Itinerarios con el recorrido del dia y tooltip de alerta
 ```
 
 Geocercas:
@@ -253,6 +277,11 @@ npm run validate      # test + lint + formato + build
 ```
 
 ## Documentacion interna
+
+Actualizacion de referencia: 2026-10-13. Los README de carpeta describen el
+codigo vigente; el registro retrospectivo de mantenciones y rendimiento vive
+en `bitacora/modulos/mantenciones-y-rendimiento.md`. Los datos operativos
+siguen siendo locales/mock; una descarga Excel/PDF no implica backend.
 
 La documentacion tecnica vive en `frontend/docs` y en los README locales dentro
 de `frontend/src`.

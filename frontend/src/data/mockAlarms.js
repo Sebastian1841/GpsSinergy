@@ -1,6 +1,7 @@
 export const mockAlarms = [
   {
     id: "alarm-001",
+    ruleId: "auto-alert-rule-001",
     companyId: "company-001",
     assetId: "asset-004",
     type: "speeding",
@@ -20,6 +21,7 @@ export const mockAlarms = [
   },
   {
     id: "alarm-002",
+    ruleId: "auto-alert-rule-003",
     companyId: "company-001",
     assetId: "asset-006",
     type: "no_signal",
@@ -38,6 +40,7 @@ export const mockAlarms = [
   },
   {
     id: "alarm-003",
+    ruleId: "auto-alert-rule-007",
     companyId: "company-001",
     assetId: "asset-005",
     type: "stop_time",
@@ -56,6 +59,7 @@ export const mockAlarms = [
   },
   {
     id: "alarm-004",
+    ruleId: "auto-alert-rule-004",
     companyId: "company-002",
     assetId: "asset-007",
     type: "geofence",
@@ -74,6 +78,7 @@ export const mockAlarms = [
   },
   {
     id: "alarm-005",
+    ruleId: "auto-alert-rule-002",
     companyId: "company-002",
     assetId: "asset-009",
     type: "battery",
@@ -92,6 +97,7 @@ export const mockAlarms = [
   },
   {
     id: "alarm-006",
+    ruleId: "auto-alert-rule-008",
     companyId: "company-003",
     assetId: "asset-010",
     type: "fuel",
@@ -110,6 +116,7 @@ export const mockAlarms = [
   },
   {
     id: "alarm-007",
+    ruleId: "auto-alert-rule-006",
     companyId: "company-003",
     assetId: "asset-011",
     type: "ignition",
@@ -128,6 +135,7 @@ export const mockAlarms = [
   },
   {
     id: "alarm-008",
+    ruleId: "auto-alert-rule-005",
     companyId: "company-004",
     assetId: "asset-012",
     type: "no_signal",

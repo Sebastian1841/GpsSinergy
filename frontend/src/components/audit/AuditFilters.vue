@@ -1,9 +1,9 @@
 <template>
-  <section class="relative shrink-0">
-    <div class="flex flex-wrap items-center justify-end gap-2">
+  <section class="relative w-full shrink-0">
+    <div class="flex w-full flex-wrap items-center gap-2 xl:flex-nowrap">
       <!-- BUSCADOR -->
       <label
-        class="flex h-12 min-w-[230px] flex-1 items-center gap-2.5 rounded-lg border border-[#d8dee8] bg-white px-3 shadow-sm transition focus-within:border-[#102372] sm:max-w-[290px]"
+        class="flex h-12 min-w-[260px] flex-[1_1_420px] items-center gap-2.5 rounded-lg border border-[#d8dee8] bg-white px-3 shadow-sm transition focus-within:border-[#102372]"
       >
         <svg
           class="h-4 w-4 shrink-0 text-slate-400"
@@ -30,46 +30,38 @@
 
       <!-- FECHAS -->
       <div
-        class="flex h-12 min-w-[290px] items-center gap-2 rounded-lg border border-[#d8dee8] bg-white px-3 shadow-sm"
+        class="flex h-12 min-w-[330px] shrink-0 items-center gap-2 rounded-lg border border-[#d8dee8] bg-white px-3 shadow-sm"
       >
-        <svg
-          class="h-4 w-4 shrink-0 text-[#102372]"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M8 7V3m8 4V3M5 11h14M6 5h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2z"
+        <label class="flex min-w-0 items-center gap-1.5">
+          <span class="date-label">Desde</span>
+          <input
+            :value="startDate"
+            class="audit-date-input"
+            type="date"
+            aria-label="Fecha desde"
+            @input="emit('update:start-date', $event.target.value)"
           />
-        </svg>
+        </label>
 
-        <input
-          :value="startDate"
-          class="audit-date-input"
-          type="date"
-          aria-label="Fecha desde"
-          @input="emit('update:start-date', $event.target.value)"
-        />
+        <span class="date-divider" aria-hidden="true"></span>
 
-        <span class="shrink-0 text-[12px] font-bold text-slate-300"> - </span>
-
-        <input
-          :value="endDate"
-          class="audit-date-input"
-          type="date"
-          aria-label="Fecha hasta"
-          @input="emit('update:end-date', $event.target.value)"
-        />
+        <label class="flex min-w-0 items-center gap-1.5">
+          <span class="date-label">Hasta</span>
+          <input
+            :value="endDate"
+            class="audit-date-input"
+            type="date"
+            aria-label="Fecha hasta"
+            @input="emit('update:end-date', $event.target.value)"
+          />
+        </label>
       </div>
 
       <!-- FILTROS -->
       <div class="relative">
         <button
           type="button"
-          class="relative inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-[#d8dee8] bg-white px-4 text-[12px] font-black text-[#102372] shadow-sm transition hover:border-[#102372] hover:bg-[#f8fafc]"
+          class="relative inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-lg border border-[#d8dee8] bg-white px-4 text-[12px] font-black text-[#102372] shadow-sm transition hover:border-[#102372] hover:bg-[#f8fafc]"
           :class="showAdvancedFilters ? 'border-[#102372] bg-[#f7f9ff]' : ''"
           @click="showAdvancedFilters = !showAdvancedFilters"
         >
@@ -172,7 +164,7 @@
       <!-- EXPORTAR -->
       <button
         type="button"
-        class="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-[#ff6600] px-5 text-[12px] font-black text-white shadow-[0_8px_18px_rgba(255,102,0,0.2)] transition hover:bg-[#e65c00] disabled:cursor-not-allowed disabled:opacity-40"
+        class="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#ff6600] px-5 text-[12px] font-black text-white shadow-[0_8px_18px_rgba(255,102,0,0.2)] transition hover:bg-[#e65c00] disabled:cursor-not-allowed disabled:opacity-40"
         :disabled="!canExport || !hasRecords"
         @click="emit('export')"
       >
@@ -289,6 +281,19 @@ const handleClearFilters = () => {
   font-size: 12px;
   font-weight: 700;
   outline: none;
+}
+
+.date-label {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.date-divider {
+  width: 1px;
+  height: 24px;
+  flex-shrink: 0;
+  background: #d8dee8;
 }
 
 .filter-label {

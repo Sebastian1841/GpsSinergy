@@ -67,7 +67,7 @@ const getMetricLabel = (metric) => {
   }
 
   if (metric.key === "warning") {
-    return Number(metric.value) === 1 ? "alerta" : "alertas"
+    return Number(metric.value) === 1 ? "acción sensible" : "acciones sensibles"
   }
 
   if (metric.key === "failed") {

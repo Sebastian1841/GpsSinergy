@@ -96,7 +96,6 @@
             :itinerary-route="selectedItineraryRoute"
             :selected-itinerary-point="selectedItineraryPoint"
             :active-filter="statusFilter"
-            :app-sidebar-open="props.appSidebarOpen"
             :background-paused="isRouteComparisonModalOpen"
             :can-view-geofences="canViewGeofences"
             :can-edit-geofences="canEditGeofences"
@@ -201,13 +200,6 @@ import { createVehicleAssetGroups } from "../utils/activos/assetVehicleGroupUtil
 const ActivosMapPanel = defineAsyncComponent(
   () => import("../components/activos/map/ActivosMapPanel.vue"),
 )
-
-const props = defineProps({
-  appSidebarOpen: {
-    type: Boolean,
-    default: false,
-  },
-})
 
 const route = useRoute()
 const router = useRouter()

@@ -92,6 +92,8 @@ Responsabilidad:
 - Simular base de datos local.
 - Normalizar empresas, usuarios, accesos y activos.
 - Persistir cambios del prototipo.
+- Guardar solo colecciones marcadas por accion mediante collectionDatabaseStorage;
+  el manifiesto versionado activa el conjunto y conserva el anterior ante fallo.
 
 Funciones criticas:
 
@@ -336,7 +338,8 @@ Responsabilidad:
 
 - Orquestar resumen, ordenes de trabajo, calendario, historial, costos,
   seleccion de vehiculo y modal operativo de mantenciones.
-- Mantener acciones locales del prototipo en refs temporales.
+- Persistir acciones locales por secciones versionadas de localStorage y
+  almacenar evidencias en IndexedDB, sin backend.
 - Distinguir mantencion como plan y OT como ejecucion concreta.
 
 Funciones criticas:
@@ -345,6 +348,11 @@ Funciones criticas:
 - creacion/edicion/eliminacion de planes manuales
 - creacion/reprogramacion/asignacion/cancelacion/cierre de OT
 - registro de costos y seleccion de vehiculo
+- propuesta de renovacion al cerrar OT y confirmacion del siguiente ciclo
+
+Los contratos de filtros/exportacion viven en useFleetExportSelection,
+useMaintenanceVehicleHistory y services/maintenance. Para ampliar el modulo,
+consultar los README locales y no duplicar indices de planes u OT por fila.
 
 Riesgo:
 

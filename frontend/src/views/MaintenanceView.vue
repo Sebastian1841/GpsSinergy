@@ -1,101 +1,107 @@
 <template>
-  <section class="h-full min-h-0 bg-[#f4f7fb] text-slate-900">
-    <div class="grid h-full min-h-0 grid-rows-[auto_1fr]">
-      <header class="shrink-0 border-b border-[#d8e0eb] bg-white px-4 py-3 sm:px-5">
-        <div class="flex flex-col gap-2 xl:flex-row xl:items-start xl:justify-between">
-          <div class="min-w-0">
-            <p class="text-[10px] font-black uppercase tracking-[0.18em] text-[#ff6600]">
-              Mantenciones
-            </p>
+  <section class="maintenance-view h-full min-h-0 bg-[#f4f7fb] text-slate-900">
+    <div class="flex h-full min-h-0 flex-col">
+      <nav class="maintenance-module-nav" aria-label="Vistas de mantenciones">
+        <button
+          v-for="tab in tabs"
+          :key="tab.id"
+          type="button"
+          :class="{ active: activeTab === tab.id }"
+          @click="activeTab = tab.id"
+        >
+          {{ tab.label }}
+        </button>
+        <div v-if="activeTab === 'overview'" class="maintenance-module-actions">
+          <span>{{ maintenanceItems.length }} vehiculos</span>
+          <button type="button" @click="openFleetExport">Exportar</button>
+          <button type="button" @click="openMaintenanceModal('maintenance-type')">
+            Tipos de mantención
+          </button>
+          <button type="button" class="primary" @click="openMaintenanceModal('maintenance')">
+            + Nuevo plan de mantención
+          </button>
+        </div>
+        <div v-else-if="activeTab === 'costs'" class="maintenance-module-actions analysis-actions">
+          <select v-model="analysisPeriod" aria-label="Periodo de analisis">
+            <option :value="6">Ultimos 6 meses</option>
+            <option :value="12">Ultimos 12 meses</option>
+          </select>
+          <button type="button" class="primary" @click="openMaintenanceModal('export')">
+            Exportar
+          </button>
+        </div>
+      </nav>
 
-            <h1 class="text-[22px] font-black leading-tight text-[#102372] sm:text-[24px]">
-              Mantenciones
-            </h1>
-
-            <p class="mt-0.5 max-w-3xl text-[11px] font-bold leading-4 text-slate-500">
-              Control y seguimiento de mantenciones por vehiculo para {{ activeCompanyLabel }}.
-            </p>
-          </div>
-
-          <div class="flex flex-wrap items-center gap-2">
+      <header
+        v-if="activeTab !== 'overview' && activeTab !== 'costs'"
+        class="shrink-0 border-b border-[#d8e0eb] bg-white px-4 py-3 sm:px-5"
+      >
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div v-if="activeTab === 'orders'" class="maintenance-analysis-sections">
             <button
               type="button"
-              class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#cfd8e6] bg-white px-3 text-[11px] font-black text-[#102372] shadow-sm transition hover:border-[#102372]/35 hover:bg-[#eef3ff]"
-              @click="activeTab = 'history'"
+              :class="{ active: orderSection === 'work-orders' }"
+              @click="orderSection = 'work-orders'"
             >
-              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" aria-hidden="true">
-                <path
-                  d="M5 5v14h14M8 15l3-3 3 2 4-6"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
-              Ver historial
+              Órdenes de trabajo
             </button>
-
             <button
               type="button"
-              class="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#ff6600] px-3 text-[11px] font-black text-white shadow-sm transition hover:bg-[#e65c00]"
+              :class="{ active: orderSection === 'without-order' }"
+              @click="orderSection = 'without-order'"
+            >
+              Pendientes de OT
+            </button>
+          </div>
+          <div v-else class="flex items-center gap-2 text-[12px] font-black">
+            <span class="text-[#102372]">Mantenciones</span><span class="text-slate-300">/</span
+            ><span class="text-slate-500">{{ activeCompanyLabel }}</span>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="mr-2 text-[10px] font-bold text-slate-500"
+              >{{ maintenanceItems.length }} vehiculos</span
+            >
+            <button
+              type="button"
+              class="maintenance-header-button"
               @click="openMaintenanceModal('maintenance')"
             >
-              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" aria-hidden="true">
-                <path
-                  d="M12 5v14M5 12h14"
-                  stroke="currentColor"
-                  stroke-width="2.3"
-                  stroke-linecap="round"
-                />
-              </svg>
-              Crear mantencion
+              + Nuevo plan de mantención
             </button>
-
             <button
               type="button"
-              class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#ff6600]/35 bg-white px-3 text-[11px] font-black text-[#ff6600] shadow-sm transition hover:bg-[#fff7ed]"
+              class="maintenance-header-button"
               @click="openMaintenanceModal('maintenance-type')"
             >
-              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" aria-hidden="true">
-                <path
-                  d="M12 5v14M5 12h14M6 6h12M6 18h12"
-                  stroke="currentColor"
-                  stroke-width="2.2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
-              Nuevo tipo
+              Tipos de mantención
+            </button>
+            <button
+              type="button"
+              class="maintenance-header-button is-primary"
+              @click="openCreateWorkOrder()"
+            >
+              Nueva OT
             </button>
           </div>
         </div>
-
-        <nav class="mt-3 flex gap-1 overflow-x-auto border-b border-[#edf1f5]">
-          <button
-            v-for="tab in tabs"
-            :key="tab.id"
-            type="button"
-            class="shrink-0 border-b-2 px-3 py-1.5 text-[11px] font-black transition"
-            :class="
-              activeTab === tab.id
-                ? 'border-[#ff6600] text-[#102372]'
-                : 'border-transparent text-slate-500 hover:text-[#102372]'
-            "
-            @click="activeTab = tab.id"
-          >
-            {{ tab.label }}
-          </button>
-        </nav>
 
         <div
           v-if="maintenanceFeedbackMessage"
           class="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-black text-emerald-700"
         >
           {{ maintenanceFeedbackMessage }}
+          <button
+            v-if="closedPlanRenewal"
+            type="button"
+            class="ml-3 rounded border border-emerald-700 px-3 py-1"
+            @click="openRenewMaintenance(closedPlanRenewal.vehicleId, closedPlanRenewal.planId)"
+          >
+            Renovar ahora
+          </button>
         </div>
 
         <div
-          v-if="activeTab !== 'overview' && activeTab !== 'orders'"
+          v-if="activeTab === 'calendar' || activeTab === 'history'"
           class="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5"
         >
           <button
@@ -128,7 +134,7 @@
         </div>
 
         <div
-          v-if="activeTab !== 'overview' && activeTab !== 'orders'"
+          v-if="activeTab === 'calendar' || activeTab === 'history'"
           class="mt-4 grid gap-2 xl:grid-cols-[minmax(260px,420px)_160px_180px_190px_auto]"
         >
           <label class="group relative min-w-0">
@@ -203,14 +209,24 @@
       </header>
 
       <main
-        class="min-h-0"
+        ref="maintenanceMain"
+        class="min-h-0 flex-1"
         :class="
           activeTab === 'overview'
-            ? 'overflow-hidden px-3 py-3 sm:px-4'
-            : 'overflow-y-auto px-4 py-4 sm:px-6'
+            ? 'overflow-hidden p-0'
+            : [
+                'overflow-y-auto px-4 py-4 sm:px-6',
+                {
+                  'maintenance-analysis-main': activeTab === 'costs',
+                  'maintenance-work-orders-main':
+                    activeTab === 'orders' && orderSection === 'work-orders',
+                },
+              ]
         "
       >
         <MaintenanceOverviewTab
+          ref="fleetTable"
+          :get-order-status-label="getOrderStatusLabel"
           v-if="activeTab === 'overview'"
           :filtered-maintenance-items="filteredMaintenanceItems"
           :get-status-class="getStatusClass"
@@ -219,10 +235,14 @@
           :get-status-text-class="getStatusTextClass"
           :get-summary-metric-card-class="getSummaryMetricCardClass"
           :get-summary-metric-icon="getSummaryMetricIcon"
+          :get-vehicle-maintenance-plans="getVehicleMaintenancePlans"
           :has-hour-meter-data="hasHourMeterData"
           :maintenance-items="maintenanceItems"
           :maintenance-summary-metrics="maintenanceSummaryMetrics"
           :maintenance-types="maintenanceTypes"
+          :active-company-label="activeCompanyLabel"
+          :open-order-count="visibleWorkOrders.length"
+          :work-orders="workOrders"
           :overview-maintenance-items="overviewMaintenanceItems"
           :search-term="searchTerm"
           :selected-status="selectedStatus"
@@ -232,9 +252,13 @@
           :workshop-options="workshopOptions"
           @apply-metric-filter="applyMetricFilter"
           @clear-filters="clearFilters"
+          @configure-maintenance="configureVehicleMaintenance"
+          @create-work-order="openCreateWorkOrder"
+          @open-orders="activeTab = 'orders'"
           @open-vehicle-costs="openVehicleCosts"
           @open-vehicle-maintenance-plans="openVehicleMaintenancePlans"
-          @select-vehicle="selectVehicle"
+          @open-work-order="openOrderInTable"
+          @renew-maintenance="openRenewMaintenance"
           @update:search-term="searchTerm = $event"
           @update:selected-status="selectedStatus = $event"
           @update:selected-type="selectedType = $event"
@@ -242,7 +266,7 @@
         />
 
         <MaintenanceWorkOrdersTab
-          v-else-if="activeTab === 'orders'"
+          v-else-if="activeTab === 'orders' && orderSection === 'work-orders'"
           :filtered-work-orders="filteredWorkOrders"
           :get-order-status-class="getOrderStatusClass"
           :get-order-status-icon="getOrderStatusIcon"
@@ -256,6 +280,7 @@
           :order-status-filters="orderStatusFilters"
           :order-summary-metrics="orderSummaryMetrics"
           :selected-order="selectedOrder"
+          :focused-order-id="focusedOrderId"
           :selected-order-details="selectedOrderDetails"
           :selected-order-priority="selectedOrderPriority"
           :selected-order-status="selectedOrderStatus"
@@ -267,6 +292,7 @@
           @apply-order-metric-filter="applyOrderMetricFilter"
           @clear-order-filters="clearOrderFilters"
           @open-maintenance-modal="openMaintenanceModal"
+          @open-order-cost="openWorkOrderCostModal"
           @open-work-order-action-modal="openWorkOrderActionModal"
           @open-work-order-vehicle-maintenance-plans="openWorkOrderVehicleMaintenancePlans"
           @select-work-order="selectWorkOrder"
@@ -274,6 +300,20 @@
           @update:selected-order-priority="selectedOrderPriority = $event"
           @update:selected-order-status="selectedOrderStatus = $event"
           @update:selected-order-workshop="selectedOrderWorkshop = $event"
+        />
+
+        <MaintenanceCostsTab
+          v-else-if="activeTab === 'orders' && orderSection === 'without-order'"
+          :maintenance-items="maintenanceItems"
+          :maintenance-types="maintenanceTypes"
+          :get-vehicle-maintenance-plans="getVehicleMaintenancePlans"
+          :work-orders="workOrders"
+          section="without-order"
+          @create-work-order="openCreateWorkOrder"
+          @filter-maintenance-status="openFleetWithStatus"
+          @filter-maintenance-vehicle="openFleetWithVehicle"
+          @filter-work-orders="openOrdersWithStatus"
+          @open-export="openMaintenanceModal('export')"
         />
 
         <MaintenanceCalendarTab
@@ -296,24 +336,31 @@
 
         <MaintenanceCostsTab
           v-else
-          :cost-form-fields="costFormFields"
-          :cost-summary="costSummary"
-          :display-cost-rows="displayCostRows"
-          :selected-vehicle="selectedVehicle"
-          @open-cost-modal="openMaintenanceModal('cost')"
-          @open-costs="activeTab = 'costs'"
-          @open-orders="activeTab = 'orders'"
+          :maintenance-items="maintenanceItems"
+          :maintenance-types="maintenanceTypes"
+          :get-vehicle-maintenance-plans="getVehicleMaintenancePlans"
+          :period-months="analysisPeriod"
+          :work-orders="workOrders"
+          section="summary"
+          @create-work-order="openCreateWorkOrder"
+          @filter-maintenance-status="openFleetWithStatus"
+          @filter-maintenance-vehicle="openFleetWithVehicle"
+          @filter-work-orders="openOrdersWithStatus"
           @open-export="openMaintenanceModal('export')"
+          @update:period-months="analysisPeriod = $event"
         />
       </main>
     </div>
 
+    <MaintenanceFleetExportModal v-if="fleetExportRows" :rows="fleetExportRows" :initial-ids="fleetExportInitialIds" :busy="isExportingFleet" :error="fleetExportError" @close="closeFleetExport" @export="exportFleet" />
     <MaintenanceActionModal
       v-if="activeMaintenanceModal"
+      :key="`${activeMaintenanceModal}-${selectedVehicle?.id || 'none'}`"
       :get-maintenance-plan-details="getMaintenancePlanDetails"
       :get-maintenance-plan-pill-class="getMaintenancePlanPillClass"
       :get-maintenance-plan-status-class="getMaintenancePlanStatusClass"
       :get-maintenance-plan-status-message="getMaintenancePlanStatusMessage"
+      :get-order-status-label="getOrderStatusLabel"
       :get-status-label="getStatusLabel"
       :get-summary-metric-icon="getSummaryMetricIcon"
       :is-base-maintenance-plan="isBaseMaintenancePlan"
@@ -323,6 +370,8 @@
       :maintenance-type-criterion-options="maintenanceTypeCriterionOptions"
       :maintenance-types="maintenanceTypes"
       :modal-action-message="modalActionMessage"
+      :maintenance-type-origins="maintenanceTypeOrigins"
+      :maintenance-type-reading-sources="maintenanceTypeReadingSources"
       :modal-description="modalDescription"
       :modal-draft="modalDraft"
       :modal-kicker="modalKicker"
@@ -335,28 +384,37 @@
       :selected-vehicle="selectedVehicle"
       :selected-vehicle-maintenance-plans="selectedVehicleMaintenancePlans"
       :status-filters="statusFilters"
+      :work-orders="workOrders"
+      :cleanup-evidence="cleanupMaintenanceEvidence"
       @close="closeMaintenanceModal"
-      @create-work-order-from-maintenance-plan="createWorkOrderFromMaintenancePlan"
+      @create-work-order-from-maintenance-plan="
+        (plan) => openCreateWorkOrder(plan.vehicleId || selectedVehicle.id, plan.id, plan.name)
+      "
+      @delete-maintenance-type="deleteMaintenanceType"
       @open-delete-maintenance-plan="openDeleteMaintenancePlan"
       @open-edit-maintenance-plan="openEditMaintenancePlan"
       @open-maintenance-modal="openMaintenanceModal"
+      @open-order-in-table="openOrderInTable"
+      @edit-before-renewal="editBeforeRenewal"
+      @renew-maintenance="openRenewMaintenance"
       @submit="submitMaintenanceModal"
       @sync-maintenance-type-draft="syncMaintenanceTypeDraft"
       @sync-maintenance-vehicle-draft="syncMaintenanceVehicleDraft"
       @sync-order-maintenance-plan-draft="syncOrderMaintenancePlanDraft"
       @sync-order-vehicle-draft="syncOrderVehicleDraft"
+      @update-maintenance-type="updateMaintenanceType"
     />
   </section>
 </template>
 
 <script setup>
-import { defineAsyncComponent } from "vue"
+import { defineAsyncComponent, nextTick, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 
 import MaintenanceCalendarTab from "../components/maintenance/MaintenanceCalendarTab.vue"
 import MaintenanceCostsTab from "../components/maintenance/MaintenanceCostsTab.vue"
 import MaintenanceHistoryTab from "../components/maintenance/MaintenanceHistoryTab.vue"
-import MaintenanceOverviewTab from "../components/maintenance/MaintenanceOverviewTab.vue"
+import MaintenanceOverviewTab from "../components/maintenance/MaintenanceFleetTab.vue"
 import MaintenanceWorkOrdersTab from "../components/maintenance/MaintenanceWorkOrdersTab.vue"
 import { useMaintenanceModule } from "../composables/maintenance/useMaintenanceModule.js"
 import "../components/maintenance/maintenance.css"
@@ -366,8 +424,51 @@ const loadMaintenanceActionModal = () =>
   import("../components/maintenance/MaintenanceActionModal.vue")
 
 const MaintenanceActionModal = defineAsyncComponent(loadMaintenanceActionModal)
+const MaintenanceFleetExportModal = defineAsyncComponent(() => import("../components/maintenance/MaintenanceFleetExportModal.vue"))
 
 const route = useRoute()
+const orderSection = ref("work-orders")
+const focusedOrderId = ref("")
+const maintenanceMain = ref(null)
+const analysisPeriod = ref(6)
+const fleetTable = ref(null)
+const fleetExportRows = ref(null)
+const fleetExportInitialIds = ref([])
+const openFleetExport = () => {
+  fleetExportError.value = ""
+  fleetExportInitialIds.value = (fleetTable.value?.getExportRows() || []).map(row => row.id)
+  fleetExportRows.value = fleetTable.value?.getExportRows(true) || []
+}
+const closeFleetExport = () => { if (!isExportingFleet.value) fleetExportRows.value = null }
+const isExportingFleet = ref(false)
+const fleetExportError = ref("")
+const exportFleet = async ({ format, rows }) => {
+  if (isExportingFleet.value) return
+  fleetExportError.value = ""
+  if (!rows?.length) {
+    fleetExportError.value = "No hay vehiculos para exportar."
+    return
+  }
+  isExportingFleet.value = true
+  try {
+    const context = {
+      company: activeCompanyLabel.value,
+      reportWidthPx: Math.max(1000, Math.min(2560, (window.screen?.availWidth || window.innerWidth) - 24)),
+    }
+    if (format === "pdf") {
+      const { exportMaintenanceFleetPdf } = await import("../services/maintenance/maintenanceFleetPdfExportService.js")
+      await exportMaintenanceFleetPdf(rows, context)
+    } else {
+      const { exportMaintenanceFleetExcel } = await import("../services/maintenance/maintenanceFleetExportService.js")
+      await exportMaintenanceFleetExcel(rows, context)
+    }
+    fleetExportRows.value = null
+  } catch {
+    fleetExportError.value = "No fue posible exportar la flota. Intenta nuevamente."
+  } finally {
+    isExportingFleet.value = false
+  }
+}
 const { assets, companies } = useAccessService()
 
 const {
@@ -380,11 +481,12 @@ const {
   clearFilters,
   clearOrderFilters,
   closeMaintenanceModal,
-  costFormFields,
-  costSummary,
+  cleanupMaintenanceEvidence,
+  maintenanceTypeOrigins,
+  maintenanceTypeReadingSources,
   createWorkOrderFromMaintenancePlan,
+  deleteMaintenanceType,
   currentSummaryMetrics,
-  displayCostRows,
   filteredMaintenanceItems,
   filteredWorkOrders,
   getMaintenancePlanDetails,
@@ -403,12 +505,14 @@ const {
   getStatusTextClass,
   getSummaryMetricCardClass,
   getSummaryMetricIcon,
+  getVehicleMaintenancePlans,
   getTaskStatusClass,
   hasHourMeterData,
   isBaseMaintenancePlan,
   isMaintenanceTemplateUsed,
   lifecycleSteps,
   maintenanceFeedbackMessage,
+  closedPlanRenewal,
   maintenanceHistory,
   maintenanceItems,
   maintenanceReadingSources,
@@ -423,19 +527,22 @@ const {
   modalTitle,
   modalVehicleMaintenancePlans,
   openDeleteMaintenancePlan,
+  openCreateWorkOrder,
   openEditMaintenancePlan,
   openMaintenanceModal,
+  openRenewMaintenance,
+  openWorkOrderCostModal,
   openVehicleCosts,
   openVehicleMaintenancePlans,
   openWorkOrderActionModal,
   openWorkOrderVehicleMaintenancePlans,
+  editBeforeRenewal,
   orderPriorityOptions,
   orderSearchTerm,
   orderStatusFilters,
   orderSummaryMetrics,
   overviewMaintenanceItems,
   searchTerm,
-  selectVehicle,
   selectWorkOrder,
   selectedOrder,
   selectedOrderDetails,
@@ -451,6 +558,7 @@ const {
   selectedWorkshop,
   statusFilters,
   submitMaintenanceModal,
+  updateMaintenanceType,
   syncMaintenanceTypeDraft,
   syncMaintenanceVehicleDraft,
   syncOrderMaintenancePlanDraft,
@@ -458,6 +566,7 @@ const {
   tabs,
   upcomingOrders,
   visibleWorkOrders,
+  workOrders,
   weekDays,
   workOrderWorkshopOptions,
   workshopOptions,
@@ -466,4 +575,240 @@ const {
   companies,
   route,
 })
+
+const configureVehicleMaintenance = (vehicleId) => {
+  openVehicleMaintenancePlans(vehicleId)
+  openMaintenanceModal("maintenance", "maintenance-detail")
+}
+
+const openOrderInTable = async (orderId) => {
+  closeMaintenanceModal()
+  clearOrderFilters()
+  selectWorkOrder(orderId)
+  focusedOrderId.value = orderId
+  orderSection.value = "work-orders"
+  activeTab.value = "orders"
+  await nextTick()
+  maintenanceMain.value?.scrollTo({ top: 0 })
+}
+
+const openFleetWithStatus = (status) => {
+  selectedStatus.value = status
+  activeTab.value = "overview"
+}
+
+const openFleetWithVehicle = (plate) => {
+  clearFilters()
+  searchTerm.value = plate
+  activeTab.value = "overview"
+}
+
+const openOrdersWithStatus = (status) => {
+  clearOrderFilters()
+  selectedOrderStatus.value = status
+  orderSection.value = "work-orders"
+  activeTab.value = "orders"
+}
+
+watch(maintenanceFeedbackMessage, (message, _previousMessage, onCleanup) => {
+  if (!message) return
+
+  const timeout = setTimeout(() => {
+    maintenanceFeedbackMessage.value = ""
+  }, 6000)
+
+  onCleanup(() => clearTimeout(timeout))
+})
+
+watch(orderSection, async () => {
+  await nextTick()
+  maintenanceMain.value?.scrollTo({ top: 0 })
+})
 </script>
+
+<style scoped>
+.maintenance-view :deep(button:not(:disabled)),
+.maintenance-view :deep(select:not(:disabled)),
+.maintenance-view :deep([role="button"]:not([aria-disabled="true"])) {
+  cursor: pointer;
+}
+
+.maintenance-view :deep(button:disabled),
+.maintenance-view :deep(select:disabled),
+.maintenance-view :deep([aria-disabled="true"]) {
+  cursor: not-allowed;
+}
+
+.maintenance-module-nav {
+  display: flex;
+  min-height: 64px;
+  align-items: flex-end;
+  gap: 0.25rem;
+  border-bottom: 1px solid #d8e0eb;
+  background: #f7f9fc;
+  padding: 0 1.5rem;
+}
+.maintenance-module-actions {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  gap: 0.55rem;
+  margin-left: auto;
+}
+.maintenance-module-actions span {
+  margin-right: 0.35rem;
+  color: #526b94;
+  font-size: 11px;
+  font-weight: 700;
+}
+.maintenance-module-nav .maintenance-module-actions button {
+  min-width: auto;
+  height: 34px;
+  border: 1px solid #cfd8e6;
+  border-radius: 7px;
+  background: #fff;
+  padding: 0 0.85rem;
+  color: #102372;
+  white-space: nowrap;
+}
+.maintenance-module-nav .maintenance-module-actions button.primary {
+  border-color: #ff6600;
+  background: #ff6600;
+  color: #fff;
+}
+.maintenance-module-nav .analysis-actions select {
+  width: 180px;
+  height: 34px;
+  border: 1px solid #cfd8e6;
+  border-radius: 7px;
+  background: #fff;
+  padding: 0 12px;
+  color: #102372;
+  font-size: 12px;
+  font-weight: 800;
+}
+.maintenance-module-nav .analysis-actions button.primary {
+  min-width: 126px;
+  border-color: #102372;
+  background: #102372;
+}
+.maintenance-module-nav button {
+  min-width: 112px;
+  height: 44px;
+  border-bottom: 2px solid transparent;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+.maintenance-module-nav button:hover {
+  color: #102372;
+}
+.maintenance-module-nav button.active {
+  border-bottom-color: #ff6600;
+  color: #102372;
+}
+.maintenance-header-button {
+  display: inline-flex;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cfd8e6;
+  border-radius: 0.4rem;
+  background: #fff;
+  padding: 0 0.8rem;
+  color: #102372;
+  font-size: 0.68rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.maintenance-header-button.is-primary {
+  border-color: #ff6600;
+  background: #ff6600;
+  color: #fff;
+}
+.maintenance-analysis-sections {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  gap: 24px;
+}
+.maintenance-analysis-sections button {
+  position: relative;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: #536783;
+  font-size: 12px;
+  font-weight: 900;
+}
+.maintenance-analysis-sections button.active {
+  color: #102372;
+}
+.maintenance-analysis-sections button.active::after {
+  position: absolute;
+  right: 0;
+  bottom: -13px;
+  left: 0;
+  height: 2px;
+  background: #ff6600;
+  content: "";
+}
+
+@media (min-width: 761px) {
+  .maintenance-work-orders-main {
+    overflow-y: hidden !important;
+  }
+}
+
+@media (max-width: 1100px) {
+  .maintenance-module-nav {
+    min-height: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 0 1rem;
+  }
+
+  .maintenance-module-nav > button {
+    height: 48px;
+  }
+
+  .maintenance-module-actions {
+    width: 100%;
+    height: auto;
+    justify-content: flex-end;
+    margin-left: 0;
+    border-top: 1px solid #e5eaf1;
+    padding: 8px 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .maintenance-module-nav {
+    padding: 0 0.75rem;
+  }
+
+  .maintenance-module-nav > button {
+    min-width: 0;
+    flex: 1 1 0;
+  }
+
+  .maintenance-module-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .maintenance-module-actions span {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+
+  .maintenance-module-nav .maintenance-module-actions button {
+    width: 100%;
+    padding: 0 0.55rem;
+  }
+
+  .maintenance-module-actions .primary {
+    grid-column: 1 / -1;
+  }
+}
+</style>

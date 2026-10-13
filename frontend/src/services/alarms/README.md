@@ -16,8 +16,10 @@ Usa `localStorage` mediante `services/storage/browserStorage.js` con la clave
 
 Las reglas automaticas usan la clave `sinergy-automatic-alert-rules`. Si no hay
 datos guardados, cargan `data/mockAutomaticAlertRules.js`.
-Cuando ya existe una lista guardada, se respeta tal cual para que las reglas
-eliminadas por el usuario no vuelvan a aparecer al recargar.
+Las alertas semilla incluyen `ruleId`; al cargar almacenamiento existente, el
+servicio repone o reemplaza sus ocho reglas enlazadas para conservar el mismo
+nombre, tipo, empresa, alcance y condicion que el historial de demostracion.
+Las demas reglas creadas por el usuario se conservan.
 
 ## Estados
 

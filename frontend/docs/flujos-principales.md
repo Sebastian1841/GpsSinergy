@@ -426,16 +426,20 @@ Flujo:
 
 1. La ruta resuelve empresa y vehiculo objetivo si vienen `empresaId`,
    `assetId`, `activoId`, `asset`, `patente`, `plate` o `ppu`.
-2. `useMaintenanceModule.js` arma vehiculos visibles, resumen, ordenes,
-   calendario, historial, costos y modal operativo.
+2. `useMaintenanceModule.js` arma Flota, Analisis y Ordenes, planes del
+   vehiculo, historial, costos y modales.
 3. `useMaintenanceCompanyScope.js` recorta vehiculos por empresa cuando la ruta
    entra desde una empresa especifica.
 4. `useMaintenanceFilters.js` aplica busqueda/filtros con debounce para no
    recalcular listas y KPI en cada tecla.
 5. La mantencion representa un plan o regla de seguimiento; la orden de trabajo
    representa la ejecucion concreta.
-6. Las acciones del prototipo quedan en refs temporales: no hay backend ni
-   `localStorage` nuevo para mantenciones.
+6. Las acciones persisten en localStorage por secciones versionadas;
+   las evidencias se guardan en IndexedDB. No hay backend.
+7. Cerrar una OT vinculada registra la ejecucion y deja propuesta de renovacion
+   del plan. Renovar confirma el siguiente ciclo, con opcion de editar antes.
+8. Flota exporta planes filtrados y vehiculos seleccionados mediante modal.
+   Historial descarga directamente Excel/PDF de todas sus ejecuciones filtradas.
 
 Archivos clave:
 
@@ -450,7 +454,7 @@ Archivos clave:
 Modelo mental:
 
 ```js
-asset + template/lectura -> plan de mantencion -> decision operativa -> orden de trabajo -> cierre/historial/costos
+asset + tipo/lectura -> plan -> OT -> cierre/historial/costos -> Sin renovar -> renovar siguiente ciclo
 ```
 
 Riesgo:

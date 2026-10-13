@@ -1,10 +1,8 @@
 <template>
   <section class="h-full min-h-0 bg-[#f6f8fb]">
-    <div class="grid h-full min-h-0 grid-rows-[auto_1fr]">
-      <CompanyManagementHeader @create-company="openCreateCompanyModal" />
-
-      <main class="min-h-0 overflow-y-auto px-4 pb-6 sm:px-8">
-        <div class="grid min-h-0 items-stretch gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+    <div class="h-full min-h-0">
+      <main class="h-full min-h-0 overflow-y-auto px-3 pb-4 pt-3 sm:px-4">
+        <div class="grid min-h-full items-stretch gap-3 lg:grid-cols-[220px_minmax(0,1fr)]">
           <CompanyFiltersPanel
             :search-term="searchTerm"
             :selected-status="selectedStatus"
@@ -20,10 +18,11 @@
             @clear-filters="clearFilters"
           />
 
-          <section class="flex min-w-0 flex-col gap-4">
+          <section class="flex min-h-0 min-w-0 flex-col gap-3">
             <CompanySummaryStrip :summary-items="summaryItems" />
 
             <CompanyCatalog
+              class="min-h-0 flex-1"
               :companies="paginatedCompanies"
               :total-companies="filteredCompanies.length"
               :selected-company-id="selectedCompanyId || ''"
@@ -33,6 +32,7 @@
               :current-page="currentPage"
               :total-pages="totalPages"
               :page-size="pageSize"
+              @create-company="openCreateCompanyModal"
               @configure-company="openCompanyConfigPanel"
               @enter-company="enterCompanyWorkspace"
               @clear-filters="clearFilters"
@@ -79,7 +79,6 @@ import { useRouter } from "vue-router"
 
 import CompanyCatalog from "../components/companies/CompanyCatalog.vue"
 import CompanyFiltersPanel from "../components/companies/CompanyFiltersPanel.vue"
-import CompanyManagementHeader from "../components/companies/CompanyManagementHeader.vue"
 import CompanySummaryStrip from "../components/companies/CompanySummaryStrip.vue"
 
 import { useAuditTrail } from "../composables/audit/useAuditTrail.js"

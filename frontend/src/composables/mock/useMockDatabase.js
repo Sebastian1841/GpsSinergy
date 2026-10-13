@@ -1,18 +1,21 @@
-import { computed, ref } from "vue"
+import { computed, ref, watch } from "vue"
 
 import { mockDatabaseSeed } from "../../data/mockDatabase.js"
-import { readJsonStorage, writeJsonStorage } from "../../services/storage/browserStorage.js"
+import { createCollectionDatabaseStorage } from "../../services/storage/collectionDatabaseStorage.js"
 import { getAssetTypeOption } from "../../utils/activos/assetTypeOptions.js"
 import { normalizeFleetAssetTagIds } from "../../utils/activos/fleetAssetFormUtils.js"
 import { createCleanScope } from "../../utils/users/userAccessStateUtils.js"
 
 const STORAGE_KEY = "sinergy-mock-database"
-const STORAGE_VERSION = 1
 const PERSIST_DEBOUNCE_MS = 250
 const BEFORE_UNLOAD_HANDLER_KEY = "__sinergyMockDatabaseBeforeUnloadHandler"
 const ACTIVE_ACCESS_SCOPE_TYPES = new Set(["all-assets", "selected-assets", "asset-tags"])
 
 let persistTimeout = null
+const dirtyCollections = new Set()
+let databaseStorage = null
+try { databaseStorage = typeof window === "undefined" ? null : window.localStorage } catch { /* Storage may be blocked. */ }
+const collectionStorage = createCollectionDatabaseStorage({ storage: databaseStorage, key: STORAGE_KEY })
 
 const cloneData = (value) => JSON.parse(JSON.stringify(value))
 
@@ -551,11 +554,7 @@ const normalizeAccesses = (
 }
 
 const readPersistedDatabase = () => {
-  const payload = readJsonStorage(STORAGE_KEY, null)
-
-  if (payload?.version !== STORAGE_VERSION || !payload.data) return null
-
-  return payload.data
+  return collectionStorage.read()
 }
 
 const persistedDatabase = readPersistedDatabase()
@@ -623,26 +622,25 @@ const syncCompaniesWithSeed = () => {
   companies.value = normalizeCompanies(companies.value)
 
   if (previousSignature !== getCompanyReportsSignature(companies.value)) {
-    schedulePersistDatabase()
+    schedulePersistDatabase("companies")
   }
 }
 
 const persistDatabase = () => {
-  writeJsonStorage(STORAGE_KEY, {
-    version: STORAGE_VERSION,
-    data: {
+  if (!dirtyCollections.size) return
+  const saved = collectionStorage.write({
       companies: companies.value,
       applicationDefinitions: applicationDefinitions.value,
       assetTags: assetTags.value,
       assets: assets.value,
       users: users.value,
       accesses: accesses.value,
-    },
-    updatedAt: new Date().toISOString(),
-  })
+  }, dirtyCollections)
+  if (saved) dirtyCollections.clear()
 }
 
-const schedulePersistDatabase = () => {
+const schedulePersistDatabase = (...names) => {
+  for (const name of names) dirtyCollections.add(name)
   if (typeof window === "undefined") return
 
   if (persistTimeout !== null) {
@@ -654,6 +652,9 @@ const schedulePersistDatabase = () => {
     persistDatabase()
   }, PERSIST_DEBOUNCE_MS)
 }
+
+// The user access editor modifies nested permissions directly rather than using database actions.
+watch(accesses, () => schedulePersistDatabase("accesses"), { deep: true, flush: "sync" })
 
 const getAccessesSignature = (items = []) => {
   return JSON.stringify(
@@ -681,7 +682,7 @@ const syncPlatformAdminAccesses = () => {
   })
 
   if (previousSignature !== getAccessesSignature(accesses.value)) {
-    schedulePersistDatabase()
+    schedulePersistDatabase("accesses")
   }
 }
 
@@ -944,7 +945,7 @@ const createCompany = (company) => {
   )
 
   syncPlatformAdminAccesses()
-  schedulePersistDatabase()
+  schedulePersistDatabase("companies", "applicationDefinitions")
 
   return getCompany(companyId)
 }
@@ -966,7 +967,7 @@ const createUser = (user) => {
     syncPlatformAdminAccesses()
   }
 
-  schedulePersistDatabase()
+  schedulePersistDatabase("users")
 
   return nextUser
 }
@@ -982,7 +983,7 @@ const updateUser = (userId, changes) => {
     syncPlatformAdminAccesses()
   }
 
-  schedulePersistDatabase()
+  schedulePersistDatabase("users")
 
   return user
 }
@@ -1014,7 +1015,7 @@ const createAccess = (access) => {
   }
 
   accesses.value.unshift(nextAccess)
-  schedulePersistDatabase()
+  schedulePersistDatabase("accesses")
 
   return nextAccess
 }
@@ -1028,7 +1029,7 @@ const deleteAccess = (accessId) => {
   })
 
   if (accesses.value.length !== previousLength) {
-    schedulePersistDatabase()
+    schedulePersistDatabase("accesses")
   }
 }
 
@@ -1038,7 +1039,7 @@ const updateCompany = (companyId, changes) => {
   if (!company) return null
 
   Object.assign(company, normalizeCompany({ ...company, ...changes }))
-  schedulePersistDatabase()
+  schedulePersistDatabase("companies")
 
   return company
 }
@@ -1066,7 +1067,7 @@ const createAssetTag = (tag = {}) => {
   if (tagIdExists) return null
 
   assetTags.value.unshift(nextAssetTag)
-  schedulePersistDatabase()
+  schedulePersistDatabase("assetTags")
 
   return nextAssetTag
 }
@@ -1092,7 +1093,7 @@ const updateAssetTag = (assetTagId, changes = {}) => {
   })
 
   if (updatedAssetTag) {
-    schedulePersistDatabase()
+    schedulePersistDatabase("assetTags")
   }
 
   return updatedAssetTag
@@ -1124,14 +1125,14 @@ const deleteAssetTag = (assetTagId) => {
     })
   })
 
-  schedulePersistDatabase()
+  schedulePersistDatabase("assetTags", "assets", "accesses")
 }
 
 const createAsset = (asset) => {
   const nextAsset = normalizeAsset(asset)
 
   assets.value.unshift(nextAsset)
-  schedulePersistDatabase()
+  schedulePersistDatabase("assets")
 
   return nextAsset
 }
@@ -1152,7 +1153,7 @@ const updateAsset = (assetId, changes) => {
   })
 
   if (updatedAsset) {
-    schedulePersistDatabase()
+    schedulePersistDatabase("assets")
   }
 
   return updatedAsset
@@ -1175,7 +1176,7 @@ const deleteAsset = (assetId) => {
   })
 
   if (assets.value.length !== previousAssetsLength) {
-    schedulePersistDatabase()
+    schedulePersistDatabase("assets", "accesses")
   }
 }
 
@@ -1185,7 +1186,7 @@ export function useMockDatabase() {
 
   if (legacyAccessMigrationPending) {
     legacyAccessMigrationPending = false
-    schedulePersistDatabase()
+    schedulePersistDatabase("accesses")
   }
 
   return {

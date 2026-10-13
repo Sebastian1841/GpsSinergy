@@ -1,0 +1,62 @@
+import assert from "node:assert/strict"
+import test from "node:test"
+import { createMaintenanceFleetWorkbook } from "./maintenanceFleetExportService.js"
+
+test("fleet Excel preserves vehicle order and includes all plans with linked orders", async () => {
+  const workbook = await createMaintenanceFleetWorkbook([
+    { plate: "JSFG-74", name: "Camion", company: "Forestal", odometer: 176820,
+      plans: [{ name: "Permiso", criterion: "Tiempo", alert: "30 dias", currentReading: "Dato calendario", lastReading: "Sin ejecuciones", nextDue: "20/08/2026", remaining: "3 dias", status: "Proxima", order: "Sin OT" },
+        { name: "Revision", status: "Al dia", order: "OT-905" }] },
+    { plate: "FLRB-22", plans: [] },
+  ])
+  const buffer = await workbook.xlsx.writeBuffer()
+  const module = await import("exceljs")
+  const ExcelJS = module.default || module
+  const reloaded = new ExcelJS.Workbook()
+  await reloaded.xlsx.load(buffer)
+  const vehicles = reloaded.getWorksheet("Vehiculos")
+  const plans = reloaded.getWorksheet("Planes")
+  assert.equal(vehicles.rowCount, 3)
+  assert.equal(vehicles.getCell("A2").value, "JSFG-74")
+  assert.equal(vehicles.getCell("A3").value, "FLRB-22")
+  assert.equal(vehicles.getCell("D2").value, 176820)
+  assert.equal(vehicles.getCell("E2").value, 2)
+  assert.equal(plans.rowCount, 3)
+  assert.equal(plans.getCell("B2").value, "Permiso")
+  assert.equal(plans.getCell("H3").value, "OT-905")
+  assert.equal(reloaded.getWorksheet("Resumen").getCell("A7").value, 2)
+  assert.equal(reloaded.getWorksheet("Resumen").getCell("C7").value, 2)
+  assert.ok(vehicles.getTable("FleetVehicles"))
+  assert.ok(plans.getTable("FleetPlans"))
+  assert.equal(plans.getCell("G2").font.bold, true)
+  assert.equal(vehicles.views[0].xSplit, 1)
+  assert.equal(vehicles.getCell("D2").numFmt, "#,##0")
+  const report = reloaded.getWorksheet("Reporte")
+  assert.ok(report)
+  assert.equal(reloaded.worksheets[0].name, "Reporte")
+  assert.ok(String(report.getCell("B8").value).includes("JSFG-74"))
+  assert.equal(report.getCell("B10").value, "Permiso")
+  assert.equal(report.getCell("E10").value, "30 dias")
+  assert.equal(report.getCell("G10").value, "Dato calendario")
+  assert.equal(report.getCell("K11").value, "OT-905")
+  assert.equal(report.getCell("J10").fill.fgColor.argb, "FFFFF5DF")
+  assert.equal(report.pageSetup.printTitlesRow, "1:6")
+  assert.equal(report.views[0].zoomScale, 85)
+  assert.equal(report.getCell("B10").font.size, 9)
+  assert.ok(report.getRow(10).height <= 28)
+  assert.ok(report.getColumn(2).width > 32)
+  assert.equal(report.getColumn(1).width, 3)
+  assert.equal(report.getCell("C1").value, "REPORTE DE VEHICULOS Y MANTENCIONES")
+  assert.equal(report.getCell("C3").value, "Informe de mantenciones")
+  assert.ok(String(report.getCell("F3").value).startsWith("Generado:"))
+  assert.equal(report.getCell("B1").border.right.style, "thin")
+  assert.equal(report.getCell("B8").fill.fgColor.argb, "FFDCE7F4")
+  assert.equal(report.getCell("B8").border.top.color.argb, "FFFF6600")
+  assert.equal(report.getRow(12).height, 10)
+  assert.equal(report.getColumn(12).hidden, false)
+  assert.equal(report.getColumn(13).hidden, false)
+  assert.equal(report.getColumn(13).width, report.getColumn(1).width)
+  assert.equal(report.getColumn(14).hidden, true)
+  assert.equal(report.getColumn(16384).hidden, true)
+  report.getColumn(1).eachCell(cell => assert.equal(cell.value, null))
+})

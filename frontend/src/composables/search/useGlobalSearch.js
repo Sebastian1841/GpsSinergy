@@ -408,33 +408,24 @@ export const useGlobalSearch = ({
     })
   })
 
-  const allSearchResults = computed(() => {
-    return [
-      ...assetResults.value,
-      ...companyResults.value,
-      ...reportResults.value,
-      ...workspaceResults.value,
-      ...userResults.value,
-      ...auditResults.value,
-    ]
-  })
-
-  const scopedSearchResults = computed(() => {
-    if (normalizedTypeFilter.value === "all") {
-      return allSearchResults.value
-    }
-
-    return allSearchResults.value.filter((result) => {
-      return result.type === normalizedTypeFilter.value
-    })
-  })
+  const resultSources = {
+    asset: assetResults,
+    company: companyResults,
+    report: reportResults,
+    workspace: workspaceResults,
+    user: userResults,
+    audit: auditResults,
+  }
 
   const globalSearchResults = computed(() => {
     const term = normalizedQuery.value
+    const type = normalizedTypeFilter.value
+    if (type !== "all") {
+      const results = resultSources[type].value
+      return term ? results.filter((result) => result.searchText.includes(term)) : results
+    }
 
     if (!term) {
-      if (normalizedTypeFilter.value !== "all") return scopedSearchResults.value
-
       return [
         ...assetResults.value.slice(0, 8),
         ...companyResults.value.slice(0, 6),
@@ -445,13 +436,15 @@ export const useGlobalSearch = ({
       ].slice(0, GLOBAL_SEARCH_RESULT_LIMIT)
     }
 
-    const filteredResults = scopedSearchResults.value.filter((result) => {
-      return result.searchText.includes(term)
-    })
-
-    if (normalizedTypeFilter.value !== "all") return filteredResults
-
-    return filteredResults.slice(0, GLOBAL_SEARCH_RESULT_LIMIT)
+    const matches = []
+    for (const group of RESULT_GROUPS) {
+      for (const result of resultSources[group.key].value) {
+        if (!result.searchText.includes(term)) continue
+        matches.push(result)
+        if (matches.length === GLOBAL_SEARCH_RESULT_LIMIT) return matches
+      }
+    }
+    return matches
   })
 
   const globalSearchGroups = computed(() => {

@@ -28,6 +28,7 @@ const normalizeAlarmStatus = (status) => {
 const normalizeAlarm = (alarm = {}) => {
   return {
     id: normalizeText(alarm.id, `alarm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
+    ruleId: normalizeText(alarm.ruleId),
     companyId: normalizeText(alarm.companyId),
     assetId: normalizeText(alarm.assetId),
     type: normalizeText(alarm.type, "operation"),
@@ -45,9 +46,14 @@ const normalizeAlarm = (alarm = {}) => {
 
 const mergeSeedAlarms = (items = []) => {
   const alarmIds = new Set(items.map((alarm) => normalizeText(alarm.id)))
+  const seedAlarmsById = new Map(mockAlarms.map((alarm) => [normalizeText(alarm.id), alarm]))
+  const enrichedItems = items.map((alarm) => ({
+    ...(seedAlarmsById.get(normalizeText(alarm.id)) || {}),
+    ...alarm,
+  }))
   const missingSeedAlarms = mockAlarms.filter((alarm) => !alarmIds.has(normalizeText(alarm.id)))
 
-  return [...items, ...cloneData(missingSeedAlarms)]
+  return [...enrichedItems, ...cloneData(missingSeedAlarms)]
 }
 
 const readAlarmRecords = () => {

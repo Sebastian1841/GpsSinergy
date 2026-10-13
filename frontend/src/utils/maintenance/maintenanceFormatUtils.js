@@ -1,3 +1,7 @@
+const numberFormatter = new Intl.NumberFormat("es-CL")
+const decimalFormatter = new Intl.NumberFormat("es-CL", { maximumFractionDigits: 1 })
+const shortDateFormatter = new Intl.DateTimeFormat("es-CL", { dateStyle: "short" })
+
 export const normalizeText = (value) => {
   return String(value || "")
     .trim()
@@ -14,8 +18,10 @@ export const parseNumber = (value) => {
 }
 
 export const formatNumber = (value) => {
-  return new Intl.NumberFormat("es-CL").format(Math.round(Number(value) || 0))
+  return numberFormatter.format(Math.round(Number(value) || 0))
 }
+
+export const formatDecimalNumber = (value) => decimalFormatter.format(value)
 
 export const formatCurrency = (value) => {
   return `$ ${formatNumber(value)}`
@@ -34,9 +40,7 @@ export const formatDateLabel = (value) => {
 
   if (Number.isNaN(date.getTime())) return value || "-"
 
-  return new Intl.DateTimeFormat("es-CL", {
-    dateStyle: "short",
-  }).format(date)
+  return shortDateFormatter.format(date)
 }
 
 export const addDays = (value, days) => {
@@ -70,7 +74,6 @@ export const getInitials = (value = "") => {
 export const getReadingUnit = (source) => {
   if (source === "Horometro") return "hrs"
   if (source === "Fecha/Hora") return "dias"
-  if (source === "Valor manual") return "valor"
 
   return "km"
 }
@@ -78,7 +81,6 @@ export const getReadingUnit = (source) => {
 export const formatMaintenanceIntervalLabel = (source, value) => {
   const unit = getReadingUnit(source)
 
-  if (source === "Valor manual") return "Valor manual"
 
   return `${formatNumber(parseNumber(value))} ${unit}`
 }

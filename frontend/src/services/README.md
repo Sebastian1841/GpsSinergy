@@ -13,10 +13,12 @@ Capa de acceso a datos, adaptadores mock y servicios externos.
 - `companies/`: empresas.
 - `itinerarios/`: exportacion y procesamiento de itinerarios.
 - `location/`: geocodificacion inversa.
+- `maintenance/`: persistencia por secciones, evidencias IndexedDB y exportaciones de OT, flota e historial.
 - `reports/`: plantillas y programaciones de reportes.
 - `routing/`: rutas externas OSRM.
 - `storage/`: wrapper de almacenamiento local.
 - `users/`: usuarios y permisos.
+- `unreported/`: descarga Excel de las filas filtradas de Sin reportar.
 
 ## Regla de mantenimiento
 

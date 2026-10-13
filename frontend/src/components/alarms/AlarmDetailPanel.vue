@@ -37,15 +37,7 @@
       <main class="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
         <article class="alarm-detail-row">
           <span class="alarm-detail-icon">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                d="M4 21V7l8-4 8 4v14M8 21v-8h8v8M8 10h.01M12 10h.01M16 10h.01"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
+            <SvgIcon name="empresas" />
           </span>
           <span class="min-w-0">
             <span class="alarm-detail-label">Empresa</span>
@@ -108,16 +100,8 @@
         </article>
 
         <article v-if="triggerReason" class="alarm-detail-row">
-          <span class="alarm-detail-icon">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                d="M12 3v10M12 17h.01M5.5 21h13L12 3 5.5 21z"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
+          <span class="alarm-detail-icon alarm-detail-reason-icon">
+            <SvgIcon :name="alarmTypeIcon" />
           </span>
           <span class="min-w-0">
             <span class="alarm-detail-label">Motivo</span>
@@ -127,22 +111,7 @@
 
         <article class="alarm-detail-row">
           <span class="alarm-detail-icon">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                d="M7 3h7l3 3v15H7V3z"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-              <path
-                d="M14 3v4h4M10 12h5M10 16h5"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
+            <SvgIcon name="detail-info" />
           </span>
           <span class="min-w-0">
             <span class="alarm-detail-label">Descripcion</span>
@@ -265,6 +234,20 @@ const detailDescription = computed(() => {
 
 const triggerReason = computed(() => props.alarm?.triggerReason || "")
 
+const alarmTypeIcon = computed(() => {
+  const type = props.alarm?.type
+
+  if (type === "speeding") return "alarm-speeding"
+  if (type === "battery") return "alarm-low-battery"
+  if (type === "no_signal") return "alarm-no-signal"
+  if (type === "geofence") return "alarm-geofence-exit"
+  if (type === "fuel") return "alarm-fuel-variation"
+  if (type === "stop_time") return "alarm-long-stop"
+  if (type === "ignition") return "alarm-after-hours"
+
+  return "alertas"
+})
+
 const formatDateTime = (value) => {
   const date = new Date(value)
 
@@ -291,9 +274,13 @@ const formatDateTime = (value) => {
   color: #315078;
 }
 
-.alarm-detail-icon svg {
+.alarm-detail-icon :deep(svg) {
   width: 1.125rem;
   height: 1.125rem;
+}
+
+.alarm-detail-reason-icon {
+  color: #ff6600;
 }
 
 .alarm-detail-label {

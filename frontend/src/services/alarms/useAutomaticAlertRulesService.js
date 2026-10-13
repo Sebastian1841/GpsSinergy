@@ -1,6 +1,7 @@
 import { computed, ref } from "vue"
 
 import { mockAutomaticAlertRules } from "../../data/mockAutomaticAlertRules.js"
+import { mockAlarms } from "../../data/mockAlarms.js"
 import { normalizeAutomaticAlertRule } from "../../utils/alarms/automaticAlertRuleUtils.js"
 import { readJsonStorage, writeJsonStorage } from "../storage/browserStorage.js"
 
@@ -26,11 +27,51 @@ const createRuleId = () => {
   return `auto-alert-rule-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
+const ruleMatchesAlarm = (rule = {}, alarm = {}) => {
+  if (normalizeText(rule.type) !== normalizeText(alarm.type)) return false
+  if (normalizeText(rule.companyId) !== normalizeText(alarm.companyId)) return false
+
+  const assetScope = rule.assetScope || {}
+
+  if (assetScope.type !== "specific") return true
+
+  return Array.isArray(assetScope.assetIds)
+    ? assetScope.assetIds.some((assetId) => normalizeText(assetId) === normalizeText(alarm.assetId))
+    : false
+}
+
+export const mergeMissingSeedRules = (items = []) => {
+  const mergedRules = [...items]
+
+  mockAlarms.forEach((alarm) => {
+    const seedRule = mockAutomaticAlertRules.find(
+      (rule) => normalizeText(rule.id) === normalizeText(alarm.ruleId),
+    )
+
+    if (!seedRule) return
+
+    const linkedRuleIndex = mergedRules.findIndex(
+      (rule) => normalizeText(rule.id) === normalizeText(alarm.ruleId),
+    )
+    const compatibleRuleIndex = mergedRules.findIndex((rule) => ruleMatchesAlarm(rule, alarm))
+    const replacementIndex = linkedRuleIndex >= 0 ? linkedRuleIndex : compatibleRuleIndex
+
+    if (replacementIndex >= 0) {
+      mergedRules.splice(replacementIndex, 1, cloneData(seedRule))
+      return
+    }
+
+    mergedRules.push(cloneData(seedRule))
+  })
+
+  return mergedRules
+}
+
 const readRuleRecords = () => {
   const storedRules = readJsonStorage(AUTOMATIC_ALERT_RULES_STORAGE_KEY, null)
 
   if (Array.isArray(storedRules)) {
-    return storedRules.map(normalizeAutomaticAlertRule)
+    return mergeMissingSeedRules(storedRules).map(normalizeAutomaticAlertRule)
   }
 
   return cloneData(mockAutomaticAlertRules).map(normalizeAutomaticAlertRule)

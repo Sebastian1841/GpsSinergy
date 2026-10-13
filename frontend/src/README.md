@@ -6,6 +6,7 @@ Raiz del codigo Vue del frontend. La organizacion se mantiene por tipo de respon
 - `components/`: componentes Vue reutilizables o secciones visuales.
 - `composables/`: estado, coordinacion de flujos y hooks Vue.
 - `data/`: datos mock o configuraciones estaticas de dominio.
+- `fixtures/`: datos sinteticos controlados por banderas para validar mantenciones e historial.
 - `router/`: definicion de rutas de la aplicacion.
 - `services/`: capa de acceso a datos, adaptadores y servicios externos.
 - `utils/`: funciones puras, formateadores, calculos y helpers testeables.

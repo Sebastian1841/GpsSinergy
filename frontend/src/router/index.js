@@ -19,6 +19,7 @@ const routeViewLoaders = {
   maintenance: () => import("../views/MaintenanceView.vue"),
   noAccess: () => import("../views/NoAccessView.vue"),
   reports: () => import("../views/ReportsView.vue"),
+  unreported: () => import("../views/UnreportedView.vue"),
   users: () => import("../views/UserManagementView.vue"),
 }
 
@@ -30,6 +31,7 @@ const PRIVATE_ROUTE_VIEW_KEYS = [
   "audit",
   "users",
   "companies",
+  "unreported",
 ]
 export const LIGHT_PRIVATE_ROUTE_VIEW_KEYS = ["reports", "companies"]
 const preloadedRouteViewKeys = new Set()
@@ -282,6 +284,19 @@ const routes = [
   },
 
   // ==================
+  // SIN REPORTAR GENERAL
+  // ==================
+  {
+    path: "/sin-reportar",
+    name: "Unreported",
+    component: routeViewLoaders.unreported,
+    meta: {
+      preloadKey: "unreported",
+      requiresPlatformAdmin: true,
+    },
+  },
+
+  // ==================
   // GESTION DE USUARIOS
   // ==================
   {
@@ -382,6 +397,19 @@ const routes = [
         id: "maintenance-view",
         permission: "view",
       },
+    },
+  },
+
+  // ==================
+  // SIN REPORTAR EMPRESA
+  // ==================
+  {
+    path: "/app/:empresaId/sin-reportar",
+    name: "AppUnreported",
+    component: routeViewLoaders.unreported,
+    meta: {
+      preloadKey: "unreported",
+      requiresModule: "assets",
     },
   },
 

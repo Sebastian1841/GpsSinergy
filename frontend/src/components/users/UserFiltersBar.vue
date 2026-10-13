@@ -2,7 +2,7 @@
   <section class="shrink-0 rounded-xl border border-[#d8dee8] bg-white p-3 shadow-sm">
     <div class="flex flex-wrap items-center gap-2">
       <!-- BUSCADOR -->
-      <label class="relative min-w-[240px] flex-1">
+      <label class="relative min-w-[260px] flex-[1_1_360px]">
         <svg
           viewBox="0 0 24 24"
           class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
@@ -21,7 +21,7 @@
           v-model="searchModel"
           type="search"
           autocomplete="off"
-          placeholder="Buscar por nombre, correo, rol o permiso..."
+          placeholder="Buscar por nombre, correo, rol o empresa..."
           class="h-10 w-full rounded-lg border border-[#d8dee8] bg-white pl-10 pr-3 text-[11px] font-semibold text-[#172033] outline-none transition placeholder:text-slate-400 focus:border-[#102372] focus:ring-2 focus:ring-[#102372]/10"
         />
       </label>
@@ -111,6 +111,17 @@
       >
         Limpiar
       </button>
+
+      <!-- NUEVO USUARIO -->
+      <button
+        v-if="canCreateUsers"
+        type="button"
+        class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#ff6600] px-3.5 text-[10px] font-black text-white shadow-sm transition hover:bg-[#e65c00] active:scale-[0.98]"
+        @click="$emit('create-user')"
+      >
+        <span class="text-base font-medium leading-none">+</span>
+        Nuevo usuario
+      </button>
     </div>
 
     <!-- FILTROS SECUNDARIOS -->
@@ -175,6 +186,10 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  canCreateUsers: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits([
@@ -184,6 +199,7 @@ const emit = defineEmits([
   "update:selectedStatus",
   "update:selectedModule",
   "clear-filters",
+  "create-user",
 ])
 
 const showMoreFilters = ref(false)

@@ -8,6 +8,12 @@ Composables para busquedas transversales de la plataforma.
 
 ## Regla de mantenimiento
 
+La busqueda general limita resultados a 36 y detiene el recorrido al alcanzar
+el limite; no concatena todas las entidades para descartarlas despues. Una
+busqueda de tipo especifico evalua esa fuente y conserva todas sus coincidencias.
+Sin consulta, se mantienen los resultados sugeridos y limites por grupo.
+`useGlobalSearch.test.js` cubre limites, tipos y comportamiento del recorrido.
+
 La busqueda global debe resolver datos y rutas, pero no debe renderizar UI. Si se agregan nuevas entidades buscables, agregarlas aqui y mantener `AppHeader.vue` como consumidor visual.
 
 `AppHeader.vue` muestra esta busqueda para usuarios autenticados. El composable

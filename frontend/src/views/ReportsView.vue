@@ -1,31 +1,7 @@
 <template>
-  <section class="h-full min-h-0 overflow-hidden bg-[#f5f8fc]">
+  <section class="reports-view h-full min-h-0 overflow-hidden bg-[#f5f8fc]">
     <main class="flex h-full min-h-0 flex-col overflow-hidden px-4 py-3 sm:px-5 lg:px-6">
-      <header
-        class="grid shrink-0 gap-3 border-b border-[#d8dee8] pb-3 xl:grid-cols-[minmax(0,1fr)_minmax(480px,780px)] xl:items-end"
-      >
-        <div class="min-w-0">
-          <div class="flex flex-wrap items-center gap-2">
-            <p class="text-[11px] font-black uppercase tracking-[0.18em] text-[#ff6600]">
-              Reportes
-            </p>
-
-            <span class="h-1.5 w-1.5 rounded-full bg-[#102372]"></span>
-
-            <p class="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
-              Plantillas
-            </p>
-          </div>
-
-          <h1 class="mt-1.5 text-[22px] font-black leading-tight text-[#102372]">
-            Biblioteca de reportes
-          </h1>
-
-          <p class="mt-0.5 max-w-[620px] text-[12px] font-semibold leading-5 text-slate-600">
-            Explora y administra los reportes disponibles para tu empresa.
-          </p>
-        </div>
-
+      <div class="shrink-0">
         <div class="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto_auto] md:items-center">
           <label class="relative min-w-0">
             <span class="sr-only">Buscar reporte</span>
@@ -68,7 +44,7 @@
             Nuevo
           </button>
         </div>
-      </header>
+      </div>
 
       <section
         class="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-[#d8dee8] bg-white shadow-sm"
@@ -777,3 +753,17 @@ const deleteReport = (templateId) => {
   }
 }
 </script>
+
+<style scoped>
+.reports-view :deep(button:not(:disabled)),
+.reports-view :deep(select:not(:disabled)),
+.reports-view :deep([role="button"]:not([aria-disabled="true"])) {
+  cursor: pointer;
+}
+
+.reports-view :deep(button:disabled),
+.reports-view :deep(select:disabled),
+.reports-view :deep([aria-disabled="true"]) {
+  cursor: not-allowed;
+}
+</style>

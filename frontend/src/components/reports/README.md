@@ -37,7 +37,7 @@ Componentes Vue del area de reportes.
   `Duracion` y `Direccion`. Si se agregan nuevas condiciones a la regla,
   revisar que tambien existan columnas configurables equivalentes para que el
   usuario pueda mostrar esos datos sin tocar codigo.
-- `ReportEventRulesModal.vue`: administra reglas de evento. El formulario interno se carga async y se monta solo cuando se crea o edita una regla.
+- `ReportEventRulesModal.vue`: administra reglas de evento en un catalogo amplio y responsive. En escritorio presenta buscador, contador, accion de creacion y tarjetas en dos columnas; en movil vuelve a una columna. Cada tarjeta conserva resumen operativo y acciones de edicion o eliminacion para reglas propias. El formulario interno se carga async durante un periodo inactivo y solo se monta cuando se crea o edita una regla; no volver a montarlo permanentemente junto al catalogo.
 - `ReportEventRuleFormModal.vue`: modal de regla de evento; orquesta UI, guardado, eliminacion y auditoria. El estado editable vive en `../../composables/reports/useReportEventRuleFormDraft.js`.
 - `ReportSchedulesModal.vue`: lista y administra programaciones visuales. El formulario interno se carga async y se monta solo cuando se crea o edita una programacion.
 - `ReportScheduleFormModal.vue`: formulario de programacion.
@@ -72,6 +72,10 @@ Los modales de reportes se cargan con `defineAsyncComponent` desde
 Al agregar un modal nuevo de reportes, mantenerlo bajo demanda si incluye
 preview, graficos, mapas, ejecucion o exportacion para que abrir Reportes o la
 pestana de Reportes en Activos no descargue trabajo que aun no se ha usado.
+
+La vista general no repite un encabezado local con `Reportes`, `Plantillas` o
+`Biblioteca de reportes`, porque el header global ya identifica el modulo. Debe
+comenzar con la barra de busqueda y acciones ocupando el ancho disponible.
 
 El flujo de creacion/edicion de plantillas debe mantenerse como configurador
 guiado. No volver a juntar reglas, columnas, widgets, exportacion y

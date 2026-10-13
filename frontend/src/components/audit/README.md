@@ -8,7 +8,6 @@ Componentes visuales del modulo de auditoria.
 - `AuditDetailModal.vue`: modal de detalle de un registro. Se carga async desde
   `AuditView.vue` y se monta con `v-if` solo cuando hay detalle abierto.
 - `AuditFilters.vue`: filtros de busqueda, rango de fechas, modulo, accion, estado y exportacion.
-- `AuditSummaryHeader.vue`: encabezado con metricas de auditoria.
 
 ## Regla de mantenimiento
 
@@ -18,11 +17,25 @@ Los componentes reciben datos y callbacks desde `AuditView.vue` o composables. E
 
 El modulo evita fondos blancos puros para no cansar la vista en tablas largas. La paleta debe mantenerse corporativa: azul `#102372` para encabezados y zonas principales, naranjo `#ff6600` para acciones, acentos y seleccion, y superficies gris/azul claras (`#eef3f8`, `#f2f5f9`, `#f5f7fb`) para contenido denso.
 
+El layout privado aplica `module-readable` a Auditoria y al resto de modulos,
+excepto Activos. Los textos de 9, 10 y 11px se presentan a 11, 12 y 13px
+respectivamente. `AuditView.vue` conserva `audit-readable` solo para alinear
+controles CSS propios y filas de detalle con esa escala. No reducirlos
+localmente para ganar espacio: priorizar truncado, scroll o ajuste de columnas.
+
 En la tabla de actividad, `Responsable` y `Entidad` deben diferenciarse visualmente. `Entidad` usa separador vertical y acento naranjo para evitar que ambas columnas se lean como una sola.
 
-La zona superior de auditoria sigue el orden `filtros -> KPI -> tabla`. No duplicar el header global dentro de la vista; el contexto principal ya lo entrega `AppHeader.vue`. `AuditFilters.vue` usa controles tipo tarjeta compacta con icono, etiqueta y valor para busqueda, rango de fechas, modulo, accion y estado. `AuditSummaryHeader.vue` muestra cuatro KPI equivalentes como indicadores minimalistas con punto de color, valor y texto secundario; no debe competir visualmente con la tabla. El KPI activo puede marcarse con borde naranjo cuando aplica un filtro real, pero la tabla de actividad no debe modificarse por cambios en esta zona superior.
+La zona superior de auditoria comienza con `AuditFilters.vue`, que usa controles
+tipo tarjeta compacta para busqueda, rango de fechas, modulo, accion, estado y
+exportacion. Los antiguos KPI se retiraron porque duplicaban las categorias
+rapidas y el selector de estado.
 
-Los KPI funcionan tambien como filtros rapidos: `Total` limpia el filtro de KPI, `Correctos` filtra `status: success`, `Fallidos` filtra `status: failed` y `Acciones sensibles` filtra `severity: warning`. Ese KPI no representa alertas operacionales de vehiculos, sino acciones de auditoria que requieren atencion.
+En escritorio, el buscador ocupa todo el ancho flexible disponible y comparte
+una sola fila con el rango de fechas, el boton de filtros avanzados y Exportar.
+En anchos menores los controles pueden envolver sin reducir la legibilidad.
+El rango identifica explicitamente sus campos con las etiquetas `Desde` y
+`Hasta`. Un separador vertical distingue ambas fechas dentro del mismo control;
+no se agrega un calendario general antes del primer campo.
 
 Las categorias rapidas de la vista deben usar el mismo criterio visual: evitar
 el texto `Alertas` para `severity: warning`, porque puede confundirse con reglas
@@ -43,3 +56,8 @@ El modal de detalle debe mantenerse como ficha simple de auditoria: accion y des
 Las acciones de grupos de geocercas deben mostrarse con etiquetas humanas:
 creacion, renombrado y eliminacion de grupo, evitando exponer codigos como
 `geofence-group:rename` en la tabla o en el detalle.
+
+Las categorias superiores reutilizan el catalogo `SvgIcon`: `menu` para Todos,
+`audit-shield-alert` para Acciones sensibles, `audit-circle-x` para Fallidos y
+`fleet-tags` para Etiquetas. Cambios de acceso conserva el candado local y
+Usuarios utiliza un fondo y azul mas oscuros para mejorar su contraste.

@@ -25,54 +25,39 @@
           @drop="dropTab($event, section.key)"
           @dragend="endTabReorder"
         >
-          <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 shrink-0" fill="none" aria-hidden="true">
-            <path
-              v-if="section.key === 'activos'"
-              d="M4.75 16.5h14.5M6.75 16.5l1.15-5.75A2.25 2.25 0 0 1 10.1 9h3.8a2.25 2.25 0 0 1 2.2 1.75l1.15 5.75M7.25 16.5v1.25M16.75 16.5v1.25M9 12.25h6"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+          <span
+            v-if="
+              ['activos', 'reportes', 'itinerarios', 'geocercas', 'etiquetas', 'alertas'].includes(
+                section.key,
+              )
+            "
+            class="fleet-tab-shared-icon flex h-3.5 w-3.5 shrink-0 items-center justify-center overflow-hidden"
+          >
+            <SvgIcon
+              :name="
+                section.key === 'activos'
+                  ? 'activos'
+                  : section.key === 'reportes'
+                    ? 'fleet-reports'
+                    : section.key === 'itinerarios'
+                      ? 'fleet-itineraries'
+                      : section.key === 'geocercas'
+                        ? 'alarm-geofence-exit'
+                        : section.key === 'etiquetas'
+                          ? 'fleet-tags'
+                          : 'alertas'
+              "
             />
+          </span>
 
+          <svg
+            v-else
+            viewBox="0 0 24 24"
+            class="h-3.5 w-3.5 shrink-0"
+            fill="none"
+            aria-hidden="true"
+          >
             <path
-              v-else-if="section.key === 'reportes'"
-              d="M4 19V5m0 14h16M8 15v-4m4 4V7m4 8V9"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-
-            <path
-              v-else-if="section.key === 'itinerarios'"
-              d="M6.5 6.75h.01M17.5 17.25h.01M8.75 6.75h3.1c2.35 0 4.25 1.9 4.25 4.25s-1.9 4.25-4.25 4.25H10.5M6.5 4.5a2.25 2.25 0 1 1 0 4.5 2.25 2.25 0 0 1 0-4.5ZM17.5 15a2.25 2.25 0 1 1 0 4.5 2.25 2.25 0 0 1 0-4.5Z"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-
-            <path
-              v-else-if="section.key === 'geocercas'"
-              d="M12 21s7-4.6 7-11.25A7 7 0 0 0 5 9.75C5 16.4 12 21 12 21ZM12 12.25a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-
-            <path
-              v-else-if="section.key === 'alertas'"
-              d="M12 4.5 4.75 18h14.5L12 4.5ZM12 9v4M12 16h.01"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-
-            <path
-              v-else
               d="M4 20V8l8-4 8 4v12M8 20v-6h8v6M9 10h.01M15 10h.01"
               stroke="currentColor"
               stroke-width="1.8"
@@ -179,6 +164,7 @@
 
 <script setup>
 import { computed, ref, watch } from "vue"
+import SvgIcon from "../../icons/SvgIcon.vue"
 import ColumnVisibilityMenu from "../../ui/ColumnVisibilityMenu.vue"
 
 const props = defineProps({
@@ -354,5 +340,13 @@ const handleTabsWheel = (event) => {
 
 .fleet-tabs-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+.fleet-tab-shared-icon :deep(svg) {
+  display: block;
+  width: 0.875rem;
+  height: 0.875rem;
+  max-width: 0.875rem;
+  max-height: 0.875rem;
 }
 </style>
