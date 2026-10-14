@@ -6,7 +6,9 @@ import { useUnreportedPagination } from "./useUnreportedPagination.js"
 test("pagination limits visible rows while preserving full data and order", () => {
   const rows = ref(Array.from({ length: 55 }, (_, index) => index))
   const state = useUnreportedPagination(rows)
-  assert.deepEqual(state.visibleRows.value, rows.value.slice(0, 10))
+  assert.equal(state.pageSize.value, 5)
+  assert.deepEqual(state.visibleRows.value, rows.value.slice(0, 5))
+  state.pageSize.value = 10
   state.changePage(5)
   assert.equal(state.currentPage.value, 6)
   assert.deepEqual(state.visibleRows.value, [50, 51, 52, 53, 54])
@@ -24,7 +26,7 @@ test("filters and page size reset pagination and shrinking data clamps the page"
   state.changePage(4)
   filter.value = "changed"
   assert.equal(state.currentPage.value, 1)
-  for (const size of [20, 50]) {
+  for (const size of [10, 20, 50, 5]) {
     state.changePage(1)
     state.pageSize.value = size
     assert.equal(state.currentPage.value, 1)

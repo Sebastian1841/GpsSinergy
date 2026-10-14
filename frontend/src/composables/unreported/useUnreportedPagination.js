@@ -2,7 +2,7 @@ import { computed, ref, watch } from "vue"
 
 export const useUnreportedPagination = (rows, resetSources = []) => {
   const page = ref(1)
-  const pageSize = ref(10)
+  const pageSize = ref(5)
   const totalPages = computed(() => Math.max(1, Math.ceil(rows.value.length / pageSize.value)))
   const currentPage = computed(() => Math.min(Math.max(1, page.value), totalPages.value))
   const offset = computed(() => (currentPage.value - 1) * pageSize.value)

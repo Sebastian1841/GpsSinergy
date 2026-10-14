@@ -4,6 +4,8 @@ Componentes Vue reutilizables y piezas visuales por dominio.
 
 ## Carpetas
 
+- `support/`: formulario de nueva solicitud del Panel de soporte.
+
 - `activos/`: UI de flota, mapa, geocercas, itinerarios y rutas.
 - `alarms/`: historial, filtros, KPIs, detalle y configuracion de reglas
   automaticas de alertas.

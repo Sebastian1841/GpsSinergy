@@ -16,6 +16,9 @@ interno. Esta correccion no debe trasladarse al contenedor compartido.
 
 ## Regla de mantenimiento
 
+`support` representa el Panel de soporte en el menu del usuario;
+`support-attachment` identifica la carga de archivos en la conversacion.
+
 `maintenance-time`, `maintenance-odometer` y `maintenance-hours` son reloj,
 medidor y reloj de arena para los tres criterios del catalogo de mantenciones.
 No usar `proxima` (advertencia) para identificar tiempo u horometro.

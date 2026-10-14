@@ -58,6 +58,9 @@ Los README locales dentro de `src` explican responsabilidades por carpeta.
 
 ## Modulos actuales
 
+- `Soporte`: pagina de solicitudes y conversacion en /soporte, accesible desde
+  el dropdown de usuario, con persistencia local y gestion por alcance/rol tecnico.
+
 - `Activos`: monitoreo de flota, mapa, geocercas, itinerarios, rutas y reportes
   desde Fleet.
 - `Reportes`: biblioteca de plantillas, reglas de evento, ejecucion, preview,

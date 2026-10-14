@@ -4,6 +4,11 @@ Pantallas principales conectadas al router.
 
 ## Archivos
 
+- `SupportView.vue`: Panel de soporte en /soporte; listado filtrado/paginado,
+  formulario de solicitud y detalle con conversacion, adjuntos y eventos.
+  Clientes consultan empresas autorizadas; administrador de plataforma y rol
+  tecnico gestionan estados/responsables/fecha dentro de su alcance. Datos locales.
+
 - `a.html`: documentacion HTML auxiliar usada aparte por el usuario. Debe mantenerse sincronizada con los cambios grandes de arquitectura, flujos, reportes y organizacion del frontend. No eliminar sin confirmacion explicita.
 - `b.html`: documentacion HTML auxiliar sobre mejora del sistema de mantenciones. No esta conectada al router y debe tratarse como informe de referencia, no como vista Vue.
 - `ActivosView.vue`: vista principal de monitoreo de activos. Tambien acepta `?activoId=`, `?assetId=` o `?asset=` para seleccionar un activo desde navegacion externa, como el buscador global del header. Si la URL incluye `section=itinerarios`, `date` y `alarmId`, abre Itinerarios, selecciona el activo autorizado, genera el recorrido del dia y destaca la alerta sobre el punto GPS mas cercano. Cuando la URL trae un activo, limpia filtros visuales de busqueda/estado/ciudad/grupo y prioriza ese activo sobre el workspace guardado. El activo solo se fuerza si ya pertenece al universo autorizado por `visibleAssets`; no salta permisos. El panel lateral de Fleet incluye `Alertas` como historial por empresa y activos autorizados, con accion para abrir el recorrido del dia. El menu contextual de cada activo puede abrir `Itinerarios` dentro del mismo panel lateral, generar el recorrido del vehiculo, mostrar el resumen diario de solo ese activo o agregarlo al resumen diario actual. La accion `Agregar a resumen diario` se expone solo despues de iniciar un resumen diario, usando el estado `hasActiveDailySummary`, para evitar que aparezca antes de existir un resumen al cual sumar activos. Tambien puede navegar a `Mantenciones` con `assetId`, `patente` y `open=maintenance-detail` para abrir las mantenciones del vehiculo seleccionado. En la seccion `Geocercas`, coordina importacion/exportacion KML, KMZ, GeoJSON, CSV y XML, creacion/renombrado/eliminacion de grupos, auditoria y refresco del mapa. Los grupos se gestionan solo en el panel lateral; el editor del mapa solo los selecciona desde dropdown o deja la geocerca sin grupo.
@@ -50,6 +55,34 @@ Pantallas principales conectadas al router.
   drawer de detalle con tabs.
 
 ## Regla de mantenimiento
+
+El seguimiento se separa en Sin reportar y Recuperados.
+Notas (contador) abre el panel de notas del equipo: consulta y agregado con fecha
+y autor. Se conserva la falla previa como primera nota y se elimina su texto
+del cuerpo de la tabla; el diagnostico GPS permanece independiente.
+En escritorio la altura queda acotada al contenedor: cabecera y paginacion
+visibles y filas con desplazamiento independiente cuando no caben.
+Filtros compactos en escritorio, sin scroll interno y con ambos botones visibles.
+Panel con separacion uniforme de 14 px, controles de 36 px en escritorio y
+estados de igual ancho sin saltos de linea.
+Tabla con cinco equipos por pagina inicialmente y filas de al menos 80 px,
+distribuidas en la altura disponible para mejorar lectura sin cortar la ultima.
+Las filas respetan la altura minima del contenido al registrar fallas, con
+padding vertical y ajuste de palabras; textos y responsables no invaden otra fila.
+Estados en dos columnas (Nunca reporto ocupa ambas), fechas Desde/Hasta y
+orden/umbral en una fila compartida; buscador con icono del sistema.
+Orden y umbral alineados abajo, etiquetas en una linea; acciones de las filas
+lado a lado para evitar altura innecesaria y mostrar mas equipos.
+En movil se mantiene el desplazamiento de pagina.
+Registrar/editar falla guarda texto, fecha y responsable sin cambiar seguimiento;
+se muestra aparte del diagnostico GPS y permanece al recuperarse. Se migran los
+retiros antiguos conservando su informacion; ya no hay pestaña de retiro ni reactivar.
+La columna Datos al desconectarse muestra etiqueta breve y datos del motivo, sin
+explicaciones largas ni hipotesis. Un voltaje anterior solo se muestra si existe;
+reportes nuevos no vuelven actuales lecturas viejas.
+La libreta de notas fue retirada a pedido del usuario. La recuperacion se prueba
+con Simular reporte (demo), no con telemetria real. KPI y listas usan el alcance
+de empresas autorizadas y los resultados del seguimiento, no conteos fijos.
 
 Las vistas deben orquestar componentes y composables. Si una vista crece demasiado, extraer secciones visuales a `components` y estado a `composables`.
 

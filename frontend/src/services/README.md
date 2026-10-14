@@ -4,6 +4,8 @@ Capa de acceso a datos, adaptadores mock y servicios externos.
 
 ## Carpetas
 
+- `support/`: solicitudes locales, permisos operativos y archivos IndexedDB.
+
 - `access/`: empresas y permisos disponibles para la sesion.
 - `activos/`: acceso a datos de activos.
 - `alarms/`: servicios locales de alertas y reglas automaticas con persistencia

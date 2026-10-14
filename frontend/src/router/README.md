@@ -1,5 +1,10 @@
 # Router
 
+`/soporte` (Support) carga SupportView bajo demanda para usuarios autenticados.
+No exige un permiso de modulo separado; el panel verifica el alcance por empresa
+y permite gestion al administrador de plataforma o al rol tecnico autorizado.
+El query empresa solo inicializa un filtro si pertenece al alcance accesible.
+
 Configuracion de rutas de Vue Router.
 
 ## Archivos

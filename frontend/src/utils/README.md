@@ -1,5 +1,10 @@
 # Utils
 
+`unreported/` muestra etiquetas y valores de desconexion sin confundir
+mediciones antiguas o datos faltantes con hechos actuales.
+
+`support/` concentra estados, tipos, alcance y validacion de adjuntos del Panel de soporte.
+
 Funciones puras y helpers compartidos.
 
 ## Archivos directos

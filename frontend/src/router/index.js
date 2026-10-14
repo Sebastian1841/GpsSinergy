@@ -19,6 +19,7 @@ const routeViewLoaders = {
   maintenance: () => import("../views/MaintenanceView.vue"),
   noAccess: () => import("../views/NoAccessView.vue"),
   reports: () => import("../views/ReportsView.vue"),
+  support: () => import("../views/SupportView.vue"),
   unreported: () => import("../views/UnreportedView.vue"),
   users: () => import("../views/UserManagementView.vue"),
 }
@@ -195,6 +196,11 @@ const getLastAccessibleAlarmsCompany = ({ accessibleCompanies, canAccessFunction
 // RUTAS
 // ==================
 const routes = [
+  {
+    path: "/soporte",
+    name: "Support",
+    component: routeViewLoaders.support,
+  },
   {
     path: "/login",
     name: "Login",

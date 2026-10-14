@@ -186,6 +186,16 @@
 
                 <div class="p-2">
                   <button
+                    class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white transition-all duration-200 hover:bg-white/10"
+                    type="button"
+                    @click="openSupport"
+                  >
+                    <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10">
+                      <SvgIcon name="support" class="h-4 w-4" />
+                    </div>
+                    <span class="font-medium">Panel de soporte</span>
+                  </button>
+                  <button
                     class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white transition-all duration-200 hover:bg-[#ff6600] hover:shadow-[0_8px_24px_rgba(255,102,0,0.28)]"
                     type="button"
                     @click="logout"
@@ -487,6 +497,7 @@ const activeContextLabel = computed(() => {
 })
 
 const activeContextName = computed(() => {
+  if (route.name === "Support") return "Panel de soporte"
   if (activeCompanyId.value) {
     return activeHeaderCompany.value?.name || activeCompanyId.value
   }
@@ -819,5 +830,10 @@ const logout = () => {
   logoutSession()
   closeAllDropdowns()
   router.replace("/login")
+}
+
+const openSupport = () => {
+  showDropdown.value = false
+  router.push({ name: "Support", query: activeCompanyId.value ? { empresa: activeCompanyId.value } : {} })
 }
 </script>

@@ -12,6 +12,12 @@
     <svg v-else-if="name === 'download'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M12 3v12m-5-5 5 5 5-5M5 16v4h14v-4" />
     </svg>
+    <svg v-else-if="name === 'support'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 14v-3a9 9 0 0 1 18 0v7a3 3 0 0 1-3 3h-3M3 11h3v7H3zM18 11h3v7h-3z" /><path d="M12 21h3" />
+    </svg>
+    <svg v-else-if="name === 'support-attachment'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m21 11-9 9a6 6 0 0 1-8.5-8.5l10-10a4 4 0 0 1 5.7 5.7l-10 10a2 2 0 0 1-2.8-2.8L16 5" />
+    </svg>
     <!-- Eye -->
     <svg
       v-else-if="name === 'eye'"

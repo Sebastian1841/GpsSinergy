@@ -34,6 +34,9 @@ Componentes estructurales de la aplicacion.
 
 ## Regla de mantenimiento
 
+El menu de usuario incluye Panel de soporte, que abre /soporte y conserva
+la empresa como filtro inicial cuando hay contexto. No se agrega a la sidebar.
+
 Layout puede coordinar navegacion y controles globales, pero no debe contener reglas internas de flota, reportes o usuarios. Si un control necesita cruzar dominios, mover la composicion de datos a `composables`.
 
 `App.vue` monta este layout para rutas privadas y dispara `preloadPrivateRouteViews()` cuando hay sesion autenticada. Ese precalentamiento evita que el primer cambio hacia Reportes, Auditoria, Usuarios o Empresas tenga que descargar el modulo completo justo al hacer click.
