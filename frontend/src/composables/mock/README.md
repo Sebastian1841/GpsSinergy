@@ -1,5 +1,12 @@
 # Mock Composables
 
+Migracion de reportes mock (2026-10-19): normalizacion completa solo activos de
+semilla conocidos, source mock-database y sin reporte explicito, con fechas y datos
+de demostracion. Nunca reemplaza snapshots del usuario/API, reportes vacios explicitos
+o telemetria existente. Marca coleccion assets pendiente y persiste una vez; snapshot
+inicial tambien se guarda para no regenerar fechas en cada recarga. No borra base,
+identidades, consultas ni historial de Sin reportar. No aplica a activos personalizados.
+
 Estado mock del prototipo.
 
 ## Archivos

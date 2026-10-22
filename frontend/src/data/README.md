@@ -4,6 +4,13 @@ Datos mock y configuraciones estaticas usadas por el prototipo.
 
 ## Archivos
 
+- `mockAssetReporting.js`: completa fixtures de Activos con reportes fechados.
+  Offline: escenarios de 2/4/8/15/30 dias y diagnosticos demostrativos de alimentacion,
+  SIM/red o causa no determinada. En linea: 1 a 5 minutos antes del snapshot inicial.
+  Conserva fechas completas y campos existentes; solo source mock-database sin
+  reporte explicito. Fecha completa en datosUlt y canonical reportedAt/lastReportAt.
+  No representa telemetria real ni stream continuo. Pruebas de escenarios y compatibilidad.
+
 - `mockDatabase.js`: base mock principal. Incluye usuarios, accesos y scopes operativos. El alcance editable de flota se modela por toda la flota, activos especificos o etiquetas de activos; los ejemplos no deben volver a crear scopes por sucursal.
 - `mockAlarms.js`: alertas mock por empresa y activo. Sirve como semilla del
   servicio local de alertas; la vista debe cruzarlas contra `visibleAssets`

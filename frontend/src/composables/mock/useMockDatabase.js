@@ -1,6 +1,7 @@
 import { computed, ref, watch } from "vue"
 
 import { mockDatabaseSeed } from "../../data/mockDatabase.js"
+import { withMockAssetReporting } from "../../data/mockAssetReporting.js"
 import { createCollectionDatabaseStorage } from "../../services/storage/collectionDatabaseStorage.js"
 import { getAssetTypeOption } from "../../utils/activos/assetTypeOptions.js"
 import { normalizeFleetAssetTagIds } from "../../utils/activos/fleetAssetFormUtils.js"
@@ -12,10 +13,18 @@ const BEFORE_UNLOAD_HANDLER_KEY = "__sinergyMockDatabaseBeforeUnloadHandler"
 const ACTIVE_ACCESS_SCOPE_TYPES = new Set(["all-assets", "selected-assets", "asset-tags"])
 
 let persistTimeout = null
+let assetReportMigrationPending = false
 const dirtyCollections = new Set()
 let databaseStorage = null
-try { databaseStorage = typeof window === "undefined" ? null : window.localStorage } catch { /* Storage may be blocked. */ }
-const collectionStorage = createCollectionDatabaseStorage({ storage: databaseStorage, key: STORAGE_KEY })
+try {
+  databaseStorage = typeof window === "undefined" ? null : window.localStorage
+} catch {
+  /* Storage may be blocked. */
+}
+const collectionStorage = createCollectionDatabaseStorage({
+  storage: databaseStorage,
+  key: STORAGE_KEY,
+})
 
 const cloneData = (value) => JSON.parse(JSON.stringify(value))
 
@@ -129,6 +138,11 @@ const normalizeAsset = (asset) => {
   const seedAsset = mockDatabaseSeed.assets.find((item) => {
     return normalizeKey(item.id) === normalizeKey(asset?.id)
   })
+  if (seedAsset) {
+    const migrated = withMockAssetReporting(asset)
+    if (migrated !== asset) assetReportMigrationPending = true
+    asset = migrated
+  }
 
   const seedApplicationByAssetApplication = findSeedApplicationById(
     asset?.applicationId || seedAsset?.applicationId,
@@ -558,6 +572,7 @@ const readPersistedDatabase = () => {
 }
 
 const persistedDatabase = readPersistedDatabase()
+if (!persistedDatabase?.assets) assetReportMigrationPending = true
 
 const initialAccessItems = mergeSeedById(
   cloneData(persistedDatabase?.accesses || mockDatabaseSeed.accesses),
@@ -628,14 +643,17 @@ const syncCompaniesWithSeed = () => {
 
 const persistDatabase = () => {
   if (!dirtyCollections.size) return
-  const saved = collectionStorage.write({
+  const saved = collectionStorage.write(
+    {
       companies: companies.value,
       applicationDefinitions: applicationDefinitions.value,
       assetTags: assetTags.value,
       assets: assets.value,
       users: users.value,
       accesses: accesses.value,
-  }, dirtyCollections)
+    },
+    dirtyCollections,
+  )
   if (saved) dirtyCollections.clear()
 }
 
@@ -1183,6 +1201,10 @@ const deleteAsset = (assetId) => {
 export function useMockDatabase() {
   syncCompaniesWithSeed()
   syncPlatformAdminAccesses()
+  if (assetReportMigrationPending) {
+    assetReportMigrationPending = false
+    schedulePersistDatabase("assets")
+  }
 
   if (legacyAccessMigrationPending) {
     legacyAccessMigrationPending = false

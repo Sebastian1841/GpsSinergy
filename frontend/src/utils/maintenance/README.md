@@ -30,3 +30,32 @@ un cuarto criterio de lectura.
 
 Los archivos `*.test.js` junto a los helpers verifican resumen, costos,
 indices, analisis y migracion.
+# Vencimientos De Licencias
+
+driverLicenseUtils.js valida campos, clases y fechas calendario, normaliza RUT y
+clasifica vigencia con dia de Chile. Vence hoy y hasta 30 dias se considera Por vencer;
+fecha anterior a hoy es Vencida. Es seguimiento por fecha registrada, no validacion
+oficial de la licencia ni calculo del digito verificador del RUT.
+
+# Gestion De Renovaciones
+
+Opciones de contacto, etiqueta de dias al vencimiento, validacion compartida de
+renovacion y seleccion de gestiones por licencia. Los estados de contacto no se
+usan para calcular vigencia ni para bloquear vehiculos.
+
+# Indice De La Lista De Conductores
+
+validateDriverRenewal exige estado por vencer o vencido (hasta30 dias inclusive),
+ademas de vencimiento nuevo posterior y no vencido. Vigentes no se renuevan.
+
+La lista permite ordenar por nombre, clases, vencimiento y estado.
+El orden inicial reutiliza el indice; las ordenaciones manuales no mutan registros.
+
+driverLicenseList prepara orden, busqueda normalizada, estados y contadores
+una sola vez por cambio de datos. No calcula actividad ni recorre contactos o
+renovaciones que no aparecen en la tabla. Conserva las referencias a historiales
+y fotos para los modales, sin modificar los registros persistidos. El filtro no vuelve a ordenar
+ni recorrer historiales. Benchmark: `node scripts/benchmark-driver-list.mjs`.
+En esta maquina 9 consultas sobre 10000 conductores: 247.15ms antes, 8.27ms con indice;
+preparacion del indice 185.37ms aparte. No mide la interfaz completa ni tiempos de red.
+

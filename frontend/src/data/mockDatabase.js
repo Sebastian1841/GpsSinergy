@@ -1,3 +1,7 @@
+import { withMockAssetReporting } from "./mockAssetReporting.js"
+
+const mockReportReference = new Date().toISOString()
+
 const buildReportAccess = (enabledReportIds, reportTypes) => {
   const enabledReports = new Set(enabledReportIds)
 
@@ -858,7 +862,7 @@ export const mockAssets = [
     datosUlt: "12:23:01",
     imei: "868123450012",
   }),
-]
+].map((asset) => withMockAssetReporting(asset, mockReportReference))
 
 const mockSystemModules = [
   {

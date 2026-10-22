@@ -8,6 +8,8 @@
           type="button"
           :class="{ active: activeTab === tab.id }"
           @click="activeTab = tab.id"
+          @pointerenter="prepareMaintenanceTab(tab.id)"
+          @focus="prepareMaintenanceTab(tab.id)"
         >
           {{ tab.label }}
         </button>
@@ -33,7 +35,7 @@
       </nav>
 
       <header
-        v-if="activeTab !== 'overview' && activeTab !== 'costs'"
+        v-if="activeTab !== 'overview' && activeTab !== 'costs' && activeTab !== 'drivers'"
         class="shrink-0 border-b border-[#d8e0eb] bg-white px-4 py-3 sm:px-5"
       >
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -217,6 +219,7 @@
             : [
                 'overflow-y-auto px-4 py-4 sm:px-6',
                 {
+                  'maintenance-drivers-main': activeTab === 'drivers',
                   'maintenance-analysis-main': activeTab === 'costs',
                   'maintenance-work-orders-main':
                     activeTab === 'orders' && orderSection === 'work-orders',
@@ -224,6 +227,15 @@
               ]
         "
       >
+        <KeepAlive :max="1">
+          <MaintenanceDriversTab
+            v-if="activeTab === 'drivers'"
+            :key="String(route.params.empresaId || '')"
+            :company-id="String(route.params.empresaId || '')"
+            :company-name="activeCompanyLabel"
+          />
+        </KeepAlive>
+        <KeepAlive :key="String(route.params.empresaId || '')" :max="6">
         <MaintenanceOverviewTab
           ref="fleetTable"
           :get-order-status-label="getOrderStatusLabel"
@@ -304,6 +316,7 @@
 
         <MaintenanceCostsTab
           v-else-if="activeTab === 'orders' && orderSection === 'without-order'"
+          key="without-order"
           :maintenance-items="maintenanceItems"
           :maintenance-types="maintenanceTypes"
           :get-vehicle-maintenance-plans="getVehicleMaintenancePlans"
@@ -335,7 +348,8 @@
         />
 
         <MaintenanceCostsTab
-          v-else
+          v-else-if="activeTab === 'costs'"
+          key="analysis"
           :maintenance-items="maintenanceItems"
           :maintenance-types="maintenanceTypes"
           :get-vehicle-maintenance-plans="getVehicleMaintenancePlans"
@@ -349,10 +363,19 @@
           @open-export="openMaintenanceModal('export')"
           @update:period-months="analysisPeriod = $event"
         />
+        </KeepAlive>
       </main>
     </div>
 
-    <MaintenanceFleetExportModal v-if="fleetExportRows" :rows="fleetExportRows" :initial-ids="fleetExportInitialIds" :busy="isExportingFleet" :error="fleetExportError" @close="closeFleetExport" @export="exportFleet" />
+    <MaintenanceFleetExportModal
+      v-if="fleetExportRows"
+      :rows="fleetExportRows"
+      :initial-ids="fleetExportInitialIds"
+      :busy="isExportingFleet"
+      :error="fleetExportError"
+      @close="closeFleetExport"
+      @export="exportFleet"
+    />
     <MaintenanceActionModal
       v-if="activeMaintenanceModal"
       :key="`${activeMaintenanceModal}-${selectedVehicle?.id || 'none'}`"
@@ -409,13 +432,13 @@
 
 <script setup>
 import { defineAsyncComponent, nextTick, ref, watch } from "vue"
-import { useRoute } from "vue-router"
+import { useRoute, useRouter } from "vue-router"
 
-import MaintenanceCalendarTab from "../components/maintenance/MaintenanceCalendarTab.vue"
-import MaintenanceCostsTab from "../components/maintenance/MaintenanceCostsTab.vue"
-import MaintenanceHistoryTab from "../components/maintenance/MaintenanceHistoryTab.vue"
+import MaintenanceTabLoading from "../components/maintenance/MaintenanceTabLoading.vue"
 import MaintenanceOverviewTab from "../components/maintenance/MaintenanceFleetTab.vue"
+import MaintenanceDriversTab from "../components/maintenance/MaintenanceDriversTab.vue"
 import MaintenanceWorkOrdersTab from "../components/maintenance/MaintenanceWorkOrdersTab.vue"
+import MaintenanceCostsTab from "../components/maintenance/MaintenanceCostsTab.vue"
 import { useMaintenanceModule } from "../composables/maintenance/useMaintenanceModule.js"
 import "../components/maintenance/maintenance.css"
 import { useAccessService } from "../services/access/useAccessService.js"
@@ -424,9 +447,23 @@ const loadMaintenanceActionModal = () =>
   import("../components/maintenance/MaintenanceActionModal.vue")
 
 const MaintenanceActionModal = defineAsyncComponent(loadMaintenanceActionModal)
-const MaintenanceFleetExportModal = defineAsyncComponent(() => import("../components/maintenance/MaintenanceFleetExportModal.vue"))
+const maintenanceTabLoaders = {
+  history: () => import("../components/maintenance/MaintenanceHistoryTab.vue"),
+  calendar: () => import("../components/maintenance/MaintenanceCalendarTab.vue"),
+}
+const asyncMaintenanceTab = (loader) =>
+  defineAsyncComponent({ loader, loadingComponent: MaintenanceTabLoading, delay: 100 })
+const MaintenanceHistoryTab = asyncMaintenanceTab(maintenanceTabLoaders.history)
+const MaintenanceCalendarTab = asyncMaintenanceTab(maintenanceTabLoaders.calendar)
+const prepareMaintenanceTab = (id) => {
+  if (maintenanceTabLoaders[id]) void maintenanceTabLoaders[id]().catch(() => {})
+}
+const MaintenanceFleetExportModal = defineAsyncComponent(
+  () => import("../components/maintenance/MaintenanceFleetExportModal.vue"),
+)
 
 const route = useRoute()
+const router = useRouter()
 const orderSection = ref("work-orders")
 const focusedOrderId = ref("")
 const maintenanceMain = ref(null)
@@ -436,10 +473,12 @@ const fleetExportRows = ref(null)
 const fleetExportInitialIds = ref([])
 const openFleetExport = () => {
   fleetExportError.value = ""
-  fleetExportInitialIds.value = (fleetTable.value?.getExportRows() || []).map(row => row.id)
+  fleetExportInitialIds.value = (fleetTable.value?.getExportRows() || []).map((row) => row.id)
   fleetExportRows.value = fleetTable.value?.getExportRows(true) || []
 }
-const closeFleetExport = () => { if (!isExportingFleet.value) fleetExportRows.value = null }
+const closeFleetExport = () => {
+  if (!isExportingFleet.value) fleetExportRows.value = null
+}
 const isExportingFleet = ref(false)
 const fleetExportError = ref("")
 const exportFleet = async ({ format, rows }) => {
@@ -453,13 +492,18 @@ const exportFleet = async ({ format, rows }) => {
   try {
     const context = {
       company: activeCompanyLabel.value,
-      reportWidthPx: Math.max(1000, Math.min(2560, (window.screen?.availWidth || window.innerWidth) - 24)),
+      reportWidthPx: Math.max(
+        1000,
+        Math.min(2560, (window.screen?.availWidth || window.innerWidth) - 24),
+      ),
     }
     if (format === "pdf") {
-      const { exportMaintenanceFleetPdf } = await import("../services/maintenance/maintenanceFleetPdfExportService.js")
+      const { exportMaintenanceFleetPdf } =
+        await import("../services/maintenance/maintenanceFleetPdfExportService.js")
       await exportMaintenanceFleetPdf(rows, context)
     } else {
-      const { exportMaintenanceFleetExcel } = await import("../services/maintenance/maintenanceFleetExportService.js")
+      const { exportMaintenanceFleetExcel } =
+        await import("../services/maintenance/maintenanceFleetExportService.js")
       await exportMaintenanceFleetExcel(rows, context)
     }
     fleetExportRows.value = null
@@ -624,9 +668,28 @@ watch(orderSection, async () => {
   await nextTick()
   maintenanceMain.value?.scrollTo({ top: 0 })
 })
+watch(
+  () => route.query.tab,
+  (value) => {
+    if (tabs.some((tab) => tab.id === value)) activeTab.value = value
+  },
+  { immediate: true },
+)
+watch(activeTab, (value) => {
+  if (route.query.tab !== value) void router.replace({ query: { ...route.query, tab: value } })
+})
 </script>
 
 <style scoped>
+.maintenance-drivers-main {
+  padding-bottom: 12px;
+  overflow: hidden;
+}
+@media (max-width: 600px) {
+  .maintenance-drivers-main {
+    overflow-y: auto;
+  }
+}
 .maintenance-view :deep(button:not(:disabled)),
 .maintenance-view :deep(select:not(:disabled)),
 .maintenance-view :deep([role="button"]:not([aria-disabled="true"])) {

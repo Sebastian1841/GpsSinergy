@@ -10,7 +10,7 @@
       ></div>
 
       <div
-        class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 lg:grid-cols-[minmax(240px,340px)_minmax(220px,1fr)_auto] 2xl:grid-cols-[minmax(340px,440px)_minmax(320px,560px)_auto]"
+        class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 lg:grid-cols-[minmax(320px,420px)_minmax(220px,1fr)_auto] 2xl:grid-cols-[minmax(420px,520px)_minmax(320px,560px)_auto]"
       >
         <div class="flex min-w-0 items-center gap-2 overflow-hidden sm:gap-3">
           <button
@@ -44,18 +44,31 @@
             />
           </div>
 
-          <div class="hidden min-w-0 border-l border-white/10 pl-3 min-[520px]:block">
-            <p class="text-[9px] font-black uppercase tracking-[0.18em] text-white/40">
+          <div
+            class="hidden min-w-0 border-l-2 border-[#ff6600] pl-3 min-[520px]:block"
+            aria-label="Ubicacion actual"
+          >
+            <p class="truncate text-[12px] font-semibold text-white/75" :title="activeContextLabel">
               {{ activeContextLabel }}
             </p>
             <p
-              class="mt-0.5 max-w-[140px] truncate text-[12px] font-black text-white sm:max-w-[190px] xl:max-w-[230px] xl:text-[13px]"
+              class="module-location-title mt-1 text-[18px] font-bold leading-tight text-[#ff8a3d] break-words"
+              :title="activeContextName"
             >
               {{ activeContextName }}
             </p>
           </div>
         </div>
 
+        <div
+          class="col-span-2 row-start-2 border-l-2 border-[#ff6600] pl-3 min-[520px]:hidden"
+          aria-label="Ubicacion actual"
+        >
+          <p class="truncate text-[12px] font-semibold text-white/75">{{ activeContextLabel }}</p>
+          <p class="module-location-title text-[18px] font-bold text-[#ff8a3d]">
+            {{ activeContextName }}
+          </p>
+        </div>
         <HeaderGlobalSearch
           :enabled="Boolean(currentUser)"
           :is-open="showGlobalSearchDropdown"
@@ -69,7 +82,7 @@
           :users="searchableUsers"
           :visible-assets="visibleAssets"
           :workspaces="workspaces"
-          class="relative z-40 col-span-2 row-start-2 w-full min-w-0 lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:max-w-[460px] lg:justify-self-center xl:max-w-[520px] 2xl:max-w-[560px]"
+          class="relative z-40 col-span-2 row-start-3 w-full min-w-0 min-[520px]:row-start-2 lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:max-w-[460px] lg:justify-self-center xl:max-w-[520px] 2xl:max-w-[560px]"
           @open="openGlobalSearchDropdown"
           @close="closeGlobalSearchDropdown"
           @before-open="raiseHeaderLayer"
@@ -493,14 +506,15 @@ const handleDeleteVehicleAssetGroup = (groupId) => {
 }
 
 const activeContextLabel = computed(() => {
+  if (activeCompanyId.value) return activeHeaderCompany.value?.name || "Vista actual"
   return activeCompanyId.value ? "Empresa actual" : "Vista actual"
 })
 
 const activeContextName = computed(() => {
   if (route.name === "Support") return "Panel de soporte"
-  if (activeCompanyId.value) {
-    return activeHeaderCompany.value?.name || activeCompanyId.value
-  }
+  if (["Maintenance", "AppMaintenance"].includes(route.name))
+    return route.query?.tab === "drivers" ? "Conductores" : "Mantenciones"
+  if (["Activos", "AppActivos"].includes(route.name)) return "Activos"
 
   if (route.name === "CompanyManagement" || route.name === "AppCompanyManagement") {
     return "Gestión de empresas"
@@ -834,6 +848,17 @@ const logout = () => {
 
 const openSupport = () => {
   showDropdown.value = false
-  router.push({ name: "Support", query: activeCompanyId.value ? { empresa: activeCompanyId.value } : {} })
+  router.push({
+    name: "Support",
+    query: activeCompanyId.value ? { empresa: activeCompanyId.value } : {},
+  })
 }
 </script>
+
+<style scoped>
+.module-location-title {
+  color: #fff;
+  -webkit-text-stroke: 0.6px #ff8a3d;
+  paint-order: stroke fill;
+}
+</style>

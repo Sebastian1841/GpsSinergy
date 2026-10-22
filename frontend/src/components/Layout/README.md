@@ -72,3 +72,22 @@ La cadena esperada es: permisos/etiquetas de acceso -> activos autorizados ->
 grupos o ciudades como filtros visuales. Un grupo de vehiculos nunca debe
 ampliar el alcance real del usuario, y una etiqueta de acceso nunca debe
 tratarse solo como filtro visual.
+# Contexto De Mantenciones
+
+En Maintenance y AppMaintenance el encabezado muestra Mantenciones como titulo y
+la empresa en la etiqueta de contexto, incluso en rutas con empresaId.
+
+# Ubicacion Actual Visible
+
+El nombre de modulo prevalece sobre la empresa en todas las rutas. Texto de 18px,
+empresa de 12px y marca naranja; en movil bajo 520px se muestra en fila propia.
+El buscador global permanece independiente del titulo del modulo.
+
+# Letras Del Modulo
+
+El encabezado identifica Conductores cuando la ruta de mantenciones usa
+query.tab=drivers; las otras pestanas mantienen el titulo Mantenciones.
+
+module-location-title combina relleno blanco con contorno naranja de 0.6px y
+paint-order stroke fill, conservando el interior legible en escritorio y movil.
+

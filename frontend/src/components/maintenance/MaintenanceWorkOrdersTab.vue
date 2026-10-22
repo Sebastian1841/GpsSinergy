@@ -181,7 +181,7 @@
 <script setup>
 import { parseMaintenanceOrderCost as parseCost, parseMaintenanceOrderDate as parseOrderDate, summarizeMaintenanceOrders } from "../../utils/maintenance/maintenanceOrderSummary.js"
 import { formatDecimalNumber, formatNumber } from "../../utils/maintenance/maintenanceFormatUtils.js"
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { computed, nextTick, onActivated, onDeactivated, onBeforeUnmount, onMounted, ref, watch } from "vue"
 
 const props = defineProps({
   filteredWorkOrders: { type: Array, default: () => [] },
@@ -225,6 +225,11 @@ const closeActionMenu = (event) => {
   if (!event.target.closest?.(".row-actions")) activeActionMenu.value = null
 }
 onMounted(() => document.addEventListener("pointerdown", closeActionMenu))
+onActivated(() => document.addEventListener("pointerdown", closeActionMenu))
+onDeactivated(() => {
+  document.removeEventListener("pointerdown", closeActionMenu)
+  activeActionMenu.value = null
+})
 onBeforeUnmount(() => document.removeEventListener("pointerdown", closeActionMenu))
 const assetOptions = computed(() => [
   ...new Set(props.filteredWorkOrders.map(({ plate }) => plate)),

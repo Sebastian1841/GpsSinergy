@@ -2,6 +2,7 @@ export const MAINTENANCE_TABS = [
   { id: "overview", label: "Flota" },
   { id: "costs", label: "Analisis" },
   { id: "orders", label: "Ordenes" },
+  { id: "drivers", label: "Conductores" },
 ]
 
 export const DEFAULT_MAINTENANCE_TYPES = [

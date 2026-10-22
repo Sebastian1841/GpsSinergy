@@ -86,7 +86,7 @@
             </div>
           </div>
         </header>
-        <div class="table-scroll">
+        <div ref="tableScroll" class="table-scroll">
           <table>
             <colgroup>
               <col class="col-vehicle" />
@@ -108,7 +108,7 @@
               </tr>
             </thead>
             <tbody>
-              <template v-for="(item, index) in sortedFleetItems" :key="item.id">
+              <template v-for="{ item, index } in fleetPagination.rows" :key="item.id">
                 <tr :class="{ 'vehicle-row-expanded': isVehicleExpanded(item.id) }">
                   <td>
                     <div class="vehicle-cell">
@@ -267,20 +267,24 @@
                   </td>
                 </tr>
               </template>
+              <tr v-if="!fleetPagination.total">
+                <td :colspan="visibleColumnCount" class="fleet-empty-result">No se encontraron vehiculos.</td>
+              </tr>
             </tbody>
           </table>
         </div>
         <footer>
           <span
-            >Mostrando 1 a {{ displayedItems.length }} de
-            {{ displayedItems.length }} vehiculos</span
+            >Mostrando {{ fleetPagination.start }} a {{ fleetPagination.end }} de
+            {{ fleetPagination.total }} vehiculos</span
           >
           <div>
-            <button title="Pagina anterior"><SvgIcon name="chevron-left" /></button
-            ><button class="active">1</button
-            ><button title="Pagina siguiente"><SvgIcon name="chevron-right" /></button
-            ><select>
-              <option>50 por pagina</option>
+            <button type="button" title="Pagina anterior" aria-label="Pagina anterior" :disabled="fleetPagination.page === 1" @click="fleetPage--"><SvgIcon name="chevron-left" /></button>
+            <button v-for="number in fleetPageNumbers" :key="number" type="button" :class="{ active: fleetPagination.page === number }" :aria-current="fleetPagination.page === number ? 'page' : undefined" :aria-label="'Pagina ' + number" @click="fleetPage = number">{{ number }}</button>
+            <span class="fleet-page-count">{{ fleetPagination.page }} / {{ fleetPagination.pageCount }}</span>
+            <button type="button" title="Pagina siguiente" aria-label="Pagina siguiente" :disabled="fleetPagination.page === fleetPagination.pageCount" @click="fleetPage++"><SvgIcon name="chevron-right" /></button>
+            <select v-model.number="fleetPageSize" aria-label="Vehiculos por pagina">
+              <option v-for="size in [10, 20, 50]" :key="size" :value="size">{{ size }} por pagina</option>
             </select>
           </div>
         </footer>
@@ -290,11 +294,12 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { computed, onActivated, onDeactivated, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import SvgIcon from "../icons/SvgIcon.vue"
 import vehicleBlueCar from "../../assets/map/vehicle-blue-car.png"
 import vehicleBlueTruck from "../../assets/map/vehicle-blue-truck.png"
 import { buildFleetOrderIndex, findFleetOpenOrder } from "./fleetOrderIndex.js"
+import { getFleetPage } from "./fleetPagination.js"
 
 const props = defineProps({
   activeCompanyLabel: { type: String, default: "Flota" },
@@ -369,6 +374,12 @@ const closeMenusOnOutsideClick = (event) => {
 }
 
 onMounted(() => document.addEventListener("pointerdown", closeMenusOnOutsideClick))
+onActivated(() => document.addEventListener("pointerdown", closeMenusOnOutsideClick))
+onDeactivated(() => {
+  document.removeEventListener("pointerdown", closeMenusOnOutsideClick)
+  showColumnMenu.value = false
+  activeMaintenanceMenu.value = null
+})
 onBeforeUnmount(() => document.removeEventListener("pointerdown", closeMenusOnOutsideClick))
 const searchModel = computed({
   get: () => props.searchTerm,
@@ -720,6 +731,22 @@ const clearLocalFilters = () => {
   selectedVehicleType.value = "all"
   emit("clear-filters")
 }
+const fleetPage = ref(1)
+const fleetPageSize = ref(20)
+const tableScroll = ref(null)
+const fleetPagination = computed(() => getFleetPage(sortedFleetItems.value, fleetPage.value, fleetPageSize.value))
+const fleetPageNumbers = computed(() => {
+  const { page, pageCount } = fleetPagination.value
+  const start = Math.max(1, Math.min(page - 2, pageCount - 4))
+  return Array.from({ length: Math.min(5, pageCount) }, (_, index) => start + index)
+})
+watch([sortedFleetItems, fleetPageSize], () => {
+  fleetPage.value = 1
+})
+watch([fleetPage, fleetPageSize, sortedFleetItems], () => {
+  if (tableScroll.value) tableScroll.value.scrollTop = 0
+  activeMaintenanceMenu.value = null
+}, { flush: "post" })
 </script>
 
 <style scoped>
@@ -1609,7 +1636,13 @@ tbody tr:hover {
 .maintenance-table footer > div {
   display: flex;
   gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
 }
+.maintenance-table > footer { flex-wrap: wrap; gap: 10px; }
+.fleet-page-count { white-space: nowrap; padding: 0 4px; }
+.fleet-empty-result { text-align: center; padding: 24px; color: #64748b; }
+.maintenance-table footer button:disabled { opacity: 0.45; cursor: not-allowed; }
 .maintenance-table footer button,
 .maintenance-table footer select {
   height: 32px;

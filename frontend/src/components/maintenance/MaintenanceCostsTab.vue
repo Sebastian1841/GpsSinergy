@@ -540,7 +540,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue"
+import { computed, onDeactivated, ref } from "vue"
 
 import SvgIcon from "../icons/SvgIcon.vue"
 import { buildFleetOrderIndex, findFleetOpenOrder } from "./fleetOrderIndex.js"
@@ -582,6 +582,7 @@ const closeExpandedChart = () => {
   if (expandedChart.value === "compliance") complianceLimit.value = 5
   expandedChart.value = ""
 }
+onDeactivated(closeExpandedChart)
 const toggleExpandedChart = (chart) => {
   if (expandedChart.value === chart) {
     closeExpandedChart()

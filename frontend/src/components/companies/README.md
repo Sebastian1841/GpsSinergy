@@ -73,3 +73,14 @@ este README.
 Los grupos de vehiculos no pertenecen a este modulo. Empresas solo gestiona la
 ficha corporativa y sus reportes base; la organizacion de flota se realiza en
 Activos, despues de aplicar permisos y etiquetas de acceso.
+# Modal De Empresa Neutro
+
+CompanyEditorModal usa fondo blanco y overlay gris sin tinte azul. Empresa y
+Contacto principal se presentan en columnas desde md, Ubicacion debajo y apilado
+en movil. Conserva campos y contratos de guardado; tipografia y controles ampliados.
+
+# RUT Chileno En Formulario
+
+RUT se formatea al escribir o pegar, con puntos, guion y K mayuscula; maximo 12
+caracteres visibles. Se descartan caracteres ajenos al formato, sin validar modulo 11.
+
