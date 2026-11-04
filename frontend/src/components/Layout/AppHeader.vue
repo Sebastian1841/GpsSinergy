@@ -511,6 +511,7 @@ const activeContextLabel = computed(() => {
 })
 
 const activeContextName = computed(() => {
+  if (route.meta?.navigationTitle) return route.meta.navigationTitle
   if (route.name === "Support") return "Panel de soporte"
   if (["Maintenance", "AppMaintenance"].includes(route.name))
     return route.query?.tab === "drivers" ? "Conductores" : "Mantenciones"

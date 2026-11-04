@@ -1,4 +1,4 @@
-export const mockAlarms = [
+const baseAlarms = [
   {
     id: "alarm-001",
     ruleId: "auto-alert-rule-001",
@@ -152,4 +152,29 @@ export const mockAlarms = [
       recovery: "Automatica",
     },
   },
+]
+
+export const mockAlarms = [
+  ...baseAlarms,
+  ...Array.from({ length: 10 }, (_, index) => {
+    const base = baseAlarms[index % 2]
+    const durationSeconds = (index + 1) * 60
+    return {
+      ...base,
+      id: `alarm-pagination-demo-${index + 1}`,
+      title: `${base.title} (prueba)`,
+      description: `Alerta de prueba para revisar la paginacion. ${base.description}`,
+      createdAt: `2026-10-${28 - index}T10:00:00-03:00`,
+      source: "demo",
+      metadata: {
+        ...base.metadata,
+        demo: true,
+        durationSeconds,
+        detectedOn: "episode-end",
+        ...(base.type === "speeding"
+          ? { speed: `${92 + index} km/h` }
+          : { offlineMinutes: `${35 + index} min` }),
+      },
+    }
+  }),
 ]

@@ -32,6 +32,8 @@ const BASE_ASSET_REPORT_COLUMN_LABELS = {
   speedingDelta: "Sobre limite",
   speeding: "Exceso",
   combustible: "Combustible",
+  idleFuelLiters: "Consumo al ralenti (L)",
+  idleFuelCost: "Costo al ralenti ($)",
   alerta: "Alerta",
   address: "Direccion",
   lastPosition: "Direccion",

@@ -5,7 +5,7 @@ Componentes visuales del modulo de auditoria.
 ## Archivos
 
 - `AuditActivityTable.vue`: tabla agrupada de actividad auditada.
-- `AuditDetailModal.vue`: modal de detalle de un registro. Se carga async desde
+- `AuditDetailModal.vue`: ficha de detalle de un registro (nombre legacy). Se carga async desde
   `AuditView.vue` y se monta con `v-if` solo cuando hay detalle abierto.
 - `AuditFilters.vue`: filtros de busqueda, rango de fechas, modulo, accion, estado y exportacion.
 
@@ -15,7 +15,10 @@ Los componentes reciben datos y callbacks desde `AuditView.vue` o composables. E
 
 ## Visual
 
-El modulo evita fondos blancos puros para no cansar la vista en tablas largas. La paleta debe mantenerse corporativa: azul `#102372` para encabezados y zonas principales, naranjo `#ff6600` para acciones, acentos y seleccion, y superficies gris/azul claras (`#eef3f8`, `#f2f5f9`, `#f5f7fb`) para contenido denso.
+La vista combina fondo gris claro con superficies blancas para filtros, listado
+y detalle. Paleta corporativa: azul #102372 para jerarquia, naranja #ff6600 para
+acciones/acento y colores semanticos para estados. No forzar un fondo azul en
+todas las filas ni describir la ficha de detalle como un modal de configuracion.
 
 El layout privado aplica `module-readable` a Auditoria y al resto de modulos,
 excepto Activos. Los textos de 9, 10 y 11px se presentan a 11, 12 y 13px
@@ -49,9 +52,16 @@ La barra de busqueda tambien compara contra la fecha del registro. Debe aceptar 
 
 Las utilidades usadas por `computed` durante el `setup`, como el parseo de fecha, deben declararse como `function` o estar definidas antes de los `computed`. Evitar `const helper = () => {}` si el helper se usa antes de su declaracion, porque puede romper la carga inicial de la vista.
 
-La tabla no debe renderizar todo el historial de una sola vez. `AuditView.vue` pagina los resultados filtrados en bloques de 150 registros y `AuditActivityTable.vue` muestra controles `Anterior`/`Siguiente`. Los filtros, KPI y exportacion CSV siguen trabajando sobre el total filtrado, no solo sobre la pagina visible.
+La tabla no debe renderizar todo el historial de una sola vez. `AuditView.vue` pagina los resultados filtrados en bloques de 150 registros y `AuditActivityTable.vue` muestra controles `Anterior`/`Siguiente`. Los filtros y la exportacion CSV siguen trabajando sobre el total filtrado, no solo sobre la pagina visible.
 
-El modal de detalle debe mantenerse como ficha simple de auditoria: accion y descripcion en el encabezado, resumen principal en filas claras y datos tecnicos al final. El diseno puede reforzarse con header azul corporativo, barras de seccion y boton naranjo, pero no debe usar una franja superior naranjo ni alterar ese orden.
+El detalle es una ficha simple: accion y descripcion en el encabezado,
+resumen principal en filas claras y datos tecnicos al final. El nombre legacy
+del componente no implica un segundo historial ni un modal de configuracion.
+
+Configuracion centraliza aqui su historial: query.module y query.action
+inicializan filtros y reinician pagina. Los cambios de Ajustes avanzados no
+requieren otro historial dentro de su vista. El registro es local, no auditoria
+inmutable de servidor; ver `../../services/audit/README.md`.
 
 Las acciones de grupos de geocercas deben mostrarse con etiquetas humanas:
 creacion, renombrado y eliminacion de grupo, evitando exponer codigos como

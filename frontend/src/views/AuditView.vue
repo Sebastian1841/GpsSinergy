@@ -196,6 +196,7 @@ import AuditActivityTable from "../components/audit/AuditActivityTable.vue"
 import AuditFilters from "../components/audit/AuditFilters.vue"
 import SvgIcon from "../components/icons/SvgIcon.vue"
 import { useAccessControl } from "../composables/auth/useAccessControl.js"
+import { useAuthSession } from "../composables/auth/useAuthSession.js"
 import { useDebouncedValue } from "../composables/ui/useDebouncedValue.js"
 import { preloadWhenIdle } from "../composables/ui/useIdlePreload.js"
 import { useAccessService } from "../services/access/useAccessService.js"
@@ -207,6 +208,7 @@ const AuditDetailModal = defineAsyncComponent(loadAuditDetailModal)
 
 const route = useRoute()
 const { canAccessFunction } = useAccessControl()
+const { isPlatformAdmin } = useAuthSession()
 const { companies } = useAccessService()
 const { auditRecords } = useAuditService()
 
@@ -220,12 +222,22 @@ const selectedEndDate = ref("")
 const selectedRecordId = ref("")
 const showDetailModal = ref(false)
 const currentPage = ref(1)
+watch(
+  () => [route.query.module, route.query.action],
+  ([module, action]) => {
+    selectedModule.value = typeof module === "string" ? module : ""
+    selectedAction.value = typeof action === "string" ? action : ""
+    currentPage.value = 1
+  },
+  { immediate: true },
+)
 
 const debouncedSearchTerm = useDebouncedValue(searchTerm, 180)
 
 const AUDIT_PAGE_SIZE = 150
 
 const moduleLabels = {
+  configuracion: "Configuración",
   activos: "Activos",
   auth: "Sesion",
   empresas: "Empresas",
@@ -236,6 +248,7 @@ const moduleLabels = {
 }
 
 const actionLabels = {
+  "configuration:advanced:update": "Ajustes avanzados actualizados",
   "asset:create": "Activo creado",
   "asset:delete": "Activo eliminado",
   "asset:update": "Activo actualizado",
@@ -305,9 +318,12 @@ const companiesById = computed(() => {
 })
 
 const visibleRecords = computed(() => {
-  if (!currentCompanyId.value) return auditRecords.value
+  const permittedRecords = auditRecords.value.filter(
+    (record) => record.action !== "configuration:advanced:update" || isPlatformAdmin.value,
+  )
+  if (!currentCompanyId.value) return permittedRecords
 
-  return auditRecords.value.filter((record) => {
+  return permittedRecords.filter((record) => {
     return !record.companyId || String(record.companyId) === currentCompanyId.value
   })
 })
@@ -315,8 +331,7 @@ const visibleRecords = computed(() => {
 const moduleOptions = computed(() => {
   return [
     ...new Set(
-      visibleRecords.value
-        .map((record) => record.module)
+      [...visibleRecords.value.map((record) => record.module), selectedModule.value]
         .filter(Boolean)
         .sort(),
     ),
@@ -337,8 +352,7 @@ const statusOptions = computed(() => {
 const actionOptions = computed(() => {
   return [
     ...new Set(
-      visibleRecords.value
-        .map((record) => record.action)
+      [...visibleRecords.value.map((record) => record.action), selectedAction.value]
         .filter(Boolean)
         .sort(),
     ),

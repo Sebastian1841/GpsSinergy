@@ -27,3 +27,21 @@ Construccion de datos operativos para reportes de activos.
 ## Criterio
 
 Esta capa no exporta archivos ni renderiza UI. Solo prepara datos.
+## Limites Y Consumo Configurados
+
+reportLimitsContext.js prepara una instantanea por empresa de velocidad, consumo
+al ralenti y ultimo precio. Prioridad: limite indicado para esa ejecucion,
+empresa, plataforma y valor base del tipo. Sin tipo no se incluyen excesos.
+No muta los activos originales ni relee JSON por muestra. Una configuracion
+corrupta detiene la ejecucion en vez de producir un informe con limites falsos.
+Las filas idle calculan litros y CLP a partir de su duracion real; no se calcula
+consumo al ralenti sobre filas de motor en marcha. Falta de duracion, tipo o
+precio produce valores ausentes, no ceros inventados. Cero consumo es valido.
+Horas motor agrega sesiones idle si esa regla esta activa. Las columnas forman
+parte de la vista previa y las exportaciones normales.
+
+La instantanea produce configuredSpeedLimit, limitsSpeedUnavailable,
+configuredIdleConsumption y reportFuelPrice sin mutar el activo original.
+`assetReportValueUtils.js` prioriza el limite configurado y el motor de eventos
+consume ese mismo contexto. No mezclar aqui el editor de reglas automaticas ni
+scripts de Variables. Pruebas especificas: reportLimitsContext.test.js.

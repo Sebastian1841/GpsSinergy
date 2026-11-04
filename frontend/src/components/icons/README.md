@@ -16,6 +16,22 @@ interno. Esta correccion no debe trasladarse al contenedor compartido.
 
 ## Regla de mantenimiento
 
+Catalogo de Configuracion vigente (2026-11-04), compartido entre ambos menus:
+
+- `configuration-limits`: velocimetro de contorno simple, sin marcas pequenas.
+  Es independiente de maintenance-odometer; las variantes de regla y escala
+  fueron descartadas y no describen el estado actual.
+- `configuration-tags`: etiquetas de contorno.
+- `configuration-alerts`: campana con aviso.
+- `variable-code`: corchetes angulares para Variables calculadas.
+- `configuration-sliders`: deslizadores para Ajustes avanzados.
+
+El mapeo vive en `../../utils/layout/configurationNavigation.js`. Caja de
+navegacion de 20x20px, stroke currentColor y mismas rutas/permisos. No reemplazar
+iconos operativos de Alertas o los de Administracion al cambiar Configuracion.
+`variable-history` identifica historial de codigo; limits-reset sigue siendo
+restablecer y no debe usarse para representar ese historial.
+
 `support` representa el Panel de soporte en el menu del usuario;
 `support-attachment` identifica la carga de archivos en la conversacion.
 

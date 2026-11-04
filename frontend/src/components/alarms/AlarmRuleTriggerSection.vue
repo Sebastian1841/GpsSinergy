@@ -1,6 +1,9 @@
 <template>
-  <section class="alarm-modal-card alarm-modal-card-wide">
-    <div class="alarm-modal-card-title">
+  <section
+    class="alarm-modal-card alarm-modal-card-wide"
+    :class="{ 'split-section': section !== 'all' }"
+  >
+    <div v-if="section === 'all'" class="alarm-modal-card-title">
       <span class="alarm-step-number">3</span>
       <div class="min-w-0">
         <h3>Configuracion de disparo</h3>
@@ -8,7 +11,7 @@
     </div>
 
     <div class="alarm-trigger-grid">
-      <section class="alarm-trigger-card">
+      <section v-if="section !== 'schedule'" class="alarm-trigger-card">
         <div class="alarm-trigger-title">
           <span class="alarm-trigger-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" focusable="false">
@@ -35,7 +38,7 @@
               />
             </label>
 
-            <label class="alarm-form-field">
+            <label v-if="section === 'all'" class="alarm-form-field">
               <span>Durante</span>
               <div class="alarm-composite-input">
                 <input
@@ -320,7 +323,7 @@
         </div>
       </section>
 
-      <section class="alarm-trigger-card">
+      <section v-if="section !== 'condition'" class="alarm-trigger-card">
         <div class="alarm-trigger-title">
           <span class="alarm-trigger-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" focusable="false">
@@ -384,6 +387,7 @@
 import { computed } from "vue"
 
 const props = defineProps({
+  section: { type: String, default: "all" },
   draft: {
     type: Object,
     required: true,
@@ -478,6 +482,17 @@ const localFuelDropAmount = computed({
 </script>
 
 <style scoped>
+.split-section {
+  border: 0 !important;
+  padding: 0 !important;
+}
+.split-section .alarm-trigger-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.split-section .alarm-trigger-card {
+  border: 0;
+  padding: 0;
+}
 .alarm-modal-card {
   min-width: 0;
   border-radius: 0.75rem;

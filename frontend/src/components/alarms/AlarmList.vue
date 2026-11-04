@@ -3,7 +3,7 @@
     class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-[#dfe6f0] bg-white shadow-sm"
   >
     <div
-      class="hidden h-9 shrink-0 items-center border-b border-[#e5ebf3] bg-[#f8fbff] px-3 text-[10px] font-black uppercase tracking-[0.08em] text-[#5f7396] md:grid md:grid-cols-[30px_minmax(220px,1fr)_minmax(170px,0.5fr)_minmax(220px,0.75fr)_145px]"
+      class="alarm-table-heading alarm-row-grid hidden h-9 shrink-0 items-center border-b border-[#e5ebf3] bg-[#f8fbff] text-[10px] font-black uppercase text-[#5f7396] md:grid"
     >
       <span></span>
       <span>Alerta</span>
@@ -13,74 +13,137 @@
     </div>
 
     <div class="min-h-0 flex-1 space-y-1.5 overflow-y-auto p-2">
-      <button
-        v-for="alarm in rows"
+      <div
+        v-for="alarm in displayRows"
         :key="alarm.id"
-        type="button"
-        class="grid w-full min-w-0 items-center gap-2.5 rounded-lg border bg-white px-3 py-2 text-left transition hover:border-[#9eb3d1] hover:bg-[#f8fbff] md:grid-cols-[30px_minmax(220px,1fr)_minmax(170px,0.5fr)_minmax(220px,0.75fr)_145px]"
-        :class="
-          selectedAlarmId === alarm.id
-            ? 'border-[#102372] bg-[#f7faff] ring-1 ring-[#102372]/15'
-            : 'border-[#e1e8f2]'
-        "
-        @click="$emit('select-alarm', alarm.id)"
+        class="alarm-episode-row flex items-center gap-2"
       >
-        <span class="flex items-center justify-start md:justify-center">
-          <span
-            class="alarm-history-icon relative flex h-7 w-7 items-center justify-center rounded-md"
-            :class="getAlarmTypeTone(alarm.type)"
-          >
-            <SvgIcon :name="getAlarmTypeIcon(alarm.type)" />
+        <input
+          type="checkbox"
+          class="h-4 w-4 shrink-0 accent-[#102372]"
+          :aria-label="`Seleccionar ${alarm.assetPlate}: ${alarm.title}`"
+          :checked="selectedGroupKeys.includes(alarm.groupKey)"
+          @change="$emit('toggle-group', alarm.groupKey)"
+        />
+        <button
+          type="button"
+          class="alarm-row-grid grid w-full min-w-0 items-center gap-2.5 rounded-lg border bg-white px-3 py-2 text-left transition hover:border-[#9eb3d1] hover:bg-[#f8fbff]"
+          :class="
+            selectedAlarmId === alarm.id
+              ? 'border-[#102372] bg-[#f7faff] ring-1 ring-[#102372]/15'
+              : 'border-[#e1e8f2]'
+          "
+          @click="$emit('select-alarm', alarm.id)"
+        >
+          <span class="flex items-center justify-start md:justify-center">
             <span
-              class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white"
-              :class="getAlarmStatusTone(alarm)"
-            ></span>
-          </span>
-        </span>
-
-        <span class="min-w-0">
-          <span class="block truncate text-[13px] font-black leading-5 text-[#102372]">
-            {{ alarm.title }}
-          </span>
-          <span class="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px]">
-            <span class="font-black text-[#102372]">{{ alarm.assetPlate }}</span>
-            <span class="h-3.5 w-px bg-[#cfd8e6]"></span>
-            <span class="min-w-0 truncate font-semibold text-[#49658f]">
-              {{ alarm.assetName }}
+              class="alarm-history-icon relative flex h-7 w-7 items-center justify-center rounded-md"
+              :class="getAlarmTypeTone(alarm.type)"
+            >
+              <SvgIcon :name="getAlarmTypeIcon(alarm.type)" />
+              <span
+                class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white"
+                :class="getAlarmStatusTone(alarm)"
+              ></span>
             </span>
           </span>
-        </span>
 
-        <span class="min-w-0 truncate text-[12px] font-bold text-[#234572]">
-          {{ alarm.companyName }}
-        </span>
+          <span class="min-w-0">
+            <span class="block truncate text-[13px] font-black leading-5 text-[#102372]">
+              {{ alarm.title }}
+              <span
+                v-if="alarm.groupMembers?.length > 1"
+                class="ml-1 rounded bg-[#eef3ff] px-1.5 py-0.5 text-[11px] font-semibold"
+                >{{ alarm.groupMembers.length }} episodios</span
+              >
+            </span>
+            <span class="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px]">
+              <span class="font-black text-[#102372]">{{ alarm.assetPlate }}</span>
+              <span class="h-3.5 w-px bg-[#cfd8e6]"></span>
+              <span class="min-w-0 truncate font-semibold text-[#49658f]">
+                {{ alarm.assetName }}
+              </span>
+            </span>
+            <span class="mt-1 flex flex-wrap gap-2 text-[10px] font-semibold">
+              <span
+                :class="
+                  alarm.severity === 'critical' || alarm.severity === 'high'
+                    ? 'text-red-600'
+                    : 'text-[#49658f]'
+                "
+                >{{ alarm.severityLabel }}</span
+              >
+              <span class="text-[#49658f]">{{ attentionLabel(alarm) }}</span>
+            </span>
+            <span
+              class="block truncate text-[11px] leading-5 text-[#49658f]"
+              :title="alarm.episodeDisplay.measurement"
+              >{{ alarm.episodeDisplay.measurement }}</span
+            >
+            <span
+              v-if="
+                alarm.episodeDisplay.duration !== 'Sin dato' ||
+                alarm.episodeDisplay.detection !== 'Deteccion sin dato'
+              "
+              class="block truncate text-[10px] leading-4 text-[#5f7396]"
+            >
+              <span v-if="alarm.episodeDisplay.duration !== 'Sin dato'"
+                >Duracion: {{ alarm.episodeDisplay.duration }}</span
+              >
+              <span
+                v-if="
+                  alarm.episodeDisplay.duration !== 'Sin dato' &&
+                  alarm.episodeDisplay.detection !== 'Deteccion sin dato'
+                "
+              >
+                ·
+              </span>
+              <span v-if="alarm.episodeDisplay.detection !== 'Deteccion sin dato'">{{
+                alarm.episodeDisplay.detection
+              }}</span>
+            </span>
+          </span>
 
-        <span class="hidden min-w-0 truncate text-[11px] font-semibold text-[#5f7396] md:block">
-          {{ getLocationText(alarm) }}
-        </span>
+          <span
+            class="min-w-0 text-[12px] font-bold text-[#234572]"
+            style="overflow-wrap: anywhere"
+          >
+            {{ alarm.companyName }}
+          </span>
 
-        <span class="flex items-center gap-2 text-[11px] font-semibold text-[#49658f]">
-          <svg viewBox="0 0 24 24" class="h-4 w-4 shrink-0 text-[#102372]" fill="none">
-            <circle
-              cx="12"
-              cy="12"
-              r="9"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-            <path
-              d="M12 7v5l3 2"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-          <span class="min-w-0 truncate">{{ formatRelativeDateTime(alarm.createdAt) }}</span>
-        </span>
-      </button>
+          <span
+            class="hidden min-w-0 text-[11px] font-semibold text-[#5f7396] md:block"
+            style="overflow-wrap: anywhere"
+          >
+            {{ getLocationText(alarm) }}
+          </span>
+
+          <span
+            class="flex min-w-0 items-center gap-2 text-[11px] font-semibold text-[#49658f]"
+            :title="alarm.episodeDisplay.age"
+          >
+            <svg viewBox="0 0 24 24" class="h-4 w-4 shrink-0 text-[#102372]" fill="none">
+              <circle
+                cx="12"
+                cy="12"
+                r="9"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M12 7v5l3 2"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <span class="min-w-0 truncate">{{ formatRelativeDateTime(alarm.createdAt) }}</span>
+          </span>
+        </button>
+      </div>
 
       <div
         v-if="!rows.length"
@@ -96,9 +159,15 @@
 </template>
 
 <script setup>
+import { computed } from "vue"
 import SvgIcon from "../icons/SvgIcon.vue"
+import { alarmEpisodeDisplay } from "../../utils/alarms/alarmEpisodeDisplay.js"
+import { alarmAttentionState, alarmAttentionLabel } from "../../utils/alarms/alarmInbox.js"
 
-defineProps({
+const attentionLabel = alarmAttentionLabel
+
+const props = defineProps({
+  now: { type: Number, default: () => Date.now() },
   rows: {
     type: Array,
     default: () => [],
@@ -107,9 +176,13 @@ defineProps({
     type: String,
     default: "",
   },
+  selectedGroupKeys: { type: Array, default: () => [] },
 })
 
-defineEmits(["select-alarm"])
+defineEmits(["select-alarm", "toggle-group"])
+const displayRows = computed(() =>
+  props.rows.map((alarm) => ({ ...alarm, episodeDisplay: alarmEpisodeDisplay(alarm, props.now) })),
+)
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000
 
@@ -129,7 +202,8 @@ const getStartOfDay = (date) => {
 }
 
 const getAlarmStatusTone = (alarm) => {
-  return alarm.status === "resolved" ? "bg-[#16a34a]" : "bg-[#ef1b23]"
+  const state = alarmAttentionState(alarm)
+  return state === "attended" ? "bg-[#16a34a]" : state === "mixed" ? "bg-[#d97706]" : "bg-[#ef1b23]"
 }
 
 const getAlarmTypeIcon = (type) => {
@@ -182,6 +256,22 @@ const formatRelativeDateTime = (value) => {
 </script>
 
 <style scoped>
+.alarm-episode-row {
+  height: var(--inbox-row-height, 112px);
+}
+.alarm-episode-row > button {
+  height: 100%;
+}
+.alarm-table-heading {
+  padding-left: 44px;
+  padding-right: 20px;
+  gap: 10px;
+}
+@media (min-width: 768px) {
+  .alarm-row-grid {
+    grid-template-columns: 30px minmax(0, 1.8fr) minmax(0, 1fr) minmax(0, 1.1fr) 150px;
+  }
+}
 .alarm-history-icon :deep(svg) {
   display: block;
   width: 1rem;

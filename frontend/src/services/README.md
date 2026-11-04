@@ -11,6 +11,9 @@ Capa de acceso a datos, adaptadores mock y servicios externos.
 - `alarms/`: servicios locales de alertas y reglas automaticas con persistencia
   mock en `localStorage`.
 - `audit/`: registros de auditoria.
+
+  El guardado estricto requirePersistence relee, deduplica y confirma escritura;
+  sigue siendo auditoria del navegador, no un registro inmutable de servidor.
 - `auth/`: autenticacion.
 - `companies/`: empresas.
 - `itinerarios/`: exportacion y procesamiento de itinerarios.

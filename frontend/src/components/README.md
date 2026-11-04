@@ -12,6 +12,8 @@ Componentes Vue reutilizables y piezas visuales por dominio.
 - `audit/`: modulo visual de auditoria.
 - `auth/`: componentes ligados a autenticacion o sesion.
 - `companies/`: administracion de empresas.
+- `configuration/`: editor de Variables calculadas, inspeccion de entradas y
+  seleccion de vehiculos; ver su README para estados y limites sin backend.
 - `icons/`: componentes de iconografia.
 - `Layout/`: estructura principal de navegacion y header.
 - `maintenance/`: piezas visuales del modulo de mantenciones.

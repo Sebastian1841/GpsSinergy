@@ -31,3 +31,16 @@ El builder es la fuente del borrador editable de plantillas. Si se agrega un
 paso visual nuevo al modal, primero revisar si realmente necesita nuevo estado;
 si solo es presentacion, derivarlo desde `reportDraft` para no crear estados
 paralelos que puedan guardar distinto entre crear y editar.
+## Ejecucion Con Limites
+
+useAssetReportExecution prepara activos con limites por tipo y alcance al iniciar
+cada ejecucion. Velocidad permite un limite opcional; ralenti y horas motor
+permiten precio por litro y generan columnas de litros/costo. Las opciones se
+validan y sus cambios invalidan la vista previa. Se conserva el ultimo precio
+por empresa solo despues de completar una ejecucion, con aviso si falla guardar.
+No existe aqui un trabajador nocturno de backend: el helper puede compartirse
+con un futuro ejecutor, pero no se presenta como una tarea ya operativa.
+
+El contexto se delega a utils/reports/execution/reportLimitsContext.js, no se
+duplica en PDF/Excel ni se relee por muestra. El borrador de ejecucion invalida
+resultados al cambiar limite o precio para impedir exportar una vista obsoleta.

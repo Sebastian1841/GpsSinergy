@@ -1,5 +1,18 @@
 # Layout Components
 
+La sidebar agrupa Operacion, Configuracion y Administracion en ese orden.
+Ambos modos comparten categorias autorizadas; se muestra una categoria a la vez.
+Los botones del panel usan aria-expanded y el selector compacto aria-pressed;
+cambiar categoria no cambia la ruta. La ruta activa selecciona su categoria.
+La barra compacta admite scroll vertical y conserva seleccion naranja.
+Configuracion usa el catalogo
+configurationNavigation.js: limites, etiquetas y alertas requieren permisos
+configuration-limits, configuration-tags y configuration-alerts respectivamente;
+variables calculadas y avanzado son exclusivos de plataforma. No se conceden
+permisos nuevos de forma automatica. Auditoria mantiene audit-view al cambiar
+de categoria. Los accesos Activos por empresa conservan el destino y muestran
+el nombre de empresa como contexto.
+
 Componentes estructurales de la aplicacion.
 
 ## Archivos
@@ -22,7 +35,8 @@ Componentes estructurales de la aplicacion.
   barra compacta se guarda en `localStorage` bajo `sinergy-sidebar-compact`.
   En pantallas pequenas la barra compacta se oculta y el panel se abre desde el
   boton del header. Cada icono compacto muestra el nombre de su modulo mediante
-  tooltip visual y conserva `title` como respaldo nativo. Los SVG de navegacion
+  tooltip flotante compartido, tambien al enfocar con teclado; se retira al
+  navegar, hacer click, desplazar o redimensionar. Los SVG de navegacion
   usan una caja fija de `20x20px` para evitar que trazados sin dimensiones
   propias desborden la barra.
 - `HeaderFleetAssetFilterMenu.vue`: selector unico del header para la vista
@@ -39,9 +53,14 @@ la empresa como filtro inicial cuando hay contexto. No se agrega a la sidebar.
 
 Layout puede coordinar navegacion y controles globales, pero no debe contener reglas internas de flota, reportes o usuarios. Si un control necesita cruzar dominios, mover la composicion de datos a `composables`.
 
-`App.vue` monta este layout para rutas privadas y dispara `preloadPrivateRouteViews()` cuando hay sesion autenticada. Ese precalentamiento evita que el primer cambio hacia Reportes, Auditoria, Usuarios o Empresas tenga que descargar el modulo completo justo al hacer click.
+`App.vue` monta este layout para rutas privadas y dispara
+`preloadPrivateRouteViews()` tras autenticarse. Solo precarga las vistas livianas
+permitidas por el router; no afirmar que Usuarios o todos los modulos se precargan.
 
-`AppHeader.vue` debe identificar el contexto textual de cada vista nueva. Mantenciones usa la etiqueta `Mantenciones` cuando no hay empresa activa; si la ruta incluye `empresaId`, el header muestra `Empresa actual` y resuelve el nombre desde `companyRecords` con fallback a `accessibleCompanies`, evitando que una carga parcial vuelva a `Vista actual`.
+`AppHeader.vue` identifica el modulo y muestra la empresa como contexto secundario.
+Mantenciones conserva el titulo del modulo aun con empresaId; Conductores se
+identifica cuando query.tab=drivers. Los nombres de Configuracion vienen de su
+catalogo compartido, incluido Ajustes avanzados (sin Avanzado PLAT).
 
 El filtro por tipo del buscador global debe pasarse como `typeFilter` a
 `useGlobalSearch.js`. No filtrar solo en el template: el composable debe aplicar
@@ -90,4 +109,13 @@ query.tab=drivers; las otras pestanas mantienen el titulo Mantenciones.
 
 module-location-title combina relleno blanco con contorno naranja de 0.6px y
 paint-order stroke fill, conservando el interior legible en escritorio y movil.
+
+## Iconos De Configuracion
+
+Catalogo actual (2026-11-04), igual en barra y panel:
+`configuration-limits` (velocimetro simple), `configuration-tags`,
+`configuration-alerts`, `variable-code` y `configuration-sliders`.
+No cambiar `maintenance-odometer` para ajustar Limites: son nombres independientes.
+Los iconos de Operacion y Administracion no se reemplazaron con este cambio.
+Pruebas de categorias, rutas y permisos: `AppSidebar.test.js`.
 

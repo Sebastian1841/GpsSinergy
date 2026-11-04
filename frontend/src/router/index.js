@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router"
 import { useAccessControl } from "../composables/auth/useAccessControl.js"
 import { useAuthSession } from "../composables/auth/useAuthSession.js"
+import { CONFIGURATION_MODULES } from "../utils/layout/configurationNavigation.js"
 import {
   readStorageValue,
   removeStorageValue,
@@ -22,6 +23,12 @@ const routeViewLoaders = {
   support: () => import("../views/SupportView.vue"),
   unreported: () => import("../views/UnreportedView.vue"),
   users: () => import("../views/UserManagementView.vue"),
+  configuration: () => import("../views/ConfigurationPlaceholderView.vue"),
+  configurationLimits: () => import("../views/ConfigurationLimitsView.vue"),
+  configurationTags: () => import("../views/ConfigurationTagsView.vue"),
+  configurationAlerts: () => import("../views/ConfigurationAlertsView.vue"),
+  configurationAdvanced: () => import("../views/ConfigurationAdvancedView.vue"),
+  configurationVariables: () => import("../views/ConfigurationVariablesView.vue"),
 }
 
 const PRIVATE_ROUTE_VIEW_KEYS = [
@@ -196,6 +203,47 @@ const getLastAccessibleAlarmsCompany = ({ accessibleCompanies, canAccessFunction
 // RUTAS
 // ==================
 const routes = [
+  ...CONFIGURATION_MODULES.flatMap((item) => [
+    {
+      path: `/configuracion/${item.slug}`,
+      name: item.name,
+      component:
+        item.slug === "limites"
+          ? routeViewLoaders.configurationLimits
+          : item.slug === "etiquetas"
+            ? routeViewLoaders.configurationTags
+            : item.slug === "alertas"
+              ? routeViewLoaders.configurationAlerts
+              : item.slug === "avanzado"
+                ? routeViewLoaders.configurationAdvanced
+                : item.slug === "variables-calculadas"
+                  ? routeViewLoaders.configurationVariables
+                  : routeViewLoaders.configuration,
+      props: ["limites", "variables-calculadas"].includes(item.slug) ? false : { title: item.label },
+      meta: { requiresPlatformAdmin: true, navigationTitle: item.label },
+    },
+    ...(!item.platformOnly
+      ? [
+          {
+            path: `/app/:empresaId/configuracion/${item.slug}`,
+            name: `App${item.name}`,
+            component:
+              item.slug === "limites"
+                ? routeViewLoaders.configurationLimits
+                : item.slug === "etiquetas"
+                  ? routeViewLoaders.configurationTags
+                  : item.slug === "alertas"
+                    ? routeViewLoaders.configurationAlerts
+                    : routeViewLoaders.configuration,
+            props: item.slug === "limites" ? false : { title: item.label },
+            meta: {
+              navigationTitle: item.label,
+              requiresFunction: { id: item.permission, permission: "view" },
+            },
+          },
+        ]
+      : []),
+  ]),
   {
     path: "/soporte",
     name: "Support",

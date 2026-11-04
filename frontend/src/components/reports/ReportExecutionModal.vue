@@ -96,6 +96,34 @@
           </button>
         </div>
 
+        <div v-if="usesSpeedLimit || usesIdleFuel" class="mt-3 flex flex-wrap items-end gap-4">
+          <label v-if="usesSpeedLimit" class="block text-xs font-semibold text-[#102372]">
+            Límite de velocidad (opcional)
+            <input
+              v-model="manualSpeedLimit"
+              type="number"
+              min="1"
+              max="300"
+              step="1"
+              placeholder="Por tipo de vehículo"
+              class="mt-1 block h-9 w-48 rounded-md border border-[#d8dee8] bg-white px-2"
+            />
+          </label>
+          <label v-if="usesIdleFuel" class="block text-xs font-semibold text-[#102372]">
+            Precio por litro ($)
+            <input
+              v-model="fuelPrice"
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="Último precio usado"
+              class="mt-1 block h-9 w-48 rounded-md border border-[#d8dee8] bg-white px-2"
+            />
+          </label>
+        </div>
+        <p v-if="executionOptionsError" role="alert" class="mt-2 text-xs text-red-700">
+          {{ executionOptionsError }}
+        </p>
         <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
           <p
             class="text-[10px] font-black"
@@ -953,6 +981,11 @@ const geofencesRef = computed(() => props.geofences)
 const groupsRef = computed(() => props.groups)
 
 const {
+  manualSpeedLimit,
+  fuelPrice,
+  usesIdleFuel,
+  usesSpeedLimit,
+  executionOptionsError,
   dateFrom,
   dateTo,
   assetSearch,

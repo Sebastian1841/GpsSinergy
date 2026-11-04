@@ -2,6 +2,11 @@
 
 Componentes de la vista de flota dentro de activos.
 
+FleetAssetTagModal es compartido con Configuracion Etiquetas. Usa dialogo nativo,
+tabla con seleccion parcial/total por pagina, filtros, buscador y pie de acciones
+fijo. Conserva seleccion entre paginas mediante useFleetAssetTagModal (25 activos
+por pagina) y permite crear o editar sin cambiar el contrato del evento save.
+
 ## Archivos
 
 - `AddActivoModal.vue`: modal para crear un activo. Muestra el perfil
@@ -100,9 +105,8 @@ En la tabla, `stopped` se etiqueta como `Detenido`. No reutilizar ese estado
 para alertas; si se agrega alerta real, debe venir en un campo o regla propia.
 
 La seccion `Alertas` de Fleet es solo historial operativo por empresa y activos
-autorizados. La configuracion de reglas automaticas se mantiene en el modulo
-principal de `Alertas` para no duplicar flujos de administracion dentro de
-Activos.
+autorizados. La configuracion de reglas automaticas vive en Configuracion de
+alertas, separada de la bandeja operativa y de Activos.
 
 Los grupos de vehiculos no se administran desde el panel lateral ni desde
 Empresas. El unico punto visual de gestion es el menu del header de Activos,
@@ -141,3 +145,12 @@ En `ActivosView.vue`, antes de `xl` el panel de Fleet y el mapa se apilan en dos
 filas proporcionales. No volver a dejar la grilla responsive sin filas definidas:
 eso permite que el panel de activos consuma todo el alto y deje el mapa fuera de
 la vista.
+
+## Editor De Etiquetas Compartido
+
+`FleetAssetTagModal.vue` tambien se usa desde ConfigurationTagsView. Recibe
+saveError y no se cierra automaticamente al emitir save: el padre confirma la
+escritura antes de cerrar. Asi un fallo conserva nombre y seleccion para reintentar.
+Activos autoriza y recorta asignaciones antes de pasarlas al componente;
+Configuracion agrega la operacion atomica con commitAssetTagConfiguration.
+Pruebas: FleetAssetTagModal.test.js y composables/mock/assetTagConfiguration.test.js.

@@ -1,4 +1,5 @@
 import { withMockAssetReporting } from "./mockAssetReporting.js"
+import { withSampleAssetTags } from "./sampleAssetTags.js"
 
 const mockReportReference = new Date().toISOString()
 
@@ -862,7 +863,7 @@ export const mockAssets = [
     datosUlt: "12:23:01",
     imei: "868123450012",
   }),
-].map((asset) => withMockAssetReporting(asset, mockReportReference))
+].map((asset) => withSampleAssetTags(withMockAssetReporting(asset, mockReportReference), mockAssetTags))
 
 const mockSystemModules = [
   {
@@ -888,6 +889,9 @@ const mockSystemModules = [
 ]
 
 const mockModuleFunctions = [
+  { id: "configuration-limits", moduleId: "assets", name: "Ver limites", description: "Acceso a configuracion de limites." },
+  { id: "configuration-tags", moduleId: "assets", name: "Ver etiquetas", description: "Acceso a configuracion de etiquetas." },
+  { id: "configuration-alerts", moduleId: "assets", name: "Ver configuracion de alertas", description: "Acceso separado de las alertas operativas." },
   {
     id: "gps",
     moduleId: "assets",

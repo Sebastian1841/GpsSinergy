@@ -4,7 +4,7 @@
       <header class="shrink-0">
         <div class="flex items-start justify-between gap-4">
           <span
-            class="inline-flex h-7 items-center gap-2 rounded-lg px-2.5 text-[10px] font-black uppercase"
+            class="inline-flex min-h-7 min-w-0 items-center gap-2 rounded-lg px-2.5 py-1 text-[10px] font-black uppercase"
             :class="statusChipClass"
           >
             <span class="h-2 w-2 rounded-full" :class="statusDotClass"></span>
@@ -35,111 +35,84 @@
       <div class="my-3 h-px shrink-0 bg-[#dfe6f0]"></div>
 
       <main class="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-        <article class="alarm-detail-row">
-          <span class="alarm-detail-icon">
-            <SvgIcon name="empresas" />
-          </span>
-          <span class="min-w-0">
-            <span class="alarm-detail-label">Empresa</span>
-            <span class="alarm-detail-value">{{ alarm.companyName }}</span>
-          </span>
-        </article>
-
-        <article class="alarm-detail-row">
-          <span class="alarm-detail-icon">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <circle
-                cx="12"
-                cy="12"
-                r="9"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-              <path
-                d="M12 7v5l3 2"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-          </span>
-          <span class="min-w-0">
-            <span class="alarm-detail-label">Fecha y hora</span>
-            <span class="alarm-detail-value">{{ formatDateTime(alarm.createdAt) }}</span>
-          </span>
-        </article>
-
-        <article class="alarm-detail-row">
-          <span class="alarm-detail-icon">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                d="M12 21s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11z"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-              <circle
-                cx="12"
-                cy="10"
-                r="2.5"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-          </span>
-          <span class="min-w-0">
-            <span class="alarm-detail-label">Ubicacion</span>
-            <span class="alarm-detail-value">{{ locationText }}</span>
-          </span>
-        </article>
-
-        <article v-if="triggerReason" class="alarm-detail-row">
-          <span class="alarm-detail-icon alarm-detail-reason-icon">
-            <SvgIcon :name="alarmTypeIcon" />
-          </span>
-          <span class="min-w-0">
-            <span class="alarm-detail-label">Motivo</span>
-            <span class="alarm-detail-value leading-5">{{ triggerReason }}</span>
-          </span>
-        </article>
-
-        <article class="alarm-detail-row">
-          <span class="alarm-detail-icon">
-            <SvgIcon name="detail-info" />
-          </span>
-          <span class="min-w-0">
-            <span class="alarm-detail-label">Descripcion</span>
-            <span class="alarm-detail-value leading-5">{{ detailDescription }}</span>
-          </span>
-        </article>
+        <AlarmAttentionForm
+          v-if="canManage && attentionCount && attending"
+          :key="alarm.id + ':' + attentionCount"
+          :count="attentionCount"
+          @save="$emit('attend-alarm', { id: alarm.id, ...$event })"
+          @cancel="$emit('cancel-attention')"
+        />
+        <details v-if="alarm.metadata?.attentionHistory?.length" class="text-[12px] text-[#49658f]">
+          <summary class="cursor-pointer font-semibold">
+            Historial de atencion ({{ alarm.metadata.attentionHistory.length }})
+          </summary>
+          <ol class="mt-2 space-y-2">
+            <li
+              v-for="(entry, index) in alarm.metadata.attentionHistory"
+              :key="index"
+              class="border-l-2 border-[#d8e0eb] pl-2"
+            >
+              <p class="font-semibold">
+                {{ entry.label || "Atencion registrada" }} · {{ entry.actor || entry.startedBy }}
+              </p>
+              <p>{{ formatDateTime(entry.at || entry.startedAt) }}</p>
+              <p v-if="entry.note" class="whitespace-pre-wrap">{{ entry.note }}</p>
+            </li>
+          </ol>
+        </details>
+        <div
+          v-if="alarm.groupMembers?.length > 1"
+          class="rounded-md bg-[#eef3ff] px-3 py-2 text-[12px] text-[#102372]"
+        >
+          {{ alarm.groupMembers.length }} episodios del mismo vehiculo, regla y dia
+          <ul class="mt-2 max-h-36 space-y-2 overflow-y-auto">
+            <li
+              v-for="episode in alarm.groupMembers"
+              :key="episode.id"
+              class="border-t border-[#d8e0eb] pt-2"
+            >
+              <span class="font-semibold">{{ formatDateTime(episode.createdAt) }}</span>
+              <p>{{ episode.triggerReason || episode.description }}</p>
+              <p class="text-[#5f7396]">{{ alarmAttentionLabel(episode) }}</p>
+            </li>
+          </ul>
+        </div>
+        <div v-if="!attending" class="alarm-information space-y-3">
+          <article v-if="alarm.metadata?.attention" class="text-[12px] text-[#49658f]">
+            <p>
+              En atencion por {{ alarm.metadata.attention.startedBy }} ·
+              {{ formatDateTime(alarm.metadata.attention.startedAt) }}
+            </p>
+            <p v-if="alarm.metadata.attention.note" class="mt-2 whitespace-pre-wrap">
+              {{ alarm.metadata.attention.note }}
+            </p>
+            <p v-if="alarm.resolvedBy" class="mt-2">
+              Atendida por {{ alarm.resolvedBy }} · {{ formatDateTime(alarm.resolvedAt) }}
+            </p>
+          </article>
+          <article v-for="field in informationFields" :key="field.label" class="alarm-detail-row">
+            <span class="alarm-detail-icon"><SvgIcon :name="field.icon" /></span>
+            <span class="min-w-0">
+              <span class="alarm-detail-label">{{ field.label }}</span>
+              <span class="alarm-detail-value">{{ field.value }}</span>
+            </span>
+          </article>
+        </div>
       </main>
 
-      <footer class="mt-3 shrink-0 border-t border-[#dfe6f0] pt-3">
-        <button
-          type="button"
-          class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-[#102372] bg-white px-4 text-[12px] font-black text-[#102372] transition hover:border-[#ff6600] hover:text-[#ff6600]"
-          @click="$emit('view-asset', alarm)"
-        >
-          <SvgIcon name="mapa" class="h-4 w-4" />
-          Ver recorrido
-        </button>
-
-        <div v-if="canManage" class="mt-3 grid gap-2">
+      <footer
+        v-if="canManage && !attending && (attentionCount || alarm.status === 'resolved')"
+        class="mt-3 shrink-0 border-t border-[#dfe6f0] pt-3"
+      >
+        <div class="grid gap-2">
           <button
-            v-if="alarm.status !== 'resolved'"
+            v-if="attentionCount && !attending"
             type="button"
             class="alarm-detail-action-primary"
-            @click="$emit('resolve-alarm', alarm.id)"
+            @click="$emit('begin-attention')"
           >
-            Resolver
+            Atender
           </button>
-
           <button
             v-if="alarm.status === 'resolved'"
             type="button"
@@ -167,10 +140,14 @@
 
 <script setup>
 import { computed } from "vue"
+import AlarmAttentionForm from "./AlarmAttentionForm.vue"
 
 import SvgIcon from "../icons/SvgIcon.vue"
+import { alarmAttentionState, alarmAttentionLabel } from "../../utils/alarms/alarmInbox.js"
 
 const props = defineProps({
+  attending: { type: Boolean, default: false },
+  attentionCount: { type: Number, default: 0 },
   alarm: {
     type: Object,
     default: null,
@@ -181,7 +158,7 @@ const props = defineProps({
   },
 })
 
-defineEmits(["close", "resolve-alarm", "reopen-alarm", "view-asset"])
+defineEmits(["close", "attend-alarm", "reopen-alarm", "begin-attention", "cancel-attention"])
 
 const dateTimeFormatter = new Intl.DateTimeFormat("es-CL", {
   day: "2-digit",
@@ -191,61 +168,59 @@ const dateTimeFormatter = new Intl.DateTimeFormat("es-CL", {
   minute: "2-digit",
 })
 
-const isResolved = computed(() => props.alarm?.status === "resolved")
-const statusLabel = computed(() => (isResolved.value ? "Resuelta" : "Activa"))
+const isResolved = computed(() => alarmAttentionState(props.alarm || {}) === "attended")
+const isMixed = computed(() => alarmAttentionState(props.alarm || {}) === "mixed")
+const statusLabel = computed(() => alarmAttentionLabel(props.alarm || {}))
 const statusChipClass = computed(() =>
-  isResolved.value ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700",
+  isResolved.value
+    ? "bg-emerald-50 text-emerald-700"
+    : isMixed.value
+      ? "bg-amber-50 text-amber-800"
+      : "bg-red-50 text-red-700",
 )
-const statusDotClass = computed(() => (isResolved.value ? "bg-[#16a34a]" : "bg-[#ef1b23]"))
+const statusDotClass = computed(() =>
+  isResolved.value ? "bg-[#16a34a]" : isMixed.value ? "bg-[#d97706]" : "bg-[#ef1b23]",
+)
 
-const locationText = computed(() => {
-  const metadata = props.alarm?.metadata || {}
-
-  return (
-    metadata.address ||
-    metadata.location ||
-    metadata.geofence ||
-    metadata.route ||
-    metadata.zone ||
-    "Ubicacion no disponible"
-  )
-})
-
-const detailDescription = computed(() => {
+const informationFields = computed(() => {
   const alarm = props.alarm
-  const metadata = alarm?.metadata || {}
-
-  if (!alarm) return ""
-
-  if (alarm.type === "speeding" && metadata.speed && metadata.limit) {
-    return `${alarm.description} Se registro ${metadata.speed} sobre un limite de ${metadata.limit}.`
+  if (!alarm) return []
+  const metadata = alarm.metadata || {}
+  let description = alarm.description || "Sin descripcion disponible."
+  if (alarm.type === "speeding" && metadata.speed && metadata.limit)
+    description += ` Se registro ${metadata.speed} sobre un limite de ${metadata.limit}.`
+  if (alarm.type === "battery" && metadata.voltage)
+    description += ` Voltaje reportado: ${metadata.voltage}.`
+  if (alarm.type === "no_signal" && metadata.offlineMinutes)
+    description += ` Tiempo sin reporte: ${metadata.offlineMinutes}.`
+  const icons = {
+    speeding: "alarm-speeding",
+    battery: "alarm-low-battery",
+    no_signal: "alarm-no-signal",
+    geofence: "alarm-geofence-exit",
+    fuel: "alarm-fuel-variation",
+    stop_time: "alarm-long-stop",
+    ignition: "alarm-after-hours",
   }
-
-  if (alarm.type === "battery" && metadata.voltage) {
-    return `${alarm.description} Voltaje reportado: ${metadata.voltage}.`
-  }
-
-  if (alarm.type === "no_signal" && metadata.offlineMinutes) {
-    return `${alarm.description} Tiempo sin reporte: ${metadata.offlineMinutes}.`
-  }
-
-  return alarm.description || "Sin descripcion disponible."
-})
-
-const triggerReason = computed(() => props.alarm?.triggerReason || "")
-
-const alarmTypeIcon = computed(() => {
-  const type = props.alarm?.type
-
-  if (type === "speeding") return "alarm-speeding"
-  if (type === "battery") return "alarm-low-battery"
-  if (type === "no_signal") return "alarm-no-signal"
-  if (type === "geofence") return "alarm-geofence-exit"
-  if (type === "fuel") return "alarm-fuel-variation"
-  if (type === "stop_time") return "alarm-long-stop"
-  if (type === "ignition") return "alarm-after-hours"
-
-  return "alertas"
+  return [
+    { label: "Empresa", value: alarm.companyName, icon: "empresas" },
+    { label: "Fecha y hora", value: formatDateTime(alarm.createdAt), icon: "alarm-after-hours" },
+    {
+      label: "Ubicacion",
+      value:
+        metadata.address ||
+        metadata.location ||
+        metadata.geofence ||
+        metadata.route ||
+        metadata.zone ||
+        "Ubicacion no disponible",
+      icon: "mapa",
+    },
+    ...(alarm.triggerReason
+      ? [{ label: "Motivo", value: alarm.triggerReason, icon: icons[alarm.type] || "alertas" }]
+      : []),
+    { label: "Descripcion", value: description, icon: "detail-info" },
+  ]
 })
 
 const formatDateTime = (value) => {
@@ -260,44 +235,37 @@ const formatDateTime = (value) => {
 <style scoped>
 .alarm-detail-row {
   display: grid;
-  grid-template-columns: 1.625rem minmax(0, 1fr);
-  gap: 0.625rem;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 10px;
   align-items: start;
 }
-
 .alarm-detail-icon {
   display: inline-flex;
-  width: 1.625rem;
-  height: 1.625rem;
+  width: 26px;
+  height: 26px;
   align-items: center;
   justify-content: center;
   color: #315078;
 }
-
 .alarm-detail-icon :deep(svg) {
-  width: 1.125rem;
-  height: 1.125rem;
+  width: 18px;
+  height: 18px;
 }
-
-.alarm-detail-reason-icon {
-  color: #ff6600;
-}
-
 .alarm-detail-label {
   display: block;
-  font-size: 0.6875rem;
+  font-size: 11px;
   font-weight: 700;
   color: #5f7396;
 }
-
 .alarm-detail-value {
   display: block;
-  margin-top: 0.125rem;
-  font-size: 0.8125rem;
+  margin-top: 2px;
+  font-size: 13px;
   font-weight: 750;
+  line-height: 20px;
   color: #102372;
+  overflow-wrap: anywhere;
 }
-
 .alarm-detail-action,
 .alarm-detail-action-primary {
   display: inline-flex;
@@ -333,5 +301,9 @@ const formatDateTime = (value) => {
 
 .alarm-detail-action-primary:hover {
   background: #e65c00;
+}
+.alarm-detail-action-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

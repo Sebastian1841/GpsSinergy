@@ -38,7 +38,7 @@
         <input
           v-model="draftModel.notificationChannels.email"
           type="checkbox"
-          :disabled="!canManage"
+          :disabled="!canManage || providerUnavailable"
         />
         <span class="alarm-notification-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false">
@@ -48,7 +48,11 @@
         </span>
         <span class="min-w-0">
           <strong>Correo electronico</strong>
-          <small>Recibe las alertas en tu correo.</small>
+          <small>{{
+            providerUnavailable
+              ? "No disponible: falta configurar el proveedor."
+              : "Recibe las alertas en tu correo."
+          }}</small>
         </span>
       </label>
     </div>
@@ -59,6 +63,7 @@
 import { computed } from "vue"
 
 const props = defineProps({
+  providerUnavailable: { type: Boolean, default: false },
   draft: {
     type: Object,
     required: true,

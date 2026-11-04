@@ -17,6 +17,10 @@ Datos mock y configuraciones estaticas usadas por el prototipo.
   antes de mostrarlas.
 - `mockAutomaticAlertRules.js`: reglas mock de alertas automaticas por empresa.
   Sirve como semilla del panel de configuracion de reglas.
+- `sampleAssetTags.js`: asignaciones demostrativas a siete IDs conocidos,
+  restringidas a etiquetas de su empresa y marcadas con version. Solo prototipo.
+- `limitsSampleAssets.js`: reparacion acotada de dos activos de muestra con
+  limitsSampleTypeVersion=1; conserva correcciones posteriores del usuario.
 - `mockGeofenceHistoryData.js`: historial mock de geocercas.
 - `mockItineraryData.js`: datos mock de itinerarios.
 - `mockPlannedRoutes.js`: rutas planificadas mock.
@@ -28,4 +32,8 @@ Datos mock y configuraciones estaticas usadas por el prototipo.
 
 Estos archivos no deben crecer como base de datos real. Para produccion, los datos deben venir desde backend y estos mocks quedar como fixtures de demo o tests.
 
-`mockDatabase.js` incluye el modulo `maintenance` y sus funciones `maintenance-view`, `maintenance-orders` y `maintenance-plans` solo para permisos y navegacion del prototipo. La vista actual de mantenciones no persiste ordenes reales ni planes reales.
+`mockDatabase.js` incluye maintenance y sus funciones maintenance-view,
+maintenance-orders y maintenance-plans para acceso al prototipo. Planes y OT
+persisten localmente mediante sus servicios; no son registros de un backend real.
+Las muestras de alertas conservan ruleId, pero no deben restaurar reglas borradas
+ni sobrescribir reglas guardadas. No desplegar semillas como datos productivos.

@@ -1,4 +1,10 @@
 import { computed } from "vue"
+import { fuelDropEpisode } from "../../utils/alarms/fuelDropEpisode.js"
+import { speedingRuleOptions } from "../../utils/alarms/speedingRule.js"
+import {
+  episodeCondition,
+  episodeConditionError,
+} from "../../utils/alarms/configurationAlertTypes.js"
 
 import {
   AUTOMATIC_ALERT_TYPE_PRESETS,
@@ -70,6 +76,8 @@ export function useAlarmRuleDraft({
       unit: preset.unit,
     }
 
+    const episode = episodeCondition(normalizedType)
+    if (episode) return episode
     if (normalizedType === "speeding") {
       return {
         ...condition,
@@ -168,7 +176,14 @@ export function useAlarmRuleDraft({
       (geofenceScope === "group" && Boolean(selectedDraftGeofenceGroup.value)) ||
       (geofenceScope === "specific" && selectedDraftGeofenceIds.value.length > 0)
 
-    return hasName && hasCompany && hasConditionValue && hasAssets && hasGeofenceTarget
+    return (
+      hasName &&
+      hasCompany &&
+      hasConditionValue &&
+      hasAssets &&
+      hasGeofenceTarget &&
+      !episodeConditionError(currentAlertType.value, draft.value.condition)
+    )
   })
 
   const applyTypePreset = () => {
@@ -198,6 +213,10 @@ export function useAlarmRuleDraft({
 
   const getDraftConditionPayload = () => {
     const condition = draft.value.condition || {}
+    if (currentAlertType.value === "fuel" && fuelDropEpisode(condition))
+      return fuelDropEpisode(condition)
+    const episode = episodeCondition(currentAlertType.value, condition)
+    if (episode) return episode
 
     if (currentAlertType.value === "speeding") {
       return {
@@ -206,6 +225,7 @@ export function useAlarmRuleDraft({
         value: Math.max(1, normalizeDraftNumber(condition.value, 80)),
         unit: "km/h",
         durationSeconds: Math.max(0, normalizeDraftNumber(condition.durationSeconds, 0)),
+        ...speedingRuleOptions(condition),
       }
     }
 
@@ -289,6 +309,7 @@ export function useAlarmRuleDraft({
         value: -Math.abs(normalizeDraftNumber(condition.value, 15)),
         unit: condition.unit === "%" ? "%" : "litros",
         windowMinutes: Math.max(1, normalizeDraftNumber(condition.windowMinutes, 15)),
+        ...(condition.stationaryOnly === true ? { stationaryOnly: true } : {}),
       }
     }
 
@@ -324,6 +345,7 @@ export function useAlarmRuleDraft({
 
     return {
       companyId: normalizeId(draft.value.companyId),
+      ...(draft.value.platformScope === true ? { platformScope: true } : {}),
       name: String(draft.value.name || "").trim(),
       description: String(draft.value.description || "").trim(),
       type: normalizeId(draft.value.type),

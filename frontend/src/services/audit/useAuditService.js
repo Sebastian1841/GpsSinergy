@@ -1,6 +1,6 @@
 import { computed, ref } from "vue"
 
-import { readJsonStorage, writeJsonStorage } from "../storage/browserStorage.js"
+import { readJsonStorage, readStorageValue, writeJsonStorage } from "../storage/browserStorage.js"
 
 export const AUDIT_LOG_STORAGE_KEY = "sinergy-audit-log"
 
@@ -111,8 +111,34 @@ if (typeof window !== "undefined") {
   })
 }
 
-export const appendAuditLog = (entry = {}) => {
+export const appendAuditLog = (entry = {}, { requirePersistence = false } = {}) => {
   const record = normalizeAuditRecord(entry)
+
+  if (requirePersistence) {
+    const raw = readStorageValue(AUDIT_LOG_STORAGE_KEY)
+    let previous = auditRecords.value
+    if (raw !== null) {
+      try {
+        const stored = JSON.parse(raw)
+        if (!Array.isArray(stored)) throw Error()
+        previous = stored.map(normalizeAuditRecord)
+      } catch {
+        throw Error("No se pudo leer el registro de Auditoria. No se sobrescribieron los datos.")
+      }
+    }
+    const existing = previous.find((item) => item.id === record.id)
+    if (existing) {
+      auditRecords.value = previous
+      return existing
+    }
+    const next = [record, ...previous]
+      .sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp))
+      .slice(0, MAX_AUDIT_RECORDS)
+    if (!writeJsonStorage(AUDIT_LOG_STORAGE_KEY, next))
+      throw Error("No se pudo guardar el evento en Auditoria.")
+    auditRecords.value = next
+    return record
+  }
 
   auditRecords.value = [record, ...auditRecords.value].slice(0, MAX_AUDIT_RECORDS)
   persistAuditRecords()

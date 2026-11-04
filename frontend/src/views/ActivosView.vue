@@ -1074,6 +1074,18 @@ const getRouteContextAsset = () => {
   )
 }
 
+watch(
+  () => [route.query.open, routeSelectedActivoId.value, activeCompanyId.value],
+  () => {
+    if (route.query.open !== "asset-detail") return
+    const activo = getRouteContextAsset()
+    if (!activo) return
+    selectedId.value = activo.id
+    if (canManageAssets.value) handleDeviceAction({ action: "edit-device", activo })
+  },
+  { immediate: true, flush: "post" },
+)
+
 const syncRouteItineraryContext = () => {
   if (!shouldOpenRouteItinerary.value) return
 

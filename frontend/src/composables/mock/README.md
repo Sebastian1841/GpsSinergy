@@ -16,6 +16,18 @@ Estado mock del prototipo.
 
 ## Regla de mantenimiento
 
+`commitAssetTagConfiguration` es la via comprobada de Configuracion Etiquetas:
+valida permiso, empresa, etiqueta y activos editables, prepara assets/assetTags
+y accesses al borrar, confirma todas las colecciones con el manifiesto y solo
+entonces publica estado Vue. Fallar conserva el estado anterior. Eliminar una
+etiqueta retira sus referencias de los scopes sin ampliar acceso.
+Pruebas: `assetTagConfiguration.test.js`. No sustituir esta accion por una
+secuencia de helpers legacy con escrituras independientes.
+
+Normalizacion de ejemplos: withSampleAssetTags asigna etiquetas a IDs semilla
+con marca de version; restoreLimitsSampleType retira solo un estado de ejemplo
+previo de dos activos. No son reglas para clasificar o etiquetar datos reales.
+
 La persistencia local usa colecciones versionadas y un manifiesto `sinergy-mock-database:collections`.
 La primera escritura migra el snapshot legacy completo; las siguientes serializan solo las colecciones
 marcadas por cada accion. El manifiesto confirma todas las colecciones de una operacion juntas.

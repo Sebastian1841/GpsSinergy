@@ -1,5 +1,39 @@
 # Views
 
+## Configuracion Vigente (2026-11-04)
+
+Las cinco rutas tienen contenido propio y se abren desde la sidebar. No hay
+navegacion horizontal adicional entre modulos. Plataforma puede abrir las cinco;
+empresa solo Limites/Etiquetas/Alertas con permisos de funcion.
+
+- `ConfigurationLimitsView.vue`: pestanas velocidad/consumo, listado lateral de
+  todos los tipos y editor del tipo seleccionado. Detalle blanco con divisores,
+  campo de 38px, vista previa de umbral y resumen guardado/original. Imagen del
+  bus con escala optica propia. Edicion en borrador hasta Guardar; descarte de
+  ambas pestanas y aviso al salir. Guardado local por alcance; herencia empresa,
+  plataforma y defaults. Un activo sin tipo no se convierte en automovil al calcular.
+- `ConfigurationTagsView.vue`: barra de empresa y busqueda general, lista de
+  etiquetas y detalle integrado con tabla ordenable/paginada. Las busquedas de
+  etiquetas y activos son refinamientos locales. Reutiliza FleetAssetTagModal;
+  escritura atomica de etiqueta/asignaciones. Editar requiere configuration-tags
+  y GPS, o plataforma. La ruta de empresa fija el alcance.
+- `ConfigurationAlertsView.vue`: AlarmConfigPanel en presentation=configuration;
+  listado blanco continuo sin estirar filas, filtros, umbral/alcance/vigencia,
+  edicion explicita y activacion. Ver la bandeja abre la ruta operativa con
+  panel=history. Editor de tres pasos con borradores protegidos. Correo y WhatsApp
+  indican falta de proveedor; no afirmar deteccion ni entrega desde backend.
+- `ConfigurationAdvancedView.vue`: siete parametros en cuatro filas compactas,
+  valores de fabrica, comparacion, descarte, restablecer y revision antes de
+  confirmar guardado. Auditoria central local con reintento; no hay historial
+  independiente aqui. Aplicacion al procesamiento de eventos pendiente.
+- `ConfigurationVariablesView.vue`: portada sin seleccion automatica, consola
+  visible de altura completa, cuatro KPI globales y scripts pendientes. Elegir
+  abre editor; Probar selecciona la variable y abre paso 2. Guardias de borrador,
+  conflicto entre ventanas y errores de almacenamiento. Historial solo de codigo;
+  metadata no crea versiones. Motor desconectado: guardar requiere prueba real y
+  permanece bloqueado. Ver `../components/configuration/README.md` y
+  `../utils/layout/README.md`.
+
 Pantallas principales conectadas al router.
 
 ## Archivos
@@ -12,18 +46,13 @@ Pantallas principales conectadas al router.
 - `a.html`: documentacion HTML auxiliar usada aparte por el usuario. Debe mantenerse sincronizada con los cambios grandes de arquitectura, flujos, reportes y organizacion del frontend. No eliminar sin confirmacion explicita.
 - `b.html`: documentacion HTML auxiliar sobre mejora del sistema de mantenciones. No esta conectada al router y debe tratarse como informe de referencia, no como vista Vue.
 - `ActivosView.vue`: vista principal de monitoreo de activos. Tambien acepta `?activoId=`, `?assetId=` o `?asset=` para seleccionar un activo desde navegacion externa, como el buscador global del header. Si la URL incluye `section=itinerarios`, `date` y `alarmId`, abre Itinerarios, selecciona el activo autorizado, genera el recorrido del dia y destaca la alerta sobre el punto GPS mas cercano. Cuando la URL trae un activo, limpia filtros visuales de busqueda/estado/ciudad/grupo y prioriza ese activo sobre el workspace guardado. El activo solo se fuerza si ya pertenece al universo autorizado por `visibleAssets`; no salta permisos. El panel lateral de Fleet incluye `Alertas` como historial por empresa y activos autorizados, con accion para abrir el recorrido del dia. El menu contextual de cada activo puede abrir `Itinerarios` dentro del mismo panel lateral, generar el recorrido del vehiculo, mostrar el resumen diario de solo ese activo o agregarlo al resumen diario actual. La accion `Agregar a resumen diario` se expone solo despues de iniciar un resumen diario, usando el estado `hasActiveDailySummary`, para evitar que aparezca antes de existir un resumen al cual sumar activos. Tambien puede navegar a `Mantenciones` con `assetId`, `patente` y `open=maintenance-detail` para abrir las mantenciones del vehiculo seleccionado. En la seccion `Geocercas`, coordina importacion/exportacion KML, KMZ, GeoJSON, CSV y XML, creacion/renombrado/eliminacion de grupos, auditoria y refresco del mapa. Los grupos se gestionan solo en el panel lateral; el editor del mapa solo los selecciona desde dropdown o deja la geocerca sin grupo.
-- `AlarmsView.vue`: vista principal de alertas operativas. Toma alertas desde
-  `useAlarmsService`, cruza cada alerta contra `visibleAssets` antes de
-  renderizar y luego aplica filtros visuales por busqueda, estado, empresa y
-  fecha. Se divide en dos paneles: `Historial`, que lista alertas ya activadas,
-  y `Configuracion`, que administra reglas automaticas con tabla y modal de
-  creacion/edicion. La configuracion de reglas de geocerca recibe geocercas y grupos
-  reales desde `useGeofences` para aplicar por todas, por grupo o por seleccion
-  especifica. En historial usa tabs superiores `Historial/Activas/Resueltas`,
-  bandeja de filas a la izquierda y panel de detalle a la derecha para resolver,
-  reabrir y navegar al recorrido del dia de la alerta con
-  `section=itinerarios`, `activoId`, `date`, `from=alertas` y `alarmId`, sin
-  exponer alertas de activos no autorizados.
+- `AlarmsView.vue`: bandeja operativa independiente de Configuracion. Recorta por
+  visibleAssets, agrupa episodios y presenta Sin iniciar/En curso/Todas con filtros,
+  Atendidas e Historicas, indicadores y detalle. Registrar atencion puede iniciar gestion o resolver, con
+  nota, actor y fecha; acciones individuales o masivas sobre eventos autorizados.
+  Puede reabrir o navegar a Itinerarios con section=itinerarios, activoId, date,
+  from=alertas y alarmId. Las reglas se administran en ConfigurationAlertsView,
+  no dentro de la bandeja. Persistencia local del prototipo.
 - `AuditView.vue`: vista de auditoria.
 - `CompanyManagementView.vue`: vista de administracion de empresas. Usa el
   layout global, cabecera simple del modulo, filtros laterales, resumen superior
@@ -128,11 +157,16 @@ Cuando se actualice una vista o documentacion relacionada con el funcionamiento 
 
 En `a.html`, la seccion de cuellos de botella debe mostrar solo deudas vigentes; los puntos ya mitigados deben moverse a notas de mantenimiento o eliminarse de esa lista.
 
-`AuditView.vue` usa una base gris/azul suave para reducir fatiga visual en tablas largas. La composicion superior sigue el orden filtros, KPI y tabla, apoyandose en el header global para el contexto principal de la vista. Sus controles y KPI deben mantenerse compactos para no empujar la tabla hacia abajo. Sus componentes refuerzan la identidad visual con azul corporativo en encabezados y naranjo en acciones o seleccion; el detalle de la paleta esta en `frontend/src/components/audit/README.md`. La vista pagina la tabla en bloques de 150 registros sin afectar filtros, KPI ni exportacion CSV. Tambien filtra por accion, por rango de fechas `Desde`/`Hasta` de forma inclusiva por dia completo y permite buscar fechas desde la barra general con formatos comunes.
+`AuditView.vue` usa fondo gris claro con superficies blancas, filtros compactos,
+categorias rapidas y tabla. Los antiguos KPI se retiraron por redundancia.
+La tabla pagina de a 150 registros; los filtros y la exportacion CSV operan
+sobre el total filtrado. Las fechas Desde/Hasta incluyen el dia completo en
+horario local; la busqueda tambien reconoce fechas y horas visibles.
+Ver `frontend/src/components/audit/README.md` para los criterios visuales.
 
 ## Mantenciones Vigentes
 
-`MaintenanceView.vue` muestra Flota, Analisis y Ordenes. Los codigos internos
+`MaintenanceView.vue` muestra Flota, Analisis, Ordenes y Conductores. Los codigos internos
 overview/costs/orders no representan pestanas Resumen/Costos antiguas.
 El estado operativo persiste por secciones en localStorage; las evidencias
 viven en IndexedDB. No hay backend, correo ni automatizacion externa.
@@ -395,16 +429,60 @@ prioridad. Limpiar restablece el plazo y la exportacion describe el filtro aplic
 
 # Mantenciones: Conductores
 
-Pestana Conductores cargada bajo demanda y remontada al cambiar de empresa para
+Pestana Conductores importada con la vista y remontada al cambiar de empresa para
 aislar formularios, archivos y registros. No muestra controles de planes/OT en
 esta pestaña. Mantiene el resto de vistas y flujos de mantenciones sin cambios.
 
+# Modal De Reglas De Configuracion
+
+En plataforma, el picker del wizard consulta todos los vehiculos autorizados
+sin el limite operativo de 120 filas. platformScope identifica reglas con alcance
+de plataforma, mantiene ids de distintas empresas al editar y las excluye de
+edicion por rutas de empresa. Reglas antiguas no amplian su alcance al abrirlas.
+
+El tercer paso usa AlarmRuleScopeSection con wizard=true: dos modos de alcance,
+busqueda y lista de seleccion. La lista nueva parte vacia; el editor operativo
+conserva su comportamiento anterior. AlarmRuleWizardActions muestra las acciones
+de la referencia e identifica las integraciones aun no disponibles.
+
+AlarmRuleTimingSection distribuye el paso Ruido y vigencia en dos columnas
+y semana de ancho completo. Solo reorganiza los controles existentes de
+horario, repeticion y dias, sin resumen ni timeline adicionales.
+
+El acceso Puerta abierta aplica el preset door-open al editor de signal:
+digitalInput2 = 0 durante 300 s (visible como digital_input_2). El editor
+AlarmRuleSignalSection incluye seis presets y un inspector del ultimo reporte
+de activos autorizados, sin afirmar que hay un historico de 30 dias.
+Los identificadores canonicos y los valores cero sobreviven al guardado.
+
+configurationAlertTypes.js define los diez tipos del catalogo del wizard y
+las condiciones de sus seis tipos adicionales. AlarmRuleEpisodeSection edita
+ralenti, temperatura, carga, puerta, ignicion y senal/variable; velocidad,
+caida, geocerca y ausencia de reportes reutilizan sus secciones existentes.
+Los tipos previos se conservan para editar/filtrar sin convertir datos.
+Ignicion como cambio de estado es distinta de ignition (fuera de horario).
+
+El paso de exceso de velocidad incorpora AlarmRuleSpeedingSection: fuente del
+limite por tipo o propio, minimo Leve/Moderada/Grave y severidad por exceso.
+Las opciones pasan por speedingRuleOptions en normalizacion y serializacion;
+no reemplazan el motor de informes ni implementan deteccion en servidor.
+El resumen consulta la misma configuracion empresa/plataforma que Limites.
+La prueba de 30 dias esta visible pero deshabilitada por falta de evaluador.
+
+ConfigurationAlertsView usa AlarmConfigPanel con presentation=configuration.
+Crear y editar abren un dialog nativo de tres pasos: deteccion, ruido/vigencia,
+alcance/acciones. El borrador y los servicios de reglas se reutilizan; solo las
+nuevas reglas de este flujo nacen inactivas. El editor operativo conserva sus
+secciones simultaneas. La validacion por paso vive en utils/alarms/alarmRuleWizard.js.
+No hay proveedor de correo ni prueba historica de 30 dias; no se simulan.
+
 # Carga De Mantenciones
 
-Analisis, ordenes, calendario, historial y conductores se cargan bajo demanda con
-placeholder y precarga al enfocar/apuntar una pestaña. Conductores se conserva
-solo para la empresa actual con KeepAlive max=1. Bundle MaintenanceView medido
-antes 137499 bytes JS, despues 94982 bytes (sin comprimir; vistas separadas aparte).
+Flota, Analisis, Ordenes y Conductores se importan con la vista. Calendario e
+historial conservan carga bajo demanda. KeepAlive retiene el contexto de las
+pestanas visitadas (maximo seis, reinicio por empresa); Conductores tiene cache
+independiente por empresa. No se montan pestañas por anticipado. Consultar
+`../components/maintenance/README.md` para ciclos de activacion y limpieza.
 
 # Navegacion De Conductores
 
@@ -414,4 +492,12 @@ su carga bajo demanda.
 
 MaintenanceView sincroniza la pestana con query.tab. Cambiar empresa desde
 Conductores mantiene esa pestana y elimina el contexto de activo anterior.
+
+## Cabeceras De Mantenciones
+
+La navegacion contiene solo las pestanas. Flota y Analisis muestran sus acciones
+en una barra contextual debajo, coherente con la cabecera de Ordenes.
+Botones y filtros de 38px; acciones secundarias de 12px sin exceso de negrita.
+Naranja para creacion y azul para exportacion de Analisis. Conductores mantiene
+su cabecera propia. No se modificaron handlers ni reglas de negocio.
 

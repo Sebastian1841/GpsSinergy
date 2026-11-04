@@ -7,7 +7,8 @@ Hooks Vue que coordinan estado, efectos, watchers y flujos de pantalla.
 - `support/`: coordinacion del listado, conversacion y gestion de solicitudes.
 
 - `activos/`: estado de activos, mapa, flota, geocercas, rutas e itinerarios.
-- `alarms/`: estado y calculos del CRUD de reglas automaticas de alertas.
+- `alarms/`: alcance y borradores del CRUD de reglas, con proteccion de cambios
+  pendientes y conflictos. No ejecuta reglas ni envia notificaciones.
 - `audit/`: historial de auditoria en cliente.
 - `auth/`: sesion y control de acceso.
 - `companies/`: gestion de empresas.

@@ -13,6 +13,8 @@
         >
           {{ tab.label }}
         </button>
+      </nav>
+      <div v-if="activeTab === 'overview' || activeTab === 'costs'" class="maintenance-context-toolbar">
         <div v-if="activeTab === 'overview'" class="maintenance-module-actions">
           <span>{{ maintenanceItems.length }} vehiculos</span>
           <button type="button" @click="openFleetExport">Exportar</button>
@@ -24,6 +26,7 @@
           </button>
         </div>
         <div v-else-if="activeTab === 'costs'" class="maintenance-module-actions analysis-actions">
+          <span>Análisis de costos</span>
           <select v-model="analysisPeriod" aria-label="Periodo de analisis">
             <option :value="6">Ultimos 6 meses</option>
             <option :value="12">Ultimos 12 meses</option>
@@ -32,11 +35,11 @@
             Exportar
           </button>
         </div>
-      </nav>
+      </div>
 
       <header
         v-if="activeTab !== 'overview' && activeTab !== 'costs' && activeTab !== 'drivers'"
-        class="shrink-0 border-b border-[#d8e0eb] bg-white px-4 py-3 sm:px-5"
+        class="maintenance-context-header shrink-0 border-b border-[#d8e0eb] bg-white px-4 py-3 sm:px-5"
       >
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div v-if="activeTab === 'orders'" class="maintenance-analysis-sections">
@@ -59,8 +62,8 @@
             <span class="text-[#102372]">Mantenciones</span><span class="text-slate-300">/</span
             ><span class="text-slate-500">{{ activeCompanyLabel }}</span>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="mr-2 text-[10px] font-bold text-slate-500"
+          <div class="maintenance-context-actions flex flex-wrap items-center gap-2">
+            <span class="mr-2 text-[12px] font-semibold text-slate-500"
               >{{ maintenanceItems.length }} vehiculos</span
             >
             <button
@@ -157,7 +160,7 @@
               v-model="searchTerm"
               type="search"
               placeholder="Buscar por patente, vehiculo, OT o taller..."
-              class="h-10 w-full rounded-lg border border-[#cfd8e6] bg-white pl-11 pr-3 text-[12px] font-bold text-[#172033] shadow-sm outline-none transition placeholder:text-slate-400 hover:border-[#b9c5d6] focus:border-[#102372] focus:ring-2 focus:ring-[#102372]/10"
+              class="h-[38px] w-full rounded-lg border border-[#cfd8e6] bg-white pl-11 pr-3 text-[12px] font-semibold text-[#172033] shadow-sm outline-none transition placeholder:text-slate-400 hover:border-[#b9c5d6] focus:border-[#102372] focus:ring-2 focus:ring-[#102372]/10"
             />
           </label>
 
@@ -193,7 +196,7 @@
 
           <button
             type="button"
-            class="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#dfe5ed] bg-white px-3 text-[11px] font-black text-slate-500 shadow-sm transition hover:border-[#102372]/25 hover:text-[#102372]"
+            class="inline-flex h-[38px] items-center justify-center gap-2 rounded-lg border border-[#dfe5ed] bg-white px-3 text-[12px] font-semibold text-slate-500 shadow-sm transition hover:border-[#102372]/25 hover:text-[#102372]"
             @click="clearFilters"
           >
             <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" aria-hidden="true">
@@ -704,58 +707,69 @@ watch(activeTab, (value) => {
 
 .maintenance-module-nav {
   display: flex;
-  min-height: 64px;
+  min-height: 48px;
+  flex-shrink: 0;
   align-items: flex-end;
   gap: 0.25rem;
   border-bottom: 1px solid #d8e0eb;
   background: #f7f9fc;
-  padding: 0 1.5rem;
+  padding: 0 20px;
 }
+.maintenance-context-toolbar {
+  flex-shrink: 0;
+  padding: 12px 20px;
+  border-bottom: 1px solid #d8e0eb;
+  background: white;
+}
+.maintenance-context-header { padding: 12px 20px; }
 .maintenance-module-actions {
   display: flex;
-  height: 100%;
+  min-height: 38px;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.55rem;
-  margin-left: auto;
+  width: 100%;
 }
 .maintenance-module-actions span {
-  margin-right: 0.35rem;
+  margin-right: auto;
   color: #526b94;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
 }
-.maintenance-module-nav .maintenance-module-actions button {
+.maintenance-context-toolbar .maintenance-module-actions button {
   min-width: auto;
-  height: 34px;
+  height: 38px;
   border: 1px solid #cfd8e6;
-  border-radius: 7px;
+  border-radius: 6px;
   background: #fff;
   padding: 0 0.85rem;
   color: #102372;
   white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
 }
-.maintenance-module-nav .maintenance-module-actions button.primary {
+.maintenance-context-toolbar .maintenance-module-actions button.primary {
   border-color: #ff6600;
   background: #ff6600;
   color: #fff;
 }
-.maintenance-module-nav .analysis-actions select {
+.maintenance-context-toolbar .analysis-actions select {
   width: 180px;
-  height: 34px;
+  height: 38px;
   border: 1px solid #cfd8e6;
-  border-radius: 7px;
+  border-radius: 6px;
   background: #fff;
   padding: 0 12px;
   color: #102372;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 }
-.maintenance-module-nav .analysis-actions button.primary {
+.maintenance-context-toolbar .analysis-actions button.primary {
   min-width: 126px;
   border-color: #102372;
   background: #102372;
 }
-.maintenance-module-nav button {
+.maintenance-module-nav > button {
   min-width: 112px;
   height: 44px;
   border-bottom: 2px solid transparent;
@@ -772,7 +786,7 @@ watch(activeTab, (value) => {
 }
 .maintenance-header-button {
   display: inline-flex;
-  height: 2rem;
+  height: 38px;
   align-items: center;
   justify-content: center;
   border: 1px solid #cfd8e6;
@@ -780,8 +794,8 @@ watch(activeTab, (value) => {
   background: #fff;
   padding: 0 0.8rem;
   color: #102372;
-  font-size: 0.68rem;
-  font-weight: 900;
+  font-size: 12px;
+  font-weight: 600;
   white-space: nowrap;
 }
 .maintenance-header-button.is-primary {
@@ -797,12 +811,12 @@ watch(activeTab, (value) => {
 }
 .maintenance-analysis-sections button {
   position: relative;
-  height: 100%;
+  min-height: 38px;
   border: 0;
   background: transparent;
   color: #536783;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 700;
 }
 .maintenance-analysis-sections button.active {
   color: #102372;
@@ -840,8 +854,7 @@ watch(activeTab, (value) => {
     height: auto;
     justify-content: flex-end;
     margin-left: 0;
-    border-top: 1px solid #e5eaf1;
-    padding: 8px 0;
+    padding: 0;
   }
 }
 
@@ -865,7 +878,7 @@ watch(activeTab, (value) => {
     margin: 0;
   }
 
-  .maintenance-module-nav .maintenance-module-actions button {
+  .maintenance-context-toolbar .maintenance-module-actions button {
     width: 100%;
     padding: 0 0.55rem;
   }
@@ -873,5 +886,7 @@ watch(activeTab, (value) => {
   .maintenance-module-actions .primary {
     grid-column: 1 / -1;
   }
+  .maintenance-context-toolbar, .maintenance-context-header { padding: 12px; }
+  .maintenance-context-actions { width: 100%; }
 }
 </style>

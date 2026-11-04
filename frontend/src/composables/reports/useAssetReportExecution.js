@@ -1,4 +1,9 @@
 import { computed, ref, shallowRef, watch } from "vue"
+import { readStorageValue, writeStorageValue } from "../../services/storage/browserStorage.js"
+import {
+  createReportLimitsContext,
+  fuelPriceStorageKey,
+} from "../../utils/reports/execution/reportLimitsContext.js"
 
 import { getReportsForAsset } from "../activos/fleet/useTelemetryHistory.js"
 import { useDebouncedValue } from "../ui/useDebouncedValue.js"
@@ -41,6 +46,15 @@ export function useAssetReportExecution({ template, assets, companies, geofences
 
   const dateFrom = ref(toDateInputValue(weekAgo))
   const dateTo = ref(toDateInputValue(today))
+  const manualSpeedLimit = ref("")
+  const fuelPrice = ref("")
+  const executionOptionsError = ref("")
+  const usesIdleFuel = computed(() =>
+    ["idle-time", "engine-hours"].includes(template.value?.reportTypeId),
+  )
+  const usesSpeedLimit = computed(() =>
+    (template.value?.eventRuleIds || [template.value?.eventRuleId]).includes("speeding"),
+  )
   const assetSearch = ref("")
   const debouncedAssetSearch = useDebouncedValue(assetSearch, 120)
 
@@ -62,7 +76,24 @@ export function useAssetReportExecution({ template, assets, companies, geofences
   })
 
   const reportColumns = computed(() => {
-    return createReportColumns(template.value)
+    const columns = createReportColumns(template.value)
+    if (usesIdleFuel.value) {
+      if (template.value?.reportTypeId === "engine-hours") {
+        for (const [key, label] of [
+          ["evento", "Evento"],
+          ["duracion", "Duracion"],
+        ]) {
+          if (!columns.some((column) => column.key === key)) columns.push({ key, label })
+        }
+      }
+      for (const [key, label] of [
+        ["idleFuelLiters", "Consumo al ralenti (L)"],
+        ["idleFuelCost", "Costo al ralenti ($)"],
+      ]) {
+        if (!columns.some((column) => column.key === key)) columns.push({ key, label })
+      }
+    }
+    return columns
   })
 
   const activeEventRuleIds = computed(() => {
@@ -75,7 +106,14 @@ export function useAssetReportExecution({ template, assets, companies, geofences
   })
 
   const templateEventRuleIds = computed(() => {
-    return normalizeReportTemplateEventRuleIds(template.value, activeEventRuleIds.value)
+    const ids = normalizeReportTemplateEventRuleIds(template.value, activeEventRuleIds.value)
+    if (
+      template.value?.reportTypeId === "engine-hours" &&
+      activeEventRuleIds.value.has("idle") &&
+      !ids.includes("idle")
+    )
+      ids.push("idle")
+    return ids
   })
 
   /*
@@ -291,6 +329,20 @@ export function useAssetReportExecution({ template, assets, companies, geofences
   })
 
   const dateRangeError = computed(() => {
+    if (
+      usesSpeedLimit.value &&
+      manualSpeedLimit.value !== "" &&
+      (!Number.isInteger(Number(manualSpeedLimit.value)) ||
+        Number(manualSpeedLimit.value) < 1 ||
+        Number(manualSpeedLimit.value) > 300)
+    )
+      return "El limite debe ser un entero entre 1 y 300 km/h."
+    if (
+      usesIdleFuel.value &&
+      fuelPrice.value !== "" &&
+      (!Number.isFinite(Number(fuelPrice.value)) || Number(fuelPrice.value) <= 0)
+    )
+      return "El precio por litro debe ser mayor que cero."
     if (!dateFrom.value || !dateTo.value) {
       return "Debes seleccionar fecha desde y fecha hasta."
     }
@@ -315,6 +367,9 @@ export function useAssetReportExecution({ template, assets, companies, geofences
   }
 
   const resetExecution = () => {
+    manualSpeedLimit.value = ""
+    fuelPrice.value = ""
+    executionOptionsError.value = ""
     assetSearch.value = ""
     selectedVehicleGroupId.value = "all"
 
@@ -353,6 +408,7 @@ export function useAssetReportExecution({ template, assets, companies, geofences
   }
 
   const executeReport = async () => {
+    executionOptionsError.value = ""
     if (!canExecuteReport.value) {
       clearReportPreview()
       return []
@@ -365,7 +421,21 @@ export function useAssetReportExecution({ template, assets, companies, geofences
      * Se capturan los valores actuales para que la ejecución
      * no dependa de cambios reactivos durante la construcción.
      */
-    const selectedAssetsSnapshot = [...selectedAssets.value]
+    const fuelPriceSnapshot = usesIdleFuel.value ? fuelPrice.value : ""
+    let selectedAssetsSnapshot
+    try {
+      const prepareAsset = createReportLimitsContext({
+        read: readStorageValue,
+        manualSpeedLimit: usesSpeedLimit.value ? manualSpeedLimit.value : "",
+        fuelPrice: fuelPriceSnapshot,
+      })
+      selectedAssetsSnapshot = selectedAssets.value.map(prepareAsset)
+    } catch {
+      executionOptionsError.value =
+        "No se pudieron leer los limites guardados. No se genero el informe."
+      clearReportPreview()
+      return []
+    }
     const reportColumnsSnapshot = [...reportColumns.value]
     const companyNameByIdSnapshot = new Map(companyNameById.value)
     const eventRulesByIdSnapshot = new Map(eventRulesById.value)
@@ -426,6 +496,24 @@ export function useAssetReportExecution({ template, assets, companies, geofences
     reportRows.value = sortAssetReportRowsByVehicle(generatedRows)
 
     executedAt.value = new Date().toISOString()
+    if (fuelPriceSnapshot !== "") {
+      const date = new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Santiago" }).format(
+        new Date(),
+      )
+      for (const companyId of new Set(
+        selectedAssetsSnapshot.map((asset) => String(asset.companyId || "")),
+      )) {
+        if (
+          !writeStorageValue(
+            fuelPriceStorageKey(companyId),
+            JSON.stringify({ price: Number(fuelPriceSnapshot), date }),
+          )
+        ) {
+          executionOptionsError.value =
+            "Informe generado, pero no se pudo guardar el ultimo precio usado."
+        }
+      }
+    }
 
     return reportRows.value
   }
@@ -494,9 +582,12 @@ export function useAssetReportExecution({ template, assets, companies, geofences
    * Cambiar filtros invalida la vista previa existente,
    * pero no genera automáticamente un nuevo reporte.
    */
-  watch([dateFrom, dateTo, selectedVehicleGroupId, selectedAssetIds], () => {
-    clearReportPreview()
-  })
+  watch(
+    [dateFrom, dateTo, selectedVehicleGroupId, selectedAssetIds, manualSpeedLimit, fuelPrice],
+    () => {
+      clearReportPreview()
+    },
+  )
 
   watch(availableAssetIdsSignature, () => {
     const availableAssetIds = new Set(
@@ -543,6 +634,11 @@ export function useAssetReportExecution({ template, assets, companies, geofences
   )
 
   return {
+    executionOptionsError,
+    manualSpeedLimit,
+    fuelPrice,
+    usesIdleFuel,
+    usesSpeedLimit,
     dateFrom,
     dateTo,
     assetSearch,

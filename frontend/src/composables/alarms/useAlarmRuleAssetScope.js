@@ -1,4 +1,4 @@
-import { computed, ref } from "vue"
+import { computed, ref, unref } from "vue"
 
 import { normalizeId } from "../../utils/idUtils.js"
 import {
@@ -34,18 +34,22 @@ export function useAlarmRuleAssetScope({
   assetTags,
   draft,
   pickerVisibleLimit = DEFAULT_PICKER_VISIBLE_LIMIT,
+  allCompanies = false,
+  scopeAllCompanies = allCompanies,
 }) {
   const assetSearchTerm = ref("")
+  const assetCompanyFilter = ref("all")
 
   const clearAssetSearchTerm = () => {
     assetSearchTerm.value = ""
+    assetCompanyFilter.value = "all"
   }
 
   const assetsForDraftCompany = computed(() => {
     const draftCompanyId = normalizeId(draft.value.companyId)
 
     return assets.value
-      .filter((asset) => normalizeId(asset.companyId) === draftCompanyId)
+      .filter((asset) => unref(allCompanies) || normalizeId(asset.companyId) === draftCompanyId)
       .map((asset) => ({
         ...asset,
         id: normalizeId(asset.id),
@@ -58,17 +62,17 @@ export function useAlarmRuleAssetScope({
   const filteredAssetsForDraftCompany = computed(() => {
     const search = normalizeSearchText(assetSearchTerm.value)
 
-    if (!search) {
-      return assetsForDraftCompany.value
-    }
-
     return assetsForDraftCompany.value.filter((asset) => {
-      return normalizeSearchText(asset.label).includes(search)
+      const companyMatches =
+        draft.value.assetScope.type !== "specific" ||
+        assetCompanyFilter.value === "all" ||
+        normalizeId(asset.companyId) === normalizeId(assetCompanyFilter.value)
+      return companyMatches && (!search || normalizeSearchText(asset.label).includes(search))
     })
   })
 
   const visibleAssetsForDraftCompany = computed(() => {
-    return filteredAssetsForDraftCompany.value.slice(0, pickerVisibleLimit)
+    return filteredAssetsForDraftCompany.value.slice(0, unref(pickerVisibleLimit))
   })
 
   const hiddenFilteredAssetCount = computed(() => {
@@ -126,13 +130,24 @@ export function useAlarmRuleAssetScope({
 
     if (draft.value.assetScope.type === "asset-tags") {
       return assetsForDraftCompany.value
+        .filter(
+          (asset) =>
+            unref(scopeAllCompanies) ||
+            normalizeId(asset.companyId) === normalizeId(draft.value.companyId),
+        )
         .filter((asset) => {
           return assetMatchesTagIds(asset, draft.value.assetScope.assetTagIds)
         })
         .map((asset) => asset.id)
     }
 
-    return assetsForDraftCompany.value.map((asset) => asset.id)
+    return assetsForDraftCompany.value
+      .filter(
+        (asset) =>
+          unref(scopeAllCompanies) ||
+          normalizeId(asset.companyId) === normalizeId(draft.value.companyId),
+      )
+      .map((asset) => asset.id)
   })
 
   const selectedDraftAssetCount = computed(() => selectedDraftAssetIds.value.length)
@@ -204,6 +219,23 @@ export function useAlarmRuleAssetScope({
     }
   }
 
+  const selectFilteredDraftAssets = () => {
+    draft.value.assetScope = {
+      type: "specific",
+      assetIds: [
+        ...new Set([
+          ...selectedDraftAssetIds.value,
+          ...filteredAssetsForDraftCompany.value.map((asset) => asset.id),
+        ]),
+      ],
+      assetTagIds: [],
+    }
+  }
+
+  const clearDraftAssetSelection = () => {
+    draft.value.assetScope = { type: "specific", assetIds: [], assetTagIds: [] }
+  }
+
   const isDraftAssetTagSelected = (tagId) => {
     return selectedDraftAssetTagIdSet.value.has(normalizeAssetTagId(tagId))
   }
@@ -226,6 +258,7 @@ export function useAlarmRuleAssetScope({
   }
 
   return {
+    assetCompanyFilter,
     assetSearchTerm,
     assetTagOptions,
     assetsForDraftCompany,
@@ -235,6 +268,8 @@ export function useAlarmRuleAssetScope({
     isDraftAssetSelected,
     isDraftAssetTagSelected,
     selectAllDraftAssets,
+    selectFilteredDraftAssets,
+    clearDraftAssetSelection,
     selectedDraftAssetCount,
     selectedDraftAssetIds,
     setDraftAssetScope,

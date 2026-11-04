@@ -1,6 +1,13 @@
 <template>
   <section class="rounded-lg border border-[#dfe6f0] bg-white p-2.5 shadow-sm">
-    <div class="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(300px,1fr)_150px_170px_170px_112px]">
+    <div
+      class="grid gap-2 md:grid-cols-2"
+      :class="
+        hideStatus
+          ? 'xl:grid-cols-[minmax(0,1fr)_170px_170px_112px]'
+          : 'xl:grid-cols-[minmax(300px,1fr)_150px_170px_170px_112px]'
+      "
+    >
       <label class="group relative min-w-0">
         <span
           class="pointer-events-none absolute left-2.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-[#102372] transition group-focus-within:text-[#ff6600]"
@@ -17,7 +24,7 @@
         />
       </label>
 
-      <label class="alarm-filter-field">
+      <label v-if="!hideStatus" class="alarm-filter-field">
         <span>Estado</span>
         <select
           :value="selectedStatus"
@@ -70,6 +77,7 @@
 import SvgIcon from "../icons/SvgIcon.vue"
 
 defineProps({
+  hideStatus: { type: Boolean, default: false },
   searchTerm: {
     type: String,
     default: "",

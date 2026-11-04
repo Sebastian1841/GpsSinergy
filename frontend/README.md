@@ -65,11 +65,28 @@ Los README locales dentro de `src` explican responsabilidades por carpeta.
   desde Fleet.
 - `Reportes`: biblioteca de plantillas, reglas de evento, ejecucion, preview,
   PDF y Excel.
-- `Alertas`: historial de alertas activadas por activo autorizado, con filtros,
-  detalle, accion para abrir el recorrido del dia en Itinerarios, panel de
-  configuracion de reglas automaticas y acciones para resolver o reabrir.
-- `Mantenciones`: Flota, Analisis y Ordenes; planes renovables, historial por vehiculo, persistencia local y exportacion PDF/Excel de flota e historial.
+- `Alertas`: bandeja operativa por activos autorizados, filtros, atencion y detalle;
+  permite abrir el recorrido del dia en Itinerarios. Las reglas automaticas
+  tienen una vista independiente dentro de Configuracion.
+- `Mantenciones`: Flota, Analisis, Ordenes y Conductores; planes renovables,
+  licencias, historial, persistencia local y exportacion PDF/Excel.
 - `Sin reportar`: listado y graficos mock, filtros, paginacion y exportacion Excel.
 - `Usuarios`: roles, permisos, alcances operativos y etiquetas de acceso.
 - `Empresas`: administracion global de empresas para administradores.
 - `Auditoria`: registro local de acciones del prototipo.
+
+## Configuracion (2026-11-04)
+
+Limites, Etiquetas y Alertas tienen vistas de plataforma/empresa con permisos.
+Variables calculadas y Ajustes avanzados son de plataforma. Todas tienen UI
+propia; no son cuatro placeholders junto a Limites.
+Variables conserva consola, cuatro KPI y editor en tres pasos; sin motor no
+ejecuta ni habilita guardado. Avanzado guarda siete parametros localmente, no
+los aplica a un backend. Auditoria se consulta en el modulo central.
+
+Referencias: [vistas](src/views/README.md),
+[componentes de Variables](src/components/configuration/README.md),
+[utilidades](src/utils/layout/README.md) y [rutas](src/router/README.md).
+Las pruebas de funciones no sustituyen integracion con servidor.
+Actualizar el README local junto con cambios de flujos, contratos o diseno;
+bitacora y capturas no reemplazan esa descripcion vigente.

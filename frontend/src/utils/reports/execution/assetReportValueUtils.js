@@ -88,6 +88,7 @@ const getRuleSpeedThreshold = (rule = {}, { includeDefault = true } = {}) => {
 
 export const getEffectiveSpeedLimitValue = ({ asset = {}, report = {}, rule = null }) => {
   const values = [
+    asset.configuredSpeedLimit,
     asset.speedLimit,
     asset.limiteVelocidad,
     asset.velocidadLimite,

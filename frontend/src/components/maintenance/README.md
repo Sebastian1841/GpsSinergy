@@ -6,6 +6,14 @@ componentes de tabla.
 
 ## Pantallas En Uso
 
+Estado visual de cabeceras (2026-11-04): la navegacion principal contiene solo
+Flota/Analisis/Ordenes/Conductores. Flota y Analisis tienen barra contextual debajo,
+igual nivel de acciones que la cabecera de Ordenes. Botones, selector de periodo
+y filtros compartidos de 38px; texto secundario de 11-12px sin peso excesivo.
+Creacion conserva naranja; Exportar de Analisis conserva azul. Conductores
+mantiene controles propios y no muestra acciones de planes/OT.
+`MaintenanceView.test.js` cubre separacion de barras y handlers conservados.
+
 - `MaintenanceFleetTab.vue`: Flota, filtros laterales, listado ordenable,
   columnas configurables, paginacion y planes expandibles por vehiculo. Expone
   `getExportRows` para el reporte de flota.
@@ -15,7 +23,8 @@ componentes de tabla.
 - `fleetOrderIndex.js`: indice de OT abiertas por vehiculo y plan/nombre.
   Evita buscar todas las OT al renderizar cada plan; pruebas en su archivo test.
 - `MaintenanceWorkOrdersTab.vue`: OT y pendientes de OT, KPI, filtros, tabla
-  con scroll interno y paginacion. Recibe acciones desde la vista.
+  con scroll interno y paginacion. Recibe acciones desde la vista; la seccion
+  sin OT reutiliza MaintenanceCostsTab con modo especifico y cache independiente.
 - `MaintenanceCostsTab.vue`: pestana Analisis; proyeccion por uso, costos,
   pendientes sin OT, cumplimiento, vencimientos, composicion y ranking.
   Usa ejecuciones cerradas para costos/cumplimiento, no porcentajes de muestra.
@@ -72,18 +81,17 @@ vehiculos. No hay datos personales demo agregados al almacenamiento del usuario.
 
 # Gestiones Y Confirmacion De Renovacion
 
-La ficha separa Gestiones y Licencias anteriores. Registrar gestion permite sin
-contacto, avisado, hora para renovar (fecha obligatoria desde hoy) y tramite.
-No modifica vigencia. Ultima gestion muestra solo la licencia actual; anteriores
-siguen visibles en historial. Renovar compara fechas y clases en paso de confirmacion
-antes de subir archivos o guardar. Se muestra Vencio hace/Vence en segun fecha.
+La interfaz actual no expone Contactos ni Ultima gestion. Los registros anteriores
+se conservan como datos legacy, sin mostrarlos como acciones vigentes.
+Renovar compara fechas y clases en un paso de confirmacion antes de subir archivos
+o guardar. Se muestra Vencio hace/Vence en segun fecha.
 
 # Diseno Y Fluidez De Conductores
 
 Banda de vencimientos, filtros alineados y tabla de seis columnas con identidad
 agrupada, clases y tiempo al vencimiento. En movil las filas se apilan con etiquetas,
-sin scroll horizontal. Paginacion de 10/20/50. Busqueda con debounce de 120ms e indice
-calculado solo al cambiar registros o dia. No se recalculan gestiones por pulsacion.
+sin scroll horizontal. Paginacion automatica o de 5/10/20/50. Busqueda con debounce
+de 120ms e indice calculado solo al cambiar registros o dia.
 La vista se conserva con KeepAlive limitado a una empresa; al desactivarse cierra
 modales y detiene temporizador. Una subida cancelada no guarda datos al volver.
 

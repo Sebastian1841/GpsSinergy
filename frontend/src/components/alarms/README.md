@@ -1,6 +1,7 @@
 # Alarm Components
 
-Componentes visuales del modulo de Alertas.
+Componentes visuales de la bandeja operativa y de Configuracion de alertas.
+Estado contrastado con el codigo: 2026-11-04.
 
 ## Archivos
 
@@ -12,7 +13,10 @@ Componentes visuales del modulo de Alertas.
   `from=alertas` y `alarmId`.
 - `AlarmConfigPanel.vue`: contenedor de configuracion de reglas automaticas.
   Mantiene seleccion, filtros, apertura del modal y persistencia. Delega filtros
-  a `AlarmRuleFilters.vue` y listado a `AlarmRuleTable.vue`. Dentro del modal de
+  a `AlarmRuleFilters.vue`. En presentation=configuration renderiza un listado
+  blanco continuo con divisores; en el modo alternativo usa AlarmRuleTable.
+  No estira filas y no repite condicion si ya coincide con la descripcion.
+  Dentro del modal de
   crear/editar delega informacion general, alcance, configuracion de disparo y
   notificaciones a componentes dedicados. El calculo de alcance, geocercas,
   validacion y payload vive en `composables/alarms`.
@@ -46,6 +50,32 @@ Componentes visuales del modulo de Alertas.
   visualmente vacias. No administra acciones de estado; esas acciones viven en el
   panel lateral de detalle.
 - `AlarmStatusBadge.vue`: badge reutilizable para estado y prioridad.
+- `AlarmAttentionForm.vue`: captura accion y nota para la atencion individual o
+  masiva; la vista calcula destinos autorizados y aplica cambios.
+- `AlarmRuleCompanyCombobox.vue`: selector buscable de empresa en el editor.
+- `AlarmRuleTimingSection.vue`: ruido, silencio, horario y dias de vigencia.
+- `AlarmRuleEpisodeSection.vue`: condiciones especificas por tipo de episodio.
+- `AlarmRuleSpeedingSection.vue`: limite por tipo o propio, duracion y severidad.
+- `AlarmRuleFuelDropSection.vue`: parametros propios de caida de combustible.
+- `AlarmRuleSignalSection.vue`: senales canonicas/presets e inspector del ultimo
+  reporte autorizado. Cero es dato valido; no es un historial de 30 dias.
+- `AlarmRuleWizardActions.vue`: canales y acciones; integraciones no disponibles
+  se identifican como tales y no se ejecutan.
+
+## Editor De Configuracion
+
+Tres pasos: deteccion, ruido/vigencia, alcance/acciones. Nuevas reglas de este
+flujo nacen inactivas. Algunos tipos del catalogo estan deshabilitados como
+Proximamente; no interpretar los diez tipos del catalogo como diez detectores
+operativos. Tipos legacy se conservan para editar sin convertir sus datos.
+Plataforma usa todos los activos autorizados del alcance permitido; la variante
+por empresa no edita reglas platformScope de otras empresas.
+La seleccion masiva respeta filtros/alcance y no se limita a la ventana renderizada.
+
+El borrador se conserva si falla la escritura. Cierre, cambio de regla, ruta o
+empresa consultan cambios pendientes; una version externa conflictiva no se
+sobrescribe. Validacion por paso y normalizacion viven en composables/utils.
+Prueba historica, motor automatico y proveedores externos no estan conectados.
 
 `AlarmList.vue` reutiliza los iconos semanticos de configuracion para identificar
 el tipo de cada alerta en el historial. El punto superpuesto al icono conserva
@@ -59,18 +89,19 @@ El historial usa un unico filtro de estado dentro de `AlarmFilters.vue`. No
 agregar nuevamente contadores `Todas`, `Activas` y `Resueltas` sobre el listado,
 porque duplican el mismo estado reactivo.
 
-Cada alerta historica semilla referencia una regla automatica concreta mediante
-`ruleId`. El titulo del evento y el nombre de esa regla deben ser identicos.
-`useAutomaticAlertRulesService.js` migra las reglas guardadas equivalentes a la
-regla semilla exacta y agrega las que falten, para que configuracion e historial
-no presenten alertas diferentes.
+Cada alerta historica semilla referencia su regla original mediante `ruleId`.
+El evento conserva su titulo aunque la regla se renombre o elimine.
+`useAutomaticAlertRulesService.js` carga ejemplos solo si no existe configuracion
+guardada. Una lista vacia es valida: nunca se reconstruyen reglas eliminadas ni
+se sustituyen reglas personalizadas. Datos corruptos muestran un error y bloquean
+las modificaciones hasta recuperar una configuracion legible.
 
 ## Regla de mantenimiento
 
-La navegacion entre `Configuracion de alertas` e `Historial de alertas` usa
-pestanas de texto sobre un divisor horizontal. La pestana activa se identifica
-con texto azul y una linea naranja inferior; no debe mostrarse como boton solido
-ni repetir iconos.
+La configuracion vive en su ruta propia. Ver la bandeja abre la ruta operativa;
+no recrear las antiguas pestanas Historial/Configuracion dentro de AlarmsView.
+La bandeja ofrece Sin iniciar, En curso, Atendidas, Todas e Historicas, ademas
+de filtros y detalle lateral. Estado de atencion no equivale a tipo de regla.
 
 Estos componentes no calculan permisos ni deciden que alertas puede ver el
 usuario. Deben recibir filas ya autorizadas desde `AlarmsView.vue`.

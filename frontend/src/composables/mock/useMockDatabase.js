@@ -1,6 +1,8 @@
 import { computed, ref, watch } from "vue"
 
 import { mockDatabaseSeed } from "../../data/mockDatabase.js"
+import { restoreLimitsSampleType } from "../../data/limitsSampleAssets.js"
+import { withSampleAssetTags } from "../../data/sampleAssetTags.js"
 import { withMockAssetReporting } from "../../data/mockAssetReporting.js"
 import { createCollectionDatabaseStorage } from "../../services/storage/collectionDatabaseStorage.js"
 import { getAssetTypeOption } from "../../utils/activos/assetTypeOptions.js"
@@ -217,7 +219,19 @@ const normalizeAsset = (asset) => {
 }
 
 const normalizeAssets = (items = []) => {
-  return mergeSeedById(items, mockDatabaseSeed.assets).map(normalizeAsset)
+  const retiredDemoIds = new Set([
+    "asset-limits-untyped-demo-1",
+    "asset-limits-untyped-demo-2",
+  ])
+  const currentItems = items.filter((asset) => !retiredDemoIds.has(normalizeKey(asset.id)))
+  if (currentItems.length !== items.length) assetReportMigrationPending = true
+  return mergeSeedById(currentItems, mockDatabaseSeed.assets).map((asset) => {
+    const sample = restoreLimitsSampleType(asset)
+    if (sample !== asset) assetReportMigrationPending = true
+    const tagged = withSampleAssetTags(sample, assetTags.value)
+    if (tagged !== sample) assetReportMigrationPending = true
+    return normalizeAsset(tagged)
+  })
 }
 
 const normalizeAssetTag = (tag = {}) => {
@@ -1062,6 +1076,70 @@ const updateCompany = (companyId, changes) => {
   return company
 }
 
+const commitAssetTagConfiguration = ({ action, companyId, tagId = "", name, assetIds = [], editableAssetIds = [], assetId, canEdit }) => {
+  if (!canEdit?.()) throw Error("No tienes permiso para modificar estas etiquetas.")
+  const company = normalizeKey(companyId)
+  if (!company || !companies.value.some(item => normalizeKey(item.id) === company))
+    throw Error("La empresa no esta disponible.")
+  if (!["create", "update", "delete", "unassign"].includes(action))
+    throw Error("Operacion de etiqueta desconocida.")
+  const current = assetTags.value.find(tag => normalizeKey(tag.id) === normalizeKey(tagId) && normalizeKey(tag.companyId) === company)
+  if (action !== "create" && !current) throw Error("La etiqueta ya no esta disponible.")
+  const allowed = new Set(editableAssetIds.map(normalizeKey))
+  const selected = new Set(assetIds.map(normalizeKey))
+  const editableAssets = assets.value.filter(asset => normalizeKey(asset.companyId) === company && allowed.has(normalizeKey(asset.id)))
+  const available = new Set(editableAssets.map(asset => normalizeKey(asset.id)))
+  if ([...selected].some(id => !available.has(id)))
+    throw Error("La seleccion contiene activos que ya no estan disponibles.")
+  if (action === "unassign" && !available.has(normalizeKey(assetId)))
+    throw Error("El activo ya no esta disponible.")
+
+  let result = current
+  if (action === "create" || action === "update") {
+    const cleanName = String(name || "").trim()
+    if (!cleanName || cleanName.length > 80) throw Error("Ingresa un nombre de hasta 80 caracteres.")
+    const application = applicationDefinitionsByCompanyId.value.get(company)
+    result = normalizeAssetTag({
+      ...(current || {}),
+      id: current?.id || `asset-tag-${globalThis.crypto.randomUUID()}`,
+      companyId: company,
+      applicationId: current?.applicationId || application?.id || "",
+      name: cleanName,
+    })
+  }
+  const id = normalizeKey(result.id)
+  const nextTags = action === "create" ? [result, ...assetTags.value]
+    : action === "delete" ? assetTags.value.filter(tag => normalizeKey(tag.id) !== id)
+      : action === "update" ? assetTags.value.map(tag => normalizeKey(tag.id) === id ? result : tag)
+        : assetTags.value
+  const nextAssets = assets.value.map(asset => {
+    if (normalizeKey(asset.companyId) !== company) return asset
+    const currentIds = normalizeFleetAssetTagIds(asset.assetTagIds)
+    let nextIds = currentIds
+    if (action === "delete" || (action === "unassign" && normalizeKey(asset.id) === normalizeKey(assetId)))
+      nextIds = currentIds.filter(item => item !== id)
+    else if ((action === "create" || action === "update") && available.has(normalizeKey(asset.id)))
+      nextIds = selected.has(normalizeKey(asset.id)) ? [...new Set([...currentIds, id])] : currentIds.filter(item => item !== id)
+    return JSON.stringify(currentIds) === JSON.stringify(nextIds) ? asset : { ...asset, assetTagIds: nextIds }
+  })
+  const nextAccesses = action === "delete" ? accesses.value.map(access => {
+    const ids = normalizeFleetAssetTagIds(access.scope?.assetTagIds)
+    return ids.includes(id) ? { ...access, scope: { ...access.scope, assetTagIds: ids.filter(item => item !== id) } } : access
+  }) : accesses.value
+  const collections = new Set([...dirtyCollections, "assetTags", "assets", ...(action === "delete" ? ["accesses"] : [])])
+  const saved = collectionStorage.write({
+    companies: companies.value, applicationDefinitions: applicationDefinitions.value,
+    users: users.value, assetTags: nextTags, assets: nextAssets, accesses: nextAccesses,
+  }, collections)
+  if (!saved) throw Error("No se pudieron guardar la etiqueta y sus asignaciones. No se aplicaron cambios. Intenta nuevamente.")
+  // Publish only after the manifest commits all affected collections together.
+  assetTags.value = nextTags
+  assets.value = nextAssets
+  if (action === "delete") accesses.value = nextAccesses
+  for (const collection of collections) dirtyCollections.delete(collection)
+  return result
+}
+
 const createAssetTag = (tag = {}) => {
   const companyId = normalizeKey(tag.companyId)
 
@@ -1237,6 +1315,7 @@ export function useMockDatabase() {
     createAssetTag,
     updateAssetTag,
     deleteAssetTag,
+    commitAssetTagConfiguration,
     createAsset,
     updateAsset,
     deleteAsset,

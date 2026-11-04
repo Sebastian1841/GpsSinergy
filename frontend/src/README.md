@@ -15,7 +15,17 @@ Raiz del codigo Vue del frontend. La organizacion se mantiene por tipo de respon
 - `main.js`: punto de entrada de Vue.
 - `style.css`: estilos globales base.
 
-`App.vue` tambien coordina la precarga diferida de vistas privadas despues del login mediante `preloadPrivateRouteViews()`. Esto mantiene el login liviano y reduce la espera del primer acceso a modulos como Reportes, Alertas, Auditoria, Usuarios y Empresas.
+`App.vue` coordina la precarga diferida de vistas privadas livianas despues del
+login mediante preloadPrivateRouteViews(). Los loaders pesados siguen bajo
+demanda; consultar router/README.md antes de ampliar la precarga.
+
+## Configuracion
+
+Las cinco pantallas viven en views/Configuration*View.vue. Componentes del editor
+de Variables en components/configuration; contratos puros y almacenamiento en
+utils/layout; reglas operativas en components/alarms y composables/alarms.
+Consultar los README de esas carpetas para permisos, persistencia y fronteras
+sin backend. No confundir motor de informes con motor de Variables calculadas.
 
 Los flujos activos mas sensibles del prototipo estan documentados con mas
 detalle en `../docs/flujos-principales.md`: permisos y etiquetas de acceso,

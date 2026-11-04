@@ -1,8 +1,17 @@
 import { ALARM_SEVERITY_OPTIONS, ALARM_TYPE_OPTIONS } from "./alarmUtils.js"
+import { fuelDropEpisode } from "./fuelDropEpisode.js"
+import { speedingRuleOptions, speedingConditionLabel } from "./speedingRule.js"
+import {
+  CONFIGURATION_ALERT_TYPES,
+  EPISODE_PRESETS,
+  episodeCondition,
+  episodeConditionLabel,
+} from "./configurationAlertTypes.js"
 import { normalizeId } from "../idUtils.js"
 import { assetMatchesTagIds, normalizeAssetTagId } from "../users/userAssetTagUtils.js"
 
 export const AUTOMATIC_ALERT_TYPE_PRESETS = {
+  ...EPISODE_PRESETS,
   speeding: {
     field: "speed",
     fieldLabel: "Velocidad",
@@ -214,7 +223,11 @@ const getPreset = (type) => {
 }
 
 export const getAutomaticAlertTypeLabel = (type) => {
-  return TYPE_LABELS.get(normalizeId(type)) || "Operacion"
+  return (
+    CONFIGURATION_ALERT_TYPES.find((option) => option.id === normalizeId(type))?.label ||
+    TYPE_LABELS.get(normalizeId(type)) ||
+    "Operacion"
+  )
 }
 
 export const getAutomaticAlertSeverityLabel = (severity) => {
@@ -225,12 +238,18 @@ export const getAutomaticAlertConditionLabel = (rule = {}) => {
   const type = normalizeId(rule.type || DEFAULT_TYPE)
   const preset = getPreset(type)
   const condition = rule.condition || {}
+  if (type === "fuel" && fuelDropEpisode(condition))
+    return "Caida de combustible; aviso al finalizar; revision cada 10 min"
+  const episodeLabel = episodeConditionLabel(type, condition)
+  if (episodeLabel) return episodeLabel
   const fieldLabel = preset.fieldLabel
   const operator = normalizeText(condition.operator, preset.operator)
   const value = normalizeText(condition.value, preset.value)
   const unit = normalizeText(condition.unit, preset.unit)
 
   if (type === "speeding") {
+    const configuredLabel = speedingConditionLabel(condition)
+    if (configuredLabel) return configuredLabel
     const durationSeconds = normalizeNumber(condition.durationSeconds, 0)
     const durationLabel = durationSeconds > 0 ? ` durante ${durationSeconds} seg` : ""
 
@@ -362,7 +381,9 @@ export const normalizeAutomaticAlertRule = (rule = {}) => {
 
   if (type === "speeding") {
     normalizedCondition.durationSeconds = Math.max(0, normalizeNumber(condition.durationSeconds, 0))
+    Object.assign(normalizedCondition, speedingRuleOptions(condition))
   }
+  Object.assign(normalizedCondition, episodeCondition(type, condition))
 
   if (type === "geofence") {
     const geofenceIds = normalizeIdList(condition.geofenceIds)
@@ -407,11 +428,17 @@ export const normalizeAutomaticAlertRule = (rule = {}) => {
 
   if (type === "fuel") {
     normalizedCondition.windowMinutes = Math.max(1, normalizeNumber(condition.windowMinutes, 15))
+    if (condition.stationaryOnly === true) normalizedCondition.stationaryOnly = true
+    if (fuelDropEpisode(condition)) {
+      Object.assign(normalizedCondition, fuelDropEpisode(condition))
+      delete normalizedCondition.windowMinutes
+    }
   }
 
   return {
     id: normalizeText(rule.id),
     companyId: normalizeId(rule.companyId),
+    ...(rule.platformScope === true ? { platformScope: true } : {}),
     name: normalizeText(rule.name, `Regla ${getAutomaticAlertTypeLabel(type)}`),
     description: normalizeText(rule.description),
     type,
@@ -453,10 +480,19 @@ export const buildAutomaticAlertRuleRows = ({
   return rules
     .map(normalizeAutomaticAlertRule)
     .filter((rule) => rule.id && rule.companyId)
-    .filter((rule) => !normalizedCompanyId || rule.companyId === normalizedCompanyId)
-    .filter((rule) => !hasCompanyScope || companiesById.has(rule.companyId))
+    .filter(
+      (rule) =>
+        !normalizedCompanyId || (!rule.platformScope && rule.companyId === normalizedCompanyId),
+    )
+    .filter((rule) =>
+      rule.platformScope
+        ? companiesById.size > 0
+        : !hasCompanyScope || companiesById.has(rule.companyId),
+    )
     .map((rule) => {
-      const companyAssets = assetsByCompanyId.get(rule.companyId) || []
+      const companyAssets = rule.platformScope
+        ? assets.filter((asset) => companiesById.has(normalizeId(asset.companyId)))
+        : assetsByCompanyId.get(rule.companyId) || []
       const availableAssetIds = new Set(companyAssets.map((asset) => normalizeId(asset.id)))
       const selectedAssetIds =
         rule.assetScope.type === "specific"
@@ -482,9 +518,23 @@ export const buildAutomaticAlertRuleRows = ({
       return {
         ...rule,
         company,
-        companyName: getCompanyName(company),
+        companyName: rule.platformScope ? "Plataforma" : getCompanyName(company),
+        ...(rule.platformScope
+          ? {
+              scopeCompanyIds: [
+                ...new Set(
+                  (rule.assetScope.type === "all" ? companyAssets : selectedAssets).map((asset) =>
+                    normalizeId(asset.companyId),
+                  ),
+                ),
+              ],
+            }
+          : {}),
         typeLabel: getAutomaticAlertTypeLabel(rule.type),
-        severityLabel: getAutomaticAlertSeverityLabel(rule.severity),
+        severityLabel:
+          rule.type === "speeding" && rule.condition.severityMode === "excess"
+            ? "Segun exceso"
+            : getAutomaticAlertSeverityLabel(rule.severity),
         conditionLabel: getAutomaticAlertConditionLabel(rule),
         updatedTime,
         availableAssetCount: companyAssets.length,

@@ -177,6 +177,7 @@ const getRuleSpeedThreshold = (rule = {}, { includeDefault = true } = {}) => {
 
 const getEffectiveSpeedLimitValue = ({ report = {}, asset = {}, rule = null }) => {
   return firstValue(
+    asset.configuredSpeedLimit,
     asset.speedLimit,
     asset.limiteVelocidad,
     asset.velocidadLimite,
@@ -559,6 +560,7 @@ const doesReportMatchOperationalRule = ({ report, asset, rule }) => {
 }
 
 const hasSpeedingSignal = ({ report = {}, asset = {}, rule = null }) => {
+  if (asset.limitsSpeedUnavailable) return false
   const speed = getOperationalSpeed({ report, asset })
   const speeding = toBooleanValue(
     firstValue(

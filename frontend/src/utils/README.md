@@ -23,7 +23,9 @@ Funciones puras y helpers compartidos.
   seleccion de grupos al exportar.
 - `geofenceUtils.js`: funciones generales de geocercas.
 - `idUtils.js`: normalizacion de identificadores.
-- `layout/`: helpers puros para alcance y datos del layout.
+- `layout/`: alcance del header, catalogo de Configuracion, limites, parametros
+  avanzados, busqueda de etiquetas y contratos/estados de Variables calculadas.
+  Su README detalla claves locales, validaciones, versiones y motor pendiente.
 - `mapSignatureUtils.js`: firmas para detectar cambios de mapa.
 - `numberUtils.js`: helpers numericos.
 - `performanceUtils.js`: utilidades de rendimiento.

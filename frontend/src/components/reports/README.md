@@ -100,3 +100,13 @@ caben y avisa el detalle adicional; Excel muestra todas las columnas y usa el
 ancho completo. El boton principal de exportacion debe descargar el formato
 activo en la vista previa, no mostrar acciones separadas que dupliquen el
 selector.
+
+## Opciones De Limites En Ejecucion
+
+ReportExecutionModal permite limite de velocidad opcional y precio por litro
+para informes de ralenti/horas motor. Opciones y cambios invalidan el resultado
+anterior; no exportar una vista previa calculada con valores distintos.
+El composable de ejecucion prepara una instantanea por empresa y devuelve las
+mismas filas a preview/PDF/Excel. Falta de duracion, tipo o precio no se reemplaza
+con ceros. Persistencia de ultimo precio y advertencias pertenecen al composable,
+no al componente. Ver composables/reports y utils/reports/execution.

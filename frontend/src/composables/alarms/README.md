@@ -15,6 +15,25 @@ reglas automaticas fuera de los componentes visuales.
 - `useAlarmRuleDraft.js`: normaliza el draft de una regla automatica, aplica
   presets por tipo de alerta, valida si se puede guardar y arma el payload final
   que consume `useAutomaticAlertRulesService.js`.
+- `useAlarmRuleDraftProtection.js`: captura firma del borrador y regla esperada,
+  detecta cambios locales/conflictos y protege cierre y beforeunload. No ignora
+  cambios de negocio; solo excluye timestamps de la firma del borrador.
+
+## Alcance Y Guardado Actual (2026-11-04)
+
+El wizard de Configuracion no trunca el universo autorizado a 120 activos.
+La ventana renderizada es una optimizacion visual: seleccion masiva y conteos
+operan sobre todos los resultados permitidos. platformScope conserva ids de
+varias empresas al editar en plataforma; la ruta de empresa no amplia ese alcance.
+Cambiar empresa reinicia o solicita descartar el borrador mediante el panel.
+
+El payload se normaliza por tipo, incluidas opciones de exceso de velocidad,
+episodios de combustible y aliases canonicos de senales. No convertir cero en
+ausencia. Si el servicio devuelve null, no cerrar formulario ni registrar exito.
+La persistencia sigue siendo local; no hay evaluador ni proveedor externo aqui.
+
+Pruebas: `useAlarmRuleAssetScope.test.js` y
+`useAlarmRuleDraftProtection.test.js`; reglas puras en utils/alarms.
 
 ## Regla de mantenimiento
 

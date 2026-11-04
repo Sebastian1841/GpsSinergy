@@ -1,4 +1,5 @@
 import { getAssetHistoryId, getAssetLabel, normalizeReportText } from "./assetReportAssetUtils.js"
+import { getIdleFuelAmounts } from "./reportLimitsContext.js"
 import { normalizeReportId } from "./assetReportColumnUtils.js"
 import { formatTimestamp, getCurrentDateOnly, getSourceTimestamp } from "./assetReportDateUtils.js"
 import { getReportEventSourceKey } from "./assetReportRuleUtils.js"
@@ -239,7 +240,7 @@ const getColumnValue = ({ asset, report, rule = null, columnKey, companyName, ti
     assetKeys: ["speedingDelta", "speedOverLimit", "excesoVelocidad"],
   })
   const speedingDeltaNumber = parseReportNumber(
-    explicitSpeedingDelta,
+    asset.configuredSpeedLimit !== undefined ? null : explicitSpeedingDelta,
     speedNumber !== null && speedLimitNumber !== null ? speedNumber - speedLimitNumber : null,
   )
   const speedingValue = getValueFromReportOrAsset({
@@ -328,6 +329,20 @@ const getColumnValue = ({ asset, report, rule = null, columnKey, companyName, ti
   }
 
   if (columnKey === "datosUlt") return values.ultimoDato
+  if (columnKey === "idleFuelLiters" || columnKey === "idleFuelCost") {
+    if (rule?.id !== "idle") return "-"
+    const amounts = getIdleFuelAmounts({ report, asset })
+    const value = columnKey === "idleFuelLiters" ? amounts.liters : amounts.cost
+    return value === null
+      ? "-"
+      : columnKey === "idleFuelLiters"
+        ? `${value.toLocaleString("es-CL", { maximumFractionDigits: 2 })} L`
+        : value.toLocaleString("es-CL", {
+            style: "currency",
+            currency: "CLP",
+            maximumFractionDigits: 0,
+          })
+  }
 
   if (columnKey === "horometroTotal") {
     return getFleetTelemetryCellValue(telemetrySource, { key: "horometroTotal" })

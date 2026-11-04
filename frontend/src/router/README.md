@@ -1,5 +1,25 @@
 # Router
 
+Configuracion Alertas carga ConfigurationAlertsView, independiente de /alertas
+y /app/:empresaId/alertas. Mantiene guardias de plataforma y configuration-alerts.
+
+Configuracion Etiquetas carga ConfigurationTagsView en rutas de plataforma y
+empresa; conserva los guardias existentes y no crea navegacion horizontal adicional.
+
+Configuracion tiene cinco rutas independientes bajo /configuracion/:modulo.
+Todas las entradas generales son de plataforma. Limites, etiquetas y alertas
+tienen variantes /app/:empresaId/configuracion/:modulo protegidas por empresa
+y su funcion configuration-limits, configuration-tags o configuration-alerts.
+Variables calculadas y avanzado no tienen variante cliente. No se amplian
+permisos existentes. Alertas operativas conserva /alertas y /app/:empresaId/alertas;
+no comparte ruta ni estado seleccionado con Configuracion. Cada entrada carga
+su vista propia: ConfigurationLimitsView, ConfigurationTagsView,
+ConfigurationAlertsView, ConfigurationVariablesView o ConfigurationAdvancedView.
+ConfigurationPlaceholderView es solo un fallback del catalogo, no la pantalla
+actual de esas cinco rutas. No hay barra horizontal de navegacion entre modulos.
+Los guards de entrada no sustituyen permisos de edicion en cada vista ni
+autorizacion del backend. Ver `../utils/layout/configurationNavigation.js`.
+
 `/soporte` (Support) carga SupportView bajo demanda para usuarios autenticados.
 No exige un permiso de modulo separado; el panel verifica el alcance por empresa
 y permite gestion al administrador de plataforma o al rol tecnico autorizado.

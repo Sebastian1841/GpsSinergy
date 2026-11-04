@@ -1,6 +1,23 @@
 <template>
   <span class="svg-icon-wrapper" aria-hidden="true">
-    <svg v-if="name === 'maintenance-time'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <svg v-if="name === 'variable-code'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m8 6-6 6 6 6m8-12 6 6-6 6" /></svg>
+    <svg v-else-if="name === 'variable-activity'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l3-9 6 18 3-9h4" /></svg>
+    <svg v-else-if="name === 'variable-pause'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
+    <svg v-else-if="name === 'variable-play'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m7 4 14 8-14 8Z" /></svg>
+    <svg v-else-if="name === 'variable-history'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 2.6-6.4L3 8M3 3v5h5M12 7v5l3 2" /></svg>
+    <svg v-else-if="name === 'configuration-limits'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4.2 19a10 10 0 1 1 15.6 0H4.2Z" /><path d="m12 12 5-5" /><circle cx="12" cy="12" r="1" />
+    </svg>
+    <svg v-else-if="name === 'configuration-tags'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 3h7l9 9-7 7-9-9V3Z" /><circle cx="7" cy="7" r="1" /><path d="m14 3 8 9-7 7" />
+    </svg>
+    <svg v-else-if="name === 'configuration-alerts'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4M12 7v4M12 14h.01" />
+    </svg>
+    <svg v-else-if="name === 'configuration-sliders'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 6h4m4 0h10M3 12h10m4 0h4M3 18h4m4 0h10" /><circle cx="9" cy="6" r="2" /><circle cx="15" cy="12" r="2" /><circle cx="9" cy="18" r="2" />
+    </svg>
+    <svg v-else-if="name === 'maintenance-time'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
     </svg>
     <svg v-else-if="name === 'maintenance-hours'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -8,6 +25,15 @@
     </svg>
     <svg v-else-if="name === 'maintenance-odometer'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M4.5 19a9 9 0 1 1 15 0M12 3v2M5.6 5.6 7 7M3 12h2M19 12h2M12 12l4-4" /><circle cx="12" cy="12" r="1" />
+    </svg>
+    <svg v-else-if="name === 'limits-warning'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.3 3.9 2.2 18a2 2 0 0 0 1.7 3h16.2a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><path d="M12 9v4M12 17h.01" />
+    </svg>
+    <svg v-else-if="name === 'limits-save'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2Z" /><path d="M7 3v6h10V3M7 21v-8h10v8" />
+    </svg>
+    <svg v-else-if="name === 'limits-reset'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 10a9 9 0 1 1 2 8M3 4v6h6" />
     </svg>
     <svg v-else-if="name === 'download'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M12 3v12m-5-5 5 5 5-5M5 16v4h14v-4" />

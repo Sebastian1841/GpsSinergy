@@ -16,6 +16,26 @@ Funciones puras del modulo de Alertas.
   cuando arma filas de reglas.
 - `automaticAlertRuleUtils.test.js`: pruebas de alcance, filtros, orden, resumen
   y defaults de reglas automaticas.
+- `configurationAlertTypes.js`: catalogo del wizard y condiciones por episodio;
+  conserva tipos legacy. idle, temperature, geofence, door_open e ignition_event
+  estan marcados como no disponibles para nuevas elecciones en el catalogo.
+- `alarmRuleWizard.js`: validacion por paso sin persistencia ni ejecucion.
+- `speedingRule.js`: opciones de limite por tipo/propio y severidad por exceso.
+- `fuelDropEpisode.js`: normalizacion de condiciones de caida; no procesa por si
+  solo un flujo real de telemetria.
+- `signalRulePresets.js`: presets, nombres canonicos y nombres visibles de senales.
+- `alarmInbox.js`: grupos/episodios, filtros y resumen de la bandeja.
+- `alarmEpisodeDisplay.js`: presentacion de motivo y metadata del episodio.
+- `alarmAttention.js`: acciones de atencion, destinos individuales/masivos y
+  payload con nota (hasta 2000 caracteres), actor, fecha e historial.
+
+## Separacion De Motores
+
+Estas utilidades normalizan configuracion y presentan eventos locales. No son un
+evaluador automatico en servidor ni el motor de scripts de Variables calculadas.
+`utils/reports/event-rules` evalua reglas de informes y no debe confundirse con
+la generacion de alertas operativas. Todos los archivos nuevos tienen pruebas
+unitarias junto al helper; validar tambien sus conexiones desde las vistas.
 
 ## Regla de permisos
 
