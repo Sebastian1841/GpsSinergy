@@ -14,3 +14,8 @@ acceso y pertenencia del archivo a la conversacion. Esto no sustituye autorizaci
 de servidor. No hay sincronizacion entre usuarios en equipos distintos, correo,
 notificaciones externas ni respaldo central. Para produccion, sustituir storage
 por API y almacenamiento de archivos con validacion y permisos reales.
+
+Antes de guardar se relee la coleccion y se combina por ID con el snapshot de
+esta instancia. Solicitudes nuevas de otra ventana se conservan; una respuesta
+o gestion basada en una version obsoleta del mismo caso se rechaza sin perder
+el ultimo guardado ni cerrar el formulario. Las pruebas simulan dos instancias.

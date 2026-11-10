@@ -44,6 +44,7 @@
         </div>
       </header>
       <p v-if="error" role="alert" class="advanced-header-error">{{ error }}</p>
+      <p v-if="saveError" role="alert" class="advanced-header-error">{{ saveError }}</p>
       <div v-if="auditWarning" class="advanced-audit-warning" role="alert">
         <span>{{ auditWarning }}</span
         ><button type="button" @click="syncAudit">Reintentar registro</button>
@@ -309,6 +310,7 @@ const draft = ref(advancedDefaults())
 const baseline = ref(advancedDefaults())
 const ready = ref(false)
 const error = ref("")
+const saveError = ref("")
 const message = ref("")
 const attempted = ref(false)
 const changesDialog = ref(null)
@@ -343,6 +345,7 @@ const reviewSave = () => {
   if (!editable.value || !ready.value || !dirty.value || error.value) return
   attempted.value = true
   if (Object.keys(errors.value).length) return
+  saveError.value = ""
   reviewedDraft.value = { ...draft.value }
   changesDialog.value.showModal()
 }
@@ -426,6 +429,7 @@ const resetGroup = (group) => {
 }
 const isFieldChanged = (field) => draft.value[field.id] !== baseline.value[field.id]
 const load = () => {
+  saveError.value = ""
   try {
     const values = readAdvancedConfiguration(readStorageValue)
     draft.value = { ...values }
@@ -465,6 +469,7 @@ const save = () => {
   attempted.value = true
   if (Object.keys(errors.value).length) return
   try {
+    saveError.value = ""
     const values = saveAdvancedConfiguration({
       read: readStorageValue,
       write: writeStorageValue,
@@ -481,7 +486,7 @@ const save = () => {
     message.value = "Cambios guardados."
     syncAudit()
   } catch (cause) {
-    error.value = cause.message
+    saveError.value = cause.message
   }
   closeChangesDialog()
 }

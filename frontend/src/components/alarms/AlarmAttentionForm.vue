@@ -43,8 +43,6 @@ const groupName = useId()
 const submit = () => {
   if (!ATTENTION_ACTIONS.some((choice) => choice.id === action.value)) return
   emit("save", { action: action.value, note: note.value })
-  action.value = ""
-  note.value = ""
 }
 </script>
 <style scoped>

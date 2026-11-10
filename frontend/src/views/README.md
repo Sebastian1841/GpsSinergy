@@ -1,6 +1,60 @@
 # Views
 
+Ordenes recibe el conjunto de OT del scope para detectar altas reales sin
+confundirlas con cambios de busqueda. Inicio/altas en Abiertas; terminales por
+pestanas Finalizadas/Canceladas o acceso explicito al detalle.
+
+Ordenes: filas solo con Ver OT y siguiente accion. El modal de detalle emite
+manage-work-order/manage-work-order-cost para abrir gestion y regresar al detalle
+al guardar/cancelar. Sin menu de opciones por fila ni perdida de operaciones.
+
+Revision de OT antiguas: estilo alineado con CompanyEditorModal y exportacion de
+Flota: cabecera clara con icono azul, titulo de 20px, texto secundario, tabla de
+bordes suaves y pie con accion naranja Entendido. Estado Identidad pendiente
+unico sobre la tabla, sin columna repetida. Ancho maximo 760px y scroll acotado.
+
+Aviso de referencias antiguas: boton icono + N OT por revisar junto a Nueva OT.
+Abre modal acotado con explicacion del problema y tabla de solo lectura con
+scroll interno, sin estirar la pagina. Cierre por boton, fondo o Escape, foco
+contenido y retorno al disparador. No se reasignan ni eliminan registros.
+
+Mantenciones (2026-11-06): advertencia de OT antiguas retirada de Flota. En
+Ordenes, Revisar registros abre una tabla acotada de referencias originales y
+categorias conservadas, sin edicion/reasignacion ni datos de vehiculos no
+verificados. El panel se cierra al cambiar empresa; otros resultados conservan
+el aviso global. El contador de vehiculos no se repone en Flota.
+
+Mantenciones, pasos 3-5 (2026-11-05): aviso global descartable sin vencimiento de
+seis segundos, accion siguiente contextual y limpieza al cambiar de empresa.
+Ordenes separa gestion de OT de configuracion de planes/tipos en Flota; muestra
+conteo de ordenes y pestana Planes sin OT. No cambia reglas de cierre/renovacion.
+
+Mantenciones (2026-11-05): navegacion Flota -> detalle de OT vinculada -> Volver
+al plan en Flota. Conserva la instancia de tabla, filtros, pagina, desplegados
+y scroll; descarta el origen al cambiar de empresa. No modifica cierre ni renovacion.
+
+Sin Reportar (2026-11-05): contexto y consultas de contacto/imagen usan companyId;
+identidad e historial ya no dependen del nombre de empresa. El modal encuentra
+la fila actual por equipmentKey aun despues de un renombrado. Filtros de texto
+siguen siendo visuales, no permisos. Un aviso identifica antecedentes antiguos
+sin atribucion verificable; no se reasignan por suposicion.
+
+Guardados comprobados (2026-11-05): Activos muestra geofenceWriteError sin cerrar
+dibujos o ediciones fallidas. Reportes y Fleet muestran templatesWriteError y
+mantienen el modal/borrador al fallar; auditoria solo tras confirmacion del servicio.
+
+Correcciones de flujo (2026-11-04): Usuarios protege la ficha del administrador
+y valida cada empresa destino en sus composables. Ajustes avanzados separa
+errores transitorios de guardado (`saveError`) de errores bloqueantes de carga
+o conflicto (`error`): permite reintentar con el borrador intacto, sin quitar
+las comprobaciones de version al confirmar.
+
 ## Configuracion Vigente (2026-11-04)
+
+Alertas operativas (2026-11-04): AlarmsView atiende/reabre grupos mediante una
+unica escritura comprobada. Solo despues registra auditoria y limpia seleccion.
+Si falla, conserva formulario y muestra alarmsWriteError. ActivosView muestra el
+mismo error al resolver/reabrir desde Fleet y no registra auditoria de exito.
 
 Las cinco rutas tienen contenido propio y se abren desde la sidebar. No hay
 navegacion horizontal adicional entre modulos. Plataforma puede abrir las cinco;
@@ -500,4 +554,13 @@ en una barra contextual debajo, coherente con la cabecera de Ordenes.
 Botones y filtros de 38px; acciones secundarias de 12px sin exceso de negrita.
 Naranja para creacion y azul para exportacion de Analisis. Conductores mantiene
 su cabecera propia. No se modificaron handlers ni reglas de negocio.
+
+# Mantenciones Sin Detalle Redundante
+
+Nueva OT recibe orderCreationContext desde composable para fijar el plan de
+la fila de origen, sin introducir ese estado UI en los datos guardados de la OT.
+
+Mantenciones escucha fleetPlanFocus para desplegar los planes en la tabla al
+regresar. Edicion directa por plan reemplaza el modal de detalle del vehiculo;
+no cambia el detalle de OT ni su navegacion de regreso a Flota.
 

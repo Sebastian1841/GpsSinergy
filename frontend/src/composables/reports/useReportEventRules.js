@@ -258,7 +258,7 @@ const readStoredRules = () => {
 }
 
 const persistRules = (rules) => {
-  writeJsonStorage(REPORT_EVENT_RULES_STORAGE_KEY, rules)
+  return writeJsonStorage(REPORT_EVENT_RULES_STORAGE_KEY, rules)
 }
 
 const mergeStoredRulesWithSeed = (storedRules = []) => {
@@ -298,10 +298,18 @@ const getInitialRules = () => {
 }
 
 const reportEventRules = ref(getInitialRules())
+const rulesWriteError = ref("")
 
 const setRules = (rules) => {
-  reportEventRules.value = rules.map(normalizeEventRule)
-  persistRules(reportEventRules.value)
+  rulesWriteError.value = ""
+  const next = rules.map(normalizeEventRule)
+  if (!persistRules(next)) {
+    rulesWriteError.value =
+      "No se pudieron guardar las reglas. Conserva los cambios e intenta nuevamente."
+    return false
+  }
+  reportEventRules.value = next
+  return true
 }
 
 export const getActiveReportEventRulesSnapshot = () => {
@@ -344,7 +352,7 @@ export function useReportEventRules() {
           ],
     })
 
-    setRules([...reportEventRules.value, nextRule])
+    if (!setRules([...reportEventRules.value, nextRule])) return null
 
     return nextRule
   }
@@ -369,7 +377,7 @@ export function useReportEventRules() {
       return updatedRule
     })
 
-    setRules(nextRules)
+    if (!updatedRule || !setRules(nextRules)) return null
 
     return updatedRule
   }
@@ -380,21 +388,20 @@ export function useReportEventRules() {
 
     if (!rule || rule.source !== "custom") return false
 
-    setRules(
+    return setRules(
       reportEventRules.value.filter((eventRule) => {
         return normalizeRuleId(eventRule.id) !== normalizedRuleId
       }),
     )
-
-    return true
   }
 
   const resetEventRules = () => {
-    setRules(seedRules)
+    return setRules(seedRules)
   }
 
   return {
     reportEventRules,
+    rulesWriteError: computed(() => rulesWriteError.value),
     activeEventRules,
     eventRulesById,
 

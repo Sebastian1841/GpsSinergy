@@ -328,12 +328,27 @@ export function useItineraryRoute({
   }
 
   const shouldAppendCurrentLocation = (asset) => {
-    return isCurrentDateInsideRange() && hasValidAssetLocation(asset)
+    const timestamp = getCurrentLocationTimestamp(asset)
+    return (
+      isCurrentDateInsideRange() &&
+      hasValidAssetLocation(asset) &&
+      Boolean(timestamp) &&
+      isPointInsideDateRange({
+        point: { timestamp },
+        fromDate: fromDate.value,
+        toDate: toDate.value,
+      })
+    )
   }
 
   const getCurrentLocationTimestamp = (asset) => {
-    return buildTimestampOnReferenceDate({
-      source: asset,
+    const candidate = getTimestampCandidates(asset).find((value) => {
+      if (!value) return false
+      return isTimeOnlyValue(String(value).trim()) || !Number.isNaN(new Date(value).getTime())
+    })
+    if (!candidate) return ""
+    return normalizeReportTimestamp({
+      source: { timestamp: candidate },
       referenceDate: getCurrentReferenceDate(),
     })
   }

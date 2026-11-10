@@ -15,6 +15,9 @@ Integracion del mapa de activos con Leaflet.
 - `useMapPanelFullscreen.js`: estado de pantalla completa.
 - `useMapPanelGeofences.js`: geocercas visibles en mapa.
 - `useMapPlannedRouteEditor.js`: editor de rutas planificadas.
+- `plainTextTooltipContent.js`: crea contenido DOM con textContent para nombres
+  editados/importados de geocercas y paradas. No interpreta HTML ni modifica
+  el nombre almacenado. Pruebas dedicadas cubren etiquetas y caracteres especiales.
 
 ## Subcarpetas
 

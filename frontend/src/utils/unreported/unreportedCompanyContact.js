@@ -1,5 +1,9 @@
-export const resolveUnreportedCompanyContact = (companies, companyName) => {
-  const matches = companies.filter((company) => company.name === companyName)
+export const resolveUnreportedCompanyContact = (companies, identity) => {
+  const matches = companies.filter((company) =>
+    typeof identity === "object" && identity !== null
+      ? identity.companyId != null && String(company.id) === String(identity.companyId)
+      : company.name === identity,
+  )
   if (matches.length !== 1) return { name: "", phone: "", href: "" }
   const company = matches[0]
   const name = String(company.contactName || "").trim()

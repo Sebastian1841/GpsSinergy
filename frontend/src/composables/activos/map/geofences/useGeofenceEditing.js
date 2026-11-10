@@ -43,10 +43,10 @@ export function createGeofenceEditingController({
     layers.editLayer?.clearLayers()
   }
 
-  const emitUpdatedGeofence = () => {
+  const emitUpdatedGeofence = (onResult) => {
     if (!editingDraft.value) return
 
-    emit("geofence-updated", cloneGeofence(editingDraft.value))
+    emit("geofence-updated", cloneGeofence(editingDraft.value), onResult)
   }
 
   const redrawEditCircle = () => {

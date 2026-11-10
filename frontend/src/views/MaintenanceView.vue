@@ -16,7 +16,7 @@
       </nav>
       <div v-if="activeTab === 'overview' || activeTab === 'costs'" class="maintenance-context-toolbar">
         <div v-if="activeTab === 'overview'" class="maintenance-module-actions">
-          <span>{{ maintenanceItems.length }} vehiculos</span>
+          <div class="fleet-toolbar-summary"></div>
           <button type="button" @click="openFleetExport">Exportar</button>
           <button type="button" @click="openMaintenanceModal('maintenance-type')">
             Tipos de mantención
@@ -55,7 +55,7 @@
               :class="{ active: orderSection === 'without-order' }"
               @click="orderSection = 'without-order'"
             >
-              Pendientes de OT
+              Planes sin OT
             </button>
           </div>
           <div v-else class="flex items-center gap-2 text-[12px] font-black">
@@ -63,23 +63,20 @@
             ><span class="text-slate-500">{{ activeCompanyLabel }}</span>
           </div>
           <div class="maintenance-context-actions flex flex-wrap items-center gap-2">
+            <button
+              v-if="activeTab === 'orders' && legacyOrderReviewRows.length"
+              type="button"
+              ref="legacyOrderTrigger"
+              class="maintenance-header-button legacy-order-toggle"
+              :title="`${legacyOrderReviewRows.length} referencias de OT antiguas sin identidad verificable. Revisar registros`"
+              :aria-label="`${showLegacyOrderReview ? 'Ocultar' : 'Revisar'} registros antiguos sin verificar: ${legacyOrderReviewRows.length}`"
+              :aria-expanded="showLegacyOrderReview"
+              aria-controls="legacy-order-review"
+              @click="showLegacyOrderReview = !showLegacyOrderReview"
+            ><SvgIcon name="limits-warning" /><span>{{ legacyOrderReviewRows.length }} OT por revisar</span></button>
             <span class="mr-2 text-[12px] font-semibold text-slate-500"
-              >{{ maintenanceItems.length }} vehiculos</span
+              >{{ activeTab === 'orders' && orderSection === 'work-orders' ? `${visibleWorkOrders.length} ordenes` : `${maintenanceItems.length} vehiculos` }}</span
             >
-            <button
-              type="button"
-              class="maintenance-header-button"
-              @click="openMaintenanceModal('maintenance')"
-            >
-              + Nuevo plan de mantención
-            </button>
-            <button
-              type="button"
-              class="maintenance-header-button"
-              @click="openMaintenanceModal('maintenance-type')"
-            >
-              Tipos de mantención
-            </button>
             <button
               type="button"
               class="maintenance-header-button is-primary"
@@ -89,22 +86,42 @@
             </button>
           </div>
         </div>
-
-        <div
-          v-if="maintenanceFeedbackMessage"
-          class="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-black text-emerald-700"
-        >
-          {{ maintenanceFeedbackMessage }}
-          <button
-            v-if="closedPlanRenewal"
-            type="button"
-            class="ml-3 rounded border border-emerald-700 px-3 py-1"
-            @click="openRenewMaintenance(closedPlanRenewal.vehicleId, closedPlanRenewal.planId)"
-          >
-            Renovar ahora
-          </button>
-        </div>
-
+        <Teleport to="body">
+          <div v-if="activeTab === 'orders' && showLegacyOrderReview && legacyOrderReviewRows.length" class="legacy-review-backdrop" @click.self="showLegacyOrderReview = false" @keydown="handleLegacyReviewKey">
+            <section id="legacy-order-review" ref="legacyOrderDialog" class="legacy-review-dialog" role="dialog" aria-modal="true" aria-labelledby="legacy-review-title" aria-describedby="legacy-review-description">
+              <header>
+                <div class="legacy-review-heading">
+                  <span class="legacy-review-symbol"><SvgIcon name="limits-warning" /></span>
+                  <div>
+                    <h2 id="legacy-review-title">Registros de OT por revisar</h2>
+                    <div class="legacy-review-subtitle">Mantenciones <span>·</span> Datos antiguos</div>
+                  </div>
+                </div>
+                <button type="button" aria-label="Cerrar revision" @click="showLegacyOrderReview = false"><SvgIcon name="close" /></button>
+              </header>
+              <div class="legacy-review-body">
+                <div class="legacy-review-notice">
+                  <SvgIcon name="detail-info" />
+                  <p id="legacy-review-description">No se pudo confirmar a que vehiculo pertenecen estos registros. Los datos se conservaron, sin asignarlos a otro activo.</p>
+                </div>
+                <div class="legacy-review-list-heading">
+                  <h3>Registros conservados <span>{{ legacyOrderReviewRows.length }}</span></h3>
+                  <span class="legacy-review-state">Identidad pendiente</span>
+                </div>
+                <div class="legacy-order-review" tabindex="0" aria-label="Registros antiguos conservados">
+                  <table>
+                    <thead><tr><th>Referencia original</th><th>Datos conservados</th></tr></thead>
+                    <tbody><tr v-for="row in legacyOrderReviewRows" :key="row.id"><td><strong>{{ row.id }}</strong></td><td>{{ row.sources }}</td></tr></tbody>
+                  </table>
+                </div>
+              </div>
+              <footer>
+                <span>No se modificaron los registros.</span>
+                <button type="button" class="legacy-review-done" @click="showLegacyOrderReview = false">Entendido</button>
+              </footer>
+            </section>
+          </div>
+        </Teleport>
         <div
           v-if="activeTab === 'calendar' || activeTab === 'history'"
           class="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5"
@@ -213,6 +230,19 @@
         </div>
       </header>
 
+      <div v-if="maintenanceFeedbackMessage" class="maintenance-result" role="status" aria-live="polite">
+        <span>{{ maintenanceFeedbackMessage }}</span>
+        <button v-if="maintenanceFeedbackAction" type="button" @click="continueMaintenanceResult">
+          {{ maintenanceFeedbackAction.label }}
+        </button>
+        <button type="button" aria-label="Descartar mensaje" @click="dismissMaintenanceResult">
+          <SvgIcon name="close" />
+        </button>
+      </div>
+      <div v-if="fleetOrderContext && activeTab === 'orders'" class="fleet-order-context">
+        <button type="button" @click="returnToFleetPlan">Volver al plan en Flota</button>
+        <span><strong>{{ fleetOrderContext.vehicle }}</strong> / {{ fleetOrderContext.plan }} / {{ fleetOrderContext.orderId }}</span>
+      </div>
       <main
         ref="maintenanceMain"
         class="min-h-0 flex-1"
@@ -272,7 +302,7 @@
           @open-orders="activeTab = 'orders'"
           @open-vehicle-costs="openVehicleCosts"
           @open-vehicle-maintenance-plans="openVehicleMaintenancePlans"
-          @open-work-order="openOrderInTable"
+          @open-work-order="openLinkedOrder"
           @renew-maintenance="openRenewMaintenance"
           @update:search-term="searchTerm = $event"
           @update:selected-status="selectedStatus = $event"
@@ -282,6 +312,7 @@
 
         <MaintenanceWorkOrdersTab
           v-else-if="activeTab === 'orders' && orderSection === 'work-orders'"
+          :work-orders="workOrders"
           :filtered-work-orders="filteredWorkOrders"
           :get-order-status-class="getOrderStatusClass"
           :get-order-status-icon="getOrderStatusIcon"
@@ -307,7 +338,6 @@
           @apply-order-metric-filter="applyOrderMetricFilter"
           @clear-order-filters="clearOrderFilters"
           @open-maintenance-modal="openMaintenanceModal"
-          @open-order-cost="openWorkOrderCostModal"
           @open-work-order-action-modal="openWorkOrderActionModal"
           @open-work-order-vehicle-maintenance-plans="openWorkOrderVehicleMaintenancePlans"
           @select-work-order="selectWorkOrder"
@@ -391,6 +421,7 @@
       :get-summary-metric-icon="getSummaryMetricIcon"
       :is-base-maintenance-plan="isBaseMaintenancePlan"
       :is-maintenance-template-used="isMaintenanceTemplateUsed"
+      :get-maintenance-reading-at-date="getMaintenanceReadingAtDate"
       :maintenance-items="maintenanceItems"
       :maintenance-reading-sources="maintenanceReadingSources"
       :maintenance-type-criterion-options="maintenanceTypeCriterionOptions"
@@ -400,6 +431,7 @@
       :maintenance-type-reading-sources="maintenanceTypeReadingSources"
       :modal-description="modalDescription"
       :modal-draft="modalDraft"
+      :order-creation-context="workOrderCreationContext"
       :modal-kicker="modalKicker"
       :modal-primary-action="modalPrimaryAction"
       :modal-title="modalTitle"
@@ -412,6 +444,10 @@
       :status-filters="statusFilters"
       :work-orders="workOrders"
       :cleanup-evidence="cleanupMaintenanceEvidence"
+      @manage-work-order="(id, type, status) => openWorkOrderActionModal(id, type, status, 'order-detail')"
+      @manage-work-order-cost="(id) => openWorkOrderCostModal(id, 'order-detail')"
+      :fleet-order-context="fleetOrderContext"
+      @return-to-fleet-plan="returnToFleetPlan"
       @close="closeMaintenanceModal"
       @create-work-order-from-maintenance-plan="
         (plan) => openCreateWorkOrder(plan.vehicleId || selectedVehicle.id, plan.id, plan.name)
@@ -420,7 +456,7 @@
       @open-delete-maintenance-plan="openDeleteMaintenancePlan"
       @open-edit-maintenance-plan="openEditMaintenancePlan"
       @open-maintenance-modal="openMaintenanceModal"
-      @open-order-in-table="openOrderInTable"
+      @open-order-in-table="openLinkedOrder"
       @edit-before-renewal="editBeforeRenewal"
       @renew-maintenance="openRenewMaintenance"
       @submit="submitMaintenanceModal"
@@ -438,11 +474,13 @@ import { defineAsyncComponent, nextTick, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 
 import MaintenanceTabLoading from "../components/maintenance/MaintenanceTabLoading.vue"
+import SvgIcon from "../components/icons/SvgIcon.vue"
 import MaintenanceOverviewTab from "../components/maintenance/MaintenanceFleetTab.vue"
 import MaintenanceDriversTab from "../components/maintenance/MaintenanceDriversTab.vue"
 import MaintenanceWorkOrdersTab from "../components/maintenance/MaintenanceWorkOrdersTab.vue"
 import MaintenanceCostsTab from "../components/maintenance/MaintenanceCostsTab.vue"
 import { useMaintenanceModule } from "../composables/maintenance/useMaintenanceModule.js"
+import { useFleetOrderNavigation } from "../composables/maintenance/useFleetOrderNavigation.js"
 import "../components/maintenance/maintenance.css"
 import { useAccessService } from "../services/access/useAccessService.js"
 
@@ -469,6 +507,27 @@ const route = useRoute()
 const router = useRouter()
 const orderSection = ref("work-orders")
 const focusedOrderId = ref("")
+const showLegacyOrderReview = ref(false)
+const legacyOrderTrigger = ref(null)
+const legacyOrderDialog = ref(null)
+watch(showLegacyOrderReview, async (open) => {
+  await nextTick()
+  if (open) legacyOrderDialog.value?.querySelector('button')?.focus()
+  else legacyOrderTrigger.value?.focus({ preventScroll: true })
+})
+const handleLegacyReviewKey = (event) => {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
+    showLegacyOrderReview.value = false
+  } else if (event.key === 'Tab') {
+    const elements = [...(legacyOrderDialog.value?.querySelectorAll('button, [tabindex="0"]') || [])]
+    const first = elements[0]
+    const last = elements.at(-1)
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+  }
+}
 const maintenanceMain = ref(null)
 const analysisPeriod = ref(6)
 const fleetTable = ref(null)
@@ -557,9 +616,11 @@ const {
   hasHourMeterData,
   isBaseMaintenancePlan,
   isMaintenanceTemplateUsed,
+  getMaintenanceReadingAtDate,
   lifecycleSteps,
   maintenanceFeedbackMessage,
-  closedPlanRenewal,
+  legacyOrderReviewRows,
+  maintenanceFeedbackAction,
   maintenanceHistory,
   maintenanceItems,
   maintenanceReadingSources,
@@ -575,12 +636,14 @@ const {
   modalVehicleMaintenancePlans,
   openDeleteMaintenancePlan,
   openCreateWorkOrder,
+  workOrderCreationContext,
   openEditMaintenancePlan,
   openMaintenanceModal,
   openRenewMaintenance,
   openWorkOrderCostModal,
   openVehicleCosts,
   openVehicleMaintenancePlans,
+  fleetPlanFocus,
   openWorkOrderActionModal,
   openWorkOrderVehicleMaintenancePlans,
   editBeforeRenewal,
@@ -627,6 +690,11 @@ const configureVehicleMaintenance = (vehicleId) => {
   openVehicleMaintenancePlans(vehicleId)
   openMaintenanceModal("maintenance", "maintenance-detail")
 }
+watch(fleetPlanFocus, async (request) => {
+  if (!request) return
+  await nextTick()
+  if (request === fleetPlanFocus.value) fleetTable.value?.showVehiclePlans(request.vehicleId)
+})
 
 const openOrderInTable = async (orderId) => {
   closeMaintenanceModal()
@@ -638,6 +706,25 @@ const openOrderInTable = async (orderId) => {
   await nextTick()
   maintenanceMain.value?.scrollTo({ top: 0 })
 }
+
+const {
+  context: fleetOrderContext,
+  open: openLinkedOrder,
+  back: returnToFleetPlan,
+  clear: clearFleetOrderContext,
+} = useFleetOrderNavigation({
+  activeTab,
+  orders: workOrders,
+  fleetTable,
+  closeModal: closeMaintenanceModal,
+  openOrder: openWorkOrderActionModal,
+  showOrders: openOrderInTable,
+})
+
+watch(() => route.params.empresaId, clearFleetOrderContext)
+watch(activeTab, (tab) => {
+  if (tab !== 'orders') clearFleetOrderContext()
+})
 
 const openFleetWithStatus = (status) => {
   selectedStatus.value = status
@@ -657,15 +744,25 @@ const openOrdersWithStatus = (status) => {
   activeTab.value = "orders"
 }
 
-watch(maintenanceFeedbackMessage, (message, _previousMessage, onCleanup) => {
-  if (!message) return
-
-  const timeout = setTimeout(() => {
-    maintenanceFeedbackMessage.value = ""
-  }, 6000)
-
-  onCleanup(() => clearTimeout(timeout))
-})
+const dismissMaintenanceResult = () => {
+  maintenanceFeedbackMessage.value = ""
+  maintenanceFeedbackAction.value = null
+}
+const continueMaintenanceResult = () => {
+  const action = maintenanceFeedbackAction.value
+  if (!action) return
+  if (action.type === 'order') {
+    if (workOrders.value.some((order) => String(order.id) === String(action.orderId))) {
+      void openLinkedOrder(action.orderId)
+    }
+  } else if (maintenanceItems.value.some((item) => String(item.id) === String(action.vehicleId))) {
+    if (action.type === 'renew') openRenewMaintenance(action.vehicleId, action.planId)
+    else openVehicleMaintenancePlans(action.vehicleId)
+  }
+  dismissMaintenanceResult()
+}
+watch(() => route.params.empresaId, dismissMaintenanceResult)
+watch(() => route.params.empresaId, () => { showLegacyOrderReview.value = false })
 
 watch(orderSection, async () => {
   await nextTick()
@@ -684,6 +781,100 @@ watch(activeTab, (value) => {
 </script>
 
 <style scoped>
+.fleet-toolbar-summary {
+  display: flex;
+  flex: 1 1 300px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  min-width: 0;
+}
+.maintenance-context-actions .legacy-order-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 48px;
+  padding: 0 8px;
+  color: #9a5700;
+  border-color: #e8cda8;
+}
+.legacy-order-toggle :deep(svg) { width: 16px; height: 16px; }
+.legacy-review-backdrop { position: fixed; inset: 0; z-index: 3100; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgb(15 23 42 / 55%); }
+.legacy-review-dialog { display: flex; flex-direction: column; width: min(900px, 100%); max-height: calc(100dvh - 32px); border: 1px solid #dce3ee; border-radius: 8px; background: #fff; color: #10234c; box-shadow: 0 24px 80px rgb(15 23 42 / 24%); overflow: hidden; }
+.legacy-review-dialog > header { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 24px; border-bottom: 1px solid #dce3ee; background: #f7f9fc; }
+.legacy-review-heading { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.legacy-review-symbol { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; flex-shrink: 0; border-radius: 8px; background: #edf2ff; color: #1460df; }
+.legacy-review-dialog .legacy-review-symbol :deep(svg) { width: 24px; height: 24px; }
+.legacy-review-dialog h2 { margin: 0; font-size: 20px; line-height: 1.3; font-weight: 800; overflow-wrap: anywhere; }
+.legacy-review-subtitle { margin-top: 5px; font-size: 12px; color: #52658c; }
+.legacy-review-subtitle > span { padding: 0 4px; }
+.legacy-review-dialog button { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex-shrink: 0; border: 1px solid #cfd8e6; border-radius: 6px; background: #fff; color: #102372; cursor: pointer; }
+.legacy-review-dialog button:hover { background: #f4f7fb; }
+.legacy-review-dialog button:focus-visible { outline: 2px solid #1460df; outline-offset: 2px; }
+.legacy-review-dialog :deep(svg) { width: 16px; height: 16px; }
+.legacy-review-body { display: flex; flex-direction: column; min-height: 0; padding: 20px 24px 24px; overflow: auto; }
+.legacy-review-notice { display: flex; align-items: flex-start; gap: 10px; padding-left: 12px; border-left: 3px solid #ff6600; }
+.legacy-review-notice > :deep(.svg-icon-wrapper) { flex: 0 0 18px; margin-top: 2px; color: #52658c; }
+.legacy-review-notice p { margin: 0; padding: 0; font-size: 13px; font-weight: 400; line-height: 1.6; color: #52658c; }
+.legacy-review-list-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin: 22px 0 10px; }
+.legacy-review-list-heading h3 { margin: 0; font-size: 13px; font-weight: 700; color: #102372; }
+.legacy-review-list-heading h3 > span { display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 4px; background: #edf2ff; font-size: 11px; }
+.legacy-review-state { padding: 4px 8px; border-radius: 4px; background: #fff7e6; color: #995700; font-size: 11px; font-weight: 600; }
+.legacy-order-review { min-height: 0; max-height: 260px; overflow: auto; overscroll-behavior: contain; border: 1px solid #d8e0eb; border-radius: 6px; font-size: 12px; }
+.legacy-order-review table { width: 100%; border-collapse: collapse; text-align: left; }
+.legacy-order-review th, .legacy-order-review td { padding: 13px 14px; border-bottom: 1px solid #e5eaf1; vertical-align: top; overflow-wrap: anywhere; }
+.legacy-order-review th { position: sticky; top: 0; background: #edf3f9; color: #52658c; font-size: 11px; font-weight: 700; }
+.legacy-order-review td { color: #52658c; }
+.legacy-order-review td strong { color: #102372; font-weight: 700; }
+.legacy-order-review tbody tr:last-child td { border-bottom: 0; }
+.legacy-review-dialog > footer { display: flex; flex-shrink: 0; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 24px; border-top: 1px solid #d8e0eb; background: #f7f9fc; }
+.legacy-review-dialog > footer > span { font-size: 11px; color: #52658c; }
+.legacy-review-dialog button.legacy-review-done { width: auto; min-width: 110px; height: 38px; padding: 0 16px; background: #ff6600; border-color: #ff6600; color: #fff; font-size: 12px; font-weight: 700; }
+.legacy-review-dialog button.legacy-review-done:hover { background: #e65c00; }
+@media (max-width: 480px) {
+  .legacy-review-dialog > header, .legacy-review-body, .legacy-review-dialog > footer { padding: 16px; }
+  .legacy-review-dialog h2 { font-size: 18px; }
+  .legacy-review-symbol { width: 40px; height: 40px; }
+  .legacy-order-review th, .legacy-order-review td { padding: 10px; }
+}
+@media (max-width: 640px) {
+  .fleet-toolbar-summary { grid-column: 1 / -1; }
+}
+.maintenance-result {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  background: #eef4ff;
+  border-bottom: 1px solid #cad6ed;
+  color: #102372;
+  font-size: 12px;
+}
+.maintenance-result > span { flex: 1; min-width: 180px; overflow-wrap: anywhere; }
+.maintenance-result button { border: 1px solid #cad6ed; border-radius: 6px; padding: 6px 10px; background: white; }
+.maintenance-result :deep(svg) { width: 16px; height: 16px; }
+.fleet-order-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid #d8e0eb;
+  background: #fff;
+  color: #52688f;
+  font-size: 12px;
+}
+.fleet-order-context button {
+  padding: 7px 12px;
+  border: 1px solid #cad6ed;
+  border-radius: 6px;
+  color: #102372;
+  background: #fff;
+}
+.fleet-order-context span { overflow-wrap: anywhere; }
 .maintenance-drivers-main {
   padding-bottom: 12px;
   overflow: hidden;

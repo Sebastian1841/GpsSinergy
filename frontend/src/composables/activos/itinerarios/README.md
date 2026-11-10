@@ -24,4 +24,9 @@ Estado y datos derivados de itinerarios.
 
 ## Regla de mantenimiento
 
+La ubicacion actual conserva el timestamp completo del reporte y solo se agrega
+si pertenece al rango consultado. No se reemplaza la fecha de un reporte antiguo
+por hoy. Sin timestamp valido no se inventa un punto actual. Las horas sin fecha
+del formato legacy se interpretan sobre la fecha de referencia de la consulta.
+
 Estos composables preparan datos para componentes. Exportaciones y formatos de archivo deben vivir en `services/itinerarios`.

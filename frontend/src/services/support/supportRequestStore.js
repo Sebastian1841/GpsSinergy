@@ -1,4 +1,5 @@
 import { shallowRef } from "vue"
+import { mergeStoredRecords } from "../storage/mergeStoredRecords.js"
 import {
   canReadSupportRequest,
   canManageSupportRequest,
@@ -23,11 +24,18 @@ export const createSupportRequestStore = ({
       : [],
   )
   const commit = (next) => {
-    if (!write(next))
+    const latest = read()
+    if (latest !== null && !Array.isArray(latest))
+      throw new Error("El historial guardado no es valido.")
+    const merged = mergeStoredRecords(requests.value, next, latest || [])
+    if (JSON.stringify(read()) !== JSON.stringify(latest)) {
+      throw new Error("El historial cambio en otra ventana. Intenta nuevamente.")
+    }
+    if (!write(merged))
       throw new Error(
         "No se pudo guardar. Revisa el almacenamiento del navegador e intenta nuevamente.",
       )
-    requests.value = next
+    requests.value = merged
   }
   const requireRequest = (id, context) => {
     const request = requests.value.find((item) => item.id === id)

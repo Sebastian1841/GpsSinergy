@@ -3,8 +3,8 @@
     <aside class="filter-panel">
       <header>
         <h2><SvgIcon name="filter-main" /> Filtros</h2>
-        <button type="button" class="clear-header" @click="clearLocalFilters">
-          Limpiar filtros
+        <button type="button" class="clear-header" title="Limpiar filtros" @click="clearLocalFilters">
+          Limpiar
         </button>
       </header>
       <div class="filter-body">
@@ -12,6 +12,13 @@
           <SvgIcon name="search" />
           <input v-model="searchModel" type="search" placeholder="Buscar vehiculo..." />
         </label>
+        <label class="select-field"
+          ><span>Tipo de mantencion</span
+          ><select v-model="selectedTypeModel">
+            <option value="all">Todas</option>
+            <option v-for="type in maintenanceTypes" :key="type" :value="type">{{ type }}</option>
+          </select></label
+        >
         <fieldset>
           <legend>Estado de mantencion</legend>
           <button
@@ -25,28 +32,6 @@
             <span class="status-option-count">{{ statusCount(option.key) }}</span>
           </button>
         </fieldset>
-        <label class="select-field"
-          ><span>Tipo de mantencion</span
-          ><select v-model="selectedTypeModel">
-            <option value="all">Todas</option>
-            <option v-for="type in maintenanceTypes" :key="type" :value="type">{{ type }}</option>
-          </select></label
-        >
-        <label class="select-field"
-          ><span>Empresa</span
-          ><select v-model="selectedCompany">
-            <option value="all">Todas</option>
-            <option :value="activeCompanyLabel">{{ activeCompanyLabel }}</option>
-          </select></label
-        >
-        <label class="select-field"
-          ><span>Tipo de vehiculo</span
-          ><select v-model="selectedVehicleType">
-            <option value="all">Todos</option>
-            <option value="Vehiculo menor">Vehiculo menor</option>
-            <option value="Camion">Camion</option>
-          </select></label
-        >
         <fieldset class="date-range-field">
           <legend>Fecha de vencimiento</legend>
           <label><span>Desde</span><input v-model="dueDateFrom" type="date" /></label>
@@ -59,7 +44,7 @@
       <section class="maintenance-table">
         <header>
           <div>
-            <h2>Listado de mantenciones</h2>
+            <h2>Planes por vehiculo</h2>
           </div>
           <div ref="columnMenuRoot" class="table-controls">
             <button
@@ -109,21 +94,9 @@
             </thead>
             <tbody>
               <template v-for="{ item, index } in fleetPagination.rows" :key="item.id">
-                <tr :class="{ 'vehicle-row-expanded': isVehicleExpanded(item.id) }">
+                <tr :data-vehicle-id="item.id" :class="{ 'vehicle-row-expanded': isVehicleExpanded(item.id) }">
                   <td>
                     <div class="vehicle-cell">
-                      <button
-                        type="button"
-                        class="vehicle-expand-button"
-                        :title="
-                          isVehicleExpanded(item.id) ? 'Ocultar mantenciones' : 'Ver mantenciones'
-                        "
-                        @click="toggleVehiclePlans(item.id)"
-                      >
-                        <SvgIcon
-                          :name="isVehicleExpanded(item.id) ? 'chevron-down' : 'chevron-right'"
-                        />
-                      </button>
                       <span>
                         <img
                           v-if="loadedVehicleImages.includes(getVehicleImage(item))"
@@ -142,10 +115,11 @@
                     </div>
                   </td>
                   <td v-if="isColumnVisible('due')">
-                    <strong>{{ vehicleMaintenances(item, index).length }} planes</strong>
-                    <small class="plans-attention-count"
-                      >{{ attentionPlanCount(item, index) }} requieren atencion</small
-                    >
+                    <strong>{{ vehicleMaintenances(item, index).length }} {{ vehicleMaintenances(item, index).length === 1 ? 'plan' : 'planes' }}</strong>
+                    <small v-if="planSummary(item).withoutOrder" class="plans-attention-count">{{ planSummary(item).withoutOrder }} {{ planSummary(item).withoutOrder === 1 ? 'pendiente' : 'pendientes' }} sin OT</small>
+                    <small v-if="planSummary(item).withOpenOrder">{{ planSummary(item).withOpenOrder }} con OT abierta</small>
+                    <small v-if="planSummary(item).renewal" class="plans-attention-count">{{ planSummary(item).renewal }} por renovar</small>
+                    <small v-if="planSummary(item).unconfigured">{{ planSummary(item).unconfigured }} por configurar</small>
                   </td>
                   <td v-if="isColumnVisible('status')">
                     <span
@@ -157,7 +131,7 @@
                   <td v-if="isColumnVisible('due')">
                     <div class="next-maintenance-cell">
                       <strong>{{ priorityMaintenance(item, index).name }}</strong>
-                      <span>{{ priorityMaintenance(item, index).date }}</span>
+                      <span v-if="priorityMaintenance(item, index).date !== '-' && priorityMaintenance(item, index).date !== priorityMaintenance(item, index).detail">{{ priorityMaintenance(item, index).date }}</span>
                       <small :class="getStatusTextClass(priorityMaintenance(item, index).status)">
                         {{ priorityMaintenance(item, index).detail }}
                       </small>
@@ -173,24 +147,25 @@
                   </td>
                   <td v-if="isColumnVisible('actions')" class="actions-column">
                     <div class="row-actions">
-                      <button class="review-plans-button" @click="toggleVehiclePlans(item.id)">
-                        {{ isVehicleExpanded(item.id) ? "Ocultar planes" : "Revisar planes" }}
+                      <button
+                        type="button"
+                        class="review-plans-button"
+                        :aria-label="`${isVehicleExpanded(item.id) ? 'Ocultar planes' : 'Ver planes'}: ${item.plate}`"
+                        :aria-expanded="isVehicleExpanded(item.id)"
+                        :aria-controls="`vehicle-plans-${encodeURIComponent(String(item.id))}`"
+                        @click="toggleVehiclePlans(item.id)"
+                      >
+                        <span class="review-plans-label">{{ isVehicleExpanded(item.id) ? 'Ocultar planes' : 'Ver planes' }}</span>
+                        <SvgIcon class="review-plans-icon" :name="isVehicleExpanded(item.id) ? 'chevron-up' : 'chevron-down'" />
                       </button>
                     </div>
                   </td>
                 </tr>
                 <tr v-if="isVehicleExpanded(item.id)" class="vehicle-plans-row">
                   <td :colspan="visibleColumnCount">
-                    <section class="vehicle-plans-panel">
+                    <section :id="`vehicle-plans-${encodeURIComponent(String(item.id))}`" class="vehicle-plans-panel">
                       <header>
                         <h3>Planes de mantención - {{ item.plate }}</h3>
-                        <button
-                          type="button"
-                          class="plans-detail-button"
-                          @click.stop="emit('open-vehicle-maintenance-plans', item.id)"
-                        >
-                          <SvgIcon name="eye" /> Ver detalle completo
-                        </button>
                       </header>
                       <div class="vehicle-plans-table-wrap">
                         <table class="vehicle-plans-table">
@@ -228,7 +203,7 @@
                                 <button
                                   type="button"
                                   class="plan-detail-link"
-                                  @click.stop="emit('open-vehicle-maintenance-plans', item.id)"
+                                  @click.stop="emit('open-vehicle-maintenance-plans', item.id, plan.id)"
                                 >
                                   {{ plan.name }}
                                 </button>
@@ -294,12 +269,14 @@
 </template>
 
 <script setup>
-import { computed, onActivated, onDeactivated, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { computed, nextTick, onActivated, onDeactivated, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import SvgIcon from "../icons/SvgIcon.vue"
 import vehicleBlueCar from "../../assets/map/vehicle-blue-car.png"
 import vehicleBlueTruck from "../../assets/map/vehicle-blue-truck.png"
 import { buildFleetOrderIndex, findFleetOpenOrder } from "./fleetOrderIndex.js"
 import { getFleetPage } from "./fleetPagination.js"
+import { getFleetPlanSummary } from "./fleetVehicleAction.js"
+import { sortFleetPlansByPriority } from './fleetPlanPriority.js'
 
 const props = defineProps({
   activeCompanyLabel: { type: String, default: "Flota" },
@@ -337,13 +314,10 @@ const expandedVehicleIds = ref([])
 const selectedMaintenanceByVehicle = ref({})
 const dueDateFrom = ref("")
 const dueDateTo = ref("")
-const selectedCompany = ref("all")
-const selectedVehicleType = ref("all")
 const configurableColumns = [
-  { key: "due", label: "Mantencion e intervalo" },
+  { key: "due", label: "Planes y mantencion prioritaria" },
   { key: "mileage", label: "Kilometraje" },
-  { key: "status", label: "Estado" },
-  { key: "actions", label: "Acciones" },
+  { key: "status", label: "Estado del plan" },
 ]
 const visibleColumns = ref(configurableColumns.map((column) => column.key))
 const visibleColumnCount = computed(
@@ -354,7 +328,7 @@ const visibleColumnCount = computed(
     (isColumnVisible("status") ? 1 : 0) +
     (isColumnVisible("actions") ? 1 : 0),
 )
-const isColumnVisible = (columnKey) => visibleColumns.value.includes(columnKey)
+const isColumnVisible = (columnKey) => columnKey === 'actions' || visibleColumns.value.includes(columnKey)
 const toggleColumn = (columnKey) => {
   visibleColumns.value = isColumnVisible(columnKey)
     ? visibleColumns.value.filter((key) => key !== columnKey)
@@ -376,11 +350,15 @@ const closeMenusOnOutsideClick = (event) => {
 onMounted(() => document.addEventListener("pointerdown", closeMenusOnOutsideClick))
 onActivated(() => document.addEventListener("pointerdown", closeMenusOnOutsideClick))
 onDeactivated(() => {
+  vehicleFocusRequest++
   document.removeEventListener("pointerdown", closeMenusOnOutsideClick)
   showColumnMenu.value = false
   activeMaintenanceMenu.value = null
 })
-onBeforeUnmount(() => document.removeEventListener("pointerdown", closeMenusOnOutsideClick))
+onBeforeUnmount(() => {
+  vehicleFocusRequest++
+  document.removeEventListener("pointerdown", closeMenusOnOutsideClick)
+})
 const searchModel = computed({
   get: () => props.searchTerm,
   set: (value) => emit("update:search-term", value),
@@ -426,10 +404,6 @@ const displayedItems = computed(() => {
         statuses.includes(item.status) ||
         (statuses.includes("renewal-pending") &&
           fleetRows.value.get(item.id)?.pendingRenewal)) &&
-      (selectedCompany.value === "all" ||
-        item.companyName === selectedCompany.value ||
-        (!item.companyName && selectedCompany.value === props.activeCompanyLabel)) &&
-      (selectedVehicleType.value === "all" || vehicleKind(index) === selectedVehicleType.value) &&
       (!from || selectedDueDate >= from) &&
       (!to || selectedDueDate <= to)
     )
@@ -440,8 +414,8 @@ const fleetSort = ref({ key: '', direction: 1 })
 const visibleSortableColumns = computed(() => [
   { key: 'plate', label: 'Vehiculo' },
   ...(isColumnVisible('due') ? [{ key: 'plans', label: 'Planes' }] : []),
-  ...(isColumnVisible('status') ? [{ key: 'status', label: 'Estado' }] : []),
-  ...(isColumnVisible('due') ? [{ key: 'due', label: 'Proximo vencimiento' }] : []),
+  ...(isColumnVisible('status') ? [{ key: 'status', label: 'Estado del plan' }] : []),
+  ...(isColumnVisible('due') ? [{ key: 'due', label: 'Mantencion prioritaria' }] : []),
   ...(isColumnVisible('mileage') ? [{ key: 'odometer', label: 'Lectura actual' }] : []),
 ])
 const sortFleet = (key) => {
@@ -474,6 +448,23 @@ const getVehicleImage = (item) => {
   return /camion|truck|volvo|scania/.test(name) ? vehicleBlueTruck : vehicleBlueCar
 }
 defineExpose({
+  showVehiclePlans: (vehicleId) => {
+    const index = sortedFleetItems.value.findIndex((item) => String(item.id) === String(vehicleId))
+    if (index < 0) return
+    const id = sortedFleetItems.value[index].id
+    expandedVehicleIds.value = [id]
+    fleetPage.value = Math.floor(index / fleetPageSize.value) + 1
+    void centerVehiclePlans(id)
+  },
+  getScrollPosition: () => ({
+    top: tableScroll.value?.scrollTop || 0,
+    left: tableScroll.value?.scrollLeft || 0,
+  }),
+  restoreScrollPosition: (position) => {
+    if (!tableScroll.value || !position) return
+    tableScroll.value.scrollTop = position.top
+    tableScroll.value.scrollLeft = position.left
+  },
   getExportRows: (all = false) => (all ? props.maintenanceItems : sortedFleetItems.value).map((item) => {
     const index = fleetRows.value.get(item.id)?.index ?? 0
     return {
@@ -554,88 +545,12 @@ const buildVehicleMaintenances = (item, index) => {
     })
   }
 
-  const names = [item.nextJob, ...props.maintenanceTypes].filter(
-    (name, position, values) => name && values.indexOf(name) === position,
-  )
-  const declaredCount = Number(item.activeMaintenanceCount) || 0
-  const count = Math.max(
-    0,
-    Math.min(item.status === "unconfigured" ? declaredCount : declaredCount || 1, names.length),
-  )
-  const dates = [
-    [dueDate(index), "14/11/2026", "18/02/2027"],
-    [dueDate(index), "03/12/2026", "22/03/2027"],
-    [dueDate(index), "28/10/2026", "10/01/2027"],
-  ][index % 3]
-
-  return names.slice(0, count).map((name, maintenanceIndex) => {
-    const normalizedName = String(name).toLowerCase()
-    const criterion =
-      normalizedName.includes("permiso") ||
-      normalizedName.includes("tecnica") ||
-      normalizedName.includes("bateria") ||
-      normalizedName.includes("electrico") ||
-      normalizedName.includes("luces") ||
-      normalizedName.includes("seguridad")
-        ? "Tiempo"
-        : normalizedName.includes("combustible") ||
-            normalizedName.includes("lubricacion") ||
-            normalizedName.includes("transmision") ||
-            normalizedName.includes("refrigeracion")
-          ? "Horometro"
-          : "Kilometraje"
-    const status =
-      maintenanceIndex === 0
-        ? item.status
-        : maintenanceIndex % 4 === 1
-          ? "due"
-          : maintenanceIndex % 4 === 2
-            ? "overdue"
-            : "current"
-    const order = findFleetOpenOrder(openOrderIndex.value, item.id, null, normalizedName)
-
-    return {
-      id: maintenanceIndex === 0 ? `base-${item.id}` : `base-${item.id}-${maintenanceIndex + 1}`,
-      name,
-      status,
-      criterion,
-      date: dates[maintenanceIndex] || dates.at(-1),
-      detail:
-        maintenanceIndex === 0
-          ? dueDetail(item, index) || "Proximo vencimiento"
-          : status === "overdue"
-            ? `Vencida hace ${5 + maintenanceIndex} dias`
-            : status === "due"
-              ? `Faltan ${15 + maintenanceIndex * 3} dias`
-              : criterion === "Horometro"
-                ? `${120 + maintenanceIndex * 35} h restantes`
-                : criterion === "Kilometraje"
-                  ? `${1200 + maintenanceIndex * 450} km restantes`
-                  : `En ${60 + maintenanceIndex * 30} dias`,
-      lastReading:
-        criterion === "Horometro"
-          ? item.hourMeterLabel
-          : criterion === "Kilometraje"
-            ? item.odometerLabel
-            : "-",
-      order,
-    }
-  })
+  return []
 }
 const fleetRows = computed(() => {
-  const priority = {
-    "renewal-pending": 0,
-    overdue: 1,
-    due: 2,
-    workshop: 3,
-    current: 4,
-    unconfigured: 5,
-  }
   return new Map(props.maintenanceItems.map((item, index) => {
-    const plans = buildVehicleMaintenances(item, index)
-    const primary = plans.reduce((selected, plan) =>
-      !selected || (priority[plan.status] ?? 5) < (priority[selected.status] ?? 5) ? plan : selected,
-    null) || {
+    const plans = sortFleetPlansByPriority(buildVehicleMaintenances(item, index))
+    const primary = plans[0] || {
       id: "",
       name: "Sin planes configurados",
       status: "unconfigured",
@@ -647,7 +562,7 @@ const fleetRows = computed(() => {
       plans,
       primary,
       pendingRenewal: plans.some((plan) => plan.orderState === "pending-renewal"),
-      attentionCount: plans.filter((plan) => ["renewal-pending", "overdue", "due"].includes(plan.status)).length,
+      summary: getFleetPlanSummary(plans),
     }]
   }))
 })
@@ -659,13 +574,13 @@ const nextPlanAction = (plan) => {
   }
   if (plan.order) {
     return {
-      label: ["in-progress", "waiting"].includes(plan.order.status) ? "Continuar OT" : "Ver OT",
-      primary: ["in-progress", "waiting"].includes(plan.order.status),
+      label: "Ver OT",
+      primary: false,
       type: "order",
     }
   }
   if (plan.status === "unconfigured") {
-    return { label: "Agregar plan", primary: true, type: "configure" }
+    return { label: "Configurar plan", primary: true, type: "configure" }
   }
   if (["overdue", "due"].includes(plan.status)) {
     return { label: "Crear OT", primary: true, type: "create-order" }
@@ -684,7 +599,8 @@ const runPlanAction = (item, plan) => {
     return
   }
   if (action.type === "configure") {
-    emit("configure-maintenance", item.id)
+    if (plan.id) emit("open-vehicle-maintenance-plans", item.id, plan.id)
+    else emit("configure-maintenance", item.id)
     return
   }
   if (action.type === "renew") {
@@ -694,12 +610,30 @@ const runPlanAction = (item, plan) => {
   if (action.type === "none") return
   emit("open-vehicle-maintenance-plans", item.id)
 }
-const attentionPlanCount = (item) => fleetRows.value.get(item.id)?.attentionCount || 0
+const planSummary = (item) => fleetRows.value.get(item.id)?.summary || {}
 const isVehicleExpanded = (itemId) => expandedVehicleIds.value.includes(itemId)
+let vehicleFocusRequest = 0
+const centerVehiclePlans = async (vehicleId) => {
+  const request = ++vehicleFocusRequest
+  await nextTick()
+  if (request !== vehicleFocusRequest || !isVehicleExpanded(vehicleId)) return
+  const container = tableScroll.value
+  const row = Array.from(container?.querySelectorAll('[data-vehicle-id]') || [])
+    .find((element) => element.dataset.vehicleId === String(vehicleId))
+  if (!container || !row) return
+  const headerHeight = container.querySelector('thead')?.getBoundingClientRect().height || 0
+  const top = container.scrollTop + row.getBoundingClientRect().top - container.getBoundingClientRect().top - headerHeight - 8
+  const reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  container.scrollTo({ top: Math.max(0, top), behavior: reducedMotion ? 'auto' : 'smooth' })
+}
 const toggleVehiclePlans = (itemId) => {
-  expandedVehicleIds.value = isVehicleExpanded(itemId)
-    ? expandedVehicleIds.value.filter((id) => id !== itemId)
-    : [...expandedVehicleIds.value, itemId]
+  if (isVehicleExpanded(itemId)) {
+    expandedVehicleIds.value = []
+    vehicleFocusRequest++
+    return
+  }
+  expandedVehicleIds.value = [itemId]
+  void centerVehiclePlans(itemId)
 }
 const selectedMaintenanceId = (item, index) =>
   selectedMaintenanceByVehicle.value[item.id] || vehicleMaintenances(item, index)[0]?.id || ""
@@ -727,8 +661,6 @@ const clearLocalFilters = () => {
   activeStatuses.value = ["all"]
   dueDateFrom.value = ""
   dueDateTo.value = ""
-  selectedCompany.value = "all"
-  selectedVehicleType.value = "all"
   emit("clear-filters")
 }
 const fleetPage = ref(1)
@@ -754,7 +686,7 @@ watch([fleetPage, fleetPageSize, sortedFleetItems], () => {
   display: grid;
   height: 100%;
   min-height: 0;
-  grid-template-columns: 275px minmax(0, 1fr);
+  grid-template-columns: 260px minmax(0, 1fr);
   gap: 16px;
   margin: 0;
   padding: 12px 16px 16px 24px;
@@ -769,8 +701,11 @@ watch([fleetPage, fleetPageSize, sortedFleetItems], () => {
   font: inherit;
 }
 .filter-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
   align-self: stretch;
+  max-height: 100%;
   overflow: hidden;
   border: 1px solid #d8e0eb;
   border-radius: 8px;
@@ -782,7 +717,7 @@ watch([fleetPage, fleetPageSize, sortedFleetItems], () => {
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid #edf1f5;
-  min-height: 64px;
+  min-height: 52px;
   padding: 0 1rem;
   color: #102372;
 }
@@ -796,7 +731,7 @@ watch([fleetPage, fleetPageSize, sortedFleetItems], () => {
   height: 20px;
 }
 .filter-panel header button {
-  height: 36px;
+  height: 32px;
   border: 1px solid #cfd8e6;
   border-radius: 6px;
   background: #fff;
@@ -811,11 +746,15 @@ watch([fleetPage, fleetPageSize, sortedFleetItems], () => {
 }
 .filter-body {
   display: grid;
-  gap: 0.9rem;
-  padding: 1rem;
+  min-height: 0;
+  align-content: start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  gap: 16px;
+  padding: 14px 16px 16px;
 }
 .filter-body fieldset:first-of-type {
-  margin-top: 0.4rem;
+  margin-top: 0;
 }
 .filter-search,
 .select-field select,
@@ -852,12 +791,13 @@ watch([fleetPage, fleetPageSize, sortedFleetItems], () => {
 }
 .filter-body fieldset {
   display: grid;
-  gap: 0.6rem;
+  min-width: 0;
+  gap: 0.35rem;
 }
 .filter-body legend,
 .select-field span,
 .date-range-field label span {
-  margin-bottom: 0.65rem;
+  margin-bottom: 0.4rem;
   color: #29456f;
   font-size: 11px;
   font-weight: 800;
@@ -868,6 +808,7 @@ watch([fleetPage, fleetPageSize, sortedFleetItems], () => {
   gap: 0.55rem;
   justify-content: space-between;
   width: 100%;
+  min-height: 30px;
   border-radius: 6px;
   padding: 0.25rem 0.4rem;
   color: #526b94;
@@ -911,18 +852,21 @@ watch([fleetPage, fleetPageSize, sortedFleetItems], () => {
   display: grid;
 }
 .date-range-field {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.55rem !important;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px !important;
 }
 .date-range-field legend {
   grid-column: 1 / -1;
 }
 .date-range-field label {
   display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
   min-width: 0;
 }
 .date-range-field label span {
-  margin-bottom: 0.35rem;
+  margin-bottom: 0;
   color: #7184a3;
   font-size: 10px;
 }
@@ -1183,11 +1127,11 @@ tbody td {
   width: 13%;
 }
 .col-actions {
-  width: 140px;
+  width: 198px;
 }
 .actions-column {
-  width: 140px;
-  min-width: 140px;
+  width: 198px;
+  min-width: 198px;
   text-align: center;
 }
 td {
@@ -1212,20 +1156,6 @@ td small {
   display: flex;
   align-items: center;
   gap: 0.7rem;
-}
-.vehicle-expand-button {
-  display: inline-grid;
-  width: 24px;
-  height: 24px;
-  flex: 0 0 24px;
-  place-items: center;
-  border: 0;
-  background: transparent;
-  color: #102372;
-}
-.vehicle-expand-button :deep(svg) {
-  width: 14px;
-  height: 14px;
 }
 .plans-attention-count {
   display: block;
@@ -1270,27 +1200,6 @@ td small {
   color: #102372;
   font-size: 11px;
   font-weight: 900;
-}
-.plans-detail-button {
-  display: inline-flex;
-  height: 26px;
-  align-items: center;
-  gap: 5px;
-  border: 1px solid #cbd9eb;
-  border-radius: 4px;
-  background: #fff;
-  padding: 0 9px;
-  color: #102372;
-  font-size: 10px;
-  font-weight: 800;
-}
-.plans-detail-button:hover {
-  border-color: #8da9cf;
-  background: #f3f7fd;
-}
-.plans-detail-button :deep(svg) {
-  width: 13px;
-  height: 13px;
 }
 .plan-action-button {
   height: 26px;
@@ -1606,16 +1515,35 @@ td small {
 }
 .row-actions button.review-plans-button {
   display: inline-flex;
-  width: 112px;
+  width: 174px;
   height: 38px;
-  min-width: 112px;
+  min-width: 0;
+  max-width: 100%;
+  gap: 6px;
+  padding: 0 8px;
   align-items: center;
   justify-content: center;
   border-color: #c4d2e4;
   border-radius: 6px;
   background: #fff;
   color: #102372;
-  line-height: 1;
+  line-height: 1.2;
+}
+.review-plans-button > .review-plans-label {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.review-plans-button > .review-plans-icon {
+  flex: 0 0 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+}
+.review-plans-icon :deep(svg) {
+  width: 15px;
+  height: 15px;
 }
 tbody tr {
   transition: background 150ms ease;

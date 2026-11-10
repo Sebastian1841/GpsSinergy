@@ -54,6 +54,7 @@ export const getOrderStatusIconClass = (status) => {
 }
 
 export const getStatusLabel = (status) => {
+  if (status === "no-reading") return "Sin lectura"
   if (status === "renewal-pending") return "Sin renovar"
   if (status === "current") return "Al dia"
   if (status === "due") return "Proxima"

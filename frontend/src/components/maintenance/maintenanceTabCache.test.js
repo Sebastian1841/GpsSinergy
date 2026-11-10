@@ -31,7 +31,7 @@ test("cached tabs release document listeners and overlays on deactivation", () =
     assert.match(script, /onDeactivated\(/)
     if (filename !== "MaintenanceCostsTab.vue") {
       assert.match(script, /onActivated\(\(\) => document.addEventListener/)
-      assert.match(script, /onDeactivated\(\(\) => \{\s*document.removeEventListener/)
+      assert.match(script, /onDeactivated\(\(\) => \{[^}]*document.removeEventListener/)
     } else {
       assert.match(script, /onDeactivated\(closeExpandedChart\)/)
     }

@@ -34,6 +34,7 @@ export function useReverseGeocodedRows(
   const stopped = ref(false)
 
   let failedRetryTimerId = null
+  const activeControllers = new Set()
 
   const sourceRows = computed(() => {
     const value = unref(rows)
@@ -239,40 +240,58 @@ export function useReverseGeocodedRows(
     const candidates = collectCandidates()
 
     if (!candidates.length) return
+    const controller = new AbortController()
+    activeControllers.add(controller)
 
     pendingAddressByKey.value = {
       ...pendingAddressByKey.value,
       ...Object.fromEntries(candidates.map(({ key }) => [key, true])),
     }
 
-    for (const { key, coordinates } of candidates) {
-      const address = await reverseGeocodeCoordinates(coordinates)
+    try {
+      for (const { key, coordinates } of candidates) {
+        if (stopped.value || controller.signal.aborted || !isEnabled.value) break
+        const address = await reverseGeocodeCoordinates(coordinates, { signal: controller.signal })
 
-      const nextPending = { ...pendingAddressByKey.value }
-      delete nextPending[key]
-      pendingAddressByKey.value = nextPending
+        const nextPending = { ...pendingAddressByKey.value }
+        delete nextPending[key]
+        pendingAddressByKey.value = nextPending
+        if (stopped.value || controller.signal.aborted || !isEnabled.value) break
 
-      if (!address || stopped.value) {
-        failedAddressByKey.value = {
-          ...failedAddressByKey.value,
-          [key]: Date.now(),
+        if (!address || stopped.value) {
+          failedAddressByKey.value = {
+            ...failedAddressByKey.value,
+            [key]: Date.now(),
+          }
+          scheduleFailedRetry()
+
+          continue
         }
+
+        resolvedAddressByKey.value = {
+          ...resolvedAddressByKey.value,
+          [key]: address,
+        }
+
+        const nextFailed = { ...failedAddressByKey.value }
+        delete nextFailed[key]
+        failedAddressByKey.value = nextFailed
         scheduleFailedRetry()
-
-        continue
       }
-
-      resolvedAddressByKey.value = {
-        ...resolvedAddressByKey.value,
-        [key]: address,
-      }
-
-      const nextFailed = { ...failedAddressByKey.value }
-      delete nextFailed[key]
-      failedAddressByKey.value = nextFailed
-      scheduleFailedRetry()
+    } finally {
+      activeControllers.delete(controller)
+      const nextPending = { ...pendingAddressByKey.value }
+      candidates.forEach(({ key }) => delete nextPending[key])
+      pendingAddressByKey.value = nextPending
     }
   }
+
+  watch(isEnabled, (enabled) => {
+    if (!enabled) {
+      clearFailedRetryTimer()
+      activeControllers.forEach((controller) => controller.abort())
+    } else scheduleFailedRetry()
+  })
 
   watch(
     candidateSignature,
@@ -286,6 +305,7 @@ export function useReverseGeocodedRows(
 
   onBeforeUnmount(() => {
     stopped.value = true
+    activeControllers.forEach((controller) => controller.abort())
     clearFailedRetryTimer()
   })
 

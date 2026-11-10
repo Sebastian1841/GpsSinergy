@@ -130,7 +130,6 @@
                   <button
                     type="button"
                     class="h-8 rounded-lg border border-[#fecaca] bg-white px-3 text-[10px] font-black text-red-500 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
-                    :disabled="draftRoutes.length <= 1"
                     @click="handleDeleteRoute"
                   >
                     Eliminar
@@ -314,11 +313,13 @@
               </div>
             </div>
           </section>
+          <p v-else class="p-4 text-[12px] text-slate-500">No hay rutas configuradas.</p>
         </main>
 
         <footer
           class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-slate-200/80 bg-white px-4 py-3"
         >
+          <p v-if="saveError" role="alert" class="w-full text-[12px] text-red-700">{{ saveError }}</p>
           <p class="text-[10px] font-semibold text-slate-500">
             Esta configuracion queda guardada en este navegador.
           </p>
@@ -373,6 +374,8 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  saveRoutes: { type: Function, default: null },
+  saveError: { type: String, default: "" },
   selectedRouteId: {
     type: String,
     default: "",
@@ -391,7 +394,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(["update:modelValue", "save", "select-route"])
+const emit = defineEmits(["update:modelValue", "select-route"])
 
 const draftRoutes = ref([])
 const activeRouteId = ref("")
@@ -554,7 +557,7 @@ const routeValidationMessage = computed(() => {
 })
 
 const canSaveRoutes = computed(() => {
-  return draftRoutes.value.length > 0 && !routeValidationMessage.value
+  return !routeValidationMessage.value
 })
 
 const getRouteStopsSnapshot = (route) => {
@@ -773,8 +776,10 @@ const handleDuplicateRoute = () => {
 }
 
 const handleDeleteRoute = () => {
-  if (!activeRoute.value || draftRoutes.value.length <= 1) return
+  if (!activeRoute.value) return
 
+  clearRouteCalculationTimer()
+  abortRouteCalculation()
   stopPlannedRouteMapEditing()
 
   draftRoutes.value = draftRoutes.value.filter((route) => route.id !== activeRoute.value.id)
@@ -848,11 +853,11 @@ const handleCaptureCurrentRoute = () => {
 }
 
 const handleSave = () => {
-  if (!canSaveRoutes.value) return
+  if (!canSaveRoutes.value || !props.saveRoutes) return
 
   const normalizedRoutes = normalizePlannedRoutes(draftRoutes.value)
 
-  emit("save", normalizedRoutes)
+  if (!props.saveRoutes(normalizedRoutes)) return
   emit("select-route", activeRouteId.value)
   stopPlannedRouteMapEditing()
   closeModal()

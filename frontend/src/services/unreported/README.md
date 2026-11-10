@@ -2,6 +2,25 @@
 
 ## Flujo Vigente
 
+Identidad estable (2026-11-05): registros actuales usan la clave
+`["company-id", companyId, imei]`; equipment conserva companyId y el nombre solo
+como etiqueta. La fuente deduplica por ID/IMEI y el contexto de la vista autoriza
+por companyIds, no por nombres. Renombrar no crea otro historial ni mezcla empresas
+con el mismo nombre. El contrato de contexto sin companyIds solo admite filas
+legacy sin ID para compatibilidad; la vista no usa ese camino.
+
+observe migra identidades antiguas antes de procesar reportes. Requiere ID
+explicito en equipment o nombre unico en el catalogo completo de empresas, ademas
+de una fila autorizada de destino (actual o archivada verificable). No deduce
+empresa por IMEI solo. Ante duplicados, destino ya existente o nombre desconocido,
+conserva los registros sin combinarlos y expone migrationWarning cuando afectan
+al equipo observado. Los originales migrados quedan como respaldo con
+identityMigratedTo y no se duplican en el historial visible. Migracion y marcador
+se guardan juntos; fallar no modifica memoria y permite reintentar.
+
+`unreportedIdentity.test.js` cubre renombrado, homonimos, alcance, migracion,
+conflictos, fallo/reintento, archivo y recarga del almacenamiento por secciones.
+
 ## Historial Persistente
 
 interruptions conserva cada episodio por empresa/IMEI, con ID estable, ultimo

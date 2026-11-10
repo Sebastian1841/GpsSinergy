@@ -7,6 +7,8 @@ const REQUEST_INTERVAL_MS = 1100
 const MAX_CACHE_ENTRIES = 800
 const COORDINATE_CACHE_DECIMALS = 4
 const DEFAULT_SOURCE_RESOLVE_LIMIT = 60
+export const REVERSE_GEOCODING_REQUEST_TIMEOUT_MS = 10000
+export const REVERSE_GEOCODING_BATCH_TIMEOUT_MS = 20000
 
 export const REVERSE_GEOCODING_ATTRIBUTION = "Direcciones por OpenStreetMap"
 
@@ -15,9 +17,16 @@ let lastRequestAt = 0
 let requestQueue = Promise.resolve()
 const pendingRequests = new Map()
 
-const wait = (milliseconds) => {
+const wait = (milliseconds, signal) => {
   return new Promise((resolve) => {
-    window.setTimeout(resolve, milliseconds)
+    const finish = () => {
+      globalThis.clearTimeout(timer)
+      signal?.removeEventListener("abort", finish)
+      resolve()
+    }
+    const timer = globalThis.setTimeout(finish, milliseconds)
+    signal?.addEventListener("abort", finish, { once: true })
+    if (signal?.aborted) finish()
   })
 }
 
@@ -372,15 +381,17 @@ const buildAddressLabel = (payload = {}) => {
   return label || payload.display_name || ""
 }
 
-const runQueuedRequest = async (request) => {
+const runQueuedRequest = async (request, signal) => {
   requestQueue = requestQueue
     .catch(() => null)
     .then(async () => {
+      if (signal?.aborted) return null
       const elapsed = Date.now() - lastRequestAt
 
       if (elapsed < REQUEST_INTERVAL_MS) {
-        await wait(REQUEST_INTERVAL_MS - elapsed)
+        await wait(REQUEST_INTERVAL_MS - elapsed, signal)
       }
+      if (signal?.aborted) return null
 
       lastRequestAt = Date.now()
 
@@ -390,7 +401,68 @@ const runQueuedRequest = async (request) => {
   return requestQueue
 }
 
-export const reverseGeocodeCoordinates = async (coordinates) => {
+const fetchAddress = (coordinates, key, controller) =>
+  new Promise((resolve) => {
+    const { signal } = controller
+    let settled = false
+    const finish = (value) => {
+      if (settled) return
+      settled = true
+      globalThis.clearTimeout(timer)
+      signal.removeEventListener("abort", abort)
+      resolve(value)
+    }
+    const abort = () => finish(null)
+    const timer = globalThis.setTimeout(
+      () => controller.abort(),
+      REVERSE_GEOCODING_REQUEST_TIMEOUT_MS,
+    )
+    signal.addEventListener("abort", abort, { once: true })
+    if (signal.aborted) {
+      finish(null)
+      return
+    }
+    // Settlement is independent of fetch honoring AbortSignal (including a hung body).
+    Promise.resolve()
+      .then(async () => {
+        if (signal.aborted) return null
+        const response = await fetch(buildProviderUrl(coordinates), {
+          signal,
+          headers: { Accept: "application/json" },
+        })
+        if (!response.ok || signal.aborted) return null
+        const payload = await response.json()
+        if (signal.aborted) return null
+        const address = buildAddressLabel(payload)
+        if (!address) return null
+        memoryCache = { ...readCache(), [key]: address }
+        persistCache()
+        return address
+      })
+      .then(finish, () => finish(null))
+  })
+
+const subscribeToRequest = (entry, signal) =>
+  new Promise((resolve) => {
+    const subscriber = {}
+    let settled = false
+    const finish = (value) => {
+      if (settled) return
+      settled = true
+      signal?.removeEventListener("abort", abort)
+      entry.subscribers.delete(subscriber)
+      if (!entry.subscribers.size && !entry.settled) entry.controller.abort()
+      resolve(value)
+    }
+    const abort = () => finish(null)
+    entry.subscribers.add(subscriber)
+    signal?.addEventListener("abort", abort, { once: true })
+    if (signal?.aborted) finish(null)
+    entry.promise.then(finish, () => finish(null))
+  })
+
+export const reverseGeocodeCoordinates = async (coordinates, { signal } = {}) => {
+  if (signal?.aborted) return null
   if (
     !isReverseGeocodingEnabled() ||
     typeof window === "undefined" ||
@@ -406,40 +478,22 @@ export const reverseGeocodeCoordinates = async (coordinates) => {
   const cache = readCache()
 
   if (cache[key]) return cache[key]
-  if (pendingRequests.has(key)) return pendingRequests.get(key)
-
-  const request = runQueuedRequest(async () => {
-    try {
-      const response = await fetch(buildProviderUrl(coordinates), {
-        headers: {
-          Accept: "application/json",
-        },
+  let entry = pendingRequests.get(key)
+  if (!entry || entry.controller.signal.aborted) {
+    entry = { controller: new AbortController(), subscribers: new Set(), settled: false }
+    const current = entry
+    entry.promise = runQueuedRequest(
+      () => fetchAddress(coordinates, key, current.controller),
+      current.controller.signal,
+    )
+      .catch(() => null)
+      .finally(() => {
+        current.settled = true
+        if (pendingRequests.get(key) === current) pendingRequests.delete(key)
       })
-
-      if (!response.ok) return null
-
-      const payload = await response.json()
-      const address = buildAddressLabel(payload)
-
-      if (!address) return null
-
-      memoryCache = {
-        ...readCache(),
-        [key]: address,
-      }
-      persistCache()
-
-      return address
-    } catch {
-      return null
-    } finally {
-      pendingRequests.delete(key)
-    }
-  })
-
-  pendingRequests.set(key, request)
-
-  return request
+    pendingRequests.set(key, entry)
+  }
+  return subscribeToRequest(entry, signal)
 }
 
 export const resolveReverseGeocodedSources = async (
@@ -450,6 +504,8 @@ export const resolveReverseGeocodedSources = async (
     enabled = true,
     resolveAddresses = true,
     resolveTripEndpoints = false,
+    signal,
+    timeoutMs = REVERSE_GEOCODING_BATCH_TIMEOUT_MS,
   } = {},
 ) => {
   const rows = Array.isArray(sources) ? sources : []
@@ -459,6 +515,15 @@ export const resolveReverseGeocodedSources = async (
   }
 
   const resolvedAddressByKey = new Map()
+  const controller = new AbortController()
+  const cancel = () => controller.abort()
+  signal?.addEventListener("abort", cancel, { once: true })
+  if (signal?.aborted) cancel()
+  const budget = Number(timeoutMs)
+  const timer = globalThis.setTimeout(
+    cancel,
+    Number.isFinite(budget) && budget > 0 ? budget : REVERSE_GEOCODING_BATCH_TIMEOUT_MS,
+  )
   const resolveLimit = Math.max(0, Number(limit) || 0)
   let resolvedMissingCount = 0
 
@@ -481,9 +546,9 @@ export const resolveReverseGeocodedSources = async (
       return cachedAddress
     }
 
-    if (fetchMissing && resolvedMissingCount < resolveLimit) {
+    if (!controller.signal.aborted && fetchMissing && resolvedMissingCount < resolveLimit) {
       resolvedMissingCount += 1
-      const address = await reverseGeocodeCoordinates(coordinates)
+      const address = await reverseGeocodeCoordinates(coordinates, { signal: controller.signal })
 
       if (address) {
         resolvedAddressByKey.set(key, address)
@@ -499,36 +564,41 @@ export const resolveReverseGeocodedSources = async (
 
   const resolvedRows = []
 
-  for (const source of rows) {
-    let resolvedRow = source
+  try {
+    for (const source of rows) {
+      let resolvedRow = source
 
-    if (resolveAddresses) {
-      const address = await resolveAddress({
-        existingAddress: getExistingAddressValue(source),
-        coordinates: getReverseGeocodeCoordinates(source),
-      })
+      if (resolveAddresses) {
+        const address = await resolveAddress({
+          existingAddress: getExistingAddressValue(source),
+          coordinates: getReverseGeocodeCoordinates(source),
+        })
 
-      resolvedRow = withResolvedAddressValue(resolvedRow, address)
+        resolvedRow = withResolvedAddressValue(resolvedRow, address)
+      }
+
+      if (resolveTripEndpoints) {
+        const startAddress = await resolveAddress({
+          existingAddress: getRouteTripEndpointAddressValue(source, "start"),
+          coordinates: getRouteTripEndpointCoordinates(source, "start"),
+        })
+        const endAddress = await resolveAddress({
+          existingAddress: getRouteTripEndpointAddressValue(source, "end"),
+          coordinates: getRouteTripEndpointCoordinates(source, "end"),
+        })
+
+        resolvedRow = withResolvedRouteTripEndpointAddresses(resolvedRow, {
+          startAddress,
+          endAddress,
+        })
+      }
+
+      resolvedRows.push(resolvedRow)
     }
 
-    if (resolveTripEndpoints) {
-      const startAddress = await resolveAddress({
-        existingAddress: getRouteTripEndpointAddressValue(source, "start"),
-        coordinates: getRouteTripEndpointCoordinates(source, "start"),
-      })
-      const endAddress = await resolveAddress({
-        existingAddress: getRouteTripEndpointAddressValue(source, "end"),
-        coordinates: getRouteTripEndpointCoordinates(source, "end"),
-      })
-
-      resolvedRow = withResolvedRouteTripEndpointAddresses(resolvedRow, {
-        startAddress,
-        endAddress,
-      })
-    }
-
-    resolvedRows.push(resolvedRow)
+    return resolvedRows
+  } finally {
+    globalThis.clearTimeout(timer)
+    signal?.removeEventListener("abort", cancel)
   }
-
-  return resolvedRows
 }

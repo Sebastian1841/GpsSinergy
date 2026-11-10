@@ -7,7 +7,11 @@ import {
   REQUIRED_REPORT_COLUMN_IDS,
   REQUIRED_REPORT_FILTER_IDS,
 } from "../../data/mockReportTemplates.js"
-import { readJsonStorage, writeJsonStorage } from "../../services/storage/browserStorage.js"
+import {
+  readJsonStorage,
+  writeJsonStorage,
+  writeJsonStorageBatch,
+} from "../../services/storage/browserStorage.js"
 import { normalizeReportBehaviorOptions } from "../../utils/reports/config/reportBehaviorOptions.js"
 import { normalizeReportOutputOptions } from "../../utils/reports/config/reportOutputOptions.js"
 import { normalizeReportWidgets } from "../../utils/reports/config/reportWidgetUtils.js"
@@ -270,18 +274,14 @@ const readDeletedReportTemplateIds = () => {
   return new Set(Array.isArray(parsedTemplateIds) ? parsedTemplateIds.map(String) : [])
 }
 
-const persistDeletedReportTemplateIds = (templateIds) => {
-  writeJsonStorage(REPORT_DELETED_TEMPLATE_IDS_STORAGE_KEY, Array.from(templateIds).map(String))
-}
-
 const persistReportTemplates = (templates) => {
-  writeJsonStorage(REPORT_TEMPLATES_STORAGE_KEY, templates)
+  return writeJsonStorage(REPORT_TEMPLATES_STORAGE_KEY, templates)
 }
 
 const getInitialReportTemplates = () => {
   const storedTemplates = readStoredReportTemplates()
 
-  if (storedTemplates?.length) {
+  if (storedTemplates !== null) {
     return mergeStoredReportTemplates(storedTemplates)
   }
 
@@ -289,6 +289,7 @@ const getInitialReportTemplates = () => {
 }
 
 const reportTemplates = ref(getInitialReportTemplates())
+const templatesWriteError = ref("")
 let hasStartedEventRuleSync = false
 
 const getTemplateCollectionSignature = (templates = []) => {
@@ -324,8 +325,8 @@ const syncReportTemplatesWithSeed = () => {
     return
   }
 
-  reportTemplates.value = mergedTemplates
-  persistReportTemplates(reportTemplates.value)
+  if (persistReportTemplates(mergedTemplates)) reportTemplates.value = mergedTemplates
+  else templatesWriteError.value = "No se pudieron guardar las plantillas. Intenta nuevamente."
 }
 
 const normalizeTemplatePayload = (payload = {}) => {
@@ -376,12 +377,25 @@ export function useReportTemplates() {
 
   const templates = computed(() => reportTemplates.value)
 
-  const setReportTemplates = (templatesList) => {
-    reportTemplates.value = templatesList
+  const setReportTemplates = (templatesList, deletedIds = null) => {
+    templatesWriteError.value = ""
+    const next = templatesList
       .filter((template) => !isDeprecatedReportTemplate(template))
       .map(cloneReportTemplate)
       .filter((template) => normalizeReportTemplateStoredEventRuleIds(template).length > 0)
-    persistReportTemplates(reportTemplates.value)
+    const saved = deletedIds
+      ? writeJsonStorageBatch([
+          [REPORT_DELETED_TEMPLATE_IDS_STORAGE_KEY, Array.from(deletedIds).map(String)],
+          [REPORT_TEMPLATES_STORAGE_KEY, next],
+        ])
+      : persistReportTemplates(next)
+    if (!saved) {
+      templatesWriteError.value =
+        "No se pudieron guardar las plantillas. Conserva los cambios e intenta nuevamente."
+      return false
+    }
+    reportTemplates.value = next
+    return true
   }
 
   const createReportTemplate = (payload = {}) => {
@@ -393,7 +407,7 @@ export function useReportTemplates() {
 
     if (!nextTemplate.eventRuleIds.length) return null
 
-    setReportTemplates([nextTemplate, ...reportTemplates.value])
+    if (!setReportTemplates([nextTemplate, ...reportTemplates.value])) return null
 
     return nextTemplate
   }
@@ -422,7 +436,7 @@ export function useReportTemplates() {
       return nextTemplate
     })
 
-    setReportTemplates(nextTemplates)
+    if (!updatedTemplate || !setReportTemplates(nextTemplates)) return null
 
     return updatedTemplate
   }
@@ -434,24 +448,22 @@ export function useReportTemplates() {
 
     if (!canDeleteReportTemplate(targetTemplate)) return false
 
+    const deletedTemplateIds = readDeletedReportTemplateIds()
     if (targetTemplate.isDefault || targetTemplate.type === REPORT_TEMPLATE_TYPES.DEFAULT) {
-      const deletedTemplateIds = readDeletedReportTemplateIds()
-
       deletedTemplateIds.add(String(targetTemplate.id))
-      persistDeletedReportTemplateIds(deletedTemplateIds)
     }
 
-    setReportTemplates(
+    return setReportTemplates(
       reportTemplates.value.filter((template) => {
         return String(template.id) !== String(templateId)
       }),
+      deletedTemplateIds,
     )
-
-    return true
   }
 
   return {
     reportTemplates: templates,
+    templatesWriteError: computed(() => templatesWriteError.value),
     createReportTemplate,
     updateReportTemplate,
     deleteReportTemplate,

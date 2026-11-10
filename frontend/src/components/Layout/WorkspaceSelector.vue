@@ -44,6 +44,7 @@
         @click.stop
         @pointerdown.stop
       >
+        <p v-if="writeError" role="alert" class="px-3 py-2 text-[12px] text-red-200">{{ writeError }}</p>
         <div v-if="panelMode === 'menu'">
           <div class="max-h-[190px] overflow-auto px-2 py-1">
             <button
@@ -322,6 +323,7 @@ import { computed, ref, watch } from "vue"
 import { normalizeId } from "../../utils/idUtils.js"
 
 const props = defineProps({
+  writeError: { type: String, default: "" },
   enabled: {
     type: Boolean,
     default: false,
@@ -451,8 +453,7 @@ const isActiveWorkspace = (workspace) => {
 }
 
 const handleSelectWorkspace = (workspaceId) => {
-  emit("select-workspace", workspaceId)
-  emit("close")
+  emit("select-workspace", workspaceId, (saved) => { if (saved) emit("close") })
 }
 
 const startManage = () => {
@@ -518,14 +519,17 @@ const submitForm = () => {
   const name = normalizedFormName.value
 
   if (!name) return
+  const confirmed = (saved) => {
+    if (!saved) return
+    resetForm()
+    panelMode.value = "menu"
+  }
 
   if (formMode.value === "create") {
     emit("create-workspace", {
       name,
       sharedWithUserIds: formSharedUserIds.value,
-    })
-    resetForm()
-    panelMode.value = "menu"
+    }, confirmed)
     return
   }
 
@@ -534,9 +538,7 @@ const submitForm = () => {
       workspaceId: editingWorkspaceId.value,
       name,
       sharedWithUserIds: formSharedUserIds.value,
-    })
-    resetForm()
-    panelMode.value = "menu"
+    }, confirmed)
   }
 }
 

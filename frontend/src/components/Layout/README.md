@@ -1,5 +1,10 @@
 # Layout Components
 
+Vistas guardadas (2026-11-05): WorkspaceSelector recibe writeError y espera
+confirmacion del header antes de limpiar el formulario de alta/edicion o cerrar
+al seleccionar una vista. AppHeader guarda nombre y usuarios compartidos en una
+operacion y muestra el error del composable. Un fallo conserva los campos.
+
 La sidebar agrupa Operacion, Configuracion y Administracion en ese orden.
 Ambos modos comparten categorias autorizadas; se muestra una categoria a la vez.
 Los botones del panel usan aria-expanded y el selector compacto aria-pressed;

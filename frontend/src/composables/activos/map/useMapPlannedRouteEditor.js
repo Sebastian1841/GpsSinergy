@@ -1,4 +1,5 @@
 import { computed, watch } from "vue"
+import { plainTextTooltipContent } from "./plainTextTooltipContent.js"
 
 import { snapOsrmPointToRoad } from "../../../services/routing/osrmRouteService.js"
 import { usePlannedRouteMapEditor } from "../routes/usePlannedRouteMapEditor.js"
@@ -230,10 +231,13 @@ export const createPlannedRouteMapEditorController = ({ L, getMap, layers }) => 
       })
 
       marker
-        .bindTooltip(index === 0 ? "Origen" : stop.name || `Parada ${index + 1}`, {
-          direction: "top",
-          className: "sinergy-geofence-tooltip",
-        })
+        .bindTooltip(
+          plainTextTooltipContent(index === 0 ? "Origen" : stop.name || `Parada ${index + 1}`),
+          {
+            direction: "top",
+            className: "sinergy-geofence-tooltip",
+          },
+        )
         .addTo(layers.plannedRouteEditLayer)
     })
 

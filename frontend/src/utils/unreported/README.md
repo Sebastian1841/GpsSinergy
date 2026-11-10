@@ -1,5 +1,14 @@
 # Unreported Utils
 
+`unreportedEquipmentIdentity.js` define la identidad compartida ID de empresa/IMEI
+y la migracion conservadora del formato anterior por nombre. No une historiales
+competidores ni atribuye un IMEI a una empresa sin evidencia verificable.
+`unreportedHistory.js` reconoce claves nuevas/antiguas, omite respaldos ya
+migrados y actualiza etiquetas de equipos archivados desde el catalogo por ID.
+Imagenes se indexan por ID de empresa/IMEI; contacto acepta el objeto con companyId
+para resolver empresas homonimas sin depender del nombre. El overload de texto
+del contacto queda solo para consumidores legacy, con coincidencia unica.
+
 unreportedHistory.js administra episodios, migracion conocida, consultas por
 episodio, resumen por equipo, identidades historicas y formato de duracion.
 Su prueba cubre idempotencia, reincidencia, datos previos limitados y ausencia

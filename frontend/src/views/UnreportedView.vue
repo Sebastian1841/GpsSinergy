@@ -214,6 +214,7 @@
         </aside>
 
         <main class="flex min-h-0 min-w-0 flex-col">
+          <p v-if="lifecycle.migrationWarning.value" role="status" class="mb-3 text-[12px] text-amber-800">{{ lifecycle.migrationWarning.value }}</p>
           <p
             v-if="flowError"
             role="alert"
@@ -562,7 +563,7 @@
     v-if="operationRow"
     :equipment="
       trackedRows.find(
-        (row) => row.imei === operationRow.imei && row.company === operationRow.company,
+        (row) => equipmentKey(row) === equipmentKey(operationRow),
       ) || operationRow
     "
     :error="flowError"
@@ -637,14 +638,16 @@ const UnreportedOperationModal = defineAsyncComponent(
 )
 const { currentUser } = useAuthSession()
 const { accessibleCompanies, visibleAssets, isPlatformAdmin } = useAccessControl()
+const { companyRecords } = useCompaniesService()
 const equipmentContext = computed(() => ({
   user: currentUser.value,
   companies: accessibleCompanies.value.map((company) => company.name),
+  companyIds: accessibleCompanies.value.map((company) => String(company.id)),
+  companyCatalog: companyRecords.value,
 }))
-const { companyRecords } = useCompaniesService()
 const operationCompanyContact = computed(() => {
-  const company = operationRow.value?.company
-  if (!company || !equipmentContext.value.companies.includes(company))
+  const company = operationRow.value
+  if (!company || !equipmentContext.value.companyIds.includes(String(company.companyId)))
     return { name: "", phone: "", href: "" }
   return resolveUnreportedCompanyContact(companyRecords.value, company)
 })
@@ -750,12 +753,12 @@ const vehicleImageIndex = computed(() =>
   buildUnreportedAssetImageIndex(
     imageAssets.value,
     companyRecords.value.filter((company) =>
-      equipmentContext.value.companies.includes(company.name),
+      equipmentContext.value.companyIds.includes(String(company.id)),
     ),
   ),
 )
 const getVehicleImage = (row) => {
-  const asset = vehicleImageIndex.value.get(unreportedAssetImageKey(row.company, row.imei))
+  const asset = vehicleImageIndex.value.get(unreportedAssetImageKey(row.companyId, row.imei))
   return getAssetImageMarkerVariant(asset || {})?.url || ""
 }
 const vehicleImageSources = computed(() => [
@@ -840,7 +843,7 @@ const sourceEquipment = computed(() =>
   buildUnreportedEquipment(visibleAssets.value, accessibleCompanies.value),
 )
 const authorizedEquipment = computed(() =>
-  knownEquipmentWithHistory(sourceEquipment.value, lifecycle.records.value).filter(
+  knownEquipmentWithHistory(sourceEquipment.value, lifecycle.records.value, companyRecords.value).filter(
     (row) =>
       lifecycle.allowed(row, equipmentContext.value) && (!row.archived || isPlatformAdmin.value),
   ),

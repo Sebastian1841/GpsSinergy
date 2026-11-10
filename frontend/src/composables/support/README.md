@@ -3,6 +3,12 @@
 `useSupportPanel.js` coordina filtros, paginacion de 10 filas, seleccion,
 creacion, respuestas, gestion y descargas del Panel de soporte.
 
+`useSupportReplyDrafts.js` conserva texto y archivos por solicitud durante la
+sesion de la vista. Filtrar, dejar la lista vacia o cambiar de solicitud no borra
+la respuesta pendiente. El envio correcto limpia solo el borrador enviado;
+un error lo conserva. Cambiar usuario elimina borradores y archivos en memoria.
+No se persisten adjuntos File en localStorage. Prueba junto al composable.
+
 - El cliente consulta solicitudes de sus empresas accesibles.
 - El administrador de plataforma gestiona las empresas de su alcance.
 - El rol technician gestiona solicitudes solo de sus empresas autorizadas.

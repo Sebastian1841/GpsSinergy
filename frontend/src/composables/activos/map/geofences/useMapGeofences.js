@@ -141,8 +141,9 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
   const saveEditing = () => {
     if (props.canEditGeofences === false || !editingDraft.value) return
 
-    editing.emitUpdatedGeofence()
-    stopEditing()
+    editing.emitUpdatedGeofence((saved) => {
+      if (saved) stopEditing()
+    })
   }
 
   const startPolygonDraw = () => {
@@ -202,9 +203,10 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
         props,
         points: draftPolygonPoints.value,
       }),
+      (saved) => {
+        if (saved) cancelDraw()
+      },
     )
-
-    cancelDraw()
   }
 
   const finishRoute = () => {
@@ -216,9 +218,10 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
         props,
         points: draftRoutePoints.value,
       }),
+      (saved) => {
+        if (saved) cancelDraw()
+      },
     )
-
-    cancelDraw()
   }
 
   const finishCircle = (center, edge) => {
@@ -230,8 +233,9 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
 
     if (!geofence) return
 
-    emit("geofence-created", geofence)
-    cancelDraw()
+    emit("geofence-created", geofence, (saved) => {
+      if (saved) cancelDraw()
+    })
   }
 
   const focusGeofence = (geofence) => {
@@ -279,12 +283,11 @@ export function createGeofenceMapController({ props, emit, getMap, layers, state
   const deleteGeofence = (id) => {
     if (props.canEditGeofences === false) return
 
-    if (normalizeId(editingDraft.value?.id) === normalizeId(id)) {
-      stopEditing()
-    }
-
-    renderer.removeCachedGeofenceLayer(normalizeId(id))
-    emit("geofence-deleted", id)
+    emit("geofence-deleted", id, (saved) => {
+      if (!saved) return
+      if (normalizeId(editingDraft.value?.id) === normalizeId(id)) stopEditing()
+      renderer.removeCachedGeofenceLayer(normalizeId(id))
+    })
   }
 
   const handleMapClick = (event) => {

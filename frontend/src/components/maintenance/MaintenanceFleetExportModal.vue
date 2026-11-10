@@ -65,7 +65,7 @@ onBeforeUnmount(() => dialog.value?.close())
 </script>
 
 <style scoped>
-.fleet-export-dialog { width: min(1080px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; border: 1px solid #d8e0eb; border-radius: 8px; color: #102372; background: #fff; }
+.fleet-export-dialog { width: min(900px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; border: 1px solid #d8e0eb; border-radius: 8px; color: #102372; background: #fff; }
 .fleet-export-dialog[open] { display: flex; flex-direction: column; }
 .fleet-export-dialog::backdrop { background: rgb(15 23 42 / 55%); }
 header, footer { display: flex; align-items: center; gap: 12px; padding: 18px 22px; flex-shrink: 0; background: #f7f9fc; }

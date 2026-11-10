@@ -58,9 +58,26 @@ diario`, la accion de agregar al resumen diario y los datos del activo cuando
   eliminar grupos como organizacion visual. Sus `assetIds` se recortan contra
   los activos autorizados antes de exponerse a la UI.
 - `useTelemetryHistory.js`: historial de pulsos y reportes de telemetria.
+  Prioriza el ID estable; separa alias de dispositivo, IMEI y patente, con
+  alcance de empresa/aplicacion. Ignora placeholders y no combina historiales
+  cuando un alias es ambiguo. Las consultas primitivas solo resuelven un unico
+  activo; para IDs repetidos entre contextos debe enviarse el objeto con alcance.
+  La eliminacion usa la misma resolucion conservadora y conserva otros activos.
+- `useTelemetryHistory.test.js`: regresiones de patentes vacias/compartidas,
+  identificadores contradictorios, alcance, tipos de alias y eliminacion aislada.
 
 ## Regla de mantenimiento
 
 Mantener aqui estado y efectos Vue. Calculos reutilizables deben moverse a `utils/activos`.
 Los perfiles operativos se consumen desde `utils/activos/operationalProfileOptions.js`;
 los composables solo los exponen a la UI.
+# Lecturas Historicas De Mantenciones
+
+Horas acumuladas incluyen engineHours y horometroTotal del update, no las horas
+diarias. Se conserva decimales/cero sin heredar del activo actual al historico.
+
+Los reportes normalizados preservan recordedMaintenanceReadings con odometro y
+horometro recibidos en ese mismo update, incluyendo cero. No hereda valores
+del activo actual para esa referencia historica; reportes antiguos sin marcador
+no sirven para afirmar una lectura pasada. La cache mantiene su limite existente.
+

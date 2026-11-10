@@ -435,7 +435,7 @@
                 :roles="roles"
                 :assets="assets"
                 :asset-tags="assetTags"
-                :can-manage-user-permissions="canManageUserPermissions"
+                :can-manage-user-permissions="canManageAccess(selectedAccess.id)"
                 @update-access-role="handleUpdateAccessRole"
                 @toggle-access-status="handleToggleAccessStatus"
                 @remove-application-access="handleRemoveApplicationAccess"
@@ -547,6 +547,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  canManageApplication: {
+    type: Function,
+    default: () => false,
+  },
 })
 
 const emit = defineEmits([
@@ -655,7 +659,7 @@ const availableApplications = computed(() => {
   )
 
   return props.applications.filter((application) => {
-    return !usedIds.has(String(application.id))
+    return !usedIds.has(String(application.id)) && props.canManageApplication(application.id)
   })
 })
 
@@ -773,7 +777,7 @@ watch(
 )
 
 const handleAddApplicationAccess = () => {
-  if (!props.canManageUserPermissions || !applicationToAddId.value) {
+  if (!props.canManageUserPermissions || !props.canManageApplication(applicationToAddId.value)) {
     return
   }
 
@@ -781,20 +785,27 @@ const handleAddApplicationAccess = () => {
   applicationToAddId.value = ""
 }
 
+const canManageAccess = (accessId) => {
+  const access = props.accesses.find((item) => String(item.id) === String(accessId))
+  return Boolean(
+    props.canManageUserPermissions && access && props.canManageApplication(access.applicationId),
+  )
+}
+
 const handleUpdateAccessRole = (accessId, roleId) => {
-  if (!props.canManageUserPermissions) return
+  if (!canManageAccess(accessId)) return
 
   emit("update-access-role", accessId, roleId)
 }
 
 const handleToggleAccessStatus = (accessId) => {
-  if (!props.canManageUserPermissions) return
+  if (!canManageAccess(accessId)) return
 
   emit("toggle-access-status", accessId)
 }
 
 const handleRemoveApplicationAccess = (accessId) => {
-  if (!props.canManageUserPermissions) return
+  if (!canManageAccess(accessId)) return
 
   emit("remove-application-access", accessId)
 
@@ -804,37 +815,37 @@ const handleRemoveApplicationAccess = (accessId) => {
 }
 
 const handleToggleModuleAccess = (accessId, moduleId) => {
-  if (!props.canManageUserPermissions) return
+  if (!canManageAccess(accessId)) return
 
   emit("toggle-module-access", accessId, moduleId)
 }
 
 const handleToggleFunctionAccess = (accessId, functionId) => {
-  if (!props.canManageUserPermissions) return
+  if (!canManageAccess(accessId)) return
 
   emit("toggle-function-access", accessId, functionId)
 }
 
 const handleTogglePermission = (accessId, functionId, permissionId) => {
-  if (!props.canManageUserPermissions) return
+  if (!canManageAccess(accessId)) return
 
   emit("toggle-permission", accessId, functionId, permissionId)
 }
 
 const handleUpdateOperationalScope = (accessId, scopeType) => {
-  if (!props.canManageUserPermissions) return
+  if (!canManageAccess(accessId)) return
 
   emit("update-operational-scope", accessId, scopeType)
 }
 
 const handleToggleScopeAsset = (accessId, assetId) => {
-  if (!props.canManageUserPermissions) return
+  if (!canManageAccess(accessId)) return
 
   emit("toggle-scope-asset", accessId, assetId)
 }
 
 const handleToggleScopeAssetTag = (accessId, tagId) => {
-  if (!props.canManageUserPermissions) return
+  if (!canManageAccess(accessId)) return
 
   emit("toggle-scope-asset-tag", accessId, tagId)
 }

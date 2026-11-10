@@ -1,10 +1,10 @@
 <template>
-  <section class="orders-view">
+  <section class="orders-view" :class="{ 'is-table-expanded': isTableExpanded }">
     <div class="orders-metrics">
       <article v-for="metric in summaryMetrics" :key="metric.label">
         <small>{{ metric.label }}</small
         ><strong>{{ metric.value }}</strong
-        ><span>{{ metric.detail }}</span>
+        >
       </article>
     </div>
 
@@ -49,11 +49,24 @@
           :key="tab.id"
           type="button"
           :class="{ active: activeList === tab.id }"
-          @click="activeList = tab.id"
+          @click="selectOrderList(tab.id)"
         >
           {{ tab.label }} ({{ tab.count }})
         </button>
       </nav>
+      <div class="orders-table-tools">
+      <button
+        ref="expandTableButton"
+        type="button"
+        class="expand-table-button"
+        :aria-pressed="isTableExpanded"
+        :title="isTableExpanded ? 'Volver a la vista normal' : 'Ver tabla a pantalla completa'"
+        @click="toggleTableExpanded"
+      >
+        <SvgIcon :name="isTableExpanded ? 'close' : 'expand'" />
+        {{ isTableExpanded ? 'Salir de pantalla completa' : 'Ampliar tabla' }}
+      </button>
+      </div>
     </div>
 
     <div ref="ordersTableWrap" class="orders-table-wrap">
@@ -67,7 +80,7 @@
             <th>Fecha límite de ejecución</th>
             <th>Estado</th>
             <th>Prioridad</th>
-            <th>Costos</th>
+            <th>Costo real</th>
             <th>Acciones</th>
           </tr>
         </thead>
@@ -83,8 +96,7 @@
               ><small>Creada {{ formatCreatedDate(order.createdAt) }}</small>
             </td>
             <td>
-              <strong>{{ order.plate }}</strong
-              ><small>{{ order.type }}</small>
+              <strong>{{ order.plate }}</strong>
             </td>
             <td class="maintenance-copy">
               <strong>{{ order.job }}</strong>
@@ -105,14 +117,10 @@
               }}</span>
             </td>
             <td>
-              <span class="priority" :class="getPriorityClass(order.priority)">{{
-                order.priority
-              }}</span>
+              <span class="priority" :class="getPriorityClass(order.priority)">{{ order.priority }}</span>
             </td>
             <td>
-              <strong>Estimado: {{ order.estimatedCost }}</strong
-              ><small>Real: {{ order.actualCost }}</small
-              ><small>{{ getCostDeviation(order) }}</small>
+              <strong>{{ order.actualCost || '$ 0' }}</strong>
             </td>
             <td>
               <div class="row-actions">
@@ -122,35 +130,12 @@
                 >
                   Ver OT
                 </button>
-                <select
-                  v-if="!['finished', 'cancelled'].includes(order.status)"
-                  :value="order.status"
-                  @change="changeOrderStatus(order, $event.target.value)"
-                >
-                  <option value="scheduled">Programada</option>
-                  <option value="in-progress">En proceso</option>
-                  <option value="waiting">En espera</option>
-                  <option value="finished">Cerrada</option></select
-                ><button
-                  v-if="!['finished', 'cancelled'].includes(order.status)"
+                <button
+                  v-if="getWorkOrderNextAction(order.status)"
                   type="button"
-                  class="more-actions-button"
-                  title="Mas acciones"
-                  :aria-expanded="activeActionMenu === order.id"
-                  @click.stop="toggleActionMenu(order.id)"
-                >
-                  ⋮
-                </button>
-                <div
-                  v-if="activeActionMenu === order.id"
-                  class="order-secondary-actions"
-                  @click.stop
-                >
-                  <button type="button" @click="openCostFromMenu(order.id)">Agregar costos</button>
-                  <button type="button" class="cancel" @click="cancelFromMenu(order.id)">
-                    Cancelar OT
-                  </button>
-                </div>
+                  class="order-next-action"
+                  @click="runNextOrderAction(order)"
+                >{{ getWorkOrderNextAction(order.status).label }}</button>
               </div>
             </td>
           </tr>
@@ -162,16 +147,18 @@
       </div>
       <footer>
         <span
-          >Mostrando {{ displayedOrders.length }} de {{ assetFilteredOrders.length }} ordenes</span
+          >Mostrando {{ pagination.start }} a {{ pagination.end }} de {{ pagination.total }} ordenes</span
         >
         <div>
           Filas por pagina
-          <select v-model="pageSize">
+          <select v-model="pageSize" aria-label="Filas por pagina">
             <option :value="10">10</option>
             <option :value="25">25</option>
             <option :value="50">50</option></select
-          ><button type="button" disabled>‹</button><b>1</b
-          ><button type="button" disabled>›</button>
+          >
+          <button type="button" aria-label="Pagina anterior" :disabled="pagination.page === 1" @click="currentPage = pagination.page - 1"><SvgIcon name="chevron-left" /></button>
+          <b aria-live="polite">{{ pagination.page }} / {{ pagination.pageCount }}</b>
+          <button type="button" aria-label="Pagina siguiente" :disabled="pagination.page === pagination.pageCount" @click="currentPage = pagination.page + 1"><SvgIcon name="chevron-right" /></button>
         </div>
       </footer>
     </div>
@@ -179,12 +166,16 @@
 </template>
 
 <script setup>
-import { parseMaintenanceOrderCost as parseCost, parseMaintenanceOrderDate as parseOrderDate, summarizeMaintenanceOrders } from "../../utils/maintenance/maintenanceOrderSummary.js"
-import { formatDecimalNumber, formatNumber } from "../../utils/maintenance/maintenanceFormatUtils.js"
+import { parseMaintenanceOrderDate as parseOrderDate, summarizeMaintenanceOrders } from "../../utils/maintenance/maintenanceOrderSummary.js"
 import { computed, nextTick, onActivated, onDeactivated, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import SvgIcon from "../icons/SvgIcon.vue"
+import { getWorkOrderNextAction } from "./workOrderNextAction.js"
+import { matchesWorkOrderList } from "./workOrderList.js"
+import { getWorkOrderPage } from "./workOrderPagination.js"
 
 const props = defineProps({
   filteredWorkOrders: { type: Array, default: () => [] },
+  workOrders: { type: Array, default: () => [] },
   focusedOrderId: { type: String, default: "" },
   getOrderStatusClass: { type: Function, required: true },
   getOrderStatusLabel: { type: Function, required: true },
@@ -195,42 +186,52 @@ const props = defineProps({
 })
 const emit = defineEmits([
   "open-maintenance-modal",
-  "open-order-cost",
   "open-work-order-action-modal",
   "select-work-order",
   "update:order-search-term",
   "update:selected-order-status",
 ])
-const activeList = ref("all")
+const activeList = ref("open")
+const selectOrderList = (list) => {
+  activeList.value = list
+  emit("update:selected-order-status", "all")
+}
+watch(() => props.selectedOrderStatus, (status) => {
+  if (status !== "all") activeList.value = status
+}, { immediate: true })
 const selectedAsset = ref("all")
 const deadlineFilter = ref("all")
 const deadlineFrom = ref("")
 const deadlineTo = ref("")
 const pendingSearch = ref(props.orderSearchTerm)
 const pageSize = ref(10)
+const currentPage = ref(1)
+const pendingFocusOrderId = ref("")
 const ordersTableWrap = ref(null)
-const activeActionMenu = ref(null)
-const toggleActionMenu = (orderId) => {
-  activeActionMenu.value = activeActionMenu.value === orderId ? null : orderId
+const isTableExpanded = ref(false)
+const expandTableButton = ref(null)
+const toggleTableExpanded = async () => {
+  const position = { top: ordersTableWrap.value?.scrollTop || 0, left: ordersTableWrap.value?.scrollLeft || 0 }
+  isTableExpanded.value = !isTableExpanded.value
+  await nextTick()
+  if (ordersTableWrap.value) {
+    ordersTableWrap.value.scrollTop = position.top
+    ordersTableWrap.value.scrollLeft = position.left
+  }
+  expandTableButton.value?.focus({ preventScroll: true })
 }
-const openCostFromMenu = (orderId) => {
-  activeActionMenu.value = null
-  emit("open-order-cost", orderId)
+const closeExpandedTable = (event) => {
+  if (event.key !== "Escape" || !isTableExpanded.value || event.defaultPrevented || event.target.closest?.('[aria-modal="true"]')) return
+  event.preventDefault()
+  void toggleTableExpanded()
 }
-const cancelFromMenu = (orderId) => {
-  activeActionMenu.value = null
-  openWorkOrderActionModal(orderId, "cancel-order")
-}
-const closeActionMenu = (event) => {
-  if (!event.target.closest?.(".row-actions")) activeActionMenu.value = null
-}
-onMounted(() => document.addEventListener("pointerdown", closeActionMenu))
-onActivated(() => document.addEventListener("pointerdown", closeActionMenu))
+onMounted(() => document.addEventListener("keydown", closeExpandedTable))
+onActivated(() => document.addEventListener("keydown", closeExpandedTable))
 onDeactivated(() => {
-  document.removeEventListener("pointerdown", closeActionMenu)
-  activeActionMenu.value = null
+  document.removeEventListener("keydown", closeExpandedTable)
+  isTableExpanded.value = false
 })
-onBeforeUnmount(() => document.removeEventListener("pointerdown", closeActionMenu))
+onBeforeUnmount(() => document.removeEventListener("keydown", closeExpandedTable))
 const assetOptions = computed(() => [
   ...new Set(props.filteredWorkOrders.map(({ plate }) => plate)),
 ])
@@ -272,77 +273,43 @@ const assetFilteredOrders = computed(() =>
 const orderStatistics = computed(() => summarizeMaintenanceOrders(assetFilteredOrders.value))
 const countStatus = (statuses) => statuses.reduce((sum, status) => sum + (orderStatistics.value.counts.get(status) || 0), 0)
 const tabs = computed(() => [
-  { id: "all", label: "Todas", count: assetFilteredOrders.value.length },
+  { id: "open", label: "Abiertas", count: countStatus(["scheduled", "waiting", "in-progress"]) },
   { id: "scheduled", label: "Programadas", count: countStatus(["scheduled"]) },
   { id: "waiting", label: "En espera", count: countStatus(["waiting"]) },
   { id: "in-progress", label: "En ejecucion", count: countStatus(["in-progress"]) },
-  { id: "closed", label: "Cerradas", count: countStatus(["finished", "cancelled"]) },
+  { id: "finished", label: "Finalizadas", count: countStatus(["finished"]) },
+  { id: "cancelled", label: "Canceladas", count: countStatus(["cancelled"]) },
 ])
 const tabFilteredOrders = computed(() =>
   assetFilteredOrders.value.filter(
-    (order) =>
-      activeList.value === "all" ||
-      (activeList.value === "closed"
-        ? ["finished", "cancelled"].includes(order.status)
-        : order.status === activeList.value),
+    (order) => matchesWorkOrderList(order.status, activeList.value),
   ),
 )
-const displayedOrders = computed(() => tabFilteredOrders.value.slice(0, pageSize.value))
-const estimatedCost = computed(() => orderStatistics.value.estimatedCost)
-const actualCost = computed(() => orderStatistics.value.actualCost)
-const averageClosingDays = computed(() => orderStatistics.value.averageClosingDays)
-const onTimeRate = computed(() => orderStatistics.value.onTimeRate)
-const costDifferenceDetail = computed(() => {
-  if (!estimatedCost.value) return "Sin presupuesto estimado"
-  const difference = actualCost.value - estimatedCost.value
-  const percentage = Math.round((Math.abs(difference) / estimatedCost.value) * 100)
-  if (!difference) return "Igual al presupuesto"
-  return `${percentage}% ${difference > 0 ? "sobre" : "bajo"} presupuesto`
-})
+const pagination = computed(() => getWorkOrderPage(tabFilteredOrders.value, currentPage.value, pageSize.value))
+const displayedOrders = computed(() => pagination.value.rows)
+watch([activeList, selectedAsset, deadlineFilter, deadlineFrom, deadlineTo, pendingSearch, pageSize], () => { currentPage.value = 1 })
+watch(() => pagination.value.pageCount, () => { currentPage.value = pagination.value.page })
+watch(currentPage, () => {
+  if (ordersTableWrap.value) ordersTableWrap.value.scrollTop = 0
+}, { flush: "sync" })
 const summaryMetrics = computed(() => [
   {
     label: "OT abiertas",
     value: orderStatistics.value.openCount,
-    detail: `${orderStatistics.value.openCount} activas`,
   },
   {
     label: "OT vencidas",
     value: orderStatistics.value.overdueCount,
-    detail: orderStatistics.value.overdueCount ? "Requieren atencion" : "Sin atrasos",
   },
   {
     label: "En ejecucion",
     value: countStatus(["in-progress"]),
-    detail: `${countStatus(["in-progress"])} en taller`,
   },
   {
-    label: "Tiempo promedio",
-    value:
-      averageClosingDays.value === null
-        ? "-"
-        : `${formatDecimalNumber(averageClosingDays.value)} dias`,
-    detail: "Para cerrar una OT",
-  },
-  {
-    label: "Cumplimiento",
-    value: onTimeRate.value === null ? "-" : `${onTimeRate.value}%`,
-    detail: "Dentro de fecha límite",
-  },
-  {
-    label: "Costo real",
-    value: `$ ${formatNumber(actualCost.value)}`,
-    detail: costDifferenceDetail.value,
+    label: "En espera",
+    value: countStatus(["waiting"]),
   },
 ])
-const getCostDeviation = (order) => {
-  const estimated = parseCost(order.estimatedCost)
-  const actual = parseCost(order.actualCost)
-  if (!estimated) return "Sin presupuesto"
-  const difference = actual - estimated
-  if (!difference) return "Sin desviacion"
-  const percentage = Math.round((Math.abs(difference) / estimated) * 100)
-  return `${percentage}% ${difference > 0 ? "sobre" : "bajo"} presupuesto`
-}
 const getDeadlineStatus = (order) => {
   const deadline = parseOrderDate(order.scheduledDate)
   if (!deadline) return { label: "Sin fecha límite de ejecución", className: "is-neutral" }
@@ -388,22 +355,16 @@ const clearLocalFilters = () => {
   deadlineFilter.value = "all"
   deadlineFrom.value = ""
   deadlineTo.value = ""
-  activeList.value = "all"
+  activeList.value = "open"
   emit("update:order-search-term", "")
   emit("update:selected-order-status", "all")
 }
 const openWorkOrderActionModal = (orderId, modalType, status = "") =>
   emit("open-work-order-action-modal", orderId, modalType, status)
-const changeOrderStatus = (order, status) =>
-  openWorkOrderActionModal(
-    order.id,
-    status === "finished"
-      ? "close-order"
-      : ["in-progress", "waiting"].includes(status)
-        ? "assign-order"
-        : "reprogram-order",
-    status,
-  )
+const runNextOrderAction = (order) => {
+  const action = getWorkOrderNextAction(order.status)
+  if (action) openWorkOrderActionModal(order.id, action.modal, action.status)
+}
 const formatCreatedDate = (value) =>
   value ? new Date(value).toLocaleDateString("es-CL") : "17/08/2026"
 watch(pendingSearch, (value) => emit("update:order-search-term", value))
@@ -413,28 +374,58 @@ watch(
     if (!orderId) return
 
     clearLocalFilters()
-    pageSize.value = 50
     await nextTick()
-
-    const selectedRow = [
-      ...(ordersTableWrap.value?.querySelectorAll("[data-order-id]") || []),
-    ].find((row) => row.dataset.orderId === orderId)
-    selectedRow?.scrollIntoView({ behavior: "smooth", block: "center" })
+    const target = props.workOrders.find((order) => String(order.id) === String(orderId)) || props.filteredWorkOrders.find((order) => String(order.id) === String(orderId))
+    if (target) activeList.value = ["finished", "cancelled"].includes(target.status) ? target.status : "open"
+    pendingFocusOrderId.value = String(orderId)
   },
   { immediate: true },
 )
+watch([tabFilteredOrders, pendingFocusOrderId], async () => {
+  const id = pendingFocusOrderId.value
+  if (!id) return
+  const index = tabFilteredOrders.value.findIndex((order) => String(order.id) === id)
+  if (index < 0) return
+  currentPage.value = Math.floor(index / Number(pageSize.value)) + 1
+  await nextTick()
+  if (pendingFocusOrderId.value !== id) return
+  const row = [...(ordersTableWrap.value?.querySelectorAll('[data-order-id]') || [])].find((element) => element.dataset.orderId === id)
+  row?.scrollIntoView({ block: 'nearest' })
+  pendingFocusOrderId.value = ""
+}, { flush: "post" })
 watch(
-  () => props.filteredWorkOrders.length,
+  () => props.workOrders.map((order) => order.id),
   (current, previous) => {
-    if (current > previous) {
+    if (current.some((id) => !previous.includes(id))) {
       selectedAsset.value = "all"
-      activeList.value = "all"
+      activeList.value = "open"
+      currentPage.value = 1
     }
   },
 )
 </script>
 
 <style scoped>
+.orders-view .orders-table-wrap footer button { display: inline-flex; align-items: center; justify-content: center; width: 32px; padding: 0; }
+.orders-table-wrap footer button :deep(svg) { width: 16px; height: 16px; }
+.orders-table-wrap footer button:disabled { opacity: 0.4; cursor: not-allowed; }
+.orders-table-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.orders-controls .expand-table-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; flex-shrink: 0; }
+.expand-table-button :deep(svg) { width: 16px; height: 16px; }
+.orders-view.is-table-expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100dvh;
+  min-height: 0;
+  padding: 16px;
+  background: #f4f7fb;
+  overflow: hidden;
+}
+.is-table-expanded .orders-metrics, .is-table-expanded .orders-filters { display: none; }
+.is-table-expanded .orders-table-wrap { height: auto; min-height: 0; }
 .orders-view {
   display: grid;
   align-content: start;
@@ -445,7 +436,7 @@ watch(
 }
 .orders-metrics {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 .orders-metrics article {
@@ -639,41 +630,10 @@ watch(
 .row-actions button:first-child {
   white-space: nowrap;
 }
+.row-actions .order-next-action { min-width: 120px; white-space: nowrap; border-color: #c8d7f5; background: #eef4ff; font-weight: 700; }
+.row-actions .order-next-action:hover { background: #e1ebff; }
 .row-actions select {
   min-width: 118px;
-}
-.row-actions .cancel {
-  border-color: #fecaca;
-  color: #dc2626;
-}
-.row-actions .more-actions-button {
-  width: 34px;
-  padding: 0;
-  font-size: 20px;
-  line-height: 1;
-}
-.order-secondary-actions {
-  position: absolute;
-  z-index: 30;
-  top: calc(100% + 5px);
-  right: 0;
-  display: grid;
-  width: 150px;
-  gap: 3px;
-  border: 1px solid #d8e0eb;
-  border-radius: 7px;
-  background: #fff;
-  padding: 5px;
-  box-shadow: 0 10px 24px rgb(15 35 90 / 16%);
-}
-.row-actions .order-secondary-actions button {
-  width: 100%;
-  justify-content: flex-start;
-  border: 0;
-  text-align: left;
-}
-.row-actions .order-secondary-actions button:hover {
-  background: #f3f6fb;
 }
 .orders-empty {
   display: grid;

@@ -1,4 +1,9 @@
 import { computed, onScopeDispose, ref, watch } from "vue"
+import { readMaintenanceHours } from '../../utils/maintenance/maintenanceTelemetryReading.js'
+import { maintenanceTargetDate } from '../../utils/maintenance/maintenanceDateTarget.js'
+import { validateMaintenanceOrderStep } from '../../utils/maintenance/maintenanceOrderWizard.js'
+import { getReportsForAsset } from '../activos/fleet/useTelemetryHistory.js'
+import { maintenanceDay, findMaintenanceHistoricalReading } from '../../utils/maintenance/maintenanceHistoricalReading.js'
 import { deleteMaintenanceEvidence, putMaintenanceEvidence } from "../../services/maintenance/maintenanceEvidenceStorage.js"
 import { removeUnreferencedMaintenanceEvidence } from "../../services/maintenance/maintenanceEvidenceSession.js"
 import { createMaintenanceStatePersistence } from "../../services/maintenance/maintenanceStatePersistence.js"
@@ -6,11 +11,11 @@ import { createMaintenanceStateStorage } from "../../services/maintenance/mainte
 import { applyMaintenanceOrderCosts, groupMaintenanceOrderCosts } from "../../utils/maintenance/maintenanceOrderCosts.js"
 import { buildMaintenancePlanIndex, findMaintenancePlansForVehicle } from "../../utils/maintenance/maintenancePlanIndex.js"
 import { migrateMaintenanceReadingSource } from "../../utils/maintenance/maintenanceReadingSourceMigration.js"
+import { toOrderPlanningDate, validateOrderPlanning } from "../../utils/maintenance/maintenanceOrderPlanning.js"
+import { baseMaintenanceOrderId, migrateLegacyMaintenanceOrders, getLegacyMaintenanceOrderReview } from "../../utils/maintenance/maintenanceOrderIdentity.js"
 
 import {
   createMaintenanceDemoAssets,
-  createMaintenanceHistoryDemoOrders,
-  ENABLE_MAINTENANCE_HISTORY_DEMO_DATA,
   ENABLE_MAINTENANCE_DEMO_DATA,
   MAINTENANCE_DEMO_TYPES,
   MAINTENANCE_DEMO_BASE_ORDER_LIMIT,
@@ -78,6 +83,10 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
   })
   const readStoredState = stateStorage.read
   const storedState = readStoredState()
+  const currentTime = ref(new Date())
+  const clockTimer = typeof window === "undefined" ? null : window.setInterval(() => {
+    currentTime.value = new Date()
+  }, 60000)
   const activeTab = ref("overview")
   const searchTerm = ref("")
   const orderSearchTerm = ref("")
@@ -88,8 +97,12 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
   const selectedOrderPriority = ref("all")
   const selectedOrderWorkshop = ref("all")
   const selectedVehicleId = ref("")
+  const workOrderCreationContext = ref(null)
+  const fleetPlanFocus = ref(null)
   const selectedOrderId = ref("")
   const maintenanceFeedbackMessage = ref("")
+  const maintenanceFeedbackAction = ref(null)
+  watch(maintenanceFeedbackMessage, () => { maintenanceFeedbackAction.value = null }, { flush: "sync" })
   const closedPlanRenewal = ref(null)
   const activeMaintenanceModal = ref("")
   const modalDraft = ref({})
@@ -113,9 +126,11 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
     readState: readMaintenanceState,
     writeSections: stateStorage.writeSections,
     putEvidence: putMaintenanceEvidence,
-    onError: () => {
+    onError: (error) => {
       maintenanceFeedbackMessage.value =
-        "No fue posible guardar los cambios o documentos. La copia anterior se conserva; revisa el almacenamiento del navegador."
+        error?.message?.includes("otra ventana")
+          ? "No se guardaron los cambios: hay un conflicto con otra ventana. Conserva tus cambios pendientes y recarga para revisar la ultima version."
+          : "No fue posible guardar los cambios o documentos. La copia anterior se conserva; revisa el almacenamiento del navegador."
     },
   })
   const cleanupMaintenanceEvidence = async (ids) => {
@@ -155,6 +170,7 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
     document.addEventListener("visibilitychange", flushWhenHidden)
   }
   onScopeDispose(() => {
+    if (clockTimer !== null) window.clearInterval(clockTimer)
     flushStoredState()
     if (typeof window !== "undefined") {
       window.removeEventListener("pagehide", flushStoredState)
@@ -231,14 +247,30 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
   }
 
   const getVehicleCurrentReading = (vehicle, source) => {
-    if (source === "Horometro") return Number(vehicle?.hourMeterHours || 0)
-    if (source === "Odometro") return Number(vehicle?.odometer || 0)
+    if (source === "Horometro") return vehicle?.hourMeterHours ?? null
+    if (source === "Odometro") return vehicle?.odometer ?? null
 
     return 0
   }
 
+  const getMaintenanceReadingAtDate = (vehicleId, day, source) => {
+    const asset = scopedAssets.value.find((item) => String(item.id) === String(vehicleId))
+    if (!asset || !day || day > maintenanceDay()) return null
+    if (day === maintenanceDay()) {
+      const vehicle = maintenanceItems.value.find((item) => String(item.id) === String(vehicleId))
+      const value = getVehicleCurrentReading(vehicle, source)
+      return value == null ? null : { value, at: null }
+    }
+    return findMaintenanceHistoricalReading(getReportsForAsset(asset), day, source)
+  }
+
   const buildReadingState = ({ actual, alert, interval, last, source }) => {
     const next = last + interval
+    if (actual == null || !Number.isFinite(Number(actual))) return {
+      actualLabel: "Sin lectura disponible", lastLabel: `${formatNumber(last)} ${getReadingUnit(source)}`,
+      nextLabel: `${formatNumber(next)} ${getReadingUnit(source)}`, remainingLabel: "Sin lectura disponible",
+      status: "no-reading", summaryLabel: "Sin lectura disponible",
+    }
     const remaining = next - actual
     const unit = getReadingUnit(source)
     const status = remaining <= 0 ? "overdue" : remaining <= alert ? "due" : "current"
@@ -262,7 +294,7 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
 
     if (!dueDate) {
       return {
-        actualLabel: formatDateLabel(new Date()),
+        actualLabel: formatDateLabel(currentTime.value),
         lastLabel: "Sin fecha",
         nextLabel: "Sin fecha",
         remainingLabel: "Sin fecha",
@@ -271,7 +303,7 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
       }
     }
 
-    const today = new Date()
+    const today = currentTime.value
     const remaining = Math.ceil((dueDate - today) / 86400000)
     const status = remaining <= 0 ? "overdue" : remaining <= alert ? "due" : "current"
     const summaryLabel =
@@ -318,6 +350,16 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
     const source = draft.readingSourceLabel
     const interval = parseNumber(draft.intervalValue)
     const alert = parseNumber(draft.alertValue)
+    if (!interval || interval <= 0 || String(draft.lastReading ?? '').trim() === '') {
+      return {
+        actualLabel: source === 'Fecha/Hora' ? formatDateLabel(currentTime.value)
+          : getVehicleCurrentReading(vehicle, source) == null ? 'Sin lectura disponible'
+            : `${formatNumber(getVehicleCurrentReading(vehicle, source))} ${getReadingUnit(source)}`,
+        lastLabel: 'Sin referencia', nextLabel: 'Sin configurar',
+        remainingLabel: 'Falta configurar el plan', status: 'unconfigured',
+        summaryLabel: 'Falta configurar el plan',
+      }
+    }
 
     if (source === "Fecha/Hora") {
       return buildDateState({
@@ -388,13 +430,18 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
       id,
       plate,
     }
-    const manualPlan = getManualMaintenancePlan(vehicleScope)
+    const storedManualPlan = getManualMaintenancePlan(vehicleScope)
     const manualPlanCount = getManualMaintenanceCount(vehicleScope)
-    const baseStatus = getMaintenanceStatus(index)
+    const baseStatus = 'unconfigured'
     const baseType = getMaintenanceType(index)
-    const odometer = parseNumber(asset.odometro) || 82000 + index * 18670
+    const rawOdometer = asset.odometro ?? asset.odometer
+    const odometer = rawOdometer == null || String(rawOdometer).trim() === "" ? null : parseNumber(rawOdometer)
     const hasHourMeter = index % 5 !== 4
-    const hourMeterHours = hasHourMeter ? 6200 + index * 847 : null
+    const hourMeterHours = readMaintenanceHours(asset)
+    const manualPlan = storedManualPlan ? {
+      ...storedManualPlan,
+      ...calculateMaintenancePlanState(storedManualPlan, { odometer, hourMeterHours }),
+    } : null
     const baseReadingSourceLabel = getMaintenanceReadingSource(index, hasHourMeter)
     const baseIntervalLabel = getMaintenanceIntervalLabel(baseReadingSourceLabel, index)
     const baseNextDueLabel = getNextDueLabel(baseStatus, index)
@@ -405,8 +452,7 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
     const readingSourceLabel = manualPlan?.readingSourceLabel || baseReadingSourceLabel
     const intervalLabel = manualPlan?.intervalLabel || baseIntervalLabel
     const isDemo = Boolean(asset.maintenanceDemo)
-    const baseMaintenanceCount =
-      baseStatus === "unconfigured" ? 0 : isDemo ? 8 + (index % 3) : 1 + (index % 2)
+    const baseMaintenanceCount = 0
 
     return {
       id,
@@ -426,10 +472,10 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
       hourMeterLabel: hourMeterHours === null ? "-" : `${formatNumber(hourMeterHours)} hrs`,
       initials: getInitials(plate || assetName),
       intervalLabel,
-      nextDueLabel: manualPlan?.summaryLabel || getNextDueLabel(status, index),
-      nextJob: manualPlan?.name || getNextJob(type, index),
+      nextDueLabel: manualPlan?.summaryLabel || 'Sin planes configurados',
+      nextJob: manualPlan?.name || 'Sin planes configurados',
       odometer,
-      odometerLabel: `${formatNumber(odometer)} km`,
+      odometerLabel: odometer == null ? "Sin lectura disponible" : `${formatNumber(odometer)} km`,
       plate,
       readingSourceLabel,
       responsible: ["Juan Vivar", "Mario Torres", "Luis Araya"][index % 3],
@@ -512,95 +558,16 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
     )
   })
 
-  const buildBaseMaintenancePlan = (vehicle) => {
-    const readingSourceLabel = vehicle?.baseReadingSourceLabel || vehicle?.readingSourceLabel
-
-    return {
-      actualLabel:
-        readingSourceLabel === "Horometro" ? vehicle.hourMeterLabel : vehicle.odometerLabel,
-      alertLabel: "Alerta no configurada",
-      companyId: vehicle?.companyId || routeCompanyId.value,
-      id: `base-${vehicle?.id || "vehicle"}`,
-      intervalLabel: vehicle?.baseIntervalLabel || vehicle?.intervalLabel || "-",
-      lastLabel: "Dato base",
-      name: vehicle?.baseMaintenanceName || vehicle?.nextJob || getDefaultMaintenanceType(),
-      nextLabel: vehicle?.baseNextDueLabel || vehicle?.nextDueLabel || "-",
-      plate: vehicle?.plate || "",
-      readingSourceLabel: readingSourceLabel || "Odometro",
-      remainingLabel: vehicle?.baseNextDueLabel || vehicle?.nextDueLabel || "-",
-      source: "base",
-      status: vehicle?.baseStatus || vehicle?.status || "due",
-      summaryLabel: vehicle?.baseNextDueLabel || vehicle?.nextDueLabel || "-",
-      type: vehicle?.baseMaintenanceType || vehicle?.type || getDefaultMaintenanceType(),
-      vehicleId: vehicle?.id || "",
-    }
-  }
-
-  const buildDeclaredBaseMaintenancePlans = (vehicle, count) => {
-    const primaryPlan = buildBaseMaintenancePlan(vehicle)
-    const alternativeTypes = maintenanceTypes.value.filter((type) => {
-      return normalizeText(type) !== normalizeText(primaryPlan.type || primaryPlan.name)
-    })
-    const typeOffset = alternativeTypes.length
-      ? parseNumber(vehicle?.odometer) % alternativeTypes.length
-      : 0
-
-    return Array.from({ length: Math.max(count, 0) }, (_, index) => {
-      if (index === 0) return primaryPlan
-
-      const name =
-        alternativeTypes[(typeOffset + index - 1) % alternativeTypes.length] ||
-        `Mantencion ${index + 1}`
-      const readingSourceLabel = maintenanceTypeReadingSources.value[name] || "Odometro"
-      const status = ["current", "due", "overdue", "current"][index % 4]
-      const intervalLabel =
-        readingSourceLabel === "Fecha/Hora"
-          ? "365 dias"
-          : readingSourceLabel === "Horometro"
-            ? "450 hrs"
-            : "10.000 km"
-      const actualLabel =
-        readingSourceLabel === "Horometro"
-          ? vehicle?.hourMeterLabel || "-"
-          : readingSourceLabel === "Fecha/Hora"
-            ? "Dato calendario"
-            : vehicle?.odometerLabel || "-"
-
-      return {
-        ...primaryPlan,
-        actualLabel,
-        id: `base-${vehicle?.id || "vehicle"}-${index + 1}`,
-        intervalLabel,
-        name,
-        nextLabel: getNextDueLabel(status, index),
-        readingSourceLabel,
-        remainingLabel: getNextDueLabel(status, index),
-        status,
-        summaryLabel: getNextDueLabel(status, index),
-        type: name,
-      }
-    })
-  }
 
   const getVehicleMaintenancePlans = (vehicle) => {
     if (!vehicle) return []
 
     const manualPlans = getManualMaintenancePlans(vehicle)
-    const declaredBaseCount = Math.max(
-      Number(vehicle.baseMaintenanceCount ?? vehicle.activeMaintenanceCount ?? 1),
-      0,
-    )
-    const basePlans = buildDeclaredBaseMaintenancePlans(vehicle, declaredBaseCount)
-    const visibleBasePlans = basePlans.filter((basePlan) => {
-      return !manualPlans.some((plan) => {
-        return (
-          plan.sourcePlanId === basePlan.id ||
-          normalizeText(plan.type || plan.name) === normalizeText(basePlan.type || basePlan.name)
-        )
-      })
-    })
-
-    return [...visibleBasePlans, ...manualPlans].map((plan) => {
+    const currentManualPlans = manualPlans.map((plan) => ({
+      ...plan,
+      ...calculateMaintenancePlanState(plan, vehicle),
+    }))
+    return currentManualPlans.map((plan) => {
       const storedOrderState = maintenancePlanOrderStates.value[plan.id]
       const orderState =
         typeof storedOrderState === "string" ? storedOrderState : storedOrderState?.status
@@ -681,7 +648,7 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
     companyId: item.companyId,
     description:
       "Cambio de aceite de motor, revision de filtros y control general antes de cerrar la mantencion.",
-    id: `OT-${String(250 + index).padStart(3, "0")}`,
+    id: baseMaintenanceOrderId(item),
     estimatedCost: formatCurrency(140000 + index * 58500),
     demoLaborCost: item.isDemo ? 85000 + (index % 6) * 28000 : 0,
     demoPartsCost: item.isDemo ? 120000 + (index % 5) * 42000 : 0,
@@ -719,28 +686,30 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
     return {
       ...order,
       ...(workOrderOverrides.value[order.id] || {}),
+      id: order.id,
+      vehicleId: order.vehicleId,
+      companyId: order.companyId,
     }
   }
+
+  const migratedOrders = migrateLegacyMaintenanceOrders(storedState, maintenanceItems.value)
+  workOrderOverrides.value = migratedOrders.workOrderOverrides
+  extraCostRows.value = migratedOrders.extraCostRows
+  maintenancePlanOrderStates.value = migratedOrders.maintenancePlanOrderStates
+  const legacyOrderReviewRows = computed(() => getLegacyMaintenanceOrderReview(readMaintenanceState(), routeCompanyId.value))
 
   const derivedWorkOrders = computed(() =>
     maintenanceItems.value
       .filter((item) => {
-        if (getManualMaintenancePlan(item)) return false
-        if (!ENABLE_MAINTENANCE_DEMO_DATA || !item.isDemo) return true
-
-        const demoNumber = Number(String(item.id).match(/\d+$/)?.[0]) || 0
-        return demoNumber % 3 === 0
+        const orderId = baseMaintenanceOrderId(item)
+        const hasStoredOrder = workOrderOverrides.value[orderId] || extraCostRows.value.some((row) => row.orderId === orderId)
+        return Boolean(hasStoredOrder)
       })
       .slice(0, ENABLE_MAINTENANCE_DEMO_DATA ? MAINTENANCE_DEMO_BASE_ORDER_LIMIT : undefined)
       .map(buildWorkOrderFromMaintenanceItem),
   )
-  const historyDemoWorkOrders = computed(() =>
-    ENABLE_MAINTENANCE_HISTORY_DEMO_DATA
-      ? createMaintenanceHistoryDemoOrders(maintenanceItems.value)
-      : [],
-  )
   const ordersWithOverrides = computed(() =>
-    [...extraWorkOrders.value, ...derivedWorkOrders.value, ...historyDemoWorkOrders.value]
+    [...extraWorkOrders.value, ...derivedWorkOrders.value]
       .map(applyWorkOrderOverride),
   )
   const costsByOrder = computed(() => groupMaintenanceOrderCosts(extraCostRows.value))
@@ -909,8 +878,11 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
   const isMaintenanceTemplateUsed = (vehicleId, templateName) => {
     if (!vehicleId || !templateName) return false
 
-    const vehicle = getVehicleById(vehicleId)
-    const ignoredPlanId = modalDraft.value?.planId || ""
+    const vehicle = maintenanceItems.value.find((item) => String(item.id) === String(vehicleId))
+    if (!vehicle) return false
+    const ignoredPlanId = activeMaintenanceModal.value === "edit-maintenance"
+      ? modalDraft.value?.planId || ""
+      : ""
 
     return getVehicleMaintenancePlans(vehicle).some((plan) => {
       if (ignoredPlanId && plan.id === ignoredPlanId) return false
@@ -1034,21 +1006,17 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
       typeOverride || template?.name || maintenanceTypes.value[0] || "Mantencion"
     const sourceLabel = getMaintenanceTypeReadingSource(maintenanceName)
     const isDateBased = sourceLabel === "Fecha/Hora"
-    const currentReading = getVehicleCurrentReading(vehicle, sourceLabel)
     const lastReading = isDateBased
-      ? getDateInputDaysAgo(
-          Math.max(Number(template?.interval || 30) - Number(template?.warning || 5), 1),
-        )
-      : Math.max(
-          currentReading - Number(template?.interval || 0) + Number(template?.warning || 0),
-          0,
-        )
+      ? maintenanceDay()
+      : getVehicleCurrentReading(vehicle, sourceLabel) ?? ""
 
     return {
       alertValue: String(template?.warning || ""),
       email: "",
-      intervalValue: String(template?.interval || ""),
+      intervalValue: "",
       lastReading: String(lastReading),
+      startDate: maintenanceDay(),
+      referenceReadingAt: null,
       name: maintenanceName,
       readingSourceLabel: sourceLabel,
       status: "due",
@@ -1060,7 +1028,7 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
   }
 
   const syncMaintenanceTypeDraft = () => {
-    const vehicle = getVehicleById(modalDraft.value.vehicleId)
+    const vehicle = maintenanceItems.value.find((item) => String(item.id) === String(modalDraft.value.vehicleId))
     const selectedType = modalDraft.value.type || maintenanceTypes.value[0]
     const template = getFirstAvailableTemplate(modalDraft.value.vehicleId, selectedType)
 
@@ -1120,9 +1088,13 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
       ),
       email: plan?.email || "",
       intervalValue: String(
-        (plan?.intervalValue ?? parseNumber(plan?.intervalLabel)) || template?.interval || "",
+        plan?.source === 'base' ? '' : (plan?.intervalValue ?? parseNumber(plan?.intervalLabel)) || template?.interval || "",
       ),
-      lastReading: getDraftReadingValueFromPlan(plan, vehicle, template),
+      lastReading: plan?.source === 'base'
+        ? plan.readingSourceLabel === 'Fecha/Hora' ? maintenanceDay() : String(getVehicleCurrentReading(vehicle, plan.readingSourceLabel) ?? '')
+        : getDraftReadingValueFromPlan(plan, vehicle, template),
+      startDate: plan?.startDate || '',
+      referenceReadingAt: plan?.referenceReadingAt || null,
       name: plan?.name || template?.name || "Mantencion preventiva",
       planId: plan?.source === "manual" ? plan.id : "",
       sourcePlanId: plan?.id || "",
@@ -1136,16 +1108,19 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
   }
 
   const syncMaintenanceVehicleDraft = () => {
-    const vehicle = getVehicleById(modalDraft.value.vehicleId)
-    const selectedType = modalDraft.value.type || maintenanceTypes.value[0]
+    const vehicle = maintenanceItems.value.find((item) => String(item.id) === String(modalDraft.value.vehicleId))
+    const previousType = modalDraft.value.type || maintenanceTypes.value[0]
+    const selectedType = isMaintenanceTemplateUsed(vehicle?.id, previousType)
+      ? maintenanceTypes.value.find((type) => !isMaintenanceTemplateUsed(vehicle?.id, type)) || ""
+      : previousType
     const template =
-      getMaintenanceTemplateById(modalDraft.value.templateId) ||
       getFirstAvailableTemplate(vehicle?.id, selectedType)
 
     modalDraft.value = {
       ...buildMaintenanceDraftFromTemplate(template, vehicle, selectedType),
       manualReading: Boolean(modalDraft.value.manualReading),
       name: selectedType,
+      type: selectedType,
       notes: modalDraft.value.notes || "",
       readingSourceLabel: getMaintenanceTypeReadingSource(selectedType),
       vehicleId: vehicle?.id || "",
@@ -1192,7 +1167,7 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
     }
   }
 
-  const createDefaultModalDraft = (type) => {
+  const createDefaultModalDraft = (type, planVehicle = null) => {
     const vehicle = selectedVehicle.value || maintenanceItems.value[0]
     const orderDraft = getSelectedOrderDraft()
 
@@ -1200,13 +1175,13 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
       const typeOverride = preferredMaintenanceType.value
       return {
         ...buildMaintenanceDraftFromTemplate(
-          getFirstAvailableTemplate(vehicle?.id, typeOverride),
-          vehicle,
+          getFirstAvailableTemplate(planVehicle?.id, typeOverride),
+          planVehicle,
           typeOverride,
         ),
         manualReading: false,
         notes: "",
-        vehicleId: vehicle?.id || "",
+        vehicleId: planVehicle?.id || "",
       }
     }
 
@@ -1235,10 +1210,10 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
         orderId: getNextWorkOrderId(),
         owner: vehicle?.responsible || "Tecnico asignado",
         priority: "Media",
-        plannedStartDate: "2026-09-30",
+        plannedStartDate: new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Santiago" }).format(new Date()),
         readingSourceLabel:
           plan?.readingSourceLabel || vehicle?.readingSourceLabel || "Odometro",
-        scheduledDate: "2026-09-30",
+        scheduledDate: "",
         scheduledTime: "09:00",
         type: plan?.type || vehicle?.type || getDefaultMaintenanceType(),
         observations: "",
@@ -1305,18 +1280,30 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
       }
     }
 
+    if (type === "reprogram-order") {
+      return { ...orderDraft,
+        scheduledDate: toOrderPlanningDate(orderDraft.scheduledDate),
+        plannedStartDate: toOrderPlanningDate(orderDraft.plannedStartDate),
+      }
+    }
     return orderDraft
   }
 
-  const setMaintenanceFeedback = (message) => {
+  const setMaintenanceFeedback = (message, action = null) => {
     maintenanceFeedbackMessage.value = message
+    maintenanceFeedbackAction.value = action
     modalActionMessage.value = message
   }
 
   const openMaintenanceModal = (type, returnTo = "") => {
+    if (type === 'create-order') workOrderCreationContext.value = null
+    if (type === 'maintenance-detail') {
+      openVehicleMaintenancePlans(selectedVehicleId.value)
+      return
+    }
     modalActionMessage.value = ""
     maintenanceTypeReturnModal.value = returnTo
-    modalDraft.value = createDefaultModalDraft(type)
+    modalDraft.value = createDefaultModalDraft(type, returnTo === "maintenance-detail" ? selectedVehicle.value : null)
     if (type === "maintenance" && returnTo === "maintenance-detail") {
       modalDraft.value.vehicleId = selectedVehicle.value?.id || ""
     }
@@ -1326,7 +1313,9 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
   const returnToMaintenanceDetail = (message = "") => {
     modalDraft.value = {}
     maintenanceTypeReturnModal.value = ""
-    activeMaintenanceModal.value = "maintenance-detail"
+    activeMaintenanceModal.value = ""
+    activeTab.value = "overview"
+    fleetPlanFocus.value = { vehicleId: selectedVehicleId.value }
     modalActionMessage.value = message
   }
 
@@ -1340,7 +1329,7 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
       ...getMaintenanceDraftFromPlan(plan),
       editMode: true,
       originalType: plan?.type || plan?.name || "",
-      returnToDetail: true,
+      returnToDetail: false,
     }
     activeMaintenanceModal.value = "maintenance"
   }
@@ -1389,7 +1378,7 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
         getDraftReadingValueFromPlan(plan, vehicle, getMaintenanceTemplateForPlan(plan)),
       sourcePlanId: plan.id,
       originalType: plan?.type || plan?.name || "",
-      returnToDetail: true,
+      returnToDetail: false,
     }
     activeMaintenanceModal.value = "maintenance"
   }
@@ -1412,6 +1401,10 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
   }
 
   const closeMaintenanceModal = () => {
+    if (maintenanceTypeReturnModal.value === "order-detail" && activeMaintenanceModal.value !== "order-detail") {
+      openMaintenanceModal("order-detail")
+      return
+    }
     if (
       activeMaintenanceModal.value === "maintenance-type" &&
       maintenanceTypeReturnModal.value === "maintenance-detail"
@@ -1477,6 +1470,7 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
       [orderId]: {
         ...(workOrderOverrides.value[orderId] || {}),
         ...patch,
+        vehicleId: workOrders.value.find((order) => order.id === orderId)?.vehicleId,
       },
     }
   }
@@ -1601,6 +1595,8 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
       intervalValue: draft.intervalValue,
       lastLabel: calculatedState.lastLabel,
       lastReading: draft.lastReading,
+      startDate: draft.startDate || '',
+      referenceReadingAt: draft.referenceReadingAt || null,
       name: draft.name,
       nextLabel: calculatedState.nextLabel,
       plate: vehicle?.plate || "",
@@ -1656,15 +1652,41 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
     }
 
     if (activeMaintenanceModal.value === "maintenance") {
-      const vehicle = getVehicleById(draft.vehicleId)
+      const vehicle = maintenanceItems.value.find((item) => String(item.id) === String(draft.vehicleId))
       const isEditingPlan = Boolean(draft.editMode || draft.planId || draft.sourcePlanId)
 
       if (!vehicle) {
         modalActionMessage.value = "Selecciona un activo para guardar el plan."
         return
       }
+      if (!String(draft.name || '').trim() || !String(draft.type || '').trim() ||
+        !maintenanceReadingSources.includes(draft.readingSourceLabel) ||
+        String(draft.alertValue ?? '').trim() === '' || !Number.isFinite(Number(draft.alertValue)) || Number(draft.alertValue) < 0) {
+        modalActionMessage.value = 'Completa el tipo, criterio y aviso previo para guardar el plan.'
+        return
+      }
 
       const existingPlan = manualMaintenancePlans.value.find((plan) => plan.id === draft.planId)
+      if (draft.readingSourceLabel === 'Fecha/Hora' && !maintenanceTargetDate(draft.lastReading, draft.intervalValue)) {
+        modalActionMessage.value = 'Ingresa una fecha de proxima mantencion posterior al inicio del plan.'
+        return
+      }
+      if (draft.readingSourceLabel !== 'Fecha/Hora' && String(draft.intervalValue ?? '').trim() === '') {
+        modalActionMessage.value = draft.readingSourceLabel === 'Horometro' ? 'Ingresa las horas de la proxima mantencion.' : 'Ingresa el kilometraje de la proxima mantencion.'
+        return
+      }
+      if (draft.startDate && draft.startDate > maintenanceDay()) {
+        modalActionMessage.value = "La fecha de inicio no puede ser futura."
+        return
+      }
+
+      if (["Odometro", "Horometro"].includes(draft.readingSourceLabel) &&
+        (!(Number(draft.intervalValue) > 0) || !Number.isFinite(Number(draft.intervalValue)) ||
+          String(draft.lastReading ?? "").trim() === "" || Number(draft.lastReading) < 0 || !Number.isFinite(Number(draft.lastReading)) ||
+          String(draft.alertValue ?? "").trim() === "" || Number(draft.alertValue) < 0 || !Number.isFinite(Number(draft.alertValue)))) {
+        modalActionMessage.value = "Ingresa la lectura del ultimo servicio, un intervalo mayor que cero y un aviso no negativo."
+        return
+      }
 
       if (!isEditingPlan && isMaintenanceTemplateUsed(draft.vehicleId, draft.type || draft.name)) {
         modalActionMessage.value = `El vehiculo ${vehicle.plate} ya tiene configurada la mantencion ${draft.type || draft.name}.`
@@ -1740,18 +1762,21 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
           [draft.planId]: pendingState.proposedState,
         }
       }
-      setMaintenanceFeedback(`${draft.name} renovada. Proximo vencimiento: ${draft.nextLabel}.`)
-      closeMaintenanceModal()
-      return
-    }
-
-    if (activeMaintenanceModal.value === "maintenance-detail") {
-      activeTab.value = "orders"
+      setMaintenanceFeedback(`${draft.name} renovada. Proximo vencimiento: ${draft.nextLabel}.`, {
+        type: "plan", vehicleId: draft.vehicleId, label: "Ver planes del vehiculo",
+      })
       closeMaintenanceModal()
       return
     }
 
     if (activeMaintenanceModal.value === "create-order") {
+      const wizardError = validateMaintenanceOrderStep(draft, 3)
+      if (wizardError) { modalActionMessage.value = wizardError; return }
+      const context = workOrderCreationContext.value
+      if (context && (String(context.vehicleId) !== String(draft.vehicleId) || String(context.planId) !== String(draft.maintenancePlanId))) {
+        modalActionMessage.value = 'El vehiculo y el plan deben coincidir con la fila seleccionada.'
+        return
+      }
       const vehicle = getVehicleById(draft.vehicleId)
       const maintenancePlan = getVehicleMaintenancePlans(vehicle).find(
         (plan) => plan.id === draft.maintenancePlanId,
@@ -1789,7 +1814,8 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
           { action: "OT creada", at: new Date().toISOString(), user: "Usuario actual" },
           {
             action: "Programada",
-            at: draft.plannedStartDate,
+            at: new Date().toISOString(),
+            detail: `Fecha planificada: ${draft.plannedStartDate}.`,
             user: "Usuario actual",
           },
         ],
@@ -1820,7 +1846,9 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
       selectedVehicleId.value = vehicle.id
       clearOrderFilters()
       activeTab.value = "orders"
-      setMaintenanceFeedback(`Orden ${newOrder.id} creada.`)
+      setMaintenanceFeedback(`Orden ${newOrder.id} creada.`, {
+        type: "order", orderId: newOrder.id, label: "Ver OT creada",
+      })
       closeMaintenanceModal()
       return
     }
@@ -1856,25 +1884,35 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
 
     if (activeMaintenanceModal.value === "reprogram-order") {
       const order = selectedOrder.value
+      if (!order || ["finished", "cancelled"].includes(order.status)) {
+        modalActionMessage.value = "Solo se puede editar la planificacion de una OT abierta."
+        return
+      }
+      const error = validateOrderPlanning(draft)
+      if (error) {
+        modalActionMessage.value = error
+        return
+      }
       updateWorkOrder(draft.orderId, {
         audit: [
           ...(order?.audit || []),
           {
-            action: "OT reprogramada",
+            action: "Planificacion actualizada",
             at: new Date().toISOString(),
-            detail: `Nueva fecha: ${draft.scheduledDate}`,
+            detail: `Inicio: ${draft.plannedStartDate || 'Sin fecha'}. Fecha limite: ${draft.scheduledDate}. Responsable: ${draft.owner}. Taller: ${draft.workshop}. Prioridad: ${draft.priority}.`,
             user: draft.owner,
           },
         ],
         owner: draft.owner,
+        priority: draft.priority,
+        plannedStartDate: draft.plannedStartDate,
         scheduledDate: draft.scheduledDate,
         scheduledTime: draft.scheduledTime,
-        status: "scheduled",
         workshop: draft.workshop,
       })
 
       selectedOrderStatus.value = "all"
-      setMaintenanceFeedback(`Orden ${draft.orderId} reprogramada.`)
+      setMaintenanceFeedback(`Planificacion de ${draft.orderId} actualizada.`)
       closeMaintenanceModal()
       return
     }
@@ -1893,7 +1931,7 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
         audit: [
           ...(order?.audit || []),
           {
-            action: draft.status === "waiting" ? "OT puesta en espera" : "Trabajo iniciado",
+            action: draft.status === "waiting" ? "OT puesta en espera" : draft.transitionLabel === "Reanudar trabajo" ? "Trabajo reanudado" : "Trabajo iniciado",
             at: new Date().toISOString(),
             detail:
               draft.status === "waiting" ? waitingReason : `Trabajo iniciado por ${draft.owner}.`,
@@ -1916,7 +1954,9 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
       })
 
       selectedOrderStatus.value = "all"
-      setMaintenanceFeedback(`Orden ${draft.orderId} asignada.`)
+      setMaintenanceFeedback(draft.transitionLabel
+        ? `Orden ${draft.orderId} ${draft.status === "waiting" ? "puesta en espera" : draft.transitionLabel === "Reanudar trabajo" ? "reanudada" : "iniciada"}.`
+        : `Orden ${draft.orderId} asignada.`)
       closeMaintenanceModal()
       return
     }
@@ -2056,6 +2096,9 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
         closedPlanRenewal.value
           ? `${draft.orderId} cerrada. Ejecucion registrada; el siguiente ciclo esta pendiente de renovacion.`
           : `${draft.orderId} cerrada correctamente.`,
+        closedPlanRenewal.value
+          ? { type: "renew", ...closedPlanRenewal.value, label: "Revisar renovacion" }
+          : { type: "order", orderId: draft.orderId, label: "Ver OT cerrada" },
       )
       closeMaintenanceModal()
       return
@@ -2096,20 +2139,30 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
     }
   }
 
-  const openWorkOrderActionModal = (orderId, modalType, requestedStatus = "") => {
+  const openWorkOrderActionModal = (orderId, modalType, requestedStatus = "", returnTo = "") => {
     selectWorkOrder(orderId)
-    openMaintenanceModal(modalType)
+    openMaintenanceModal(modalType, returnTo)
     if (modalType === "assign-order" && requestedStatus) {
       modalDraft.value.status = requestedStatus
+      modalDraft.value.transitionLabel = requestedStatus === "waiting"
+        ? "Poner en espera"
+        : selectedOrder.value?.status === "waiting" ? "Reanudar trabajo" : "Iniciar trabajo"
     }
   }
 
-  const openWorkOrderCostModal = (orderId) => {
+  const openWorkOrderCostModal = (orderId, returnTo = "") => {
     selectWorkOrder(orderId)
-    openMaintenanceModal("cost")
+    openMaintenanceModal("cost", returnTo)
   }
 
   const openCreateWorkOrder = (vehicleId, maintenancePlanId = "", maintenancePlanName = "") => {
+    const existingOrder = maintenancePlanId
+      ? findOpenOrderForMaintenancePlan(vehicleId, maintenancePlanId)
+      : null
+    if (existingOrder) {
+      openWorkOrderActionModal(existingOrder.id, "order-detail")
+      return
+    }
     const requestedVehicle = vehicleId
       ? maintenanceItems.value.find((vehicle) => String(vehicle.id) === String(vehicleId))
       : null
@@ -2140,6 +2193,7 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
                 normalizeText(plan.name || plan.type) === normalizeText(maintenancePlanName),
             )
       if (selectedPlan) {
+        workOrderCreationContext.value = { vehicleId: selectedVehicleId.value, planId: selectedPlan.id }
         modalDraft.value = {
           ...modalDraft.value,
           description: `OT creada para ejecutar ${selectedPlan.name}. ${selectedPlan.summaryLabel}.`,
@@ -2163,7 +2217,7 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
     openVehicleMaintenancePlans(order.vehicleId)
   }
 
-  const openVehicleMaintenancePlans = (vehicleId) => {
+  const openVehicleMaintenancePlans = (vehicleId, planId = "") => {
     const vehicle = maintenanceItems.value.find((item) => String(item.id) === String(vehicleId))
 
     if (!vehicle) {
@@ -2171,11 +2225,22 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
       return
     }
 
+    if (planId && !getVehicleMaintenancePlans(vehicle).some((plan) => String(plan.id) === String(planId))) {
+      setMaintenanceFeedback("No fue posible encontrar el plan seleccionado para este vehiculo.")
+      return
+    }
+
     selectedVehicleId.value = vehicle.id
     modalActionMessage.value = ""
     maintenanceTypeReturnModal.value = ""
     modalDraft.value = {}
-    activeMaintenanceModal.value = "maintenance-detail"
+    activeMaintenanceModal.value = ""
+    activeTab.value = 'overview'
+    fleetPlanFocus.value = { vehicleId: vehicle.id }
+    if (planId) {
+      const plan = getVehicleMaintenancePlans(vehicle).find((item) => String(item.id) === String(planId))
+      openEditMaintenancePlan(plan)
+    }
   }
 
   useMaintenanceRouteTarget({
@@ -2232,8 +2297,11 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
     hasHourMeterData,
     isBaseMaintenancePlan,
     isMaintenanceTemplateUsed,
+    getMaintenanceReadingAtDate,
     lifecycleSteps,
     maintenanceFeedbackMessage,
+    legacyOrderReviewRows,
+    maintenanceFeedbackAction,
     closedPlanRenewal,
     maintenanceHistory,
     maintenanceItems,
@@ -2252,12 +2320,14 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
     modalVehicleMaintenancePlans,
     openDeleteMaintenancePlan,
     openCreateWorkOrder,
+    workOrderCreationContext,
     openEditMaintenancePlan,
     openMaintenanceModal,
     openRenewMaintenance,
     openWorkOrderCostModal,
     openVehicleCosts,
     openVehicleMaintenancePlans,
+    fleetPlanFocus,
     openWorkOrderActionModal,
     openWorkOrderVehicleMaintenancePlans,
     orderPriorityOptions,

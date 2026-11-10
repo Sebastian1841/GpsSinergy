@@ -67,10 +67,11 @@ export function useActivosGeofenceActions({
     mapPanelRef.value?.editGeofenceSelection?.(geofence)
   }
 
-  const handleGeofenceCreated = async (geofence) => {
+  const handleGeofenceCreated = async (geofence, onResult) => {
     if (!unref(canEditGeofences)) return
 
     const createdGeofence = createGeofence(geofence)
+    onResult?.(Boolean(createdGeofence))
 
     if (!createdGeofence) return
 
@@ -91,10 +92,11 @@ export function useActivosGeofenceActions({
     await refreshMapLayout(true)
   }
 
-  const handleGeofenceUpdated = (updatedGeofence) => {
+  const handleGeofenceUpdated = (updatedGeofence, onResult) => {
     if (!unref(canEditGeofences)) return
 
     const geofence = updateGeofence(updatedGeofence)
+    onResult?.(Boolean(geofence))
 
     if (!geofence) return
 
@@ -111,14 +113,16 @@ export function useActivosGeofenceActions({
     })
   }
 
-  const handleGeofenceDeleted = async (geofenceId) => {
+  const handleGeofenceDeleted = async (geofenceId, onResult) => {
     if (!unref(canEditGeofences)) return
 
     const geofence = geofences.value.find((item) => {
       return normalizeId(item.id) === normalizeId(geofenceId)
     })
 
-    deleteGeofence(geofenceId)
+    const deleted = deleteGeofence(geofenceId)
+    onResult?.(Boolean(deleted))
+    if (!deleted) return
 
     recordAudit({
       module: "geocercas",
@@ -157,8 +161,7 @@ export function useActivosGeofenceActions({
       typeof deleteGeofences === "function"
         ? deleteGeofences(targetIds)
         : targetIds.filter((geofenceId) => {
-            deleteGeofence(geofenceId)
-            return true
+            return Boolean(deleteGeofence(geofenceId))
           })
 
     const deletedIdSet = new Set(deletedIds.map((geofenceId) => normalizeId(geofenceId)))

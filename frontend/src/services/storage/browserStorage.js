@@ -60,3 +60,33 @@ export const readJsonStorage = (key, fallback = null, options = {}) => {
 export const writeJsonStorage = (key, value, options = {}) => {
   return writeStorageValue(key, JSON.stringify(value), options)
 }
+
+// Best-effort rollback for related browser keys; not a cross-window transaction.
+export const writeJsonStorageBatch = (entries, { type = "local" } = {}) => {
+  let storage
+  const written = []
+  try {
+    storage = getBrowserStorage(type)
+    if (!storage) return false
+    const pending = entries.map(([key, value]) => ({
+      key,
+      next: JSON.stringify(value),
+      previous: storage.getItem(key),
+    }))
+    for (const entry of pending) {
+      storage.setItem(entry.key, entry.next)
+      written.push(entry)
+    }
+    return true
+  } catch {
+    for (const entry of written.reverse()) {
+      try {
+        if (entry.previous === null) storage.removeItem(entry.key)
+        else storage.setItem(entry.key, entry.previous)
+      } catch {
+        /* The caller must still report failure and keep its draft. */
+      }
+    }
+    return false
+  }
+}

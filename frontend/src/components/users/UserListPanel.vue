@@ -186,7 +186,7 @@
 
           <span class="flex items-center justify-end gap-2">
             <button
-              v-if="canEditUsers"
+              v-if="canEditUsers && (!row.user.isPlatformAdmin || canEditPlatformAdmins)"
               type="button"
               class="grid h-9 w-9 cursor-pointer place-items-center rounded-md border border-[#d8dee8] bg-white text-[#102372] transition hover:bg-[#eef3ff]"
               aria-label="Editar usuario"
@@ -285,10 +285,13 @@
 
           <div
             class="mt-auto grid gap-2 pt-4"
-            :class="canEditUsers ? 'grid-cols-2' : 'grid-cols-1'"
+            :class="
+              canEditUsers && (!row.user.isPlatformAdmin || canEditPlatformAdmins)
+                ? 'grid-cols-2'
+                : 'grid-cols-1'
+            "
           >
             <button
-              v-if="canEditUsers"
               type="button"
               class="inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-md border border-[#d8dee8] bg-white px-3 text-[10px] font-black text-[#102372] transition hover:bg-[#f7f9fc]"
               @click="$emit('select-user', row.user.id)"
@@ -297,6 +300,7 @@
               Ver detalle
             </button>
             <button
+              v-if="canEditUsers && (!row.user.isPlatformAdmin || canEditPlatformAdmins)"
               type="button"
               class="inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-md bg-[#183568] px-3 text-[10px] font-black text-white transition hover:bg-[#102372]"
               @click="$emit('edit-user', row.user.id)"
@@ -484,6 +488,10 @@ const props = defineProps({
     default: 10,
   },
   canEditUsers: {
+    type: Boolean,
+    default: false,
+  },
+  canEditPlatformAdmins: {
     type: Boolean,
     default: false,
   },

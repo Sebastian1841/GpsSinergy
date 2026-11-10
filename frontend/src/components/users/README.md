@@ -6,6 +6,11 @@ detalle y la edicion se abren sobre esta superficie solo cuando se necesitan.
 
 ## Archivos
 
+El listado recibe `canEditPlatformAdmins` para ocultar edicion de cuentas
+administradoras a operadores. El detalle recibe `canManageApplication`, aplicado
+al acceso seleccionado y a las aplicaciones disponibles para agregar.
+Las mutaciones repiten estos controles en el composable.
+
 - `UserManagementHeader.vue`: encabezado legado conservado temporalmente para
   compatibilidad, pero ya no se monta desde `UserManagementView.vue`.
 - `UserFiltersBar.vue`: barra compacta con buscador, filtros por empresa, rol,

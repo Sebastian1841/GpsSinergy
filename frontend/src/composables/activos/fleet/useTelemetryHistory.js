@@ -1,4 +1,5 @@
 import { parseNumberFromLabel } from "../../../utils/numberUtils.js"
+import { readMaintenanceHours } from '../../../utils/maintenance/maintenanceTelemetryReading.js'
 import {
   formatTelemetryTime,
   getTelemetryTimestamp,
@@ -8,7 +9,6 @@ import {
   appendReportEventsFromTelemetryReports,
   clearReportEventsForSourceKeys,
   clearGeneratedReportEvents,
-  clearReportEventsForAsset,
   getReportEventSourceKeyForReport,
 } from "../../reports/useGeneratedReportEvents.js"
 
@@ -17,74 +17,80 @@ export const TELEMETRY_HISTORY_MAX_REPORTS_PER_ASSET = 1200
 const telemetryReportsByAssetId = new Map()
 const telemetryReportKeysByAssetId = new Map()
 const telemetryCanonicalAssetIdByAlias = new Map()
+const telemetryIdentityByAssetKey = new Map()
 
 const normalizeId = (value) => {
   return String(value ?? "").trim()
 }
 
-const normalizeIdentityList = (values = []) => {
-  return Array.from(
-    new Set(
-      values
-        .map(normalizeId)
-        .filter(Boolean)
-        .filter((value) => value !== "null" && value !== "undefined"),
-    ),
+const normalizeIdentity = (value) => {
+  const identity = normalizeId(value)
+  return ["", "-", "--", "null", "undefined", "n/a", "sin patente", "sin dato"].includes(
+    identity.toLowerCase(),
   )
+    ? ""
+    : identity
 }
 
-const getAssetIdentityValues = (source = {}) => {
+const getAssetIdentity = (source = {}) => {
   if (typeof source !== "object" || source === null) {
-    return normalizeIdentityList([source])
+    return { aliases: [["any", normalizeIdentity(source)]].filter(([, value]) => value) }
   }
-
-  return normalizeIdentityList([
-    source.id,
-    source.assetId,
-    source.activoId,
-    source.deviceId,
-    source.device_id,
-    source.imei,
-    source.patente,
-    source.patent,
-  ])
+  const aliases = [
+    ["id", [source.assetId, source.activoId, source.id].map(normalizeIdentity).find(Boolean)],
+    ["device", [source.deviceId, source.device_id].map(normalizeIdentity).find(Boolean)],
+    ["imei", source.imei],
+    ["plate", [source.patente, source.patent].map(normalizeIdentity).find(Boolean)],
+  ]
+    .map(([type, value]) => [type, normalizeIdentity(value)])
+    .filter(([, value]) => value)
+  return {
+    aliases,
+    companyId: normalizeIdentity(source.companyId),
+    applicationId: normalizeIdentity(source.applicationId),
+  }
 }
 
-const getTelemetryIdentityValues = ({ activo = {}, update = {} }) => {
-  return normalizeIdentityList([
-    update.id,
-    update.assetId,
-    update.activoId,
-    update.deviceId,
-    update.device_id,
-    update.imei,
-    update.patente,
-    update.patent,
-    ...getAssetIdentityValues(activo),
-  ])
+const aliasKey = ([type, value]) => JSON.stringify([type, value])
+const identityKey = (identity) =>
+  JSON.stringify([identity.applicationId || "", identity.companyId || "", ...identity.aliases[0]])
+const matchesScope = (identity, owner) =>
+  (!identity.companyId || identity.companyId === owner.companyId) &&
+  (!identity.applicationId || identity.applicationId === owner.applicationId)
+
+const findAssetKeys = (identity) => {
+  // An explicit asset ID must never fall back to a plate or device belonging to another asset.
+  const aliases =
+    identity.aliases[0]?.[0] === "id" ? identity.aliases.slice(0, 1) : identity.aliases
+  const candidates = new Set()
+  for (const alias of aliases) {
+    const keys =
+      alias[0] === "any"
+        ? ["id", "device", "imei", "plate"].map((type) => aliasKey([type, alias[1]]))
+        : [aliasKey(alias)]
+    for (const key of keys) {
+      for (const assetKey of telemetryCanonicalAssetIdByAlias.get(key) || []) {
+        if (matchesScope(identity, telemetryIdentityByAssetKey.get(assetKey)))
+          candidates.add(assetKey)
+      }
+    }
+  }
+  return candidates.size === 1 ? [...candidates] : []
 }
 
-const getPrimaryAssetId = ({ activo = {}, update = {} }) => {
-  return getTelemetryIdentityValues({ activo, update })[0] || ""
+const registerAssetAliases = (assetKey, identity) => {
+  const aliases = [...new Map(identity.aliases.map((alias) => [aliasKey(alias), alias])).values()]
+  telemetryIdentityByAssetKey.set(assetKey, { ...identity, aliases })
+  for (const alias of identity.aliases) {
+    const key = aliasKey(alias)
+    const owners = telemetryCanonicalAssetIdByAlias.get(key) || new Set()
+    owners.add(assetKey)
+    telemetryCanonicalAssetIdByAlias.set(key, owners)
+  }
 }
 
-const resolveCanonicalAssetId = (identityValues = []) => {
-  return (
-    identityValues
-      .map((identity) => telemetryCanonicalAssetIdByAlias.get(identity))
-      .find(Boolean) ||
-    identityValues[0] ||
-    ""
-  )
-}
-
-const registerAssetAliases = ({ canonicalAssetId, identityValues = [] }) => {
-  if (!canonicalAssetId) return
-
-  identityValues.forEach((identity) => {
-    telemetryCanonicalAssetIdByAlias.set(identity, canonicalAssetId)
-  })
-}
+const getPrimaryAssetId = ({ activo = {}, update = {} }) =>
+  getAssetIdentity({ ...activo, ...update }).aliases[0]?.[1] || ""
 
 const isValidNumber = (value) => {
   return Number.isFinite(Number(value))
@@ -195,6 +201,10 @@ const buildTelemetryHistoryPoint = (activo = {}, update = {}) => {
     id: update.reportId || update.telemetryId || `${assetId}-telemetry-${cleanTimestamp}`,
     assetId,
     timestamp,
+    recordedMaintenanceReadings: {
+      odometer: update.odometer ?? update.odometro ?? null,
+      hourMeterHours: readMaintenanceHours(update),
+    },
 
     lat: Number(lat),
     lng: Number(lng),
@@ -434,19 +444,19 @@ export const appendTelemetryReports = (batch = []) => {
 
   batch.forEach((rawUpdate) => {
     const activo = rawUpdate?.activo || {}
-    const identityValues = getTelemetryIdentityValues({
-      activo,
-      update: rawUpdate,
+    const identity = getAssetIdentity({
+      ...activo,
+      ...rawUpdate,
+      assetId:
+        activo.id ?? activo.assetId ?? rawUpdate.assetId ?? rawUpdate.activoId ?? rawUpdate.id,
     })
-
-    if (!identityValues.length) return
-
-    const canonicalAssetId = resolveCanonicalAssetId(identityValues)
-
-    registerAssetAliases({
-      canonicalAssetId,
-      identityValues,
-    })
+    if (!identity.aliases.length) return
+    const assetKey =
+      identity.aliases[0][0] === "id"
+        ? identityKey(identity)
+        : findAssetKeys(identity)[0] || identityKey(identity)
+    const canonicalAssetId =
+      telemetryIdentityByAssetKey.get(assetKey)?.aliases[0][1] || identity.aliases[0][1]
 
     const update = {
       ...rawUpdate,
@@ -458,8 +468,16 @@ export const appendTelemetryReports = (batch = []) => {
 
     if (!nextReport) return
 
+    registerAssetAliases(assetKey, {
+      ...identity,
+      companyId: telemetryIdentityByAssetKey.get(assetKey)?.companyId || identity.companyId,
+      applicationId:
+        telemetryIdentityByAssetKey.get(assetKey)?.applicationId || identity.applicationId,
+      aliases: [...(telemetryIdentityByAssetKey.get(assetKey)?.aliases || []), ...identity.aliases],
+    })
+
     const reportWasAppended = appendReportForAssetKey({
-      assetKey: canonicalAssetId,
+      assetKey,
       report: nextReport,
     })
 
@@ -474,17 +492,7 @@ export const appendTelemetryReports = (batch = []) => {
 }
 
 export const getReportsForAsset = (asset) => {
-  const identityValues = getAssetIdentityValues(asset)
-
-  if (!identityValues.length) return []
-
-  const canonicalAssetIds = Array.from(
-    new Set(
-      identityValues.map((identity) => {
-        return telemetryCanonicalAssetIdByAlias.get(identity) || identity
-      }),
-    ),
-  )
+  const canonicalAssetIds = findAssetKeys(getAssetIdentity(asset))
   const reports = canonicalAssetIds.flatMap((assetKey) => {
     return telemetryReportsByAssetId.get(assetKey) || []
   })
@@ -497,30 +505,27 @@ export const getTelemetryReportsCountForAsset = (asset) => {
 }
 
 export const clearReportsForAsset = (asset) => {
-  const identityValues = getAssetIdentityValues(asset)
-  const canonicalAssetIds = new Set(
-    identityValues.map((identity) => {
-      return telemetryCanonicalAssetIdByAlias.get(identity) || identity
-    }),
-  )
+  const canonicalAssetIds = new Set(findAssetKeys(getAssetIdentity(asset)))
 
   canonicalAssetIds.forEach((assetKey) => {
+    clearReportEventsForSourceKeys(
+      (telemetryReportsByAssetId.get(assetKey) || []).map(getReportEventSourceKeyForReport),
+    )
     telemetryReportsByAssetId.delete(assetKey)
     telemetryReportKeysByAssetId.delete(assetKey)
+    telemetryIdentityByAssetKey.delete(assetKey)
   })
 
-  telemetryCanonicalAssetIdByAlias.forEach((canonicalAssetId, alias) => {
-    if (canonicalAssetIds.has(canonicalAssetId) || identityValues.includes(alias)) {
-      telemetryCanonicalAssetIdByAlias.delete(alias)
-    }
+  telemetryCanonicalAssetIdByAlias.forEach((owners, alias) => {
+    canonicalAssetIds.forEach((assetKey) => owners.delete(assetKey))
+    if (!owners.size) telemetryCanonicalAssetIdByAlias.delete(alias)
   })
-
-  clearReportEventsForAsset(asset)
 }
 
 export const clearTelemetryHistory = () => {
   telemetryReportsByAssetId.clear()
   telemetryReportKeysByAssetId.clear()
   telemetryCanonicalAssetIdByAlias.clear()
+  telemetryIdentityByAssetKey.clear()
   clearGeneratedReportEvents()
 }

@@ -40,6 +40,7 @@
           />
 
           <main class="min-h-0 overflow-auto p-3">
+            <p v-if="rulesWriteError" role="alert" class="mb-3 text-[12px] text-red-700">{{ rulesWriteError }}</p>
             <div
               class="rounded-lg bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70"
             >
@@ -157,7 +158,7 @@ const props = defineProps({
 
 const emit = defineEmits(["update:modelValue", "saved", "deleted"])
 
-const { reportEventRules, createEventRule, updateEventRule, deleteEventRule } =
+const { reportEventRules, rulesWriteError, createEventRule, updateEventRule, deleteEventRule } =
   useReportEventRules()
 const { recordAudit } = useAuditTrail()
 

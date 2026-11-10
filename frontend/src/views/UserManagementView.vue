@@ -40,6 +40,7 @@
             :total-pages="totalPages"
             :page-size="pageSize"
             :can-edit-users="canEditUsersForRoute"
+            :can-edit-platform-admins="isPlatformAdmin"
             @select-user="handleSelectUser"
             @edit-user="handleEditUserFromCatalog"
             @clear-filters="clearFilters"
@@ -114,8 +115,11 @@
               :assets="assets"
               :asset-tags="assetTags"
               :can-impersonate="canImpersonateSelectedUser"
-              :can-edit-users="canEditUsersForRoute"
+              :can-edit-users="
+                canEditUsersForRoute && (!selectedUserIsPlatformAdmin || isPlatformAdmin)
+              "
               :can-manage-user-permissions="canManageSelectedUserPermissionsForRoute"
+              :can-manage-application="canManageApplication"
               @impersonate-user="handleImpersonateSelectedUser"
               @edit-user="handleOpenEditUserModal"
               @toggle-user-status="handleToggleSelectedUserStatus"
@@ -141,7 +145,7 @@
       :mode="editorMode"
       :draft-user="draftUser"
       :roles="roles"
-      :applications="applications"
+      :applications="creatableApplications"
       @update:draft-user="updateDraftUser"
       @close="closeEditorModal"
       @save="handleSaveUserFromModal"
@@ -171,7 +175,8 @@ const UserEditorModal = defineAsyncComponent(loadUserEditorModal)
 const route = useRoute()
 const router = useRouter()
 
-const { canImpersonateUser, startImpersonation, defaultAuthenticatedRoute } = useAuthSession()
+const { canImpersonateUser, startImpersonation, defaultAuthenticatedRoute, isPlatformAdmin } =
+  useAuthSession()
 
 const { canAccessFunction } = useAccessControl()
 const { assetTags } = useMockDatabase()
@@ -187,6 +192,8 @@ const {
   accesses,
   companies,
   applications,
+  canManageApplication,
+  creatableApplications,
   modules,
   moduleFunctions,
   permissions,

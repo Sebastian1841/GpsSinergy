@@ -67,9 +67,17 @@ const readAlarmRecords = () => {
 }
 
 const alarms = ref(readAlarmRecords())
+const alarmsWriteError = ref("")
 
-const persistAlarms = () => {
-  writeJsonStorage(ALARMS_STORAGE_KEY, alarms.value)
+const persistAlarms = (nextAlarms) => {
+  alarmsWriteError.value = ""
+  if (!writeJsonStorage(ALARMS_STORAGE_KEY, nextAlarms)) {
+    alarmsWriteError.value =
+      "No se pudo guardar el cambio de alertas. Los datos no cambiaron. Intenta nuevamente."
+    return false
+  }
+  alarms.value = nextAlarms
+  return true
 }
 
 if (typeof window !== "undefined") {
@@ -83,34 +91,34 @@ if (typeof window !== "undefined") {
 const createAlarm = (payload = {}) => {
   const alarm = normalizeAlarm(payload)
 
-  alarms.value = [alarm, ...alarms.value].slice(0, MAX_ALARM_RECORDS)
-  persistAlarms()
+  if (!persistAlarms([alarm, ...alarms.value].slice(0, MAX_ALARM_RECORDS))) return null
 
   return alarm
 }
 
-const updateAlarm = (alarmId, changes = {}) => {
-  const normalizedAlarmId = normalizeText(alarmId)
-  let updatedAlarm = null
-
-  alarms.value = alarms.value.map((alarm) => {
-    if (normalizeText(alarm.id) !== normalizedAlarmId) return alarm
-
-    updatedAlarm = normalizeAlarm({
-      ...alarm,
-      ...changes,
-      id: alarm.id,
-    })
-
-    return updatedAlarm
-  })
-
-  if (updatedAlarm) {
-    persistAlarms()
+const updateAlarms = (updates = []) => {
+  alarmsWriteError.value = ""
+  if (!updates.length) return null
+  const changesById = new Map(updates.map(({ id, changes }) => [normalizeText(id), changes]))
+  if (
+    changesById.size !== updates.length ||
+    [...changesById.keys()].some((id) => !alarms.value.some((alarm) => alarm.id === id))
+  ) {
+    alarmsWriteError.value =
+      "No se encontraron todas las alertas. Actualiza la seleccion e intenta nuevamente."
+    return null
   }
-
-  return updatedAlarm
+  const updatedAlarms = []
+  const nextAlarms = alarms.value.map((alarm) => {
+    if (!changesById.has(alarm.id)) return alarm
+    const updated = normalizeAlarm({ ...alarm, ...changesById.get(alarm.id), id: alarm.id })
+    updatedAlarms.push(updated)
+    return updated
+  })
+  return persistAlarms(nextAlarms) ? updatedAlarms : null
 }
+
+const updateAlarm = (alarmId, changes = {}) => updateAlarms([{ id: alarmId, changes }])?.[0] || null
 
 const resolveAlarm = (alarmId, actorName = "Usuario") => {
   const currentAlarm = alarms.value.find(
@@ -139,7 +147,9 @@ const reopenAlarm = (alarmId) => {
 export const useAlarmsService = () => {
   return {
     alarms: computed(() => alarms.value),
+    alarmsWriteError: computed(() => alarmsWriteError.value),
     createAlarm,
+    updateAlarms,
     updateAlarm,
     resolveAlarm,
     reopenAlarm,

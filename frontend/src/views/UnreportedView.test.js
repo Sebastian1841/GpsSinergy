@@ -129,7 +129,7 @@ test("equipment thumbnails reuse Activos configuration with fixed size and failu
   assert.match(descriptor.scriptSetup.content, /useActivosService\(\)/)
   assert.match(descriptor.scriptSetup.content, /getAssetImageMarkerVariant\(asset \|\| \{\}\)/)
   assert.match(descriptor.scriptSetup.content, /\[\{\}, \.\.\.vehicleImageIndex.value.values\(\)\]/)
-  assert.match(descriptor.scriptSetup.content, /unreportedAssetImageKey\(row.company, row.imei\)/)
+  assert.match(descriptor.scriptSetup.content, /unreportedAssetImageKey\(row.companyId, row.imei\)/)
   assert.doesNotMatch(descriptor.scriptSetup.content, /camion\|truck\|volvo\|scania/)
   assert.match(descriptor.template.content, /:src="getVehicleImage\(row\)"/)
   assert.match(descriptor.template.content, /@error="markVehicleImageFailed/)
@@ -340,7 +340,7 @@ test("review shows company contact from the shared authorized company catalog", 
     readFileSync(new URL("./UnreportedView.vue", import.meta.url), "utf8"),
   ).descriptor
   assert.match(view.scriptSetup.content, /useCompaniesService\(\)/)
-  assert.match(view.scriptSetup.content, /equipmentContext.value.companies.includes\(company\)/)
+  assert.match(view.scriptSetup.content, /equipmentContext.value.companyIds.includes\(String\(company.companyId\)\)/)
   assert.match(view.template.content, /:company-contact="operationCompanyContact"/)
   const modal = parse(
     readFileSync(

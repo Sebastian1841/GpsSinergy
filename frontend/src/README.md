@@ -1,5 +1,9 @@
 # Frontend Source
 
+`App.vue` muestra `persistenceError` de la base compartida como aviso accesible.
+No descarta el estado de formularios cuando un guardado local falla o entra en
+conflicto con otra ventana.
+
 Raiz del codigo Vue del frontend. La organizacion se mantiene por tipo de responsabilidad para evitar duplicar modulos:
 
 - `assets/`: imagenes, iconos raster y estilos globales especificos.

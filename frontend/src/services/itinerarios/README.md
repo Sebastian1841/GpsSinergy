@@ -11,6 +11,9 @@ Servicios de exportacion y procesamiento de itinerarios.
 - `itineraryExcelExportService.js`: construccion del libro Excel. La hoja `Reporte` sigue el orden visual de la vista previa y las hojas `Detalle GPS` y `Activos` conservan los datos completos.
 - `itineraryExportService.test.js`: pruebas de exportacion.
 - `itineraryPanelExportService.js`: exportacion desde el panel de itinerarios.
+  resolveItineraryExportRows propaga signal/timeoutMs al servicio de direcciones;
+  el presupuesto predeterminado de 20 segundos conserva coordenadas de respaldo
+  si no termina la resolucion. No limita el tiempo de construir el archivo.
 - `nativeExcelCharts.js`: soporte de graficos nativos para Excel. Puede anexar graficos y logo a una hoja que ya tenga dibujos de ExcelJS, como el mapa de ruta.
 
 ## Regla de mantenimiento

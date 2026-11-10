@@ -94,6 +94,7 @@
           class="col-start-2 row-start-1 flex min-w-0 shrink-0 items-center justify-end gap-1.5 justify-self-end sm:gap-2 lg:col-start-3"
         >
           <WorkspaceSelector
+            :write-error="workspaceWriteError"
             class="hidden shrink-0 xl:block"
             :enabled="showWorkspacesControl"
             :is-open="showWorkspaceDropdown"
@@ -244,6 +245,7 @@
           class="col-span-2 row-start-3 flex min-w-0 flex-wrap items-center justify-end gap-2 pt-0.5 xl:hidden"
         >
           <WorkspaceSelector
+            :write-error="workspaceWriteError"
             class="shrink-0"
             :enabled="showWorkspacesControl"
             :is-open="showWorkspaceDropdown"
@@ -601,7 +603,7 @@ const {
   selectWorkspace,
   createWorkspace,
   renameWorkspace,
-  shareWorkspace,
+  workspaceWriteError,
   saveCurrentWorkspaceView,
   deleteWorkspace,
 } = useWorkspaces({
@@ -762,9 +764,10 @@ const requestRestoreForWorkspace = (workspace) => {
   })
 }
 
-const handleSelectWorkspace = async (workspaceId) => {
+const handleSelectWorkspace = async (workspaceId, onResult) => {
   const workspace = selectWorkspace(workspaceId)
 
+  onResult?.(Boolean(workspace))
   if (!workspace) return
 
   closeAllDropdowns()
@@ -783,16 +786,17 @@ const handleSelectWorkspace = async (workspaceId) => {
   requestRestoreForWorkspace(workspace)
 }
 
-const handleCreateWorkspace = ({ name, sharedWithUserIds = [] }) => {
-  createWorkspace({
+const handleCreateWorkspace = ({ name, sharedWithUserIds = [] }, onResult) => {
+  const saved = createWorkspace({
     name,
     sharedWithUserIds,
   })
+  onResult?.(Boolean(saved))
 }
 
-const handleRenameWorkspace = ({ workspaceId, name, sharedWithUserIds = [] }) => {
-  renameWorkspace(workspaceId, name)
-  shareWorkspace(workspaceId, sharedWithUserIds)
+const handleRenameWorkspace = ({ workspaceId, name, sharedWithUserIds = [] }, onResult) => {
+  const saved = renameWorkspace(workspaceId, name, sharedWithUserIds)
+  onResult?.(Boolean(saved))
 }
 
 const handleDeleteWorkspace = (workspaceId) => {

@@ -23,6 +23,14 @@ registros invalidos generan rulesLoadError y bloquean mutaciones sin sobrescribi
 
 ## Escritura Comprobada
 
+Alertas operativas: createAlarm/updateAlarm/resolveAlarm/reopenAlarm solo publican
+estado tras confirmar writeJsonStorage. Fallar devuelve null y expone
+alarmsWriteError; reintentar no requiere recrear el servicio. updateAlarms permite
+atender o reabrir varios registros en una sola escritura: si falta un ID o falla
+la persistencia no se publica ningun cambio. No es una transaccion de servidor
+ni implementa deteccion de conflictos entre ventanas. Pruebas en
+`useAlarmsService.test.js` cubren fallo, reintento, lote y consumidores.
+
 createRule/updateRule/deleteRule/toggleRule releen el estado actual y solo
 publican el resultado reactivo cuando writeJsonStorage confirma escritura.
 Al editar o borrar se compara la regla esperada con la actual; conflicto o fallo

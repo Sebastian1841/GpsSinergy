@@ -1,4 +1,5 @@
 import { describeUnreportedDiagnosis } from "./unreportedDiagnosis.js"
+import { equipmentKey } from "./unreportedEquipmentIdentity.js"
 
 const time = (value) => (value ? Date.parse(value) : NaN)
 
@@ -182,28 +183,47 @@ export const consultationsForInterruption = (record, interruption) =>
         (!interruption.recoveredAt || time(call.createdAt) <= time(interruption.recoveredAt)),
   )
 
-export const knownEquipmentWithHistory = (source, records) => {
-  const rows = new Map(source.map((row) => [JSON.stringify([row.company, String(row.imei)]), row]))
+export const knownEquipmentWithHistory = (source, records, companies = []) => {
+  const rows = new Map(source.map((row) => [equipmentKey(row), row]))
+  const companiesById = new Map(companies.map((company) => [String(company.id), company]))
+  const companiesByName = new Map()
+  for (const company of companies) {
+    const matches = companiesByName.get(company.name) || []
+    matches.push(company)
+    companiesByName.set(company.name, matches)
+  }
   for (const [key, record] of Object.entries(records)) {
     if (rows.has(key)) continue
     if (!record || typeof record !== "object") continue
+    if (record.identityMigratedTo) continue
     let identity
     try {
       identity = JSON.parse(key)
     } catch {
       continue
     }
-    if (!Array.isArray(identity) || identity.length !== 2 || !identity[0] || !identity[1]) continue
-    const [company, imei] = identity
+    if (!Array.isArray(identity)) continue
+    const stable = identity.length === 3 && identity[0] === "company-id"
+    if (!stable && identity.length !== 2) continue
+    const namedCompanies = companiesByName.get(identity[0]) || []
+    const companyId = stable
+      ? String(identity[1])
+      : (record.equipment?.companyId ??
+        (namedCompanies.length === 1 ? String(namedCompanies[0].id) : undefined))
+    const company = stable ? record.equipment?.company || "Empresa" : identity[0]
+    const imei = stable ? identity[2] : identity[1]
+    if (!company || !imei) continue
     const metadata = record.equipment || {}
-    rows.set(key, {
+    const archived = {
       name: metadata.name || String(imei),
-      company: String(company),
+      company: companiesById.get(String(companyId))?.name || String(company),
+      ...(companyId == null ? {} : { companyId: String(companyId) }),
       imei: String(imei),
       lastReport: record.lastSeenAt,
       location: metadata.location || "Sin posicion conocida",
       archived: true,
-    })
+    }
+    if (!rows.has(equipmentKey(archived))) rows.set(equipmentKey(archived), archived)
   }
   return [...rows.values()]
 }

@@ -3,6 +3,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { parse, compileScript, compileTemplate } from "@vue/compiler-sfc"
 import { CONFIGURATION_MODULES } from "../utils/layout/configurationNavigation.js"
+import { ref } from "vue"
 
 test("advanced configuration compiles and keeps platform-only access and local processing disclosure", () => {
   const source = readFileSync(new URL("ConfigurationAdvancedView.vue", import.meta.url), "utf8")
@@ -55,4 +56,60 @@ test("advanced configuration compiles and keeps platform-only access and local p
   assert.ok(source.includes("requirePersistence: true"))
   assert.ok(!source.includes("advanced-history"))
   assert.ok(!source.includes("ADVANCED_HISTORY_DEMO"))
+})
+
+test("a transient advanced save error allows retry without discarding the draft", () => {
+  const source = readFileSync(new URL("ConfigurationAdvancedView.vue", import.meta.url), "utf8")
+  const review = source.slice(
+    source.indexOf("const reviewSave ="),
+    source.indexOf("const informationButton ="),
+  )
+  const save = source.slice(source.indexOf("const save ="), source.indexOf("const onStorage ="))
+  const draft = ref({ value: 2 }),
+    baseline = ref({ value: 1 }),
+    saveError = ref(""),
+    error = ref("")
+  let writes = 0
+  const state = {
+    editable: ref(true),
+    ready: ref(true),
+    dirty: ref(true),
+    error,
+    saveError,
+    attempted: ref(false),
+    errors: ref({}),
+    reviewedDraft: ref(null),
+    draft,
+    baseline,
+    changesDialog: ref({ showModal() {} }),
+    currentUser: ref({ id: "user" }),
+    message: ref(""),
+    closeChangesDialog() {},
+    syncAudit() {},
+    sameAdvancedConfiguration: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+    readStorageValue() {},
+    writeStorageValue() {},
+    saveAdvancedConfiguration: ({ draft }) => {
+      if (++writes === 1) throw new Error("Storage full")
+      return draft
+    },
+  }
+  const handlers = new Function(
+    ...Object.keys(state),
+    `${review}\n${save}\nreturn { reviewSave, save }`,
+  )(...Object.values(state))
+  handlers.reviewSave()
+  handlers.save()
+  assert.equal(saveError.value, "Storage full")
+  assert.equal(error.value, "")
+  assert.deepEqual(draft.value, { value: 2 })
+  handlers.reviewSave()
+  handlers.save()
+  assert.equal(writes, 2)
+  assert.equal(saveError.value, "")
+  assert.deepEqual(baseline.value, { value: 2 })
+  error.value = "Changed in another window"
+  handlers.reviewSave()
+  handlers.save()
+  assert.equal(writes, 2)
 })

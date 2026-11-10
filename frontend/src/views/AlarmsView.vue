@@ -62,8 +62,9 @@
           @clear-filters="clearFilters"
         />
 
+        <div v-if="alarmsWriteError" role="alert" class="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">{{ alarmsWriteError }}</div>
         <div
-          v-if="feedbackMessage"
+          v-if="feedbackMessage && !alarmsWriteError"
           class="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-black text-emerald-700"
         >
           {{ feedbackMessage }}
@@ -206,7 +207,7 @@ const currentCompanyId = computed(() => {
 })
 
 const { currentUser } = useAuthSession()
-const { alarms, reopenAlarm, updateAlarm } = useAlarmsService()
+const { alarms, updateAlarms, alarmsWriteError } = useAlarmsService()
 
 const { accessibleCompanies, visibleAssets, canAccessFunction, isPlatformAdmin } =
   useAccessControl()
@@ -642,24 +643,28 @@ const handleAttention = ({ id, action, note } = {}) => {
   }
   const targets = [...attentionTargets.value]
   const now = new Date().toISOString()
-  let registered = 0
-  for (const alarm of targets) {
-    const changes = buildAttentionUpdate(alarm, {
+  const updates = targets.map((alarm) => ({
+    id: alarm.id,
+    changes: buildAttentionUpdate(alarm, {
       action,
       note,
       actor: currentActorName.value,
       at: now,
-    })
-    if (!changes) continue
-    updateAlarm(alarm.id, changes)
-    registered++
+    }),
+  }))
+  if (updates.some(({ changes }) => !changes)) return
+  feedbackMessage.value = ""
+  const saved = updateAlarms(updates)
+  if (!saved) return
+  for (const { id, changes } of updates) {
+    const alarm = targets.find((item) => item.id === id)
     recordAlarmAudit({
       alarm,
       action: "alarm:attention",
       description: `${changes.metadata.attention.label}${changes.metadata.attention.note ? ": " + changes.metadata.attention.note : ""}`,
     })
   }
-  if (!registered) return
+  const registered = saved.length
   cancelAttention()
   selectedGroupKeys.value = []
   selectedAlarmId.value = ""
@@ -676,8 +681,13 @@ const handleReopenAlarm = (alarmId) => {
   })
 
   if (!alarmBeforeUpdate) return
-  for (const alarm of alarmBeforeUpdate.groupMembers) {
-    updateAlarm(alarm.id, {
+  feedbackMessage.value = ""
+  const updates = alarmBeforeUpdate.groupMembers.map((alarm) => ({
+    id: alarm.id,
+    changes: {
+      status: "open",
+      resolvedAt: null,
+      resolvedBy: null,
       metadata: {
         ...alarm.metadata,
         attention: null,
@@ -693,8 +703,10 @@ const handleReopenAlarm = (alarmId) => {
           },
         ],
       },
-    })
-    reopenAlarm(alarm.id)
+    },
+  }))
+  if (!updateAlarms(updates)) return
+  for (const alarm of alarmBeforeUpdate.groupMembers) {
     recordAlarmAudit({
       alarm,
       action: "alarm:reopen",

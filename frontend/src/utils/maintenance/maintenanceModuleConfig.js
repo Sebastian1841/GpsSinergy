@@ -1,8 +1,8 @@
 export const MAINTENANCE_TABS = [
   { id: "overview", label: "Flota" },
-  { id: "costs", label: "Analisis" },
   { id: "orders", label: "Ordenes" },
   { id: "drivers", label: "Conductores" },
+  { id: "costs", label: "Analisis" },
 ]
 
 export const DEFAULT_MAINTENANCE_TYPES = [
@@ -85,6 +85,7 @@ export const MAINTENANCE_TEMPLATES = [
 ]
 
 export const MAINTENANCE_STATUS_FILTERS = [
+  { value: "no-reading", label: "Sin lectura", dotClass: "bg-slate-400" },
   { value: "renewal-pending", label: "Sin renovar", dotClass: "bg-violet-500" },
   { value: "current", label: "Al dia", dotClass: "bg-emerald-500" },
   { value: "due", label: "Proximas", dotClass: "bg-amber-500" },
@@ -211,10 +212,10 @@ export const MAINTENANCE_MODAL_COPY_BY_TYPE = {
     title: "Detalle de la OT",
   },
   "reprogram-order": {
-    action: "Reprogramar",
-    description: "Ajusta la fecha, hora, taller o responsable de la orden seleccionada.",
-    kicker: "Agenda",
-    title: "Reprogramar orden",
+    action: "Guardar planificacion",
+    description: "",
+    kicker: "Orden de trabajo",
+    title: "Editar planificacion",
   },
   "assign-order": {
     action: "Asignar",

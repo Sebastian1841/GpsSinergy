@@ -14,21 +14,23 @@
       <section
         class="flex max-h-[calc(100vh-16px)] w-full flex-col overflow-hidden rounded-t-xl border border-[#dfe5ed] bg-white shadow-[0_26px_90px_rgba(15,23,42,0.35)] sm:max-h-[calc(100vh-32px)] sm:rounded-xl"
         :class="
-          modalType === 'maintenance'
+          isStartConfirmation
+            ? 'work-order-transition-shell max-w-[900px]'
+            : modalType === 'maintenance'
             ? 'maintenance-create-shell max-w-[900px]'
             : modalType === 'maintenance-type'
-              ? 'maintenance-types-modal-shell max-w-[1192px]'
+              ? 'maintenance-types-modal-shell max-w-[900px]'
               : modalType === 'create-order'
-                ? 'work-order-create-shell max-w-[1240px]'
+                ? 'work-order-create-shell max-w-[900px]'
                 : modalType === 'close-order'
-                  ? 'work-order-close-shell max-w-[1180px]'
+                  ? 'work-order-close-shell max-w-[900px]'
                   : modalType === 'cost'
                     ? 'work-order-cost-shell max-w-[900px]'
                     : modalType === 'order-detail'
-                      ? 'order-detail-shell max-w-[1280px]'
-                      : modalType === 'maintenance-detail'
-                        ? 'maintenance-detail-shell max-w-[1080px]'
-                        : 'max-w-[760px]'
+                      ? 'order-detail-shell max-w-[900px]'
+                      : modalType === 'reprogram-order'
+                          ? 'work-order-planning-shell max-w-[900px]'
+                          : 'max-w-[900px]'
         "
       >
         <header
@@ -36,8 +38,6 @@
           :class="
             modalType === 'maintenance-type'
               ? 'maintenance-types-modal-header'
-              : modalType === 'maintenance-detail'
-              ? 'border-[#edf1f5]'
               : isBlueHeader
                 ? `border-[#0b2d63] bg-[#0b2d63] ${
                     modalType === 'maintenance-type' ? 'maintenance-types-modal-header' : ''
@@ -46,21 +46,14 @@
           "
         >
           <div class="flex items-start justify-between gap-4">
-            <h2
-              v-if="modalType === 'maintenance-detail'"
-              class="text-[20px] font-black text-[#102372]"
-            >
-              Mantenciones del vehiculo
-            </h2>
             <div
-              v-if="modalType !== 'maintenance-detail' && modalType !== 'order-detail'"
+              v-if="modalType !== 'order-detail'"
               class="min-w-0 flex-1"
             >
               <p
                 v-if="
                   modalType !== 'maintenance-type' &&
-                  modalType !== 'create-order' &&
-                  modalType !== 'close-order'
+                  modalType !== 'close-order' && !isStartConfirmation
                 "
                 class="text-[10px] font-black uppercase tracking-[0.16em]"
                 :class="isBlueHeader ? 'text-blue-200' : 'text-[#41557b]'"
@@ -82,9 +75,13 @@
                       : "Nuevo plan de mantención"
                     : modalType === "maintenance-type"
                       ? "Tipos de mantención"
-                      : modalTitle
+                      : isStartConfirmation ? `${draft.transitionLabel} en ${draft.orderId}?` : modalType === 'assign-order' && draft.transitionLabel ? draft.transitionLabel : modalTitle
                 }}
               </h2>
+              <div v-if="modalType === 'reprogram-order'" class="work-order-planning-identity">
+                <strong>{{ draft.orderId }}</strong><span>·</span><strong>{{ draft.plate }}</strong>
+                <span class="work-order-planning-job">{{ draft.job }}</span>
+              </div>
 
               <p
                 v-if="modalType === 'maintenance-type'"
@@ -95,7 +92,7 @@
 
               <p
                 v-if="
-                  modalType === 'close-order' || (!isBlueHeader && modalType !== 'create-order' && modalType !== 'maintenance-type')
+                  modalType === 'close-order' || (!isStartConfirmation && !isBlueHeader && modalType !== 'create-order' && modalType !== 'maintenance-type')
                 "
                 class="mt-1 text-[12px] font-bold leading-5"
                 :class="modalType === 'close-order' ? 'text-blue-100' : 'text-slate-500'"
@@ -105,11 +102,8 @@
             </div>
 
             <div v-if="modalType === 'order-detail'" class="order-detail-header-main">
-              <h2>Detalles de OT</h2>
+              <h2>Orden {{ draft.orderId }}</h2>
               <div class="order-detail-header-summary">
-                <div>
-                  <span>OT</span><strong>{{ draft.orderId }}</strong>
-                </div>
                 <div>
                   <span>Activo</span><strong>{{ draft.plate }}</strong>
                 </div>
@@ -117,23 +111,20 @@
                   <span>Tipo de mantencion</span><strong>{{ draft.job }}</strong>
                 </div>
                 <div>
-                  <span>Prioridad</span><strong>{{ draft.priority }}</strong>
-                </div>
-                <div>
                   <span>Estado</span>
                   <strong
                     class="order-detail-status-pill"
-                    :class="draft.status === 'cancelled' ? 'is-cancelled' : 'is-closed'"
+                    :class="draft.status === 'cancelled' ? 'is-cancelled' : draft.status === 'finished' ? 'is-closed' : 'is-open'"
                   >
                     {{ getOrderStatusLabel(draft.status) }}
                   </strong>
                 </div>
                 <div>
                   <span>{{
-                    draft.status === "cancelled" ? "OT cancelada el" : "OT cerrada el"
+                    draft.status === "cancelled" ? "OT cancelada el" : draft.status === "finished" ? "OT cerrada el" : "Fecha limite de ejecucion"
                   }}</span>
                   <strong>{{
-                    formatDetailDate(draft.cancelledAt || draft.closedAt || draft.scheduledDate)
+                    formatDetailDate(draft.status === 'cancelled' ? draft.cancelledAt : draft.status === 'finished' ? draft.closedAt : draft.scheduledDate)
                   }}</strong>
                 </div>
               </div>
@@ -146,7 +137,7 @@
               aria-label="Cerrar modal"
               @click="emit('close')"
             >
-              <SvgIcon v-if="modalType === 'maintenance-type'" name="close" />
+              <SvgIcon v-if="modalType === 'maintenance-type' || modalType === 'reprogram-order'" name="close" />
               <template v-else>x</template>
             </button>
           </div>
@@ -159,17 +150,17 @@
               ? 'p-0'
               : modalType === 'maintenance'
                 ? 'p-0'
-                : modalType === 'maintenance-detail'
-                  ? 'p-4'
-                  : 'p-4'
+                : modalType === 'create-order' ? 'p-0'
+                : 'p-4'
           "
         >
           <div
             v-if="modalActionMessage"
+            :role="modalType === 'reprogram-order' ? 'alert' : 'status'"
             class="mb-3 rounded-lg border px-3 py-2 text-[12px] font-black"
             :class="
-              modalType === 'maintenance-detail'
-                ? 'border-amber-300 bg-amber-50 text-amber-800'
+              modalType === 'reprogram-order'
+                ? 'border-rose-200 bg-rose-50 text-rose-700'
                 : 'border-emerald-200 bg-emerald-50 text-emerald-700'
             "
           >
@@ -204,21 +195,27 @@
                   <p>Paso 1 de 3</p>
                   <h3>Tipo de mantencion</h3>
                   <h4>Selecciona el tipo de mantencion que deseas crear.</h4>
+                  <label class="maintenance-modal-field mb-4">
+                    <span>Vehiculo</span>
+                    <select v-model="draft.vehicleId" @change="emit('sync-maintenance-vehicle-draft')">
+                      <option value="" disabled>Selecciona un vehiculo</option>
+                      <option v-for="vehicle in maintenanceItems" :key="vehicle.id" :value="vehicle.id">{{ vehicle.plate }} - {{ vehicle.assetName }}</option>
+                    </select>
+                  </label>
                   <div class="maintenance-create-types">
                     <button
                       v-for="type in maintenanceTypes"
                       :key="type"
                       type="button"
-                      :class="{ active: draft.type === type }"
+                      :class="{ active: draft.type === type && !isCreateMaintenanceTypeDisabled(type) }"
+                      :aria-disabled="isCreateMaintenanceTypeDisabled(type)"
                       :disabled="isCreateMaintenanceTypeDisabled(type)"
                       @click="selectMaintenanceType(type)"
                     >
                       <span
                         ><strong>{{ type }}</strong
-                        ><small v-if="isCreateMaintenanceTypeDisabled(type)">Ya configurada</small
-                        ><small v-else
-                          >{{ getMaintenanceTypeCriterionLabel(type) }} ·
-                          {{ getMaintenanceTypeInterval(type) }}</small
+                        ><small v-if="draft.vehicleId && isCreateMaintenanceTypeDisabled(type)">Ya configurada</small
+                        ><small v-else>{{ getMaintenanceTypeCriterionLabel(type) }}</small
                         ></span
                       >
                       <i></i>
@@ -259,7 +256,10 @@
                     <h5>Informacion general</h5>
                     <div class="maintenance-confirm-general">
                       <div>
-                        <span>Tipo de mantencion</span><strong>{{ draft.name }}</strong>
+                        <span>Tipo de mantencion</span><strong>{{ draft.type || draft.originalType || draft.name }}</strong>
+                      </div>
+                      <div>
+                        <span>Nombre del plan</span><strong>{{ draft.name }}</strong>
                       </div>
                       <div>
                         <span>Vehiculo</span><strong>{{ selectedDraftVehicleLabel }}</strong>
@@ -275,19 +275,19 @@
                       </div>
                       <div>
                         <dt>{{ maintenanceIntervalLabel }}</dt>
-                        <dd>{{ draft.intervalValue }} {{ maintenanceValueUnit }}</dd>
+                        <dd>{{ draft.readingSourceLabel === 'Fecha/Hora' ? String(maintenanceScheduleValue).split('-').reverse().join('-') : maintenanceScheduleValue }} {{ draft.readingSourceLabel === 'Fecha/Hora' ? '' : maintenanceValueUnit }}</dd>
                       </div>
                       <div>
                         <dt>{{ maintenanceAlertLabel }}</dt>
                         <dd>{{ draft.alertValue }} {{ maintenanceValueUnit }}</dd>
                       </div>
-                      <div>
-                        <dt>Ultima vez</dt>
-                        <dd>{{ maintenanceLastReadingDisplay }}</dd>
+                      <div v-if="maintenanceThresholdSummary" class="maintenance-warning-threshold">
+                        <dt>Umbral restante</dt>
+                        <dd>{{ maintenanceThresholdSummary }}</dd>
                       </div>
-                      <div>
-                        <dt>Lectura anotada a mano</dt>
-                        <dd>{{ draft.manualReading ? "Si" : "No" }}</dd>
+                      <div v-if="draft.readingSourceLabel !== 'Odometro'">
+                        <dt>{{ maintenanceLastReadingLabel }}</dt>
+                        <dd>{{ maintenanceLastReadingDisplay }}</dd>
                       </div>
                       <div>
                         <dt>Notas</dt>
@@ -326,15 +326,14 @@
                   <div class="maintenance-config-type">
                     <span><SvgIcon name="maintenance-calendar" /></span>
                     <div>
-                      <small>Tipo de mantencion</small><strong>{{ draft.name }}</strong>
+                      <small>Tipo seleccionado</small><strong>{{ draft.type || draft.originalType || draft.name }}</strong>
                     </div>
                     <button type="button" @click="maintenanceWizardStep = 1">Cambiar tipo</button>
                   </div>
                   <div class="maintenance-config-form">
-                    <label><span>Nombre</span><input v-model="draft.name" type="text" /></label>
                     <label
                       ><span>Criterio</span
-                      ><select v-model="draft.readingSourceLabel">
+                      ><select v-model="draft.readingSourceLabel" @change="prefillMaintenanceGpsReading">
                         <option
                           v-for="source in maintenanceReadingSources"
                           :key="source"
@@ -344,16 +343,22 @@
                         </option>
                       </select></label
                     >
+                    <label v-if="draft.readingSourceLabel !== 'Fecha/Hora'"><span>Fecha de inicio del plan</span><input v-model="draft.startDate" type="date" :max="maintenanceToday" @change="syncMaintenanceHistoricalReading" /></label>
+                    <label v-else><span>Fecha de inicio del plan</span><input v-model="draft.lastReading" type="date" /></label>
+                    <div v-if="draft.readingSourceLabel !== 'Fecha/Hora'" class="maintenance-gps-reading" role="status">
+                      <div><span>{{ maintenanceDisplayedReadingTitle }}</span><small class="maintenance-reference-time">{{ maintenanceReferenceTimestamp }}</small></div>
+                      <strong>{{ maintenanceDisplayedReading }}</strong>
+                    </div>
                     <label
                       ><span>{{
                         draft.readingSourceLabel === "Fecha/Hora"
-                          ? "Cada (dias)"
+                          ? "Fecha de la proxima mantencion"
                           : draft.readingSourceLabel === "Horometro"
-                            ? "Cada (horas)"
-                            : "Cada (km)"
-                      }}</span
-                      ><input v-model="draft.intervalValue" type="number" min="0"
-                    /></label>
+                            ? "Proxima mantencion a las (horas)"
+                            : "Proxima mantencion a los (km)"
+                      }}<b class="text-rose-600"> *</b></span
+                      ><input v-model="maintenanceScheduleValue" :type="draft.readingSourceLabel === 'Fecha/Hora' ? 'date' : 'number'" :min="draft.readingSourceLabel === 'Fecha/Hora' ? draft.lastReading : 0" required :aria-invalid="!isMaintenanceTargetValid"
+                    /><small v-if="!isMaintenanceTargetValid" class="text-[11px] text-rose-600">Ingresa {{ draft.readingSourceLabel === 'Fecha/Hora' ? 'la fecha' : draft.readingSourceLabel === 'Horometro' ? 'las horas' : 'el kilometraje' }} de la proxima mantencion.</small></label>
                     <label
                       ><span>{{
                         draft.readingSourceLabel === "Fecha/Hora"
@@ -364,31 +369,11 @@
                       }}</span
                       ><input v-model="draft.alertValue" type="number" min="0"
                     /></label>
-                    <label
-                      ><span>Ultima vez</span
-                      ><input
-                        v-model="draft.lastReading"
-                        :type="draft.readingSourceLabel === 'Fecha/Hora' ? 'date' : 'number'"
-                        min="0"
-                    /></label>
                   </div>
-                  <label class="maintenance-config-manual"
-                    ><input v-model="draft.manualReading" type="checkbox" /><span
-                      ><strong>Lectura anotada a mano</strong
-                      ><small
-                        >Para equipos que no reportan odometro. Sin esto, el plan queda sin lectura
-                        hasta que el equipo informe.</small
-                      ></span
-                    ></label
-                  >
-                  <label class="maintenance-config-notes"
-                    ><span>Notas</span
-                    ><textarea
-                      v-model="draft.notes"
-                      maxlength="500"
-                      placeholder="Agrega informacion adicional sobre esta mantencion..."
-                    /><small>{{ String(draft.notes || "").length }} / 500</small></label
-                  >
+                  <details class="maintenance-config-extra">
+                    <summary>Notas <small>(opcional)</small></summary>
+                    <label class="maintenance-config-notes"><textarea v-model="draft.notes" maxlength="500" rows="2" placeholder="Informacion adicional de esta mantencion"></textarea><small>{{ String(draft.notes || "").length }} / 500</small></label>
+                  </details>
                 </div>
               </section>
             </template>
@@ -439,8 +424,8 @@
               </div>
 
               <label class="maintenance-modal-field sm:col-span-2">
-                <span>Nombre</span>
-                <input v-model="draft.name" type="text" placeholder="Cambio de aceite" />
+                <span>Nombre del plan</span>
+                <input :value="draft.name" type="text" readonly title="Se completa con el tipo de mantencion seleccionado" />
               </label>
 
               <label class="maintenance-modal-field">
@@ -461,12 +446,12 @@
               <label class="maintenance-modal-field">
                 <span>{{
                   draft.readingSourceLabel === "Fecha/Hora"
-                    ? "Cada (dias)"
+                    ? "Fecha de la proxima mantencion"
                     : draft.readingSourceLabel === "Horometro"
-                      ? "Cada (horas)"
-                      : "Cada (km)"
+                      ? "Proxima mantencion a las (horas)"
+                      : "Proxima mantencion a los (km)"
                 }}</span>
-                <input v-model="draft.intervalValue" type="number" min="0" />
+                <input v-model="maintenanceScheduleValue" :type="draft.readingSourceLabel === 'Fecha/Hora' ? 'date' : 'number'" :min="draft.readingSourceLabel === 'Fecha/Hora' ? draft.lastReading : 0" required />
               </label>
 
               <label class="maintenance-modal-field">
@@ -480,14 +465,8 @@
                 <input v-model="draft.alertValue" type="number" min="0" />
               </label>
 
-              <label class="maintenance-modal-field">
-                <span>{{
-                  draft.readingSourceLabel === "Fecha/Hora"
-                    ? "Ultima vez"
-                    : draft.readingSourceLabel === "Horometro"
-                      ? "Ultima vez a las (horas)"
-                      : "Ultima vez a los (km)"
-                }}</span>
+              <label v-if="draft.readingSourceLabel === 'Fecha/Hora'" class="maintenance-modal-field">
+                <span>{{ maintenanceLastReadingLabel }}</span>
                 <input
                   v-model="draft.lastReading"
                   :type="draft.readingSourceLabel === 'Fecha/Hora' ? 'date' : 'number'"
@@ -495,18 +474,14 @@
                 />
               </label>
 
-              <label
-                class="sm:col-span-2 flex items-start gap-2 rounded-lg border border-[#d8e0eb] bg-white p-3 text-[#102372]"
-              >
-                <input v-model="draft.manualReading" type="checkbox" class="mt-0.5 h-4 w-4" />
-                <span
-                  ><strong class="block text-[11px] font-black">Lectura anotada a mano</strong
-                  ><small class="mt-0.5 block text-[9px] font-medium text-slate-500"
-                    >Para equipos que no reportan odometro. Sin esto, el plan queda sin lectura
-                    hasta que el equipo informe.</small
-                  ></span
-                >
-              </label>
+              <section v-if="draft.readingSourceLabel !== 'Fecha/Hora'" class="maintenance-start-reading sm:col-span-2">
+                <label><span>Fecha de inicio del plan</span><input v-model="draft.startDate" type="date" :max="maintenanceToday" @change="syncMaintenanceHistoricalReading" /></label>
+                <div role="status"><small>{{ maintenanceReferenceTimestamp }}</small></div>
+              </section>
+              <div v-if="draft.readingSourceLabel !== 'Fecha/Hora'" class="maintenance-gps-reading sm:col-span-2" role="status">
+                <span>{{ maintenanceDisplayedReadingTitle }}</span>
+                <strong>{{ maintenanceDisplayedReading }}</strong>
+              </div>
 
               <label class="maintenance-modal-field sm:col-span-2">
                 <span>Notas</span>
@@ -739,418 +714,6 @@
               </section>
             </template>
 
-            <template v-else-if="modalType === 'maintenance-detail'">
-              <section class="maintenance-vehicle-strip sm:col-span-2">
-                <div class="maintenance-vehicle-identity">
-                  <span class="maintenance-vehicle-image"
-                    ><img :src="selectedVehicleImage" alt=""
-                  /></span>
-                  <div class="min-w-0">
-                    <h3>{{ selectedVehicle.plate }}</h3>
-                    <span>{{ selectedVehicle.assetName }}</span>
-                  </div>
-                </div>
-
-                <div class="maintenance-current-mileage">
-                  <SvgIcon name="distancia" />
-                  <div>
-                    <span>Kilometraje actual</span
-                    ><strong>{{ selectedVehicle.odometerLabel }}</strong>
-                  </div>
-                </div>
-
-                <div class="maintenance-vehicle-strip-actions">
-                  <details v-if="vehicleDetailTab === 'Historial'" ref="historyExportMenu" class="relative" @keydown.esc.prevent="historyExportMenu.open = false" @focusout="closeHistoryExportMenu">
-                    <summary class="flex h-10 cursor-pointer list-none items-center gap-2 rounded border border-[#cbd8ef] bg-white px-3 text-[12px] font-bold text-[#102372] hover:bg-slate-50">
-                      <SvgIcon name="download" class="h-4 w-4" />{{ historyExportBusy ? 'Generando...' : 'Exportar historial' }}<SvgIcon name="chevron-down" class="h-4 w-4" />
-                    </summary>
-                    <div class="absolute right-0 top-full z-30 mt-1 w-40 overflow-hidden rounded border border-[#cbd8ef] bg-white shadow-lg">
-                      <button v-for="format in ['excel', 'pdf']" :key="format" type="button" class="block w-full px-4 py-3 text-left text-[12px] font-bold text-[#102372] hover:bg-slate-50 disabled:opacity-50" :disabled="historyExportBusy || !filteredVehicleHistory.length" @click="exportVehicleHistory(format)">{{ format === 'excel' ? 'Excel (.xlsx)' : 'PDF' }}</button>
-                    </div>
-                  </details>
-                  <button
-                    v-if="vehicleDetailTab === 'Planes'"
-                    type="button"
-                    @click="emit('open-maintenance-modal', 'maintenance', 'maintenance-detail')"
-                  >
-                    Agregar mantencion
-                  </button>
-
-                  <button
-                    v-if="vehicleDetailTab === 'Planes'"
-                    type="button"
-                    class="secondary"
-                    @click="
-                      emit('open-maintenance-modal', 'maintenance-type', 'maintenance-detail')
-                    "
-                  >
-                    Nuevo tipo
-                  </button>
-                </div>
-              </section>
-
-              <div
-                class="sm:col-span-2 flex gap-4 border-b border-slate-200"
-                role="tablist"
-                aria-label="Detalle del vehiculo"
-              >
-                <button
-                  v-for="tab in ['Planes', 'Historial']"
-                  :key="tab"
-                  type="button"
-                  role="tab"
-                  :aria-selected="vehicleDetailTab === tab"
-                  class="border-b-2 px-3 py-2 text-[12px] font-bold"
-                  :class="
-                    vehicleDetailTab === tab
-                      ? 'border-orange-500 text-[#102372]'
-                      : 'border-transparent text-slate-500'
-                  "
-                  @click="vehicleDetailTab = tab"
-                >
-                  {{ tab }}
-                </button>
-              </div>
-
-              <section v-if="vehicleDetailTab === 'Historial'" class="sm:col-span-2">
-                <div class="mb-3 flex flex-wrap items-end gap-3">
-                  <label class="maintenance-modal-field">
-                    <span>Mantencion</span>
-                    <select v-model="vehicleHistoryType">
-                      <option value="all">Todas</option>
-                      <option v-for="type in vehicleHistoryTypes" :key="type" :value="type">
-                        {{ type }}
-                      </option>
-                    </select>
-                  </label>
-                  <label class="maintenance-modal-field"
-                    ><span>Desde</span><input v-model="vehicleHistoryFrom" type="date"
-                  /></label>
-                  <label class="maintenance-modal-field"
-                    ><span>Hasta</span><input v-model="vehicleHistoryTo" type="date"
-                  /></label>
-                  <div class="ml-auto flex min-h-10 flex-wrap items-center justify-end gap-3">
-                    <span class="text-[11px] text-slate-500">{{ filteredVehicleHistory.length }} ejecuciones</span>
-                  </div>
-                </div>
-                <p v-if="historyExportError" role="alert" class="mb-3 text-[12px] text-rose-600">{{ historyExportError }}</p>
-                <div class="max-h-[min(330px,40dvh)] overflow-auto border border-slate-200 rounded">
-                  <table class="w-full min-w-[820px] text-left text-[12px]">
-                    <thead class="sticky top-0 z-10 bg-slate-50 text-slate-600">
-                      <tr>
-                        <th
-                          v-for="column in historyColumns"
-                          :key="column.key"
-                          class="p-3"
-                          :aria-sort="
-                            historySort.key === column.key
-                              ? historySort.direction === 1
-                                ? 'ascending'
-                                : 'descending'
-                              : 'none'
-                          "
-                        >
-                          <button
-                            type="button"
-                            class="flex items-center gap-1 font-bold text-left"
-                            @click="sortHistory(column.key)"
-                          >
-                            {{ column.label }}
-                            <SvgIcon
-                              name="chevron-down"
-                              :class="{ 'rotate-180': historySort.key === column.key && historySort.direction === 1 }"
-                              class="h-3 w-3"
-                            />
-                          </button>
-                        </th>
-                        <th class="p-3">Accion</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr
-                        v-for="order in displayedVehicleHistory"
-                        :key="order.id"
-                        class="border-t border-slate-200"
-                      >
-                        <td class="p-3">{{ formatHistoryDate(order.closedAt) }}</td>
-                        <td class="p-3 font-bold">{{ order.job }}</td>
-                        <td class="p-3">{{ order.id }}</td>
-                        <td class="p-3">{{ order.closingReading || "Sin registro" }}</td>
-                        <td class="p-3">{{ order.closedBy || order.owner || "Sin registro" }}</td>
-                        <td class="p-3 whitespace-nowrap">
-                          {{ order.actualCost || "Sin registro" }}
-                        </td>
-                        <td class="p-3">
-                          <button
-                            type="button"
-                            class="rounded border border-slate-300 px-3 py-1 font-bold text-[#102372]"
-                            @click="emit('open-order-in-table', order.id)"
-                          >
-                            Ver OT
-                          </button>
-                        </td>
-                      </tr>
-                      <tr v-if="!filteredVehicleHistory.length">
-                        <td colspan="7" class="p-6 text-center text-slate-500">
-                          {{
-                            vehicleHistoryOrders.length
-                              ? "No hay ejecuciones para estos filtros."
-                              : "Este vehiculo aun no tiene OT finalizadas."
-                          }}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <footer class="maintenance-history-pagination">
-                  <span>Mostrando {{ filteredVehicleHistory.length ? (vehicleHistoryPage - 1) * vehicleHistoryPageSize + 1 : 0 }} a {{ Math.min(vehicleHistoryPage * vehicleHistoryPageSize, filteredVehicleHistory.length) }} de {{ filteredVehicleHistory.length }} ejecuciones</span>
-                  <div>
-                    <select v-model.number="vehicleHistoryPageSize" aria-label="Ejecuciones por pagina">
-                      <option :value="10">10 por pagina</option>
-                      <option :value="20">20 por pagina</option>
-                      <option :value="50">50 por pagina</option>
-                    </select>
-                    <button type="button" title="Pagina anterior" :disabled="vehicleHistoryPage === 1" @click="vehicleHistoryPage--"><SvgIcon name="chevron-left" /></button>
-                    <span>{{ vehicleHistoryPage }} / {{ vehicleHistoryPageCount }}</span>
-                    <button type="button" title="Pagina siguiente" :disabled="vehicleHistoryPage === vehicleHistoryPageCount" @click="vehicleHistoryPage++"><SvgIcon name="chevron-right" /></button>
-                  </div>
-                </footer>
-              </section>
-
-              <div
-                v-if="vehicleDetailTab === 'Planes' && primaryMaintenancePlan"
-                class="vehicle-maintenance-grid sm:col-span-2"
-              >
-                <article class="vehicle-maintenance-card">
-                  <header class="vehicle-maintenance-card-header">
-                    <div>
-                      <h4>{{ primaryMaintenancePlan.name }}</h4>
-                      <p>Control de mantencion del vehiculo segun su intervalo configurado.</p>
-                    </div>
-                    <div class="maintenance-plan-badges">
-                      <span
-                        v-if="primaryMaintenancePlan.orderState === 'active'"
-                        class="maintenance-plan-order-badge"
-                      >
-                        Con OT activa
-                      </span>
-                      <span :class="getMaintenancePlanPillClass(primaryMaintenancePlan.status)">
-                        {{
-                          primaryMaintenancePlan.readingSourceLabel ||
-                          getStatusLabel(primaryMaintenancePlan.status)
-                        }}
-                      </span>
-                    </div>
-                  </header>
-
-                  <div class="maintenance-progress">
-                    <div>
-                      <span>Progreso del intervalo</span
-                      ><strong
-                        >{{ primaryMaintenancePlan.actualLabel }} /
-                        {{ primaryMaintenancePlan.intervalLabel }}</strong
-                      >
-                    </div>
-                    <span
-                      ><i
-                        :style="{ width: `${getMaintenancePlanProgress(primaryMaintenancePlan)}%` }"
-                      ></i
-                    ></span>
-                  </div>
-
-                  <dl class="vehicle-maintenance-details">
-                    <div
-                      v-for="detail in getMaintenancePlanDetails(primaryMaintenancePlan)"
-                      :key="detail.label"
-                    >
-                      <dt>{{ detail.label }}</dt>
-                      <dd>{{ detail.value }}</dd>
-                    </div>
-                  </dl>
-
-                  <div class="vehicle-maintenance-contact">
-                    <div>
-                      <span>Email contacto</span>
-                      <strong>{{ primaryMaintenancePlan.email || "N/A" }}</strong>
-                    </div>
-
-                    <div>
-                      <span>Origen</span>
-                      <strong>{{
-                        primaryMaintenancePlan.source === "base" ? "Base visual" : "Configurada"
-                      }}</strong>
-                    </div>
-                  </div>
-
-                  <section class="border-t border-slate-200 px-4 py-3 text-[12px]">
-                    <dl class="grid gap-3 sm:grid-cols-2">
-                      <div class="min-w-0">
-                        <dt class="font-bold text-slate-500">Última ejecución</dt>
-                        <dd class="mt-1 break-words text-[#102372]">
-                          {{ planClosureLabel }}
-                          <button
-                            v-if="latestClosedPlanOrder"
-                            type="button"
-                            class="ml-1 font-bold underline"
-                            @click="emit('open-order-in-table', latestClosedPlanOrder.id)"
-                          >
-                            {{ latestClosedPlanOrder.id }} · Finalizada
-                          </button>
-                        </dd>
-                      </div>
-                      <div class="min-w-0">
-                        <dt class="font-bold text-slate-500">Próximo ciclo</dt>
-                        <dd class="mt-1 break-words text-[#102372]">{{ planNextDueLabel }}</dd>
-                      </div>
-                    </dl>
-                  </section>
-
-                  <footer class="vehicle-maintenance-footer">
-                    <span
-                      class="vehicle-maintenance-status"
-                      :class="getMaintenancePlanStatusClass(primaryMaintenancePlan.status)"
-                    >
-                      <span class="vehicle-maintenance-status-icon">
-                        <SvgIcon :name="getSummaryMetricIcon(primaryMaintenancePlan.status)" />
-                      </span>
-                      <span
-                        ><strong>{{ getStatusLabel(primaryMaintenancePlan.status) }}</strong
-                        ><small>{{
-                          getMaintenancePlanStatusMessage(primaryMaintenancePlan.status)
-                        }}</small></span
-                      >
-                    </span>
-
-                    <div class="vehicle-maintenance-actions">
-                      <button
-                        v-if="primaryMaintenancePlan.orderState === 'pending-renewal'"
-                        type="button"
-                        @click="
-                          emit('renew-maintenance', selectedVehicle.id, primaryMaintenancePlan.id)
-                        "
-                      >
-                        Renovar plan
-                      </button>
-
-                      <button
-                        v-else-if="activePlanOrder"
-                        type="button"
-                        @click="emit('open-order-in-table', activePlanOrder.id)"
-                      >
-                        {{
-                          ["in-progress", "waiting"].includes(activePlanOrder.status)
-                            ? "Continuar OT"
-                            : "Ver OT"
-                        }}
-                      </button>
-
-                      <button
-                        v-else-if="primaryMaintenancePlan.status === 'unconfigured'"
-                        type="button"
-                        @click="emit('open-edit-maintenance-plan', primaryMaintenancePlan)"
-                      >
-                        Configurar plan
-                      </button>
-
-                      <button
-                        v-else-if="['due', 'overdue'].includes(primaryMaintenancePlan.status)"
-                        type="button"
-                        @click="
-                          emit('create-work-order-from-maintenance-plan', primaryMaintenancePlan)
-                        "
-                      >
-                        Crear OT
-                      </button>
-                      <span v-else class="text-[11px] font-bold text-slate-500">Sin acción</span>
-
-                      <button
-                        type="button"
-                        class="secondary"
-                        @click="emit('open-edit-maintenance-plan', primaryMaintenancePlan)"
-                      >
-                        Editar
-                      </button>
-
-                      <button
-                        type="button"
-                        class="danger"
-                        :disabled="isBaseMaintenancePlan(primaryMaintenancePlan)"
-                        @click="emit('open-delete-maintenance-plan', primaryMaintenancePlan)"
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </footer>
-                </article>
-
-                <aside class="vehicle-maintenance-add-card">
-                  <header>
-                    <h4>Otras mantenciones</h4>
-                    <p>Mantenciones adicionales configuradas para este vehiculo.</p>
-                  </header>
-                  <div class="additional-maintenance-filters">
-                    <label>
-                      <SvgIcon name="search" />
-                      <input
-                        v-model="maintenancePlanSearch"
-                        type="search"
-                        placeholder="Buscar mantencion..."
-                      />
-                    </label>
-                    <div>
-                      <button
-                        v-for="filter in maintenancePlanStatusFilters"
-                        :key="filter.value"
-                        type="button"
-                        :class="{ active: maintenancePlanStatus === filter.value }"
-                        @click="maintenancePlanStatus = filter.value"
-                      >
-                        {{ filter.label }}
-                      </button>
-                    </div>
-                  </div>
-                  <div
-                    v-if="filteredAdditionalMaintenancePlans.length"
-                    class="additional-maintenance-list"
-                  >
-                    <button
-                      v-for="plan in filteredAdditionalMaintenancePlans"
-                      :key="plan.id"
-                      type="button"
-                      @click="selectedMaintenancePlanId = plan.id"
-                    >
-                      <SvgIcon name="llave" /><span
-                        ><strong>{{ plan.name }}</strong
-                        ><small>{{ getStatusLabel(plan.status) }}</small></span
-                      >
-                    </button>
-                  </div>
-                  <div v-else class="additional-maintenance-empty">
-                    <span><SvgIcon name="reporte" /></span>
-                    <strong>{{ additionalMaintenanceEmptyTitle }}</strong>
-                    <p>
-                      {{ additionalMaintenanceEmptyDescription }}
-                    </p>
-                  </div>
-                  <button
-                    class="add-maintenance-button"
-                    type="button"
-                    @click="emit('open-maintenance-modal', 'maintenance', 'maintenance-detail')"
-                  >
-                    <SvgIcon name="plus" /> Agregar nuevo plan
-                  </button>
-                  <button
-                    class="view-types-button"
-                    type="button"
-                    @click="
-                      emit('open-maintenance-modal', 'maintenance-type', 'maintenance-detail')
-                    "
-                  >
-                    Ver tipos de mantencion disponibles
-                  </button>
-                </aside>
-              </div>
-            </template>
 
             <template v-else-if="modalType === 'delete-maintenance'">
               <section class="sm:col-span-2 rounded-xl border border-rose-200 bg-rose-50 p-4">
@@ -1201,195 +764,77 @@
             </template>
 
             <template v-else-if="modalType === 'create-order'">
-              <section class="work-order-create-form sm:col-span-2">
-                <div class="work-order-create-main">
-                  <section class="work-order-create-section">
-                    <header>
-                      <h3>Informacion principal</h3>
-                      <small>Define el activo y el tipo de mantencion.</small>
-                    </header>
-                    <div class="work-order-create-grid">
-                      <label
-                        ><span>Activo <b>*</b></span
-                        ><select
-                          v-model="draft.vehicleId"
-                          @change="emit('sync-order-vehicle-draft')"
-                        >
-                          <option
-                            v-for="maintenanceVehicle in maintenanceItems"
-                            :key="maintenanceVehicle.id"
-                            :value="maintenanceVehicle.id"
-                          >
-                            {{ maintenanceVehicle.plate }} - {{ maintenanceVehicle.assetName }}
-                          </option>
-                        </select></label
-                      >
-                      <label
-                        ><span>Tipo de mantencion <b>*</b></span
-                        ><select
-                          v-model="draft.maintenancePlanId"
-                          @change="emit('sync-order-maintenance-plan-draft')"
-                        >
-                          <option v-if="!modalVehicleMaintenancePlans.length" value="" disabled>
-                            Este vehiculo no tiene mantenciones configuradas
-                          </option>
-                          <option
-                            v-for="plan in modalVehicleMaintenancePlans"
-                            :key="plan.id"
-                            :value="plan.id"
-                          >
-                            {{ plan.name }} - {{ plan.intervalLabel }}
-                          </option>
-                        </select></label
-                      >
-                      <label
-                        ><span>Titulo <b>*</b></span
-                        ><input v-model="draft.job" type="text"
-                      /></label>
-                      <fieldset class="work-order-priority">
-                        <legend>Prioridad <b>*</b></legend>
-                        <div>
-                          <button
-                            v-for="priority in orderPriorityOptions"
-                            :key="priority"
-                            type="button"
-                            :class="{ active: draft.priority === priority }"
-                            @click="draft.priority = priority"
-                          >
-                            {{ priority }}
-                          </button>
-                        </div>
+              <section class="order-wizard-layout sm:col-span-2">
+                <aside class="maintenance-create-sidebar" aria-label="Pasos de nueva OT">
+                  <template v-for="(step, index) in orderWizardSteps" :key="step.title">
+                    <div :class="{ active: orderWizardStep === index + 1 }" :aria-current="orderWizardStep === index + 1 ? 'step' : undefined">
+                      <b>{{ index + 1 }}</b><span><strong>{{ step.title }}</strong><small>{{ step.description }}</small></span>
+                    </div>
+                    <i v-if="index < 2"></i>
+                  </template>
+                </aside>
+                <div class="order-wizard-main">
+                  <p class="order-wizard-position">Paso {{ orderWizardStep }} de 3</p>
+                  <h3 ref="orderWizardHeading" tabindex="-1">{{ orderWizardSteps[orderWizardStep - 1].title }}</h3>
+                  <template v-if="orderWizardStep === 1">
+                    <dl v-if="orderCreationContext" class="order-wizard-context">
+                      <div><dt>Vehiculo</dt><dd>{{ draftVehicleLabel }}</dd></div>
+                      <div><dt>Mantencion</dt><dd>{{ draftPlanLabel }}</dd></div>
+                    </dl>
+                    <div class="order-wizard-fields">
+                      <template v-if="!orderCreationContext">
+                        <label><span>Vehiculo *</span><select v-model="draft.vehicleId" required @change="emit('sync-order-vehicle-draft')">
+                          <option value="" disabled>Selecciona un vehiculo</option>
+                          <option v-for="vehicle in maintenanceItems" :key="vehicle.id" :value="vehicle.id">{{ vehicle.plate }} - {{ vehicle.assetName }}</option>
+                        </select></label>
+                        <label><span>Mantencion *</span><select v-model="draft.maintenancePlanId" required @change="emit('sync-order-maintenance-plan-draft')">
+                          <option value="" disabled>{{ modalVehicleMaintenancePlans.length ? 'Selecciona un plan' : 'Sin planes configurados' }}</option>
+                          <option v-for="plan in modalVehicleMaintenancePlans" :key="plan.id" :value="plan.id">{{ plan.name }}</option>
+                        </select></label>
+                      </template>
+                      <label class="order-wizard-wide"><span>Titulo del trabajo *</span><input v-model="draft.job" type="text" required /></label>
+                      <fieldset class="work-order-priority order-wizard-wide">
+                        <legend>Prioridad *</legend>
+                        <div><button v-for="priority in orderPriorityOptions" :key="priority" type="button" :class="{ active: draft.priority === priority }" :aria-pressed="draft.priority === priority" @click="draft.priority = priority">{{ priority }}</button></div>
                       </fieldset>
                     </div>
-                  </section>
-                  <section class="work-order-create-section">
-                    <header>
-                      <h3>Programacion</h3>
-                      <small>Define cuando se espera iniciar y la fecha maxima de ejecucion.</small>
-                    </header>
-                    <div class="work-order-create-grid">
-                      <label
-                        ><span>Fecha planificada <b>*</b></span
-                        ><input v-model="draft.plannedStartDate" type="date"
-                      /></label>
-                      <label
-                        ><span>Fecha limite de ejecucion <small>(opcional)</small></span
-                        ><input v-model="draft.scheduledDate" type="date"
-                      /></label>
-                    </div>
-                  </section>
-                  <section class="work-order-create-section">
-                    <header>
-                      <h3>Responsables</h3>
-                      <small>Indica quien sera responsable de la orden.</small>
-                    </header>
-                    <div class="work-order-create-grid">
-                      <label
-                        ><span>Asignada a <b>*</b></span
-                        ><input v-model="draft.owner" type="text"
-                      /></label>
-                      <label
-                        ><span>Taller <b>*</b></span
-                        ><input v-model="draft.workshop" type="text"
-                      /></label>
-                    </div>
-                  </section>
-                  <section class="work-order-create-section">
-                    <header>
-                      <h3>Descripcion</h3>
-                      <small>Agrega una descripcion detallada de la orden.</small>
-                    </header>
-                    <label class="work-order-description">
-                      <textarea v-model="draft.description" maxlength="500" rows="4"></textarea
-                      ><small>{{ String(draft.description || "").length }}/500</small></label
-                    >
-                  </section>
-                </div>
-                <aside class="work-order-create-aside">
-                  <section class="work-order-create-section work-order-cost-estimate">
-                    <header>
-                      <h3>Costos estimados <small>(opcional)</small></h3>
-                      <small>Define los costos asociados a la orden.</small>
-                    </header>
-                    <div class="work-order-cost-inputs">
-                      <label
-                        ><span>Mano de obra</span>
-                        <div>
-                          <b>$</b
-                          ><input
-                            v-model="draft.estimatedLabor"
-                            type="text"
-                            inputmode="numeric"
-                          /></div
-                      ></label>
-                      <label
-                        ><span>Repuestos</span>
-                        <div>
-                          <b>$</b
-                          ><input
-                            v-model="draft.estimatedParts"
-                            type="text"
-                            inputmode="numeric"
-                          /></div
-                      ></label>
-                      <label
-                        ><span>Otros costos</span>
-                        <div>
-                          <b>$</b
-                          ><input
-                            v-model="draft.estimatedOther"
-                            type="text"
-                            inputmode="numeric"
-                          /></div
-                      ></label>
-                    </div>
-                    <div class="work-order-estimated-total">
-                      <strong>Total estimado</strong><b>{{ formattedCreateOrderTotal }}</b>
-                    </div>
-                  </section>
-                  <section class="work-order-create-section work-order-additional">
-                    <header>
-                      <h3>Observaciones <small>(opcional)</small></h3>
-                      <small>Agrega informacion adicional sobre la orden.</small>
-                    </header>
-                    <label class="work-order-description">
-                      <textarea
-                        v-model="draft.observations"
-                        maxlength="500"
-                        rows="4"
-                        placeholder="Observaciones adicionales sobre la orden de trabajo..."
-                      ></textarea
-                      ><small>{{ String(draft.observations || "").length }}/500</small></label
-                    >
-                  </section>
-                  <section class="automatic-data-summary">
-                    <header>
-                      <SvgIcon name="check" />
-                      <div>
-                        <h3>Generado automaticamente</h3>
-                        <small>Se registrara al crear la orden.</small>
-                      </div>
-                    </header>
-                    <dl>
-                      <div>
-                        <dt>OT</dt>
-                        <dd>{{ draft.orderId || "Al confirmar" }}</dd>
-                      </div>
-                      <div>
-                        <dt>Estado inicial</dt>
-                        <dd>Programada</dd>
-                      </div>
-                      <div>
-                        <dt>Activo y plan</dt>
-                        <dd>{{ draftVehicleLabel }} · {{ draftPlanLabel }}</dd>
-                      </div>
-                      <div>
-                        <dt>Lectura de apertura</dt>
-                        <dd>{{ draftOpeningReading }}</dd>
-                      </div>
+                  </template>
+                  <div v-else-if="orderWizardStep === 2" class="order-wizard-fields">
+                    <label><span>Fecha planificada *</span><input v-model="draft.plannedStartDate" type="date" required /></label>
+                    <label><span>Fecha limite (opcional)</span><input v-model="draft.scheduledDate" type="date" :min="draft.plannedStartDate || undefined" /></label>
+                    <label><span>Responsable *</span><input v-model="draft.owner" type="text" required /></label>
+                    <label><span>Taller / proveedor *</span><input v-model="draft.workshop" type="text" required /></label>
+                  </div>
+                  <template v-else>
+                    <dl class="order-wizard-summary">
+                      <div><dt>Vehiculo</dt><dd>{{ draftVehicleLabel }}</dd></div>
+                      <div><dt>Mantencion</dt><dd>{{ draftPlanLabel }}</dd></div>
+                      <div class="order-wizard-wide"><dt>Trabajo</dt><dd>{{ draft.job }}</dd></div>
+                      <div><dt>Prioridad</dt><dd>{{ draft.priority }}</dd></div>
+                      <div><dt>Estado inicial</dt><dd>Programada</dd></div>
+                      <div><dt>Fecha planificada</dt><dd>{{ draft.plannedStartDate.split('-').reverse().join('-') }}</dd></div>
+                      <div><dt>Fecha limite</dt><dd>{{ draft.scheduledDate ? draft.scheduledDate.split('-').reverse().join('-') : 'Sin fecha limite' }}</dd></div>
+                      <div><dt>Responsable</dt><dd>{{ draft.owner }}</dd></div>
+                      <div><dt>Taller / proveedor</dt><dd>{{ draft.workshop }}</dd></div>
                     </dl>
-                  </section>
-                </aside>
+                    <details class="order-wizard-optional">
+                      <summary>Presupuesto estimado <small>(opcional)</small><strong>{{ formattedCreateOrderTotal }}</strong></summary>
+                      <div class="order-wizard-fields">
+                        <label><span>Mano de obra ($)</span><input v-model="draft.estimatedLabor" type="text" inputmode="numeric" /></label>
+                        <label><span>Repuestos ($)</span><input v-model="draft.estimatedParts" type="text" inputmode="numeric" /></label>
+                        <label><span>Otros costos ($)</span><input v-model="draft.estimatedOther" type="text" inputmode="numeric" /></label>
+                      </div>
+                    </details>
+                    <details class="order-wizard-optional">
+                      <summary>Descripcion y observaciones <small>(opcional)</small></summary>
+                      <div class="order-wizard-fields">
+                        <label class="order-wizard-wide"><span>Descripcion</span><textarea v-model="draft.description" maxlength="500" rows="3"></textarea></label>
+                        <label class="order-wizard-wide"><span>Observaciones</span><textarea v-model="draft.observations" maxlength="500" rows="3"></textarea></label>
+                      </div>
+                    </details>
+                  </template>
+                  <p v-if="orderWizardError" class="order-wizard-error" role="status">{{ orderWizardError }}</p>
+                </div>
               </section>
             </template>
 
@@ -1453,24 +898,31 @@
             </template>
 
             <template v-else-if="modalType === 'reprogram-order'">
-              <label class="maintenance-modal-field">
-                <span>Fecha límite de ejecución</span>
-                <input v-model="draft.scheduledDate" type="text" />
-              </label>
-              <label class="maintenance-modal-field">
-                <span>Hora</span>
-                <input v-model="draft.scheduledTime" type="text" />
-              </label>
-              <label class="maintenance-modal-field">
-                <span>Taller</span>
-                <input v-model="draft.workshop" type="text" />
-              </label>
-              <label class="maintenance-modal-field">
-                <span>Responsable</span>
-                <input v-model="draft.owner" type="text" />
-              </label>
+              <section class="work-order-planning-form sm:col-span-2">
+                <fieldset>
+                  <legend><SvgIcon name="maintenance-calendar" />Fechas</legend>
+                  <label><span>Inicio planificado</span><input v-model="draft.plannedStartDate" type="date" :max="draft.scheduledDate || undefined" /></label>
+                  <label><span>Fecha limite de ejecucion</span><input v-model="draft.scheduledDate" type="date" :min="draft.plannedStartDate || undefined" required /></label>
+                  <label><span>Hora limite</span><input v-model="draft.scheduledTime" type="time" /></label>
+                </fieldset>
+                <fieldset>
+                  <legend><SvgIcon name="user" />Asignacion</legend>
+                  <label><span>Responsable</span><input v-model="draft.owner" type="text" required /></label>
+                  <label><span>Taller / proveedor</span><input v-model="draft.workshop" type="text" required /></label>
+                  <label><span>Prioridad</span><select v-model="draft.priority"><option v-for="priority in orderPriorityOptions" :key="priority" :value="priority">{{ priority }}</option></select></label>
+                </fieldset>
+              </section>
             </template>
 
+            <template v-else-if="isStartConfirmation">
+              <section class="work-order-transition-summary sm:col-span-2">
+                <strong>{{ draft.plate || selectedVehicle?.plate }} · {{ draft.job }}</strong>
+                <dl>
+                  <div><dt>Responsable</dt><dd>{{ draft.owner || 'Sin asignar' }}</dd></div>
+                  <div><dt>Taller / proveedor</dt><dd>{{ draft.workshop || 'Sin asignar' }}</dd></div>
+                </dl>
+              </section>
+            </template>
             <template v-else-if="modalType === 'assign-order'">
               <label class="maintenance-modal-field">
                 <span>Responsable</span>
@@ -1494,7 +946,8 @@
               </label>
               <label class="maintenance-modal-field">
                 <span>Estado</span>
-                <select v-model="draft.status">
+                <input v-if="draft.transitionLabel" :value="getOrderStatusLabel(draft.status)" type="text" readonly />
+                <select v-else v-model="draft.status">
                   <option value="scheduled">Programada</option>
                   <option value="in-progress">En proceso</option>
                   <option value="waiting">En espera</option>
@@ -1753,10 +1206,15 @@
 
             <template v-else-if="modalType === 'order-detail'">
               <section class="order-detail-view sm:col-span-2">
+                <div v-if="!['finished', 'cancelled'].includes(draft.status)" class="order-detail-management">
+                  <strong>Gestion de la OT</strong>
+                  <button type="button" @click="emit('manage-work-order', draft.orderId, 'reprogram-order')">Editar planificacion</button>
+                  <button v-if="draft.status === 'in-progress'" type="button" @click="emit('manage-work-order', draft.orderId, 'assign-order', 'waiting')">Poner en espera</button>
+                </div>
                 <div class="order-detail-columns">
                   <div class="order-detail-left">
-                    <section class="order-detail-costs">
-                      <h3>Informacion general</h3>
+                    <section class="order-detail-general">
+                      <h3>Trabajo y asignacion</h3>
                       <dl>
                         <dt>Responsable</dt>
                         <dd>{{ draft.owner }}</dd>
@@ -1764,19 +1222,17 @@
                         <dd>{{ draft.workshop }}</dd>
                         <dt>Prioridad</dt>
                         <dd>{{ draft.priority }}</dd>
-                        <dt>Fecha límite de ejecución</dt>
-                        <dd>{{ formatDetailDate(draft.scheduledDate) }}</dd>
-                        <dt v-if="draft.plannedStartDate">Fecha planificada</dt>
-                        <dd v-if="draft.plannedStartDate">
+                        <dt v-if="draft.plannedStartDate && draft.plannedStartDate !== draft.scheduledDate">Inicio planificado</dt>
+                        <dd v-if="draft.plannedStartDate && draft.plannedStartDate !== draft.scheduledDate">
                           {{ formatDetailDate(draft.plannedStartDate) }}
                         </dd>
-                        <dt>Lectura inicial</dt>
-                        <dd>{{ draft.openingReading || "Sin registro" }}</dd>
+                        <dt v-if="draft.startedAt || draft.openingReading">Lectura al iniciar</dt>
+                        <dd v-if="draft.startedAt || draft.openingReading">{{ draft.openingReading || "Sin registro" }}</dd>
                         <dt v-if="draft.status === 'finished'">Lectura final</dt>
                         <dd v-if="draft.status === 'finished'">
                           {{ draft.closingReading || "Sin registro" }}
                         </dd>
-                        <dt>Descripcion</dt>
+                        <dt>Descripcion registrada</dt>
                         <dd>{{ draft.description || "Sin descripcion" }}</dd>
                       </dl>
                     </section>
@@ -1793,20 +1249,7 @@
                       </ul>
                     </section>
                     <p v-if="evidenceError" class="maintenance-evidence-error">{{ evidenceError }}</p>
-                    <section>
-                      <h3>Costos</h3>
-                      <dl>
-                        <dt>Mano de obra</dt>
-                        <dd>{{ draft.laborCost || "$ 0" }}</dd>
-                        <dt>Repuestos</dt>
-                        <dd>{{ draft.partsCost || "$ 0" }}</dd>
-                        <dt>Otros costos</dt>
-                        <dd>{{ draft.otherCost || "$ 0" }}</dd>
-                        <dt>Total estimado</dt>
-                        <dd>{{ draft.actualCost || draft.estimatedCost || "$ 0" }}</dd>
-                      </dl>
-                    </section>
-                    <section class="order-detail-result">
+                    <section v-if="['finished', 'cancelled'].includes(draft.status)" class="order-detail-result">
                       <h3>
                         {{
                           draft.status === "cancelled"
@@ -1835,20 +1278,33 @@
                         <dd>
                           {{
                             formatDetailDate(
-                              draft.cancelledAt || draft.closedAt || draft.scheduledDate,
+                              draft.status === 'cancelled' ? draft.cancelledAt : draft.closedAt,
                             )
                           }}
                         </dd>
                         <dt>Observacion</dt>
                         <dd>
                           {{
-                            draft.observations || "Cierre completado sin observaciones adicionales."
+                            draft.observations || "Sin observaciones registradas."
                           }}
                         </dd>
                       </dl>
                     </section>
                   </div>
                   <div class="order-detail-right">
+                    <section class="order-detail-costs">
+                      <div class="order-detail-cost-heading">
+                        <h3>Costos</h3>
+                        <button v-if="!['finished', 'cancelled'].includes(draft.status)" type="button" @click="emit('manage-work-order-cost', draft.orderId)">Agregar costos</button>
+                      </div>
+                      <dl>
+                        <dt>Presupuesto estimado</dt><dd>{{ draft.estimatedCost || '$ 0' }}</dd>
+                        <dt>Mano de obra</dt><dd>{{ draft.laborCost || '$ 0' }}</dd>
+                        <dt>Repuestos</dt><dd>{{ draft.partsCost || '$ 0' }}</dd>
+                        <dt>Otros costos</dt><dd>{{ draft.otherCost || '$ 0' }}</dd>
+                        <dt class="order-cost-total">Total real registrado</dt><dd class="order-cost-total">{{ draft.actualCost || '$ 0' }}</dd>
+                      </dl>
+                    </section>
                     <section class="order-detail-trace">
                       <h3>Trazabilidad de la orden</h3>
                       <ol>
@@ -1859,24 +1315,12 @@
                         >
                           <strong>{{ event.action }}</strong
                           ><span>{{ formatDetailDate(event.at) }}</span>
+                          <small v-if="event.user">{{ event.user }}</small>
+                          <p v-if="event.detail">{{ event.detail }}</p>
                         </li>
                       </ol>
                     </section>
-                    <section class="order-detail-comments">
-                      <h3>Opiniones / Comentarios</h3>
-                      <div class="order-detail-comment-head">
-                        <span>Fecha y hora</span><span>Usuario</span><span>Comentario</span>
-                      </div>
-                      <div
-                        v-for="comment in orderCommentEvents"
-                        :key="comment.key"
-                        class="order-detail-comment-row"
-                      >
-                        <span>{{ formatDetailDate(comment.at) }}</span
-                        ><strong>{{ comment.user }}</strong>
-                        <p>{{ comment.detail }}</p>
-                      </div>
-                    </section>
+                    <p v-if="!orderTraceEvents.length" class="order-detail-empty-history">Sin movimientos registrados.</p>
                   </div>
                 </div>
               </section>
@@ -1926,6 +1370,14 @@
             {{ orderExportError }}
           </span>
           <button
+            v-if="modalType === 'order-detail' && fleetOrderContext"
+            type="button"
+            class="mr-auto inline-flex min-h-9 items-center rounded-lg border border-[#dfe5ed] px-4 text-[12px] font-bold text-[#102372]"
+            @click="emit('return-to-fleet-plan')"
+          >
+            Volver al plan en Flota
+          </button>
+          <button
             v-if="modalType === 'order-detail' && draft.status === 'finished'"
             class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#102372] px-4 text-[12px] font-black text-[#102372] transition hover:bg-blue-50 disabled:cursor-wait disabled:opacity-70"
             type="button"
@@ -1940,18 +1392,26 @@
             {{ isExportingOrder ? "Generando..." : "Exportar OT" }}
           </button>
           <button
+            v-if="modalType === 'order-detail' && !['finished', 'cancelled'].includes(draft.status)"
+            type="button"
+            class="order-detail-cancel"
+            @click="emit('manage-work-order', draft.orderId, 'cancel-order')"
+          >Cancelar OT</button>
+          <button
             class="h-9 rounded-lg border border-[#dfe5ed] px-4 text-[12px] font-black text-slate-500 transition hover:border-slate-400"
             type="button"
             @click="
-              modalType === 'maintenance' && maintenanceWizardStep > 1
+              modalType === 'create-order' && orderWizardStep > 1
+                ? orderWizardStep--
+                : modalType === 'maintenance' && maintenanceWizardStep > 1
                 ? maintenanceWizardStep--
                 : emit('close')
             "
           >
             {{
-              modalType === "order-detail" || modalType === "maintenance-detail"
+              modalType === "order-detail"
                 ? "Cerrar"
-                : modalType === "maintenance" && maintenanceWizardStep > 1
+                : (modalType === 'create-order' && orderWizardStep > 1) || (modalType === "maintenance" && maintenanceWizardStep > 1)
                   ? "Volver"
                   : "Cancelar"
             }}
@@ -1964,19 +1424,15 @@
           >
             Editar antes
           </button>
+          <button v-if="modalType === 'maintenance' && draft.editMode && editingMaintenancePlan && !isBaseMaintenancePlan(editingMaintenancePlan)" type="button" class="h-9 rounded-md border border-rose-200 px-3 text-[12px] text-rose-700" @click="emit('open-delete-maintenance-plan', editingMaintenancePlan)">Eliminar plan</button>
           <button
-            v-if="modalType !== 'order-detail' && modalType !== 'maintenance-detail'"
-            class="h-9 rounded-lg bg-[#ff6600] px-4 text-[12px] font-black text-white transition hover:bg-[#e65c00] disabled:cursor-not-allowed disabled:bg-orange-300"
+            v-if="modalType !== 'order-detail'"
+            class="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#ff6600] px-4 text-[12px] font-black leading-none text-white transition hover:bg-[#e65c00] disabled:cursor-not-allowed disabled:bg-orange-300"
             type="button"
             :disabled="
               isUploadingEvidence ||
-              (modalType === 'create-order' &&
-                (!draft.vehicleId ||
-                  !draft.maintenancePlanId ||
-                  !String(draft.job || '').trim() ||
-                  !draft.plannedStartDate ||
-                  !String(draft.owner || '').trim() ||
-                  !String(draft.workshop || '').trim())) ||
+              ((modalType === 'maintenance' && maintenanceWizardStep > 1 || modalType === 'edit-maintenance') && !isMaintenanceTargetValid) ||
+              (modalType === 'create-order' && Boolean(orderWizardError)) ||
               (modalType === 'assign-order' &&
                 draft.status === 'waiting' &&
                 !String(draft.waitingReason || '').trim()) ||
@@ -1986,27 +1442,27 @@
                   !String(draft.closingReading || '').trim())) ||
               (modalType === 'maintenance' &&
                 ((maintenanceWizardStep === 1 &&
-                  isCreateMaintenanceTypeDisabled(draft.type || draft.name)) ||
+                  (!draft.vehicleId || isCreateMaintenanceTypeDisabled(draft.type || draft.name))) ||
                   (maintenanceWizardStep > 1 &&
                     (!draft.vehicleId ||
                       (!draft.editMode &&
                         isMaintenanceTemplateUsed(draft.vehicleId, draft.type || draft.name))))))
             "
-            @click="modalType === 'maintenance' ? handleMaintenanceWizardPrimary() : emit('submit')"
+            @click="modalType === 'create-order' ? handleOrderWizardPrimary() : modalType === 'maintenance' ? handleMaintenanceWizardPrimary() : emit('submit')"
           >
             {{
-              modalType === "maintenance"
+              modalType === 'create-order' ? orderWizardStep < 3 ? 'Siguiente' : 'Crear OT' : modalType === "maintenance"
                 ? maintenanceWizardStep < 3
                   ? "Siguiente"
                   : draft.editMode
                     ? "Guardar cambios"
                     : "Crear plan"
-                : modalPrimaryAction
+                : modalType === 'assign-order' && draft.transitionLabel ? draft.transitionLabel : modalPrimaryAction
             }}
             <SvgIcon
-              v-if="modalType === 'maintenance' && maintenanceWizardStep < 3"
+              v-if="modalType === 'maintenance' && maintenanceWizardStep < 3 || modalType === 'create-order' && orderWizardStep < 3"
               name="arrow-right"
-              class="ml-2 inline-block h-4 w-4"
+              class="inline-flex h-4 w-4 shrink-0 items-center justify-center [&_svg]:h-4 [&_svg]:w-4"
             />
           </button>
         </footer>
@@ -2016,7 +1472,11 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
+import { validateMaintenanceOrderStep } from '../../utils/maintenance/maintenanceOrderWizard.js'
+import { maintenanceDay } from '../../utils/maintenance/maintenanceHistoricalReading.js'
+import { maintenanceRemainingThreshold } from '../../utils/maintenance/maintenanceRemainingThreshold.js'
+import { maintenanceTargetDate, maintenanceDateInterval } from '../../utils/maintenance/maintenanceDateTarget.js'
 
 const historyExportMenu = ref(null)
 const historyExportBusy = ref(false)
@@ -2049,14 +1509,11 @@ import { createMaintenanceEvidenceSession } from "../../services/maintenance/mai
 import { useMaintenanceTypeCatalog } from "../../composables/maintenance/useMaintenanceTypeCatalog.js"
 import { useMaintenanceVehicleHistory } from "../../composables/maintenance/useMaintenanceVehicleHistory.js"
 
-const formatDetailDate = (value) => {
-  if (!value) return "Sin registro"
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) return value
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("es-CL")
-}
+import { formatOrderDetailDate as formatDetailDate, getOrderDetailEvents } from "../../utils/maintenance/maintenanceOrderDetail.js"
 
 const props = defineProps({
+  orderCreationContext: { type: Object, default: null },
+  fleetOrderContext: { type: Object, default: null },
   cleanupEvidence: { type: Function, required: true },
   maintenanceTypeOrigins: { type: Object, default: () => ({}) },
   maintenanceTypeReadingSources: { type: Object, default: () => ({}) },
@@ -2096,6 +1553,7 @@ const props = defineProps({
     type: Function,
     required: true,
   },
+  getMaintenanceReadingAtDate: { type: Function, default: () => null },
   maintenanceItems: {
     type: Array,
     default: () => [],
@@ -2171,6 +1629,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
+  "manage-work-order",
+  "manage-work-order-cost",
+  "return-to-fleet-plan",
   "close",
   "create-work-order-from-maintenance-plan",
   "open-delete-maintenance-plan",
@@ -2189,6 +1650,18 @@ const emit = defineEmits([
 ])
 
 const draft = computed(() => props.modalDraft || {})
+const draftVehicle = computed(() => props.maintenanceItems.find((vehicle) => String(vehicle.id) === String(draft.value.vehicleId)) || props.selectedVehicle)
+const draftPlan = computed(() => props.modalVehicleMaintenancePlans.find((plan) => String(plan.id) === String(draft.value.maintenancePlanId)))
+const draftVehicleLabel = computed(() => draftVehicle.value?.plate || 'Activo seleccionado')
+const draftPlanLabel = computed(() => draftPlan.value?.name || draft.value.job || 'Plan seleccionado')
+const draftOpeningReading = computed(() => {
+  if (draft.value.readingSourceLabel === 'Horometro') return draftVehicle.value?.hourMeterLabel || 'Sin lectura'
+  if (draft.value.readingSourceLabel === 'Fecha/Hora') return 'Fecha del sistema'
+  return draftVehicle.value?.odometerLabel || 'Sin lectura'
+})
+const editingMaintenancePlan = computed(() => props.modalVehicleMaintenancePlans.find((plan) => String(plan.id) === String(draft.value.planId)))
+const isStartConfirmation = computed(() => props.modalType === "assign-order" &&
+  draft.value.status === "in-progress" && Boolean(draft.value.transitionLabel))
 const parseCreateOrderCost = (value) => Number(String(value || "0").replace(/[^0-9]/g, "")) || 0
 const createOrderEstimatedTotal = computed(
   () =>
@@ -2212,28 +1685,6 @@ watch(
   },
   { immediate: true },
 )
-const draftVehicle = computed(
-  () =>
-    props.maintenanceItems.find(
-      (vehicle) => String(vehicle.id) === String(draft.value.vehicleId),
-    ) || props.selectedVehicle,
-)
-const draftPlan = computed(() =>
-  props.modalVehicleMaintenancePlans.find(
-    (plan) => String(plan.id) === String(draft.value.maintenancePlanId),
-  ),
-)
-const draftVehicleLabel = computed(() => draftVehicle.value?.plate || "Activo seleccionado")
-const draftPlanLabel = computed(
-  () => draftPlan.value?.name || draft.value.job || "Plan seleccionado",
-)
-const draftOpeningReading = computed(() => {
-  if (draft.value.readingSourceLabel === "Horometro") {
-    return draftVehicle.value?.hourMeterLabel || "Sin lectura"
-  }
-  if (draft.value.readingSourceLabel === "Fecha/Hora") return "Fecha del sistema"
-  return draftVehicle.value?.odometerLabel || "Sin lectura"
-})
 const automaticNextCycleLabel = computed(() =>
   String(draft.value.nextCycle || "")
     .toLowerCase()
@@ -2333,116 +1784,24 @@ const exportCurrentWorkOrder = async () => {
     isExportingOrder.value = false
   }
 }
-const orderTraceEvents = computed(() => {
-  const events = (draft.value.audit || []).map((event, index) => ({
-    action: event.action || "Actualizacion",
-    at: event.at,
-    className: getTraceEventClass(event.action),
-    detail: event.detail || getTraceEventDetail(event.action, event.user),
-    key: `${event.action}-${event.at || index}-${index}`,
-    user: event.user || draft.value.owner || "Usuario actual",
-  }))
-  const hasAction = (term) =>
-    events.some((event) => event.action.toLowerCase().includes(term.toLowerCase()))
-  const insertBeforeTerminal = (event) => {
-    const terminalIndex = events.findIndex((item) =>
-      ["cerrada", "cancelada"].some((term) => item.action.toLowerCase().includes(term)),
-    )
-    events.splice(terminalIndex === -1 ? events.length : terminalIndex, 0, event)
-  }
-
-  if (!hasAction("creada")) {
-    events.unshift({
-      action: "OT creada",
-      at: draft.value.createdAt || draft.value.scheduledDate,
-      className: "",
-      detail: `Orden creada para ${draft.value.job}.`,
-      key: "created-fallback",
-    })
-  }
-  if (!hasAction("programada") && !hasAction("reprogramada")) {
-    events.splice(1, 0, {
-      action: "Programada",
-      at: draft.value.scheduledDate,
-      className: "",
-      detail: "Fecha de ejecucion programada.",
-      key: "scheduled-fallback",
-    })
-  }
-  if (["waiting", "in-progress", "finished"].includes(draft.value.status) && !hasAction("espera")) {
-    insertBeforeTerminal({
-      action: "En espera",
-      at: "",
-      className: "is-missing",
-      detail: "Este paso no fue registrado en la orden.",
-      key: "waiting-missing",
-    })
-  }
-  if (["in-progress", "finished"].includes(draft.value.status) && !hasAction("iniciado")) {
-    insertBeforeTerminal({
-      action: "En ejecucion",
-      at: draft.value.startedAt || "",
-      className: draft.value.startedAt ? "is-progress" : "is-missing",
-      detail: draft.value.startedAt
-        ? "Trabajo iniciado."
-        : "Este paso no fue registrado en la orden.",
-      key: "progress-missing",
-    })
-  }
-  if (draft.value.status === "cancelled" && !hasAction("cancelada")) {
-    events.push({
-      action: "Cancelada",
-      at: draft.value.cancelledAt || draft.value.scheduledDate,
-      className: "is-cancelled",
-      detail: draft.value.cancellationReason || draft.value.description || "Sin razon registrada",
-      key: "cancelled-fallback",
-    })
-  }
-  if (draft.value.status === "finished" && !hasAction("cerrada")) {
-    events.push({
-      action: "Cerrada",
-      at: draft.value.closedAt || draft.value.scheduledDate,
-      className: "is-closed",
-      detail: draft.value.workPerformed || draft.value.description || "Orden finalizada",
-      key: "closed-fallback",
-      user: draft.value.closedBy || "Usuario actual",
-    })
-  }
-  return events
-})
-const orderCommentEvents = computed(() =>
-  orderTraceEvents.value.filter(
-    (event) =>
-      event.className !== "is-missing" &&
-      ["iniciado", "espera", "cerrada", "cancelada"].some((term) =>
-        event.action.toLowerCase().includes(term),
-      ),
-  ),
-)
+const orderTraceEvents = computed(() => getOrderDetailEvents(draft.value).map((event) => ({
+  ...event, className: getTraceEventClass(event.action),
+})))
 
 function getTraceEventClass(action = "") {
   const normalizedAction = action.toLowerCase()
   if (normalizedAction.includes("cancelada")) return "is-cancelled"
   if (normalizedAction.includes("cerrada")) return "is-closed"
-  if (normalizedAction.includes("iniciado") || normalizedAction.includes("ejecucion")) {
+  if (normalizedAction.includes("iniciado") || normalizedAction.includes("reanudado") || normalizedAction.includes("ejecucion")) {
     return "is-progress"
   }
   if (normalizedAction.includes("espera")) return "is-waiting"
   return ""
 }
 
-function getTraceEventDetail(action = "", user = "") {
-  const normalizedAction = action.toLowerCase()
-  if (normalizedAction.includes("creada")) return `Orden creada para ${draft.value.job}.`
-  if (normalizedAction.includes("programada")) return "Fecha de ejecucion programada."
-  if (normalizedAction.includes("espera"))
-    return `Orden puesta en espera${user ? ` por ${user}` : ""}.`
-  if (normalizedAction.includes("iniciado")) return `Trabajo iniciado${user ? ` por ${user}` : ""}.`
-  return user ? `Actualizacion realizada por ${user}.` : "Estado de la orden actualizado."
-}
 const typeCatalogMode = ref("empty")
 const selectedMaintenanceType = ref("")
-const selectedMaintenancePlanId = ref("")
+const selectedMaintenancePlanId = ref(props.modalDraft?.planId || "")
 const vehicleDetailTab = ref("Planes")
 const {
   type: vehicleHistoryType,
@@ -2479,6 +1838,26 @@ const maintenanceTypeSearch = ref("")
 const maintenanceTypeCriterionFilter = ref("all")
 const openTypeMenu = ref("")
 const maintenanceWizardStep = ref(1)
+const orderWizardStep = ref(1)
+const orderWizardHeading = ref(null)
+const orderWizardSteps = [
+  { title: 'Trabajo', description: 'Vehiculo y mantencion' },
+  { title: 'Programacion', description: 'Fecha y responsables' },
+  { title: 'Confirmar', description: 'Revisa y crea la OT' },
+]
+const orderWizardError = computed(() => validateMaintenanceOrderStep(draft.value, orderWizardStep.value))
+const handleOrderWizardPrimary = () => {
+  if (orderWizardError.value) return
+  if (orderWizardStep.value < 3) orderWizardStep.value++
+  else emit('submit')
+}
+watch(orderWizardStep, async () => {
+  await nextTick()
+  if (props.modalType !== 'create-order') return
+  orderWizardHeading.value?.focus({ preventScroll: true })
+  const body = orderWizardHeading.value?.closest('.maintenance-action-modal > section')?.children[1]
+  if (body) body.scrollTop = 0
+})
 const maintenancePlanSearch = ref("")
 const maintenancePlanStatus = ref("all")
 const maintenancePlanStatusFilters = [
@@ -2552,8 +1931,70 @@ const maintenanceValueUnit = computed(() =>
       ? "horas"
       : "km",
 )
-const maintenanceIntervalLabel = computed(() => `Cada (${maintenanceValueUnit.value})`)
+const maintenanceIntervalLabel = computed(() => draft.value.readingSourceLabel === 'Fecha/Hora' ? 'Fecha de la proxima mantencion' : draft.value.readingSourceLabel === 'Horometro' ? 'Proxima mantencion a las (horas)' : 'Proxima mantencion a los (km)')
+const maintenanceScheduleValue = computed({
+  get: () => draft.value.readingSourceLabel !== 'Fecha/Hora'
+    ? (draft.value.intervalValue === '' ? '' : Number(draft.value.lastReading || 0) + Number(draft.value.intervalValue || 0))
+    : maintenanceTargetDate(draft.value.lastReading, draft.value.intervalValue),
+  set: (value) => {
+    draft.value.intervalValue = draft.value.readingSourceLabel === 'Fecha/Hora'
+      ? maintenanceDateInterval(draft.value.lastReading, value)
+      : value !== '' ? String(Number(value) - Number(draft.value.lastReading || 0)) : ''
+  },
+})
+const isMaintenanceTargetValid = computed(() => draft.value.readingSourceLabel === 'Fecha/Hora' ? Boolean(maintenanceScheduleValue.value) : (
+  String(draft.value.intervalValue ?? '').trim() !== '' &&
+  Number.isFinite(Number(draft.value.intervalValue)) && Number(draft.value.intervalValue) > 0 &&
+  Number.isFinite(Number(maintenanceScheduleValue.value)) && Number(maintenanceScheduleValue.value) > 0
+))
+const maintenanceGpsReading = computed(() => {
+  const vehicle = props.maintenanceItems.find((item) => String(item.id) === String(draft.value.vehicleId))
+  const value = draft.value.readingSourceLabel === 'Horometro' ? vehicle?.hourMeterHours : vehicle?.odometer
+  return value == null || !Number.isFinite(Number(value)) ? 'Sin lectura disponible' : `${new Intl.NumberFormat('es-CL').format(Number(value))} ${maintenanceValueUnit.value}`
+})
+const maintenanceToday = maintenanceDay()
+const isHistoricalMaintenanceReading = computed(() => Boolean(draft.value.startDate && draft.value.startDate !== maintenanceToday))
+const maintenanceDisplayedReadingTitle = computed(() => isHistoricalMaintenanceReading.value
+  ? `Lectura GPS del ${String(draft.value.startDate || '').split('-').reverse().join('-')}`
+  : 'Lectura actual del GPS')
+const maintenanceDisplayedReading = computed(() => !isHistoricalMaintenanceReading.value
+  ? maintenanceGpsReading.value
+  : String(draft.value.lastReading ?? '').trim() === '' ? 'Sin lectura para esta fecha'
+    : `${new Intl.NumberFormat('es-CL').format(Number(draft.value.lastReading))} ${maintenanceValueUnit.value}`)
+const maintenanceReferenceTimestamp = computed(() => draft.value.referenceReadingAt
+  ? `Ultima lectura registrada del dia: ${new Intl.DateTimeFormat('es-CL', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Santiago' }).format(new Date(draft.value.referenceReadingAt))}`
+  : draft.value.startDate === maintenanceToday ? 'Lectura actual disponible del vehiculo' : 'Sin registro historico verificable disponible')
+const syncMaintenanceHistoricalReading = () => {
+  const target = draft.value.readingSourceLabel !== 'Fecha/Hora' ? maintenanceScheduleValue.value : null
+  const reading = props.getMaintenanceReadingAtDate(draft.value.vehicleId, draft.value.startDate, draft.value.readingSourceLabel)
+  draft.value.lastReading = reading == null ? '' : String(reading.value)
+  draft.value.referenceReadingAt = reading?.at || null
+  if (target !== null) maintenanceScheduleValue.value = target
+}
+const prefillMaintenanceGpsReading = () => {
+  if (draft.value.editMode) return
+  if (draft.value.readingSourceLabel === 'Fecha/Hora') {
+    draft.value.lastReading = maintenanceToday
+    draft.value.intervalValue = ''
+    return
+  }
+  if (!draft.value.startDate) draft.value.startDate = maintenanceToday
+  syncMaintenanceHistoricalReading()
+  draft.value.intervalValue = ''
+}
 const maintenanceAlertLabel = computed(() => `Avisar con (${maintenanceValueUnit.value})`)
+const maintenanceThresholdSummary = computed(() => {
+  const vehicle = props.maintenanceItems.find((item) => String(item.id) === String(draft.value.vehicleId))
+  const current = draft.value.readingSourceLabel === 'Horometro' ? vehicle?.hourMeterHours : vehicle?.odometer
+  return maintenanceRemainingThreshold(draft.value, current)
+})
+const maintenanceLastReadingLabel = computed(() =>
+  draft.value.readingSourceLabel === "Fecha/Hora"
+    ? "Fecha de la ultima mantencion"
+    : draft.value.readingSourceLabel === "Horometro"
+      ? "Horometro de la ultima mantencion (horas)"
+      : "Kilometraje de la ultima mantencion (km)",
+)
 const maintenanceLastReadingDisplay = computed(() => {
   const value = String(draft.value.lastReading || "-")
   if (draft.value.readingSourceLabel !== "Fecha/Hora" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -2563,8 +2004,8 @@ const maintenanceLastReadingDisplay = computed(() => {
   return `${day} - ${month} - ${year}`
 })
 const isCreateMaintenanceTypeDisabled = (type) => {
-  const vehicleId = draft.value.vehicleId || props.selectedVehicle?.id
-  if (!vehicleId || !type) return false
+  const vehicleId = draft.value.vehicleId
+  if (!vehicleId || !type || !props.maintenanceItems.some((vehicle) => String(vehicle.id) === String(vehicleId))) return true
 
   const normalize = (value) =>
     String(value || "")
@@ -2572,7 +2013,7 @@ const isCreateMaintenanceTypeDisabled = (type) => {
       .replace(/[\u0300-\u036f]/g, "")
       .trim()
       .toLowerCase()
-  if (draft.value.editMode && normalize(type) === normalize(draft.value.originalType)) return false
+  if (props.modalType === 'edit-maintenance' && normalize(type) === normalize(draft.value.originalType)) return false
   const plans = draft.value.vehicleId
     ? props.modalVehicleMaintenancePlans
     : props.selectedVehicleMaintenancePlans
@@ -2583,7 +2024,7 @@ const isCreateMaintenanceTypeDisabled = (type) => {
   return exists || props.isMaintenanceTemplateUsed(vehicleId, type)
 }
 const isBlueHeader = computed(() =>
-  ["maintenance", "close-order"].includes(props.modalType),
+  ["maintenance", "create-order", "close-order"].includes(props.modalType),
 )
 const selectedVehicleImage = computed(() =>
   String(props.selectedVehicle?.assetName || "")
@@ -2765,6 +2206,7 @@ const typeVehicleCount = (type) =>
 watch(
   () => props.modalType,
   (modalType) => {
+    if (modalType === 'create-order') orderWizardStep.value = 1
     if (modalType === "maintenance") {
       maintenanceWizardStep.value = 1
     }
@@ -2777,18 +2219,10 @@ watch(
       draft.value.name = ""
       draft.value.readingSourceLabel = "Odometro"
     }
-    if (modalType === "maintenance-detail") {
-      vehicleDetailTab.value = "Planes"
-      vehicleHistoryType.value = "all"
-      vehicleHistoryFrom.value = ""
-      vehicleHistoryTo.value = ""
-      selectedMaintenancePlanId.value = props.selectedVehicleMaintenancePlans[0]?.id || ""
-      maintenancePlanSearch.value = ""
-      maintenancePlanStatus.value = "all"
-    }
   },
 )
 const selectMaintenanceType = (type) => {
+  if (props.modalType === 'maintenance' && isCreateMaintenanceTypeDisabled(type)) return
   if (draft.value.editMode && type === draft.value.originalType) {
     draft.value.type = type
     draft.value.name = type
@@ -2799,6 +2233,7 @@ const selectMaintenanceType = (type) => {
   emit("sync-maintenance-type-draft")
 }
 const handleMaintenanceWizardPrimary = () => {
+  if (maintenanceWizardStep.value > 1 && !isMaintenanceTargetValid.value) return
   if (maintenanceWizardStep.value < 3) {
     maintenanceWizardStep.value += 1
     return

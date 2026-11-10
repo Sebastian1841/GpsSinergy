@@ -397,14 +397,15 @@
     </main>
 
     <RoutePlanConfiguratorModal
-      v-if="isRoutePlanConfiguratorOpen"
+      v-if="isRoutePlanConfiguratorOpen && canEditRoutes"
       v-model="isRoutePlanConfiguratorOpen"
       :routes="plannedRoutes"
       :selected-route-id="selectedPlannedRouteId"
       :current-route-points="routePlanCurrentRoutePoints"
       :current-route-asset="routePlanCurrentAsset"
       :current-route-label="activeRangeLabel"
-      @save="handleSavePlannedRoutes"
+      :save-routes="handleSavePlannedRoutes"
+      :save-error="catalogError"
       @select-route="handleSelectPlannedRoute"
     />
 
@@ -412,6 +413,8 @@
       v-if="isRouteComparisonOpen"
       v-model="isRouteComparisonOpen"
       :assets="routeComparisonAssets"
+      :routes="plannedRoutes"
+      :can-manage-routes="canEditRoutes"
       :route-result="routeResult"
       :range-label="activeRangeLabel"
       :selected-route-id="selectedPlannedRouteId"
@@ -452,7 +455,14 @@ const itineraryChartsRef = ref(null)
 const showExportMenu = ref(false)
 const isRouteComparisonOpen = ref(false)
 const isRoutePlanConfiguratorOpen = ref(false)
-const { plannedRoutes, savePlannedRoutes } = usePlannedRouteCatalog()
+const { plannedRoutes, savePlannedRoutes, canEditRoutes, catalogError, contextKey } = usePlannedRouteCatalog()
+const routePlanContextKey = ref("")
+watch([contextKey, canEditRoutes], () => {
+  isRoutePlanConfiguratorOpen.value = false
+  isRouteComparisonOpen.value = false
+  selectedPlannedRouteId.value = ""
+  routePlanAssetId.value = ""
+})
 const { setRouteComparisonModalOpen } = useRouteComparisonUiState()
 const selectedPlannedRouteId = ref("")
 const routePlanAssetId = ref("")
@@ -934,6 +944,8 @@ const routePlanCurrentRoutePoints = computed(() => {
 })
 
 const openRoutePlanConfigurator = (payload = "") => {
+  if (!canEditRoutes.value) return
+  routePlanContextKey.value = contextKey.value
   const options = payload && typeof payload === "object" ? payload : { routeId: payload }
   const routeId = String(options.routeId || "").trim()
 
@@ -946,11 +958,12 @@ const openRoutePlanConfigurator = (payload = "") => {
 }
 
 const handleSavePlannedRoutes = (routes) => {
-  savePlannedRoutes(routes)
+  if (!canEditRoutes.value || routePlanContextKey.value !== contextKey.value) return null
+  return savePlannedRoutes(routes)
 }
 
 const handleSelectPlannedRoute = (routeId) => {
-  selectedPlannedRouteId.value = routeId || ""
+  selectedPlannedRouteId.value = plannedRoutes.value.some((route) => route.id === routeId) ? routeId : ""
 }
 
 const toggleExportMenu = () => {

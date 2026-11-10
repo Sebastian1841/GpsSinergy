@@ -4,6 +4,10 @@ Composables que descomponen `ActivosView.vue`.
 
 ## Archivos
 
+Acciones de geocercas (2026-11-05): crear/editar/borrar responden confirmacion
+al mapa y solo registran auditoria tras persistir. Un fallo no elimina seleccion
+ni afirma borrado. El callback permite conservar el dibujo/borrador para reintentar.
+
 - `useActivosCrud.js`: acciones de creacion, edicion y eliminacion.
 - `useActivosDeviceActions.js`: acciones cruzadas del menu contextual de
   activos. Abre itinerarios, resumen diario, agrega activos al resumen y navega

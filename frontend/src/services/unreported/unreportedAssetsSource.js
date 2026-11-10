@@ -1,4 +1,5 @@
 import { parseUnreportedTimestamp } from "./unreportedLifecycleStore.js"
+import { equipmentKey } from "../../utils/unreported/unreportedEquipmentIdentity.js"
 
 const reportTimestamp = (asset) => {
   const value =
@@ -19,7 +20,7 @@ export const buildUnreportedEquipment = (assets, companies) => {
     const company = companyById.get(String(asset.companyId))
     const imei = String(asset.imei || asset.deviceId || "").trim()
     if (!company || !imei) return []
-    const key = JSON.stringify([company, imei])
+    const key = equipmentKey({ companyId: asset.companyId, imei })
     if (identities.has(key)) return []
     identities.add(key)
     const lastReport = reportTimestamp(asset) || reportTimestamp(asset.telemetry || {})

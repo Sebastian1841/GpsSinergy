@@ -45,6 +45,11 @@ Componentes Vue del area de reportes.
 
 ## Regla de mantenimiento
 
+Errores de guardado (2026-11-05): el modal de plantilla recibe saveError; Reportes
+y Fleet no lo cierran si el servicio devuelve null. El formulario de reglas
+muestra rulesWriteError y conserva su borrador. Errores de borrado tambien se
+muestran en la biblioteca/panel; no se registran exitos sin escritura confirmada.
+
 Estos archivos deberian quedarse enfocados en UI y eventos. El estado Vue debe vivir en `../../composables/reports` y la logica pura en `../../utils/reports`.
 
 La busqueda de la biblioteca en `ReportsView.vue` usa `useDebouncedValue` antes de llamar a `filterReportsViewRows`. Mantener ese patron para que plantillas, reglas y paginacion no se recalculen en cada tecla.

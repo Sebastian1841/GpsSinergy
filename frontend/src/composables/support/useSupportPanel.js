@@ -4,6 +4,7 @@ import { useAuthSession } from "../auth/useAuthSession.js"
 import { useAccessControl } from "../auth/useAccessControl.js"
 import { useUsersService } from "../../services/users/useUsersService.js"
 import { useSupportService } from "../../services/support/useSupportService.js"
+import { useSupportReplyDrafts } from "./useSupportReplyDrafts.js"
 import {
   saveSupportFile,
   getSupportFile,
@@ -30,9 +31,11 @@ export const useSupportPanel = () => {
     busy = ref(false),
     error = ref(""),
     notice = ref("")
-  const createOpen = ref(false),
-    replyText = ref(""),
-    replyFiles = ref([])
+  const createOpen = ref(false)
+  const { replyText, replyFiles, clearReplyDraft } = useSupportReplyDrafts(
+    selectedId,
+    () => currentUser.value?.id,
+  )
   const management = ref({ status: "received", assigneeId: "", scheduledAt: "" })
   const companyForAccess = (access) =>
     applications.value.find((app) => String(app.id) === String(access.applicationId))?.companyId
@@ -127,10 +130,6 @@ export const useSupportPanel = () => {
     },
     { immediate: true },
   )
-  watch(selectedId, () => {
-    replyText.value = ""
-    replyFiles.value = []
-  })
   watch(
     () => currentUser.value?.id,
     () => {
@@ -209,8 +208,7 @@ export const useSupportPanel = () => {
     return run(() =>
       withFiles(files, (attachments) => {
         service.reply(id, text, attachments, context())
-        replyText.value = ""
-        replyFiles.value = []
+        clearReplyDraft(id)
         notice.value = "Respuesta enviada."
       }),
     )

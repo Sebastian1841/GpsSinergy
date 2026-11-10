@@ -4,6 +4,14 @@
   <div v-else class="fixed inset-0 flex flex-col overflow-hidden bg-gray-50 font-sans">
     <AppHeader @toggle-sidebar="toggleSidebar" />
     <ImpersonationBanner />
+    <p
+      v-if="persistenceError"
+      role="alert"
+      class="shrink-0 bg-red-50 px-4 py-2 text-sm text-red-800"
+    >
+      {{ persistenceError }} Los cambios pendientes siguen en esta ventana; no la cierres sin
+      revisarlos.
+    </p>
 
     <div class="relative flex min-h-0 flex-1 overflow-hidden">
       <AppSidebar ref="appSidebarRef" />
@@ -26,10 +34,12 @@ import AppHeader from "./components/Layout/AppHeader.vue"
 import AppSidebar from "./components/Layout/AppSidebar.vue"
 import ImpersonationBanner from "./components/auth/ImpersonationBanner.vue"
 import { useAuthSession } from "./composables/auth/useAuthSession.js"
+import { useMockDatabase } from "./composables/mock/useMockDatabase.js"
 import { LIGHT_PRIVATE_ROUTE_VIEW_KEYS, preloadPrivateRouteViews } from "./router"
 
 const route = useRoute()
 const { isAuthenticated } = useAuthSession()
+const { persistenceError } = useMockDatabase()
 const appSidebarRef = ref(null)
 let cancelRouteViewPreload = null
 

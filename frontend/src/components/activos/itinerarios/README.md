@@ -37,6 +37,11 @@ Componentes visuales de itinerarios.
 
 ## Regla de mantenimiento
 
+Rutas esperadas (2026-11-04): el panel usa el catalogo de la empresa de la ruta
+y sus activos autorizados; consulta requiere itineraries/view y edicion edit.
+Abrir y guardar revalidan permisos/contexto. Cambiar usuario, empresa, permisos
+o alcance cierra modales y limpia seleccion. No compartir catalogo sin contexto.
+
 Los componentes consumen datos ya preparados desde composables. Transformaciones
 de filas o rutas deben estar en `composables/activos/itinerarios` o
 `utils/activos`.

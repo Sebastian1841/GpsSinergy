@@ -4,6 +4,19 @@ import { readFileSync } from "node:fs"
 import { parse, compileScript, compileTemplate } from "@vue/compiler-sfc"
 import { getFleetPage } from "./fleetPagination.js"
 
+test("fleet filters constrain the body instead of clipping lower controls", () => {
+  const source = readFileSync(new URL("./MaintenanceFleetTab.vue", import.meta.url), "utf8")
+  const panel = source.match(/\.filter-panel \{([^}]+)\}/)[1]
+  const body = source.match(/\.filter-body \{([^}]+)\}/)[1]
+  assert.match(panel, /display: grid/)
+  assert.match(panel, /grid-template-rows: auto minmax\(0, 1fr\)/)
+  assert.match(panel, /align-self: stretch/)
+  assert.match(panel, /max-height: 100%/)
+  assert.match(body, /min-height: 0/)
+  assert.match(body, /overflow-y: auto/)
+  assert.match(body, /align-content: start/)
+})
+
 test("fleet pagination limits rendered rows and retains indexes across pages", () => {
   const items = Array.from({ length: 1000 }, (_, id) => ({ id }))
   const original = [...items]

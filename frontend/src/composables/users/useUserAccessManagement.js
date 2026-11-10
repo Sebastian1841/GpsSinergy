@@ -1,6 +1,7 @@
 import { computed, ref, unref, watch } from "vue"
 
 import { useAuthSession } from "../auth/useAuthSession.js"
+import { useAccessControl } from "../auth/useAccessControl.js"
 import { useUsersService } from "../../services/users/useUsersService.js"
 import { useDebouncedValue } from "../ui/useDebouncedValue.js"
 import { useUserAccessDrafts } from "./useUserAccessDrafts.js"
@@ -12,6 +13,7 @@ const DEFAULT_USER_PAGE_SIZE = 10
 
 export function useUserAccessManagement({ routeCompanyId = null, assetTags = null } = {}) {
   const { currentUser, isPlatformAdmin } = useAuthSession()
+  const { canAccessFunction } = useAccessControl()
 
   const {
     users,
@@ -75,6 +77,25 @@ export function useUserAccessManagement({ routeCompanyId = null, assetTags = nul
   const applicationsById = computed(() => {
     return new Map(applications.value.map((application) => [application.id, application]))
   })
+
+  const canUseApplication = (applicationId, functionId, permission) => {
+    const application = applicationsById.value.get(applicationId)
+    if (!application) return false
+    const companyId = normalizeUserAccessKey(application.companyId)
+    if (resolvedRouteCompanyId.value && companyId !== resolvedRouteCompanyId.value) return false
+    return canAccessFunction(functionId, companyId, permission)
+  }
+  const availableApplications = computed(() =>
+    applications.value.filter((application) =>
+      canUseApplication(application.id, "users-view", "view"),
+    ),
+  )
+
+  const canViewUser = (user) =>
+    isPlatformAdmin.value ||
+    getUserAccesses(user).some((access) =>
+      canUseApplication(access.applicationId, "users-view", "view"),
+    )
 
   const companiesById = computed(() => {
     return new Map(companies.value.map((company) => [company.id, company]))
@@ -140,17 +161,24 @@ export function useUserAccessManagement({ routeCompanyId = null, assetTags = nul
   }
 
   const selectedUser = computed(() => {
-    return users.value.find((user) => user.id === selectedUserId.value) || users.value[0] || null
+    return (
+      users.value.find((user) => user.id === selectedUserId.value && canViewUser(user)) ||
+      users.value.find(canViewUser) ||
+      null
+    )
   })
 
   const selectedUserAccesses = computed(() => {
     if (!selectedUser.value) return []
 
-    return accessesByUserId.value.get(selectedUser.value.id) || []
+    return (accessesByUserId.value.get(selectedUser.value.id) || []).filter((access) =>
+      canUseApplication(access.applicationId, "users-view", "view"),
+    )
   })
 
   const filteredUsers = computed(() => {
     return users.value.filter((user) => {
+      if (!canViewUser(user)) return false
       const userAccesses = accessesByUserId.value.get(user.id) || []
 
       const matchesSearch = userMatchesSearch({
@@ -311,6 +339,7 @@ export function useUserAccessManagement({ routeCompanyId = null, assetTags = nul
   }
 
   const selectUser = (userId) => {
+    if (!users.value.some((user) => user.id === userId && canViewUser(user))) return
     selectedUserId.value = userId
   }
 
@@ -346,7 +375,7 @@ export function useUserAccessManagement({ routeCompanyId = null, assetTags = nul
   } = useUserAccessDrafts({
     users,
     accesses,
-    applications,
+    applications: availableApplications,
     modules,
     moduleFunctions,
     assets,
@@ -357,6 +386,13 @@ export function useUserAccessManagement({ routeCompanyId = null, assetTags = nul
     applicationsById,
     currentUserId,
     isPlatformAdmin,
+    canManageApplication: (id) => canUseApplication(id, "users-permissions", "admin"),
+    canCreateInApplication: (id) => canUseApplication(id, "users-create", "edit"),
+    canEditUser: (user) =>
+      isPlatformAdmin.value ||
+      getUserAccesses(user).some((access) =>
+        canUseApplication(access.applicationId, "users-edit", "edit"),
+      ),
     createDatabaseUser,
     updateDatabaseUser,
     createDatabaseAccess,
@@ -367,7 +403,13 @@ export function useUserAccessManagement({ routeCompanyId = null, assetTags = nul
     users,
     accesses,
     companies,
-    applications,
+    applications: availableApplications,
+    canManageApplication: (id) => canUseApplication(id, "users-permissions", "admin"),
+    creatableApplications: computed(() =>
+      availableApplications.value.filter((app) =>
+        canUseApplication(app.id, "users-create", "edit"),
+      ),
+    ),
     modules,
     moduleFunctions,
     permissions,

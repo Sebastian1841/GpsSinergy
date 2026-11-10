@@ -1,4 +1,5 @@
 import L from "leaflet"
+import { plainTextTooltipContent } from "../plainTextTooltipContent.js"
 
 import {
   buildCoordinatesSignature,
@@ -85,7 +86,7 @@ export function createGeofenceRendererController({
 
     if (!layer) return null
 
-    layer.bindTooltip(geofence.name, {
+    layer.bindTooltip(plainTextTooltipContent(geofence.name), {
       direction: "top",
       sticky: true,
       className: "sinergy-geofence-tooltip",

@@ -1,5 +1,6 @@
 <template>
   <section class="flex h-full min-h-0 flex-col overflow-hidden bg-[#f6f8fb]">
+    <p v-if="templatesWriteError" role="alert" class="shrink-0 px-4 py-2 text-[12px] text-red-700">{{ templatesWriteError }}</p>
     <!-- Encabezado -->
     <header class="shrink-0 border-b border-[#d8dee8] bg-white px-4 py-3">
       <div class="flex items-center justify-between gap-4">
@@ -568,6 +569,7 @@
 
     <ReportTemplateModal
       v-if="isReportTemplateModalOpen"
+      :save-error="templatesWriteError"
       :open="isReportTemplateModalOpen"
       :template="editingTemplate"
       :categories="REPORT_CATEGORIES"
@@ -663,7 +665,7 @@ const props = defineProps({
   },
 })
 
-const { reportTemplates, createReportTemplate, updateReportTemplate, deleteReportTemplate } =
+const { reportTemplates, templatesWriteError, createReportTemplate, updateReportTemplate, deleteReportTemplate } =
   useReportTemplates()
 
 const { reportEventRules } = useReportEventRules()
@@ -997,6 +999,7 @@ const saveReportTemplate = ({ templateId, payload }) => {
   const savedTemplate = templateId
     ? updateReportTemplate(templateId, payload)
     : createReportTemplate(payload)
+  if (!savedTemplate) return
 
   if (savedTemplate) {
     selectedCategory.value = savedTemplate.category || CATEGORY_ALL_ID

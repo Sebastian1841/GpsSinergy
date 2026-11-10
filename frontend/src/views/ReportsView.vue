@@ -1,6 +1,7 @@
 <template>
   <section class="reports-view h-full min-h-0 overflow-hidden bg-[#f5f8fc]">
     <main class="flex h-full min-h-0 flex-col overflow-hidden px-4 py-3 sm:px-5 lg:px-6">
+      <p v-if="templatesWriteError" role="alert" class="shrink-0 py-2 text-[12px] text-red-700">{{ templatesWriteError }}</p>
       <div class="shrink-0">
         <div class="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto_auto] md:items-center">
           <label class="relative min-w-0">
@@ -409,6 +410,7 @@
 
     <ReportTemplateModal
       v-if="isReportModalOpen"
+      :save-error="templatesWriteError"
       :open="isReportModalOpen"
       :template="editingTemplate"
       :categories="REPORT_CATEGORIES"
@@ -472,7 +474,7 @@ const route = useRoute()
 const currentCompanyId = computed(() => String(route.params.empresaId || ""))
 
 const { visibleAssets } = useAccessControl()
-const { reportTemplates, createReportTemplate, updateReportTemplate, deleteReportTemplate } =
+const { reportTemplates, templatesWriteError, createReportTemplate, updateReportTemplate, deleteReportTemplate } =
   useReportTemplates()
 const { reportEventRules } = useReportEventRules()
 const { companyRecords } = useReportsService()
@@ -707,6 +709,7 @@ const saveReport = ({ templateId, payload }) => {
   const savedTemplate = isEditing
     ? updateReportTemplate(templateId, payload)
     : createReportTemplate(payload)
+  if (!savedTemplate) return
 
   if (savedTemplate) {
     recordAudit({

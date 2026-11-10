@@ -12,6 +12,16 @@ Estado del modulo de usuarios.
 
 ## Flujo Actual
 
+Las credenciales y ficha de un administrador solo las puede editar un
+administrador de plataforma. Se bloquean apertura y guardado, no solo botones.
+`useUserAccessDrafts.test.js` cubre ambos caminos.
+
+Cada mutacion de acceso valida su aplicacion destino con `canManageApplication`:
+empresa de la ruta (si existe) y permiso users-permissions en esa empresa.
+Crear valida users-create en el destino. Aplicaciones y detalle se recortan por
+users-view; administrar A no habilita cambiar accesos en B. Editar la ficha no
+permite cambiar roles sin permiso de administrar accesos.
+
 `UserManagementView.vue` consume `useUserAccessManagement({ routeCompanyId })`
 y entrega estado a componentes presentacionales. El composable mantiene
 `selectedCompany`, `selectedStatus`, `selectedRole`, `selectedModule`,

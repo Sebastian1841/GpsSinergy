@@ -1,4 +1,8 @@
 import { shallowRef } from "vue"
+import {
+  equipmentKey,
+  migrateUnreportedEquipmentIdentities,
+} from "../../utils/unreported/unreportedEquipmentIdentity.js"
 import { createUnreportedStateStorage } from "./unreportedStateStorage.js"
 import {
   consultationSituations,
@@ -13,7 +17,7 @@ import {
   closeInterruption,
   captureInterruptionTelemetry,
 } from "../../utils/unreported/unreportedHistory.js"
-export const equipmentKey = (row) => JSON.stringify([row.company, String(row.imei)])
+export { equipmentKey } from "../../utils/unreported/unreportedEquipmentIdentity.js"
 const diagnosticFields = [
   "externalVoltage",
   "internalVoltage",
@@ -71,8 +75,15 @@ export const createUnreportedLifecycleStore = ({
   const records = shallowRef(
     initial && !Array.isArray(initial) && typeof initial === "object" ? initial : {},
   )
+  const migrationWarning = shallowRef("")
   const allowed = (row, context) =>
-    Boolean(context.user?.id && context.companies.includes(row.company))
+    Boolean(
+      context.user?.id &&
+      (Array.isArray(context.companyIds)
+        ? row.companyId != null &&
+          context.companyIds.some((id) => String(id) === String(row.companyId))
+        : row.companyId == null && context.companies?.includes(row.company)),
+    )
   const requireAccess = (row, context) => {
     if (!allowed(row, context)) throw new Error("No tienes acceso a este equipo.")
   }
@@ -106,6 +117,7 @@ export const createUnreportedLifecycleStore = ({
     const equipment = {
       name: row.name || String(row.imei),
       company: row.company,
+      ...(row.companyId == null ? {} : { companyId: String(row.companyId) }),
       imei: String(row.imei),
       location: row.location || "Sin posicion conocida",
     }
@@ -154,8 +166,16 @@ export const createUnreportedLifecycleStore = ({
   const observe = (rows, context, thresholdHours) => {
     const date = now(),
       threshold = thresholdMs(thresholdHours)
-    const changedKeys = new Set()
-    const next = { ...records.value }
+    const migrated = migrateUnreportedEquipmentIdentities(
+      records.value,
+      rows.filter((row) => allowed(row, context)),
+      context.companyCatalog,
+    )
+    const changedKeys = migrated.changedKeys
+    const next = migrated.records
+    migrationWarning.value = migrated.unresolved
+      ? "Hay antecedentes antiguos sin empresa verificable o con identidades en conflicto. Se conservaron sin reasignarlos."
+      : ""
     for (const row of rows) {
       if (!allowed(row, context)) continue
       const key = equipmentKey(row),
@@ -508,6 +528,7 @@ export const createUnreportedLifecycleStore = ({
   }
   return {
     records,
+    migrationWarning,
     allowed,
     observe,
     receiveReport,

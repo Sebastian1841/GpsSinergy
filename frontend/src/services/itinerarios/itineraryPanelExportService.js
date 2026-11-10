@@ -39,6 +39,8 @@ const formatGeneratedAt = () => {
 export const resolveItineraryExportRows = (rows = [], options = {}) => {
   return resolveReverseGeocodedSources(rows, {
     limit: options.limit || EXPORT_ADDRESS_RESOLVE_LIMIT,
+    signal: options.signal,
+    timeoutMs: options.timeoutMs,
   })
 }
 

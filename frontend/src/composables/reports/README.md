@@ -20,6 +20,13 @@ Estado Vue reutilizable para reportes.
 
 ## Tests
 
+Persistencia comprobada (2026-11-05): plantillas y reglas solo publican tras
+confirmar escritura. Crear/editar devuelve null y borrar false al fallar;
+templatesWriteError/rulesWriteError explican el fallo. El borrado de plantilla base
+guarda tambien su marcador de eliminacion con rollback de mejor esfuerzo.
+Sincronizar presets tampoco publica una escritura fallida. Pruebas cruzadas en
+services/storage/confirmedFeatureWrites.test.js. No resuelve conflictos multiusuario.
+
 - `useReportTemplates.test.js`
 - `useGeneratedReportEvents.test.js`
 

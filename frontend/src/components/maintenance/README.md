@@ -1,10 +1,99 @@
 # Maintenance Components
 
+Nueva OT comparte el estilo del asistente de mantencion: encabezado azul,
+contenido blanco, barra lateral de 250px y el mismo ancho de modal (900px).
+Los tres pasos y sus validaciones se mantienen sin cambios.
+
 UI del modulo de mantenciones. `MaintenanceView.vue` conecta estas piezas con
 `useMaintenanceModule.js`; los datos y cambios operativos no se guardan en los
 componentes de tabla.
 
 ## Pantallas En Uso
+
+Detalle de OT (2026-11-06): ancho 1080px, resumen de activo/mantencion/estado/fecha
+sin prioridad ni fecha duplicadas. Gestion en franja superior, sin participar
+en la cuadricula. Columnas normales: trabajo/asignacion y evidencia/resultado a
+izquierda; costos e historial a derecha. Sin display:contents ni comentarios
+vacios que duplicaban eventos. Presupuesto separado de total real registrado.
+Fechas calendario sin conversion horaria y eventos solo de datos registrados;
+no se inventan pasos en espera ni se usa vencimiento como fecha de cierre.
+
+Paginacion de Ordenes: anterior/siguiente reales, rango de filas, pagina/total y
+tamanos 10/25/50. Cambiar filtros/pestana/tamano reinicia pagina; si disminuye
+el total se ajusta al ultimo indice valido. Alta real vuelve a primera pagina.
+Acceso contextual localiza la pagina exacta de la OT, incluso mas alla de 50
+filas y con busqueda debounced; no fuerza otro tamano. Vacio muestra 0 a 0.
+
+Ordenes inicia en Abiertas (programadas, en ejecucion y en espera). Finalizadas
+y Canceladas estan separadas. Limpiar filtros y crear OT vuelven a Abiertas;
+acceder expresamente a una OT terminal abre su pestana. Los filtros no cambian
+de pestana por el mero aumento de resultados; contador del pie usa lista activa.
+
+Limpieza de Ordenes (2026-11-06): cuatro KPI operativos sin subtitulos repetidos
+(abiertas, vencidas, ejecucion, espera). Patente sin mantencion duplicada. Costo
+real por fila; desglose en detalle. Tabla de OT con Prioridad siempre visible y columnas fijas,
+sin selector Columnas; conserva Ampliar tabla. Analisis conserva promedio/cumplimiento/costo de OT finalizadas
+en el periodo seleccionado, mediante summarizeMaintenanceOrders.
+
+Iniciar/Reanudar trabajo usa confirmacion compacta: OT en titulo, vehiculo,
+trabajo, responsable y taller existentes, sin campos editables ni selector de
+estado. Cancelar conserva el estado. Espera mantiene motivo obligatorio; cierre
+no cambia. La asignacion se edita dentro de Editar planificacion.
+
+Acciones de OT (2026-11-06): se sustituye selector de estados por Iniciar trabajo
+(programada), Cerrar OT (en proceso) o Reanudar trabajo (en espera). Ver OT sigue
+disponible. Sin menu secundario en filas: Editar planificacion (reune fechas,
+hora, responsable, taller y prioridad) y Poner en espera solo en proceso se
+ubican en Gestion del detalle; Agregar costos
+junto a Costos y Cancelar OT en el pie. Al guardar o cancelar estas operaciones
+se vuelve al detalle de la misma OT. Detalle de cierre solo para OT terminales.
+Modales de transicion muestran titulo
+y confirmacion de la accion elegida, con estado destino de solo lectura; no
+cambian la OT hasta confirmar. Planificacion conserva el estado operativo, inicio
+real y motivo de espera; valida fechas y asignacion y retorna al detalle.
+
+Ordenes: Ampliar tabla ocupa el viewport y oculta temporalmente KPI/filtros;
+conserva filtros aplicados, pagina, scroll y acciones de OT. Salir de pantalla
+completa o Escape restaura la vista. Se desactiva al salir de la pestana y no
+intercepta Escape de modales. No usa permisos del fullscreen del navegador.
+
+Claridad de Flota (2026-11-06): Planes por vehiculo, Estado del plan y Mantencion
+prioritaria describen la fila agregada y su plan mas urgente. El resumen separa
+pendientes sin OT, planes con OT abierta, por renovar y por configurar; no mezcla
+trabajo programado con decisiones pendientes. Calculo cacheado en fleetRows.
+
+Flota simplificada (2026-11-06): fila con un solo Ver planes/Ocultar planes, sin
+chevron duplicado ni acceso directo a OT desde el agregado. La columna Acciones
+permanece visible para no perder el acceso al plegado. Dentro de cada plan:
+Crear OT, Ver OT o Renovar plan segun estado. Sin Continuar OT ni Ver detalle
+completo; el nombre abre el plan exacto. Sin planes, Agregar primer plan dentro
+del desplegable. Los datos y contadores existentes no cambian.
+
+Tipo y nombre (2026-11-06): seleccionar tipo completa automaticamente el nombre
+del plan, de solo lectura en configuracion/edicion. Confirmacion muestra ambos.
+El catalogo de tipos sigue siendo editable; no se migran nombres historicos.
+Ultima lectura se etiqueta segun criterio: kilometraje, horometro (horas) o fecha
+de la ultima mantencion, en formulario y confirmacion. Sin resaltado amarillo
+temporal; retirado por solicitud nutella.
+
+Nuevo plan: el paso 1 muestra un selector de vehiculo. Sin seleccion no muestra
+tipos como Ya configurada ni permite avanzar. Desde una fila conserva el vehiculo
+explicitamente y lo muestra en el selector; no usa selectedVehicle como fallback.
+
+Pasos 3-5 (2026-11-05): resultados persistentes y descartables en todas las
+pestanas, con Ver OT creada, Revisar renovacion o Ver planes del vehiculo segun
+la operacion. Sin renovacion automatica. Ordenes conserva Nueva OT y Planes sin
+OT; configuracion de planes/tipos permanece en Flota. Flota omite vencimientos
+repetidos y conteos de cero pendientes. El detalle de OT abierta muestra fecha
+limite y estado abierto, no una falsa fecha de cierre.
+
+Desde un plan de Flota, Ver/Continuar OT abre directamente su detalle. El modal
+y la cabecera de Ordenes ofrecen Volver al plan en Flota. KeepAlive conserva los
+filtros, pagina y vehiculos desplegados; la tabla expone captura/restauracion de
+scroll. El detalle existente ya muestra activo y tipo de mantencion asociado.
+
+El boton principal del modal usa inline-flex y centrado vertical; la flecha de
+Siguiente tiene dimensiones fijas de 16px para no desalinearse con el texto.
 
 Estado visual de cabeceras (2026-11-04): la navegacion principal contiene solo
 Flota/Analisis/Ordenes/Conductores. Flota y Analisis tienen barra contextual debajo,
@@ -17,9 +106,20 @@ mantiene controles propios y no muestra acciones de planes/OT.
 - `MaintenanceFleetTab.vue`: Flota, filtros laterales, listado ordenable,
   columnas configurables, paginacion y planes expandibles por vehiculo. Expone
   `getExportRows` para el reporte de flota.
+  El panel de filtros reserva cabecera fija y cuerpo con altura minima cero y
+  scroll vertical propio cuando no caben los campos. Espaciado compacto sin
+  ocultar fechas ni extender la pagina al reducir la altura de ventana.
   Paginacion real 10/20/50 (20 iniciales), aplicada despues de filtros/orden.
   Solo se dibuja la pagina visible; exportacion mantiene todos los resultados.
   Cambiar filtros/orden/tamano vuelve a pagina1 y conserva indices de fila globales.
+- `fleetVehicleAction.js`: accion contextual de cada fila de Flota. Sin planes
+  ofrece Configurar mantencion con el vehiculo de la fila. Los demas casos
+  despliegan los planes sin elegir uno ni ejecutar operaciones automaticamente:
+  revisar pendientes sin OT, renovaciones, configuracion o trabajos abiertos.
+  Distingue OT programadas, en proceso y en espera; no llama trabajo en curso
+  a una OT que todavia no comenzo. Casos mixtos priorizan decisiones pendientes.
+  Clasificacion calculada junto al indice de filas, sin nuevas busquedas por render.
+  Siete pruebas cubren estados, conteos, cambios reactivos y conexion del boton.
 - `fleetOrderIndex.js`: indice de OT abiertas por vehiculo y plan/nombre.
   Evita buscar todas las OT al renderizar cada plan; pruebas en su archivo test.
 - `MaintenanceWorkOrdersTab.vue`: OT y pendientes de OT, KPI, filtros, tabla
@@ -172,6 +272,132 @@ No hay filtro de empresa en la vista del cliente;
 la empresa de la ruta y sus permisos delimitan todos los registros.
 
 # Cache De Pestanas
+
+Panel lateral de filtros vuelve a cubrir toda la altura de la tabla, sin mover
+controles: fondo blanco continuo hasta abajo, contenido alineado al inicio.
+
+Filtros en panel lateral compacto. Experimento de franja superior revertido
+por solicitud del usuario; se conservan los controles y comportamientos previos.
+
+Ver planes funciona como acordeon: solo un vehiculo expandido. Al abrirlo o
+regresar a sus planes se desplaza el scroll interno hasta su fila, dejando
+cabecera visible. Espera al render, respeta movimiento reducido y descarta
+enfoques anteriores al cambiar rapido de vehiculo o salir de la pestana.
+
+Planes expandidos ordenados por urgencia: vencida, proxima, sin renovar,
+en taller, sin lectura, al dia. En empate urgente, primero sin OT abierta.
+Empates restantes conservan orden; no compara km con dias/horas. Mantencion
+prioritaria de la fila principal usa el primer plan de ese mismo orden.
+
+Panel de filtros compacto: busqueda/tipo, estados y fechas. Alto por contenido
+con limite al viewport y scroll interno cuando hace falta, sin relleno vertical.
+Fechas en filas separadas con etiquetas Desde/Hasta para no cortar el calendario.
+
+Filtros de Flota para cliente: busqueda, estado, tipo de mantencion y fechas.
+Retirados Empresa y Tipo de vehiculo, junto con su estado local. El alcance de
+empresa sigue delimitado por ruta/permisos, no por un filtro seleccionable.
+
+Solo se listan planes configurados y guardados. No se generan planes base ni
+filas de respaldo por cantidad de activos/tipos. Vehiculo sin planes: contador
+cero, Sin configurar y Agregar primer plan; no una mantencion incompleta.
+
+Se elimina el modal Mantenciones del vehiculo. Flota mantiene la tabla expandida;
+pulsar un plan abre directamente el formulario de edicion. Configurar plan usa
+ese mismo acceso. Guardar/cancelar vuelve a Flota; eliminar sigue disponible en
+edicion de planes manuales. Historial operativo permanece en Ordenes.
+
+Planes base sin configuracion real muestran Sin configurar, sin fechas de
+ejemplo ni estado Al dia prefijado. Comparten evaluador con planes guardados.
+Configurar plan abre el detalle exacto para editarlo, sin crear duplicados.
+
+Por fecha tambien usa objetivo exacto: Fecha de la proxima mantencion, calendario
+vacio y obligatorio. Fecha de inicio precargada hoy, aviso en dias. Resumen
+muestra fecha elegida y dias restantes; se traduce al intervalo para persistir.
+
+Horometro GPS usa engineHours/horometroTotal del activo, ademas de aliases
+hourMeterHours/horometro. No confunde horas diarias con acumuladas ni inventa
+lecturas ausentes. Numeros decimales y cero real se conservan.
+
+Horometro igual que odometro: objetivo absoluto Proxima mantencion a las (horas),
+vacio y obligatorio al crear. No usa Cada ni relleno de plantilla. Fecha de
+inicio consulta lectura horaria; resumen muestra objetivo y horas restantes.
+
+Proxima mantencion por kilometraje obligatoria: asterisco, required, mensaje
+visible si falta, Siguiente/Crear bloqueados y validacion al guardar.
+
+Confirmacion incluye Umbral restante: objetivo menos lectura actual del GPS,
+o dias hasta vencimiento. No resta aviso previo ni usa lectura historica como
+actual. Distingue faltante, vencida y ausencia de lectura; aviso es independiente.
+
+Paso Configuracion ordenado: tipo como identidad unica, criterio + fecha de
+inicio, banda con lectura de esa fecha y hora de registro, objetivo + aviso.
+Sin nombre repetido ni fecha debajo del objetivo. Notas en desplegable secundario.
+Sin datos de prueba ni bloqueo de demostracion. Grilla de dos columnas, una en movil.
+
+La banda azul de lectura muestra el dato de la fecha seleccionada, con fecha
+en el titulo. Hoy usa lectura actual reactiva;
+pasado usa referencia historica, sin repetir kilometrajes distintos en dos bloques.
+
+Fecha de inicio (sustituye Actualizar): hoy usa lectura actual; un dia anterior
+usa el ultimo reporte explicito del dia en America/Santiago, mostrando su hora.
+Sin registro queda Sin lectura para esta fecha y no se permite guardar referencia
+vacia. Conserva objetivo absoluto al cambiar fecha, guarda startDate/referenceReadingAt.
+La lectura GPS actual sigue reactiva y no desplaza referencias guardadas.
+Historico limitado a getReportsForAsset del activo/empresa; sin consulta backend,
+sin interpolacion ni reutilizar lecturas actuales en dias pasados.
+
+Proxima mantencion por odometro empieza vacia en nuevos planes, sin objetivo
+sugerido por plantilla. Solo el usuario establece ese kilometraje. Editar un
+plan conserva su objetivo guardado; Actualizar no rellena uno vacio.
+
+Decision final de kilometraje: Proxima mantencion a los (km) recibe objetivo
+absoluto, no Cada. Lectura GPS en banda informativa y aviso en km. Se oculta
+ultimo servicio en este criterio y el resumen confirma el objetivo absoluto.
+Actualizar conserva el objetivo; internamente intervalo = objetivo - referencia.
+
+Lista de tipos de nuevo plan: nombre y criterio (tiempo, odometro u horometro),
+o Ya configurada cuando corresponde. No muestra intervalo del catalogo.
+Criterio, intervalo y aviso siguen editables en Configuracion; seleccionar un
+tipo no modifica los valores del catalogo al guardar el plan.
+
+Nuevo plan bloquea todos los tipos hasta elegir un vehiculo valido. No hay
+seleccion activa ni mensaje Ya configurada antes de elegirlo; Siguiente permanece
+bloqueado. Despues se aplica el bloqueo de tipos existentes del vehiculo.
+
+Actualizar en lectura GPS copia al campo del ultimo servicio la ultima lectura
+del activo disponible en la pagina, tanto al crear como al editar. Sin lectura
+queda deshabilitado. No ejecuta peticiones remotas ni guarda sin confirmar.
+Muestra circulo y Actualizando durante la accion local (minimo visual 350ms),
+bloquea clics repetidos y descarta la copia si cambia el borrador/vehiculo/criterio.
+
+Configuracion por odometro/horometro: lectura actual del activo solo informativa,
+sin boton para copiarla. En nuevos planes la referencia del ultimo servicio
+se precarga con el GPS al elegir vehiculo/tipo/criterio, editable para correccion;
+si falta lectura permanece vacia. No se sobreescriben planes existentes. Se configura ultimo servicio,
+intervalo y anticipacion; objetivo = ultimo servicio + intervalo. Lecturas ausentes
+no se reemplazan por cero ni valores de ejemplo: estado Sin lectura. Fecha sin cambios.
+
+Nuevo plan: tipos existentes del vehiculo se bloquean incluso si quedo un
+planId/modo de edicion en el borrador. Al cambiar vehiculo se selecciona un tipo
+libre, sin mostrar seleccionado uno bloqueado. Exclusion del propio plan solo
+en edit-maintenance.
+
+Nueva OT en tres pasos: Trabajo, Programacion, Confirmar. Trabajo contiene
+vehiculo/plan, titulo y prioridad; desde una fila, vehiculo/plan son datos fijos.
+Programacion pide fechas/responsable/taller. Confirmar muestra resumen y opcionales
+plegables de presupuesto/descripcion/observaciones. Volver conserva el borrador;
+solo Crear OT del ultimo paso emite guardado. Validacion independiente por paso.
+Fecha inicial usa el dia actual en America/Santiago, sin vencimiento ficticio.
+Crear OT mantiene validacion de campos y prevencion de OT abierta duplicada.
+
+Todos los modales comparten ancho maximo de 900px: formularios, detalles,
+catalogo, confirmaciones, exportacion y revision de referencias antiguas.
+Todos se limitan al viewport, con altura segun contenido y scroll interno.
+
+Editar planificacion usa cabecera blanca compacta con OT, activo y mantencion.
+Fechas y Asignacion se presentan en dos filas de tres campos sin tarjetas
+anidadas; en ventanas estrechas pasan a una columna con pie visible.
+Los errores de validacion se identifican como alertas, sin modificar el flujo.
 
 Flota, Ordenes, Analisis, pendientes sin OT, calendario e historial se conservan
 al visitarse en KeepAlive (maximo seis instancias, reiniciado al cambiar empresa).

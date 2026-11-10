@@ -21,6 +21,40 @@ const buildRoute = ({ asset, points }) => {
   }
 }
 
+test("current location retains its report date and does not invent a report for today", () => {
+  const asset = {
+    id: "offline",
+    lat: -33.45,
+    lng: -70.66,
+    timestamp: "2026-11-01T12:00:00",
+    estado: "offline",
+  }
+  const route = useItineraryRoute({
+    emit: () => {},
+    latestDate: "2026-11-04",
+    selectedAssetIds: ref([asset.id]),
+    filteredAssets: ref([asset]),
+    selectedAssets: ref([asset]),
+    primarySelectedAsset: ref(asset),
+    showDeviceList: ref(false),
+    fromDate: ref("2026-11-04"),
+    toDate: ref("2026-11-04"),
+    formError: ref(""),
+    applyDateRange: () => {},
+    allowFallbackPoints: false,
+    filterItineraryPoints: () => [],
+    buildItineraryResult: buildRoute,
+  })
+  route.handleGenerateRoute()
+  assert.equal(route.routeResult.value.rows.length, 0)
+  asset.timestamp = "2026-11-04T09:15:00.000"
+  route.handleGenerateRoute()
+  assert.equal(route.routeResult.value.rows[0].timestamp, asset.timestamp)
+  delete asset.timestamp
+  route.handleGenerateRoute()
+  assert.equal(route.routeResult.value.rows.length, 0)
+})
+
 test("useItineraryRoute keeps fallback route points when appending current location", () => {
   const emitted = []
   const asset = {

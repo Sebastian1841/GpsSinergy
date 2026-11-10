@@ -8,6 +8,8 @@
       }"
     >
       <div class="relative flex min-h-0 min-w-0 flex-col overflow-hidden bg-white">
+        <p v-if="alarmsWriteError" role="alert" class="shrink-0 border-b border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">{{ alarmsWriteError }}</p>
+        <p v-if="geofenceWriteError" role="alert" class="shrink-0 border-b border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">{{ geofenceWriteError }}</p>
         <FleetListPanel
           :activos="personalFilteredActivos"
           :all-activos="personalTableActivos"
@@ -223,7 +225,7 @@ const {
   deleteActivo: deleteActivoRecord,
 } = useActivosService()
 
-const { alarms: alarmRecords, resolveAlarm, reopenAlarm } = useAlarmsService()
+const { alarms: alarmRecords, resolveAlarm, reopenAlarm, alarmsWriteError } = useAlarmsService()
 
 const activeCompanyId = computed(() => String(route.params.empresaId || ""))
 
@@ -588,6 +590,7 @@ const {
   geofences,
   geofenceGroups,
   createGeofence,
+  geofenceWriteError,
   createGeofenceGroup,
   updateGeofence,
   deleteGeofence,

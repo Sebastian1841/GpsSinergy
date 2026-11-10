@@ -52,6 +52,8 @@ Estado contrastado con el codigo: 2026-11-04.
 - `AlarmStatusBadge.vue`: badge reutilizable para estado y prioridad.
 - `AlarmAttentionForm.vue`: captura accion y nota para la atencion individual o
   masiva; la vista calcula destinos autorizados y aplica cambios.
+  No limpia campos al emitir Guardar: el padre cierra solo despues de persistir.
+  Si falla, conserva accion y nota para reintentar.
 - `AlarmRuleCompanyCombobox.vue`: selector buscable de empresa en el editor.
 - `AlarmRuleTimingSection.vue`: ruido, silencio, horario y dias de vigencia.
 - `AlarmRuleEpisodeSection.vue`: condiciones especificas por tipo de episodio.

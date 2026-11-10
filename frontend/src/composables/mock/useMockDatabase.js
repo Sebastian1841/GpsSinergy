@@ -17,6 +17,7 @@ const ACTIVE_ACCESS_SCOPE_TYPES = new Set(["all-assets", "selected-assets", "ass
 let persistTimeout = null
 let assetReportMigrationPending = false
 const dirtyCollections = new Set()
+const persistenceError = ref("")
 let databaseStorage = null
 try {
   databaseStorage = typeof window === "undefined" ? null : window.localStorage
@@ -668,7 +669,12 @@ const persistDatabase = () => {
     },
     dirtyCollections,
   )
-  if (saved) dirtyCollections.clear()
+  if (saved) {
+    dirtyCollections.clear()
+    persistenceError.value = ""
+  } else {
+    persistenceError.value = collectionStorage.getError() || "No se pudieron guardar los cambios."
+  }
 }
 
 const schedulePersistDatabase = (...names) => {
@@ -1292,6 +1298,7 @@ export function useMockDatabase() {
   return {
     companies,
     companyRecords,
+    persistenceError,
     applications,
     assetTags,
     assets,

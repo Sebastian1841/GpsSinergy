@@ -78,7 +78,7 @@
               </select>
             </label>
 
-            <div class="flex items-end">
+            <div v-if="canManageRoutes" class="flex items-end">
               <button
                 type="button"
                 class="h-9 w-full rounded-lg border border-[#d8dee8] bg-white px-3 text-[10px] font-black uppercase tracking-[0.08em] text-[#102372] transition hover:border-[#ff6600] hover:text-[#ff6600]"
@@ -223,7 +223,6 @@ import { computed, ref, watch } from "vue"
 
 import RouteComparisonMap from "./RouteComparisonMap.vue"
 import RouteDeviationList from "./RouteDeviationList.vue"
-import { usePlannedRouteCatalog } from "../../../composables/activos/routes/usePlannedRouteCatalog.js"
 import { useRouteDeviationDocument } from "../../../composables/activos/routes/useRouteDeviationDocument.js"
 import { compareRouteAgainstPlan } from "../../../utils/activos/routeComparisonUtils.js"
 
@@ -242,6 +241,8 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  routes: { type: Array, default: () => [] },
+  canManageRoutes: { type: Boolean, default: false },
   routeResult: {
     type: Object,
     default: null,
@@ -258,7 +259,7 @@ const props = defineProps({
 
 const emit = defineEmits(["update:modelValue", "open-route-configurator"])
 
-const { plannedRoutes } = usePlannedRouteCatalog()
+const plannedRoutes = computed(() => props.routes)
 
 const {
   isGeneratingDeviationDocument,
@@ -624,6 +625,7 @@ const getAssetLabel = (asset) => {
 }
 
 const handleOpenRouteConfigurator = () => {
+  if (!props.canManageRoutes) return
   emit("open-route-configurator", {
     routeId: selectedRouteIdDraft.value,
     assetId: selectedAssetNormalizedId.value,

@@ -30,6 +30,9 @@ export function useUserAccessDrafts({
   applicationsById,
   currentUserId,
   isPlatformAdmin,
+  canManageApplication = () => false,
+  canCreateInApplication = () => false,
+  canEditUser = () => false,
   createDatabaseUser,
   updateDatabaseUser,
   createDatabaseAccess,
@@ -37,7 +40,9 @@ export function useUserAccessDrafts({
 }) {
   const showEditorModal = ref(false)
   const editorMode = ref("create")
-  const draftUser = ref(createEmptyDraftUser(applications.value[0]?.id || null))
+  const initialApplicationId = () =>
+    applications.value.find((app) => canCreateInApplication(app.id))?.id || null
+  const draftUser = ref(createEmptyDraftUser(initialApplicationId()))
 
   const selectedUserIsPlatformAdmin = computed(() => {
     return Boolean(selectedUser.value?.isPlatformAdmin)
@@ -78,7 +83,9 @@ export function useUserAccessDrafts({
   const canMutateAccess = (accessId) => {
     const access = getAccessById(accessId)
 
-    return Boolean(access && !isPlatformAdminAccess(access))
+    return Boolean(
+      access && !isPlatformAdminAccess(access) && canManageApplication(access.applicationId),
+    )
   }
 
   const getModuleFunction = (functionId) => {
@@ -301,7 +308,7 @@ export function useUserAccessDrafts({
   }
 
   const resetDraftUser = () => {
-    draftUser.value = createEmptyDraftUser(applications.value[0]?.id || null)
+    draftUser.value = createEmptyDraftUser(initialApplicationId())
   }
 
   const openCreateUserModal = () => {
@@ -312,6 +319,8 @@ export function useUserAccessDrafts({
 
   const openEditUserModal = () => {
     if (!selectedUser.value) return
+    if (!canEditUser(selectedUser.value)) return
+    if (selectedUserIsPlatformAdmin.value && !isPlatformAdmin.value) return
 
     editorMode.value = "edit"
     draftUser.value = createDraftUserFromSelected({
@@ -327,6 +336,7 @@ export function useUserAccessDrafts({
   }
 
   const createUser = () => {
+    if (!canCreateInApplication(draftUser.value.initialApplicationId)) return
     const name = draftUser.value.name.trim()
     const username = draftUser.value.username.trim()
     const password = draftUser.value.password.trim()
@@ -377,6 +387,8 @@ export function useUserAccessDrafts({
     const user = users.value.find((item) => item.id === draftUser.value.id)
 
     if (!user) return
+    if (!canEditUser(user)) return
+    if (isPlatformAdminUserRecord(user) && !isPlatformAdmin.value) return
 
     const nextUsername = draftUser.value.username.trim()
     const nextEmail = draftUser.value.email.trim()
@@ -407,7 +419,7 @@ export function useUserAccessDrafts({
 
     const primaryAccess = selectedUserAccesses.value[0]
 
-    if (primaryAccess && !isPlatformAdminUserRecord(user)) {
+    if (primaryAccess && canMutateAccess(primaryAccess.id)) {
       primaryAccess.role = draftUser.value.initialRole
     }
 
@@ -425,6 +437,7 @@ export function useUserAccessDrafts({
 
   const toggleSelectedUserStatus = () => {
     if (!selectedUser.value) return
+    if (!canEditUser(selectedUser.value)) return
     if (isPlatformAdminUserRecord(selectedUser.value)) return
     if (!isPlatformAdmin.value && isCurrentUserRecord(selectedUser.value)) return
 
@@ -434,6 +447,7 @@ export function useUserAccessDrafts({
   const addApplicationAccess = (applicationId) => {
     if (!selectedUser.value || !applicationId) return
     if (selectedUserIsPlatformAdmin.value) return
+    if (!canManageApplication(applicationId)) return
 
     const alreadyExists = accesses.value.some((access) => {
       return access.userId === selectedUser.value.id && access.applicationId === applicationId
@@ -462,6 +476,7 @@ export function useUserAccessDrafts({
   }
 
   const updateAccessRole = (accessId, roleId) => {
+    if (!canMutateAccess(accessId)) return
     const access = getAccessById(accessId)
 
     if (!access) return
@@ -471,6 +486,7 @@ export function useUserAccessDrafts({
   }
 
   const toggleAccessStatus = (accessId) => {
+    if (!canMutateAccess(accessId)) return
     const access = getAccessById(accessId)
 
     if (!access) return
@@ -481,6 +497,7 @@ export function useUserAccessDrafts({
   }
 
   const toggleModuleAccess = (accessId, moduleId) => {
+    if (!canMutateAccess(accessId)) return
     const access = getAccessById(accessId)
 
     if (!access) return
@@ -498,6 +515,7 @@ export function useUserAccessDrafts({
   }
 
   const toggleFunctionAccess = (accessId, functionId) => {
+    if (!canMutateAccess(accessId)) return
     const access = getAccessById(accessId)
 
     if (!access) return
@@ -515,6 +533,7 @@ export function useUserAccessDrafts({
   }
 
   const togglePermission = (accessId, functionId, permissionId) => {
+    if (!canMutateAccess(accessId)) return
     const access = getAccessById(accessId)
     const functionAccess = access?.functions?.find((item) => item.functionId === functionId)
 
@@ -533,6 +552,7 @@ export function useUserAccessDrafts({
   }
 
   const updateOperationalScope = (accessId, scopeType) => {
+    if (!canMutateAccess(accessId)) return
     const access = getAccessById(accessId)
     const allowedScopeTypes = new Set(["all-assets", "selected-assets", "asset-tags"])
     const nextScopeType = allowedScopeTypes.has(scopeType) ? scopeType : "selected-assets"
@@ -571,6 +591,7 @@ export function useUserAccessDrafts({
   }
 
   const toggleScopeAsset = (accessId, assetId) => {
+    if (!canMutateAccess(accessId)) return
     const access = getAccessById(accessId)
     const normalizedAssetId = normalizeUserAccessKey(assetId).trim()
     const asset = assets.value.find((item) => {
@@ -595,6 +616,7 @@ export function useUserAccessDrafts({
   }
 
   const toggleScopeAssetTag = (accessId, tagId) => {
+    if (!canMutateAccess(accessId)) return
     const access = getAccessById(accessId)
     const normalizedTagId = normalizeAssetTagId(tagId)
 

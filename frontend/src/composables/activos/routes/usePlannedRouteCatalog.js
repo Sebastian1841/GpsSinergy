@@ -1,9 +1,13 @@
-import { ref } from "vue"
+import { computed, getCurrentScope, onScopeDispose, ref } from "vue"
+import { useRoute } from "vue-router"
+import { useAccessControl } from "../../auth/useAccessControl.js"
+import { useAuthSession } from "../../auth/useAuthSession.js"
 
-import { mockPlannedRoutes } from "../../../data/mockPlannedRoutes.js"
-import { readJsonStorage, writeJsonStorage } from "../../../services/storage/browserStorage.js"
+import { readStorageValue, writeJsonStorage } from "../../../services/storage/browserStorage.js"
 
 const ROUTE_PLAN_STORAGE_KEY = "activos.planned-routes.v1"
+const catalogRevision = ref(0)
+const scopedStorageKey = (companyId) => `activos.planned-routes.v2:${encodeURIComponent(companyId)}`
 const DEFAULT_TOLERANCE_METERS = 300
 const ROUTE_POINT_SAMPLE_LIMIT = 8
 const ROUTE_GEOMETRY_POINT_LIMIT = 900
@@ -90,6 +94,7 @@ export const normalizePlannedRoute = (route = {}, index = 0) => {
     corridorLabel: String(route.corridorLabel || "Corredor operativo").trim(),
     toleranceMeters: Number.isFinite(toleranceMeters) ? toleranceMeters : DEFAULT_TOLERANCE_METERS,
     assetId,
+    companyId: firstText(route.companyId, route.asset?.companyId) || "",
     assetLabel: firstText(route.assetLabel, route.routeAssetLabel, getAssetLabel(route.asset)),
     stops: stops.map(normalizeRouteStop).filter(hasValidCoordinates),
     routePoints: routePoints.map(normalizeActualPoint).filter(hasValidCoordinates),
@@ -208,35 +213,148 @@ export const createPlannedRouteFromPoints = ({
   }
 }
 
-const loadPlannedRoutes = () => {
-  const storedRoutes = normalizePlannedRoutes(readJsonStorage(ROUTE_PLAN_STORAGE_KEY, []))
-
-  if (storedRoutes.length) return storedRoutes
-
-  return clonePlannedRoutes(mockPlannedRoutes)
-}
-
-const plannedRoutes = ref(loadPlannedRoutes())
-
-export const usePlannedRouteCatalog = () => {
+export const createPlannedRouteCatalog = ({ getContext }) => {
+  const catalogError = ref("")
+  const context = computed(getContext)
+  const contextKey = computed(() =>
+    JSON.stringify([
+      context.value.userId || "",
+      context.value.companyId || "",
+      context.value.canView,
+      context.value.canEdit,
+      (context.value.assets || [])
+        .filter((asset) => String(asset.companyId) === String(context.value.companyId))
+        .map((asset) => String(asset.id))
+        .sort(),
+    ]),
+  )
+  const canView = computed(() =>
+    Boolean(context.value.userId && context.value.companyId && context.value.canView),
+  )
+  const canEditRoutes = computed(() => canView.value && Boolean(context.value.canEdit))
+  const allowedAssetIds = computed(
+    () =>
+      new Set(
+        (context.value.assets || [])
+          .filter((asset) => String(asset.companyId) === String(context.value.companyId))
+          .map((asset) => String(asset.id)),
+      ),
+  )
+  const load = () => {
+    const companyId = String(context.value.companyId)
+    const stored = readStorageValue(scopedStorageKey(companyId))
+    const legacy = stored === null
+    const raw = legacy ? readStorageValue(ROUTE_PLAN_STORAGE_KEY) : stored
+    if (raw === null) return []
+    const records = JSON.parse(raw)
+    if (!Array.isArray(records))
+      throw Error("El catalogo de rutas no es valido. No se sobrescribio.")
+    if (
+      !legacy &&
+      records.some((record) => record.companyId && String(record.companyId) !== companyId)
+    ) {
+      throw Error("El catalogo contiene rutas de otra empresa. No se sobrescribio.")
+    }
+    // Unscoped legacy records remain untouched; do not infer ownership from an asset ID.
+    return normalizePlannedRoutes(records)
+      .filter((record) =>
+        legacy
+          ? record.companyId === companyId
+          : !record.companyId || record.companyId === companyId,
+      )
+      .map((record) => ({ ...record, companyId }))
+  }
+  const plannedRoutes = computed(() => {
+    void catalogRevision.value
+    if (!canView.value) return []
+    try {
+      return clonePlannedRoutes(
+        load().filter((record) => allowedAssetIds.value.has(String(record.assetId))),
+      )
+    } catch {
+      catalogError.value = "No se pudo leer el catalogo de rutas. No se sobrescribio."
+      return []
+    }
+  })
   const savePlannedRoutes = (routes = []) => {
-    const normalizedRoutes = normalizePlannedRoutes(routes)
-
-    plannedRoutes.value = normalizedRoutes.length
-      ? normalizedRoutes
-      : clonePlannedRoutes(mockPlannedRoutes)
-
-    writeJsonStorage(ROUTE_PLAN_STORAGE_KEY, plannedRoutes.value)
+    catalogError.value = ""
+    if (!canEditRoutes.value) {
+      catalogError.value = "No tienes permiso para modificar rutas en esta empresa."
+      return null
+    }
+    try {
+      const companyId = String(context.value.companyId)
+      const normalized = normalizePlannedRoutes(routes)
+      if (
+        normalized.length !== routes.length ||
+        new Set(normalized.map((record) => record.id)).size !== normalized.length ||
+        normalized.some(
+          (record) =>
+            (record.companyId && record.companyId !== companyId) ||
+            !allowedAssetIds.value.has(String(record.assetId)),
+        )
+      ) {
+        throw Error("Las rutas deben pertenecer a vehiculos autorizados de la empresa actual.")
+      }
+      const current = load()
+      const hidden = current.filter((record) => !allowedAssetIds.value.has(String(record.assetId)))
+      if (normalized.some((record) => hidden.some((other) => other.id === record.id))) {
+        throw Error("No puedes reemplazar una ruta fuera de tu alcance.")
+      }
+      const next = [...hidden, ...normalized.map((record) => ({ ...record, companyId }))]
+      if (!writeJsonStorage(scopedStorageKey(companyId), next)) {
+        throw Error("No se pudieron guardar las rutas. Conserva el borrador e intenta nuevamente.")
+      }
+      catalogRevision.value++
+      return normalized
+    } catch (error) {
+      catalogError.value = error.message || "No se pudieron guardar las rutas."
+      return null
+    }
   }
-
-  const resetPlannedRoutes = () => {
-    plannedRoutes.value = clonePlannedRoutes(mockPlannedRoutes)
-    writeJsonStorage(ROUTE_PLAN_STORAGE_KEY, plannedRoutes.value)
-  }
-
   return {
     plannedRoutes,
     savePlannedRoutes,
-    resetPlannedRoutes,
+    canEditRoutes,
+    catalogError,
+    contextKey,
   }
+}
+
+export const usePlannedRouteCatalog = () => {
+  const route = useRoute()
+  const { currentUser } = useAuthSession()
+  const { visibleAssets, canAccessCompany, canAccessFunction } = useAccessControl()
+  const refresh = (event) => {
+    if (
+      event.key === null ||
+      event.key === ROUTE_PLAN_STORAGE_KEY ||
+      event.key?.startsWith("activos.planned-routes.v2:")
+    )
+      catalogRevision.value++
+  }
+  if (typeof window !== "undefined" && getCurrentScope()) {
+    window.addEventListener("storage", refresh)
+    onScopeDispose(() => window.removeEventListener("storage", refresh))
+  }
+  return createPlannedRouteCatalog({
+    getContext: () => {
+      const companyId = String(route.params.empresaId || "")
+      return {
+        companyId,
+        userId: currentUser.value?.id,
+        assets: visibleAssets.value,
+        canView: Boolean(
+          companyId &&
+          canAccessCompany(companyId) &&
+          canAccessFunction("itineraries", companyId, "view"),
+        ),
+        canEdit: Boolean(
+          companyId &&
+          canAccessCompany(companyId) &&
+          canAccessFunction("itineraries", companyId, "edit"),
+        ),
+      }
+    },
+  })
 }

@@ -2,6 +2,10 @@
 
 Componentes de la vista de flota dentro de activos.
 
+Reportes (2026-11-05): FleetReportsPanel mantiene el modal y borrador si falla
+guardar plantilla, muestra templatesWriteError en panel/modal y solo registra
+auditoria tras confirmacion. Se conserva el flujo de ejecucion/exportacion.
+
 FleetAssetTagModal es compartido con Configuracion Etiquetas. Usa dialogo nativo,
 tabla con seleccion parcial/total por pagina, filtros, buscador y pie de acciones
 fijo. Conserva seleccion entre paginas mediante useFleetAssetTagModal (25 activos

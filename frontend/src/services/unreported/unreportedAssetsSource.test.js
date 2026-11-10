@@ -16,7 +16,11 @@ test("Maquinaria forestal returns to the active search after a second simulated 
     (item) => item.imei === "868123450009",
   )
   assert.ok(row)
-  const context = { user: { id: "test" }, companies: [row.company] }
+  const context = {
+    user: { id: "test" },
+    companies: [row.company],
+    companyIds: [String(row.companyId)],
+  }
   const store = createUnreportedLifecycleStore({
     read: () => ({}),
     write: () => true,
@@ -78,7 +82,7 @@ test("equipment source uses the actual company, identity, location and report wi
 })
 
 test("a new report on the actual asset closes its case with the original telemetry", () => {
-  const context = { user: { id: "u" }, companies: ["Empresa A"] }
+  const context = { user: { id: "u" }, companies: ["Empresa A"], companyIds: ["a"] }
   const store = createUnreportedLifecycleStore({
     read: () => ({}),
     write: () => true,
@@ -106,7 +110,7 @@ test("a new report on the actual asset closes its case with the original telemet
 })
 
 test("completing an old undated fixture creates an open case, not a fictitious recovery", () => {
-  const context = { user: { id: "u" }, companies: ["Empresa A"] }
+  const context = { user: { id: "u" }, companies: ["Empresa A"], companyIds: ["a"] }
   const store = createUnreportedLifecycleStore({
     read: () => ({}),
     write: () => true,

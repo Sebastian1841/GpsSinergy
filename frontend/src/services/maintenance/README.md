@@ -8,6 +8,13 @@ mantenciones ni sincronizacion entre navegadores.
 - `maintenanceStateStorage.js`: secciones versionadas de localStorage y
   manifiesto; confirma el conjunto solo si todas las escrituras resultan.
   Migra el snapshot antiguo y conserva la version anterior ante errores.
+  Compara version cargada, cambio local y ultima version persistida por seccion:
+  listas con ID y diccionarios de OT combinan cambios en registros distintos;
+  cambios incompatibles del mismo registro rechazan todo el lote. La referencia
+  local solo avanza al confirmar, no al leer para limpiar evidencias. Una migracion
+  parcial conserva secciones legacy no modificadas. Comprueba el manifiesto antes
+  de confirmar; es proteccion optimista local, no transaccion entre procesos ni
+  sincronizacion automatica de la vista. Recargar incorpora los datos externos.
 - `maintenanceStatePersistence.js`: agrupa cambios durante 350 ms, guarda
   secciones con nueva referencia y vacia pendientes al salir/ocultar la pagina.
 - `maintenanceEvidenceStorage.js`: archivos en IndexedDB y migracion de

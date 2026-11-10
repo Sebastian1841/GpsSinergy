@@ -1,7 +1,11 @@
 import { computed, ref, unref, watch } from "vue"
 
 import { appendAuditLog } from "../../services/audit/useAuditService.js"
-import { readJsonStorage, writeJsonStorage } from "../../services/storage/browserStorage.js"
+import {
+  readJsonStorage,
+  writeJsonStorage,
+  writeJsonStorageBatch,
+} from "../../services/storage/browserStorage.js"
 import { normalizeId } from "../../utils/idUtils.js"
 
 export const WORKSPACES_STORAGE_KEY = "sinergy-workspaces-v1"
@@ -11,6 +15,7 @@ const DEFAULT_WORKSPACE_NAME = "Vista principal"
 
 const workspaceRecords = ref(readJsonStorage(WORKSPACES_STORAGE_KEY, []))
 const activeWorkspaceIdsByUser = ref(readJsonStorage(ACTIVE_WORKSPACE_STORAGE_KEY, {}))
+const workspaceWriteError = ref("")
 
 if (typeof window !== "undefined") {
   window.addEventListener("storage", (event) => {
@@ -52,12 +57,31 @@ const buildWorkspaceId = (userId) => {
   return `workspace-${normalizeId(userId)}-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-const persistWorkspaces = () => {
-  writeJsonStorage(WORKSPACES_STORAGE_KEY, workspaceRecords.value)
+const persistWorkspaces = (records, activeIds = activeWorkspaceIdsByUser.value) => {
+  workspaceWriteError.value = ""
+  if (
+    !writeJsonStorageBatch([
+      [WORKSPACES_STORAGE_KEY, records],
+      [ACTIVE_WORKSPACE_STORAGE_KEY, activeIds],
+    ])
+  ) {
+    workspaceWriteError.value =
+      "No se pudo guardar la vista. Conserva los cambios e intenta nuevamente."
+    return false
+  }
+  workspaceRecords.value = records
+  activeWorkspaceIdsByUser.value = activeIds
+  return true
 }
 
-const persistActiveWorkspaces = () => {
-  writeJsonStorage(ACTIVE_WORKSPACE_STORAGE_KEY, activeWorkspaceIdsByUser.value)
+const persistActiveWorkspaces = (activeIds) => {
+  workspaceWriteError.value = ""
+  if (!writeJsonStorage(ACTIVE_WORKSPACE_STORAGE_KEY, activeIds)) {
+    workspaceWriteError.value = "No se pudo guardar la seleccion de vista. Intenta nuevamente."
+    return false
+  }
+  activeWorkspaceIdsByUser.value = activeIds
+  return true
 }
 
 const getWorkspaceUpdatedAt = (workspace) => {
@@ -96,6 +120,7 @@ const toPersistedWorkspace = (workspace) => {
 export function resetWorkspacesForTest() {
   workspaceRecords.value = []
   activeWorkspaceIdsByUser.value = {}
+  workspaceWriteError.value = ""
 }
 
 export function useWorkspaces({
@@ -192,8 +217,7 @@ export function useWorkspaces({
       delete nextActiveIds[user]
     }
 
-    activeWorkspaceIdsByUser.value = nextActiveIds
-    persistActiveWorkspaces()
+    return persistActiveWorkspaces(nextActiveIds)
   }
 
   const activeWorkspaceId = computed(() => {
@@ -265,9 +289,13 @@ export function useWorkspaces({
       updatedAt: now,
     }
 
-    workspaceRecords.value = [workspace, ...workspaceRecords.value]
-    persistWorkspaces()
-    setActiveWorkspaceId(workspace.id)
+    if (
+      !persistWorkspaces([workspace, ...workspaceRecords.value], {
+        ...activeWorkspaceIdsByUser.value,
+        [user]: workspace.id,
+      })
+    )
+      return null
 
     recordWorkspaceAudit({
       workspace,
@@ -283,7 +311,7 @@ export function useWorkspaces({
 
     if (!workspace) return null
 
-    setActiveWorkspaceId(workspace.id)
+    if (!setActiveWorkspaceId(workspace.id)) return null
 
     return workspace
   }
@@ -307,9 +335,13 @@ export function useWorkspaces({
       updatedAt: now,
     }
 
-    workspaceRecords.value = [workspace, ...workspaceRecords.value]
-    persistWorkspaces()
-    setActiveWorkspaceId(workspace.id)
+    if (
+      !persistWorkspaces([workspace, ...workspaceRecords.value], {
+        ...activeWorkspaceIdsByUser.value,
+        [user]: workspace.id,
+      })
+    )
+      return null
 
     recordWorkspaceAudit({
       workspace,
@@ -320,7 +352,7 @@ export function useWorkspaces({
     return workspace
   }
 
-  const renameWorkspace = (workspaceId, name) => {
+  const renameWorkspace = (workspaceId, name, sharedWithUserIds) => {
     const workspace = resolveOwnedWorkspace(workspaceId)
     const workspaceName = normalizeName(name)
 
@@ -329,15 +361,22 @@ export function useWorkspaces({
     const updatedWorkspace = toPersistedWorkspace({
       ...workspace,
       name: workspaceName,
+      ...(sharedWithUserIds === undefined
+        ? {}
+        : {
+            sharedWithUserIds: normalizeUserIds(sharedWithUserIds).filter(
+              (id) => id !== resolvedUserId.value,
+            ),
+          }),
       updatedAt: new Date().toISOString(),
     })
 
-    workspaceRecords.value = workspaceRecords.value.map((storedWorkspace) => {
+    const nextRecords = workspaceRecords.value.map((storedWorkspace) => {
       return normalizeId(storedWorkspace.id) === normalizeId(workspace.id)
         ? updatedWorkspace
         : storedWorkspace
     })
-    persistWorkspaces()
+    if (!persistWorkspaces(nextRecords)) return null
 
     recordWorkspaceAudit({
       workspace: updatedWorkspace,
@@ -359,13 +398,18 @@ export function useWorkspaces({
       updatedAt: new Date().toISOString(),
     })
 
-    workspaceRecords.value = workspaceRecords.value.map((storedWorkspace) => {
+    const nextRecords = workspaceRecords.value.map((storedWorkspace) => {
       return normalizeId(storedWorkspace.id) === normalizeId(workspace.id)
         ? updatedWorkspace
         : storedWorkspace
     })
-    persistWorkspaces()
-    setActiveWorkspaceId(updatedWorkspace.id)
+    if (
+      !persistWorkspaces(nextRecords, {
+        ...activeWorkspaceIdsByUser.value,
+        [resolvedUserId.value]: updatedWorkspace.id,
+      })
+    )
+      return null
 
     recordWorkspaceAudit({
       workspace: updatedWorkspace,
@@ -385,19 +429,19 @@ export function useWorkspaces({
 
     if (!workspace || ownedWorkspaces.length <= 1) return null
 
-    workspaceRecords.value = workspaceRecords.value.filter((storedWorkspace) => {
+    const nextRecords = workspaceRecords.value.filter((storedWorkspace) => {
       return normalizeId(storedWorkspace.id) !== normalizeId(workspace.id)
     })
-    persistWorkspaces()
 
     const nextWorkspace =
       userWorkspaces.value.find((storedWorkspace) => {
         return normalizeId(storedWorkspace.id) !== normalizeId(workspace.id)
       }) || null
 
-    if (normalizeId(activeWorkspaceId.value) === normalizeId(workspace.id)) {
-      setActiveWorkspaceId(nextWorkspace?.id || null)
-    }
+    const nextActive = { ...activeWorkspaceIdsByUser.value }
+    if (normalizeId(activeWorkspaceId.value) === normalizeId(workspace.id))
+      nextActive[resolvedUserId.value] = nextWorkspace?.id || null
+    if (!persistWorkspaces(nextRecords, nextActive)) return null
 
     recordWorkspaceAudit({
       workspace,
@@ -423,12 +467,12 @@ export function useWorkspaces({
       updatedAt: new Date().toISOString(),
     })
 
-    workspaceRecords.value = workspaceRecords.value.map((storedWorkspace) => {
+    const nextRecords = workspaceRecords.value.map((storedWorkspace) => {
       return normalizeId(storedWorkspace.id) === normalizeId(workspace.id)
         ? updatedWorkspace
         : storedWorkspace
     })
-    persistWorkspaces()
+    if (!persistWorkspaces(nextRecords)) return null
 
     recordWorkspaceAudit({
       workspace: updatedWorkspace,
@@ -470,6 +514,7 @@ export function useWorkspaces({
     workspaces: userWorkspaces,
     activeWorkspaceId,
     activeWorkspace,
+    workspaceWriteError: computed(() => workspaceWriteError.value),
 
     selectWorkspace,
     createWorkspace,

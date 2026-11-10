@@ -24,9 +24,14 @@ const draft = {
 }
 const setup = (write = () => true) => {
   let id = 0
+  let persisted = []
   return createSupportRequestStore({
-    read: () => [],
-    write,
+    read: () => structuredClone(persisted),
+    write: (rows) => {
+      if (!write(rows)) return false
+      persisted = structuredClone(rows)
+      return true
+    },
     createId: () => `id-${++id}`,
     now: () => "2026-10-13T12:00:00.000Z",
   })
@@ -120,4 +125,31 @@ test("platform administrators can manage requests only within the supplied autho
     () => store.update(id, { status: "resolved" }, { ...admin, companyIds: [] }),
     /acceso/,
   )
+})
+
+test("two stores preserve new requests and reject stale edits to the same request", () => {
+  let saved = [],
+    id = 0
+  const options = {
+    read: () => structuredClone(saved),
+    write: (rows) => {
+      saved = structuredClone(rows)
+      return true
+    },
+    createId: () => `shared-${++id}`,
+  }
+  const a = createSupportRequestStore(options),
+    b = createSupportRequestStore(options)
+  const requestA = a.create({ ...draft, subject: "A" }, client)
+  b.create({ ...draft, subject: "B" }, client)
+  assert.deepEqual(
+    saved.map((row) => row.subject),
+    ["B", "A"],
+  )
+  const stale = createSupportRequestStore(options)
+  a.reply(requestA, "New reply", [], client)
+  const previous = structuredClone(saved)
+  assert.throws(() => stale.reply(requestA, "Stale reply", [], client), /otra ventana/)
+  assert.deepEqual(saved, previous)
+  assert.equal(stale.requests.value.find((row) => row.id === requestA).messages.length, 1)
 })

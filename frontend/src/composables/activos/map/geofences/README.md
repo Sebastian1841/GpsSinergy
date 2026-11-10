@@ -13,6 +13,8 @@ Geocercas dentro del mapa.
   que el usuario confirma con `Guardar`.
 - `useGeofenceRenderer.js`: renderizado de capas. Muestra el nombre de cada
   geocerca en tooltip y no abre edicion al hacer click sobre la capa del mapa.
+  El nombre se entrega como nodo DOM con textContent mediante
+  `../plainTextTooltipContent.js`: nombres editados o importados no son HTML.
 - `useMapGeofences.js`: coordinador principal.
 - `useMapPanelGeofenceActions.js`: acciones desde panel de mapa.
 - `useMapPanelGeofenceState.js`: estado compartido de geocercas visibles,
@@ -20,6 +22,10 @@ Geocercas dentro del mapa.
   monta modales de selector o historial de geocercas.
 
 ## Regla de mantenimiento
+
+Confirmacion de guardado (2026-11-05): crear/actualizar/borrar emiten callback de
+resultado hacia Activos. Solo al recibir true se cancela el dibujo, se cierra la
+edicion o se retira la capa. Un fallo conserva geometria y metadatos del borrador.
 
 Mantener aqui solo integracion con mapa y estado Vue. Calculos geometricos
 reutilizables deben quedar en `utils`. La edicion de geocercas debe abrirse

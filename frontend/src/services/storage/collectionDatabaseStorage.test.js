@@ -8,16 +8,27 @@ const setup = () => {
   let fail = ""
   let id = 0
   const storage = {
-    getItem: key => items.get(key) ?? null,
+    getItem: (key) => items.get(key) ?? null,
     setItem: (key, value) => {
       if (fail && key.includes(fail)) throw new Error("Storage full")
       items.set(key, value)
       writes.push(key)
     },
-    removeItem: key => items.delete(key),
+    removeItem: (key) => items.delete(key),
   }
-  const database = createCollectionDatabaseStorage({ storage, key: "db", createId: () => String(++id) })
-  return { items, writes, database, failOn: value => { fail = value } }
+  const database = createCollectionDatabaseStorage({
+    storage,
+    key: "db",
+    createId: () => String(++id),
+  })
+  return {
+    items,
+    writes,
+    database,
+    failOn: (value) => {
+      fail = value
+    },
+  }
 }
 
 test("legacy snapshot migrates all collections without losing unrelated records", () => {
@@ -35,7 +46,14 @@ test("subsequent saves serialize and write only changed collections", () => {
   database.write({ assets: [], users: [] }, new Set(["assets"]))
   const oldAssetsKey = JSON.parse(items.get("db:collections")).sections.assets
   writes.length = 0
-  const state = { assets: [{ id: 3 }], users: { toJSON: () => { throw new Error("Unchanged collection serialized") } } }
+  const state = {
+    assets: [{ id: 3 }],
+    users: {
+      toJSON: () => {
+        throw new Error("Unchanged collection serialized")
+      },
+    },
+  }
   assert.equal(database.write(state, new Set(["assets"])), true)
   assert.equal(writes.length, 2)
   assert.deepEqual(database.read(), { assets: [{ id: 3 }], users: [] })
@@ -72,4 +90,46 @@ test("failed migration retains the legacy snapshot and missing storage is suppor
   const unavailable = createCollectionDatabaseStorage({ storage: null, key: "db" })
   assert.equal(unavailable.read(), null)
   assert.equal(unavailable.write(data, new Set(["assets"])), false)
+})
+
+test("two windows preserve independent edits and reject conflicting record updates atomically", () => {
+  const { database: first, items } = setup()
+  first.write(
+    {
+      companies: [
+        { id: "A", phone: "old" },
+        { id: "B", phone: "old" },
+      ],
+      users: [],
+    },
+    new Set(["companies"]),
+  )
+  const second = createCollectionDatabaseStorage({
+    storage: {
+      getItem: (key) => items.get(key) ?? null,
+      setItem: (key, value) => items.set(key, value),
+      removeItem: (key) => items.delete(key),
+    },
+    key: "db",
+  })
+  const a = first.read(),
+    b = second.read()
+  a.companies[0].phone = "from A"
+  assert.equal(first.write(a, new Set(["companies"])), true)
+  b.companies[1].phone = "from B"
+  assert.equal(second.write(b, new Set(["companies"])), true)
+  assert.deepEqual(
+    first.read().companies.map((c) => c.phone),
+    ["from A", "from B"],
+  )
+  const stale = second.read()
+  const fresh = first.read()
+  fresh.companies[0].phone = "newer"
+  first.write(fresh, new Set(["companies"]))
+  stale.companies[0].phone = "conflict"
+  stale.users.push({ id: "uncommitted" })
+  assert.equal(second.write(stale, new Set(["users", "companies"])), false)
+  assert.match(second.getError(), /otra ventana/)
+  assert.equal(first.read().companies[0].phone, "newer")
+  assert.deepEqual(first.read().users, [])
 })

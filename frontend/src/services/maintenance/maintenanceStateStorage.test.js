@@ -16,8 +16,18 @@ const setup = () => {
     },
     removeItem: (key) => items.delete(key),
   }
-  const store = createMaintenanceStateStorage({ storage, key: "module", createId: () => String(++nextId) })
-  return { items, writes, store, fail: (key) => { failKey = key } }
+  const createStore = () =>
+    createMaintenanceStateStorage({ storage, key: "module", createId: () => String(++nextId) })
+  const store = createStore()
+  return {
+    items,
+    writes,
+    store,
+    createStore,
+    fail: (key) => {
+      failKey = key
+    },
+  }
 }
 
 test("migrates old state and reads partitioned sections after reload", () => {
@@ -25,7 +35,11 @@ test("migrates old state and reads partitioned sections after reload", () => {
   const original = { plans: [{ id: "p1" }], orders: [{ id: "OT-1" }], costs: [] }
   items.set("module", JSON.stringify(original))
   assert.deepEqual(store.read(), original)
-  store.writeSections(Object.fromEntries(Object.entries(original).map(([key, value]) => [key, JSON.stringify(value)])))
+  store.writeSections(
+    Object.fromEntries(
+      Object.entries(original).map(([key, value]) => [key, JSON.stringify(value)]),
+    ),
+  )
   assert.deepEqual(store.read(), original)
   assert.equal(items.has("module"), false)
   assert.equal(JSON.parse(items.get("module:manifest")).version, 2)
@@ -66,4 +80,114 @@ test("failed manifest commit preserves legacy state and removes uncommitted sect
   assert.throws(() => store.writeSections({ plans: "[]" }), /Quota/)
   assert.deepEqual(store.read(), { plans: [{ id: "keep" }] })
   assert.deepEqual([...items.keys()], ["module"])
+})
+
+test("two windows preserve independent record edits within the same section", () => {
+  const { store, createStore } = setup()
+  store.writeSections({
+    plans: JSON.stringify([
+      { id: "a", name: "old A" },
+      { id: "b", name: "old B" },
+    ]),
+  })
+  const first = createStore()
+  const second = createStore()
+  const a = first.read()
+  const b = second.read()
+  a.plans[0].name = "new A"
+  b.plans[1].name = "new B"
+  first.writeSections({ plans: JSON.stringify(a.plans) })
+  second.writeSections({ plans: JSON.stringify(b.plans) })
+  assert.deepEqual(
+    createStore()
+      .read()
+      .plans.map((row) => row.name),
+    ["new A", "new B"],
+  )
+  // A later save from the stale editor must not erase the external edit either.
+  b.plans[1].name = "newer B"
+  second.writeSections({ plans: JSON.stringify(b.plans) })
+  assert.deepEqual(
+    createStore()
+      .read()
+      .plans.map((row) => row.name),
+    ["new A", "newer B"],
+  )
+})
+
+test("conflicting edits reject the whole multi-section commit and keep its baseline", () => {
+  const { store, createStore, items } = setup()
+  store.writeSections({ plans: '[{"id":"a","name":"old"}]', costs: "[]" })
+  const first = createStore()
+  const second = createStore()
+  first.read()
+  second.read()
+  first.writeSections({ plans: '[{"id":"a","name":"external"}]' })
+  const manifest = items.get("module:manifest")
+  const keys = [...items.keys()]
+  // An evidence-cleanup read must not turn an outdated draft into the new baseline.
+  second.read()
+  const save = () =>
+    second.writeSections({ plans: '[{"id":"a","name":"local"}]', costs: '[{"id":"cost"}]' })
+  assert.throws(save, /otra ventana/)
+  assert.throws(save, /otra ventana/)
+  assert.equal(items.get("module:manifest"), manifest)
+  assert.deepEqual([...items.keys()], keys)
+  assert.deepEqual(createStore().read(), { plans: [{ id: "a", name: "external" }], costs: [] })
+})
+
+test("OT override maps merge by key and reject competing edits or deletion", () => {
+  const { store, createStore } = setup()
+  store.writeSections({ overrides: '{"OT-A":{"status":"old"},"OT-B":{"status":"old"}}' })
+  const first = createStore()
+  const second = createStore()
+  const a = first.read()
+  const b = second.read()
+  a.overrides["OT-A"].status = "finished"
+  b.overrides["OT-B"].status = "scheduled"
+  first.writeSections({ overrides: JSON.stringify(a.overrides) })
+  second.writeSections({ overrides: JSON.stringify(b.overrides) })
+  assert.deepEqual(createStore().read().overrides, {
+    "OT-A": { status: "finished" },
+    "OT-B": { status: "scheduled" },
+  })
+  delete b.overrides["OT-A"]
+  assert.throws(
+    () => second.writeSections({ overrides: JSON.stringify(b.overrides) }),
+    /otra ventana/,
+  )
+})
+
+test("independent additions and removals survive stale windows and failed writes", () => {
+  const { store, createStore, fail } = setup()
+  store.writeSections({ plans: '[{"id":"a"},{"id":"b"}]' })
+  const first = createStore()
+  const second = createStore()
+  first.read()
+  second.read()
+  first.writeSections({ plans: '[{"id":"b"},{"id":"external"}]' })
+  fail(":manifest")
+  assert.throws(
+    () => second.writeSections({ plans: '[{"id":"a"},{"id":"b"},{"id":"local"}]' }),
+    /Quota/,
+  )
+  fail("")
+  second.writeSections({ plans: '[{"id":"a"},{"id":"b"},{"id":"local"}]' })
+  assert.deepEqual(
+    createStore()
+      .read()
+      .plans.map((row) => row.id),
+    ["local", "b", "external"],
+  )
+})
+
+test("partial legacy migration preserves untouched sections", () => {
+  const { items, store, createStore } = setup()
+  items.set("module", '{"plans":[{"id":"a"}],"overrides":{"OT-1":{"status":"old"}}}')
+  store.read()
+  store.writeSections({ plans: '[{"id":"a","name":"changed"}]' })
+  assert.deepEqual(createStore().read(), {
+    plans: [{ id: "a", name: "changed" }],
+    overrides: { "OT-1": { status: "old" } },
+  })
 })

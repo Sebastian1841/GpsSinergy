@@ -79,6 +79,11 @@
       </article>
     </div>
 
+    <dl v-if="analysisSection === 'summary'" class="order-period-results" aria-label="Resultados de OT finalizadas en el periodo">
+      <div><dt>Tiempo promedio de cierre</dt><dd>{{ completedOrderStatistics.averageClosingDays === null ? 'Sin datos' : `${formatDecimalNumber(completedOrderStatistics.averageClosingDays)} dias` }}</dd></div>
+      <div><dt>Cumplimiento de OT finalizadas</dt><dd>{{ completedOrderStatistics.onTimeRate === null ? 'Sin datos' : `${completedOrderStatistics.onTimeRate}%` }}</dd></div>
+      <div><dt>Costo real de OT finalizadas</dt><dd>{{ currency(completedOrderStatistics.actualCost) }}</dd></div>
+    </dl>
     <div v-if="analysisSection === 'summary'" class="primary">
       <article class="card" :class="{ 'chart-expanded': expandedChart === 'usage' }">
         <header>
@@ -543,6 +548,8 @@
 import { computed, onDeactivated, ref } from "vue"
 
 import SvgIcon from "../icons/SvgIcon.vue"
+import { parseMaintenanceOrderDate, summarizeMaintenanceOrders } from "../../utils/maintenance/maintenanceOrderSummary.js"
+import { formatDecimalNumber } from "../../utils/maintenance/maintenanceFormatUtils.js"
 import { buildFleetOrderIndex, findFleetOpenOrder } from "./fleetOrderIndex.js"
 import { aggregateMaintenanceAnalysisPeriod, buildMaintenanceAnalysisIndex, maintenanceAnalysisMonthKey } from "../../utils/maintenance/maintenanceAnalysisData.js"
 const props = defineProps({
@@ -737,6 +744,13 @@ const periodStart = computed(() => {
   start.setHours(0, 0, 0, 0)
   start.setMonth(start.getMonth() - months.value + 1, 1)
   return start
+})
+const completedOrderStatistics = computed(() => {
+  const now = new Date()
+  return summarizeMaintenanceOrders(props.workOrders.filter((order) => {
+    const closed = parseMaintenanceOrderDate(order.closedAt)
+    return order.status === "finished" && closed && closed >= periodStart.value && closed <= now
+  }), now)
 })
 const periodAnalysis = computed(() =>
   aggregateMaintenanceAnalysisPeriod(analysisOrderIndex.value, periodStart.value),
@@ -945,6 +959,10 @@ const withoutOrder = computed(() =>
 </script>
 
 <style scoped>
+.order-period-results { order: 2; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 14px 0; border-top: 1px solid #d8e0eb; border-bottom: 1px solid #d8e0eb; }
+.order-period-results dt { color: #52658c; font-size: 12px; }
+.order-period-results dd { margin: 6px 0 0; color: #102372; font-size: 18px; font-weight: 700; }
+@media (max-width: 640px) { .order-period-results { grid-template-columns: 1fr; } }
 .analysis-view {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -956,7 +974,7 @@ const withoutOrder = computed(() =>
   font-size: 14px;
 }
 .analysis-view.is-summary {
-  grid-template-rows: auto minmax(270px, auto) minmax(220px, auto) auto;
+  grid-template-rows: auto auto minmax(270px, auto) minmax(220px, auto) auto;
 }
 .analysis-view.is-without-order {
   grid-template-rows: auto auto minmax(250px, auto) minmax(300px, 1fr);

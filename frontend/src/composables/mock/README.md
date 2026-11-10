@@ -1,5 +1,9 @@
 # Mock Composables
 
+Los guardados por coleccion combinan registros independientes de otras ventanas
+y rechazan conflictos sobre el mismo ID. `persistenceError` expone el fallo a
+App; las colecciones pendientes no se marcan guardadas tras un error.
+
 Migracion de reportes mock (2026-10-19): normalizacion completa solo activos de
 semilla conocidos, source mock-database y sin reporte explicito, con fechas y datos
 de demostracion. Nunca reemplaza snapshots del usuario/API, reportes vacios explicitos

@@ -1283,6 +1283,7 @@
         </div>
 
         <footer class="shrink-0 border-t border-[#edf1f5] bg-white px-3 py-2.5">
+          <p v-if="saveError" role="alert" class="mb-2 text-[12px] text-red-700">{{ saveError }}</p>
           <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex w-full flex-wrap gap-2 sm:w-auto">
               <button
@@ -1375,6 +1376,7 @@ import {
 import { REPORT_WIDGET_IDS } from "../../utils/reports/config/reportWidgetUtils.js"
 
 const props = defineProps({
+  saveError: { type: String, default: "" },
   open: {
     type: Boolean,
     default: false,
