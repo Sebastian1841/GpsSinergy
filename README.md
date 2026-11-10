@@ -2,7 +2,7 @@
 
 Frontend Vue para un prototipo funcional de gestion de flota GPS en entorno
 multiempresa. La plataforma cubre activos, mapa, geocercas, reportes, alertas,
-mantenciones, usuarios, permisos, empresas y auditoria.
+mantenciones, usuarios, permisos, empresas, auditoria y Configuracion.
 
 El objetivo del proyecto es modelar una operacion real de flota: primero se
 calcula que empresas y vehiculos puede ver el usuario, y despues se aplican
@@ -106,6 +106,9 @@ prototipo local con datos mock y persistencia en el navegador.
 
 Incluye:
 
+- Panel de soporte desde el menu del usuario, con solicitudes, conversacion,
+  adjuntos y seguimiento local por empresa;
+
 - autenticacion mock;
 - permisos por empresa, modulo y funcion;
 - activos y telemetria simulada;
@@ -119,6 +122,22 @@ Incluye:
   historial por vehiculo, evidencias locales y reportes PDF/Excel;
 - Sin reportar con listado/graficos mock y exportacion Excel;
 - auditoria local.
+
+Configuracion tiene cinco vistas propias: Limites, Etiquetas, Alertas, Variables
+calculadas y Ajustes avanzados. Limites/Etiquetas/Alertas ofrecen alcance por
+empresa con permisos; Variables/Avanzado son exclusivos de plataforma. Guardado
+local no significa configuracion aplicada en un servidor. Variables permite
+editar e inspeccionar entradas, pero su motor no esta conectado y Guardar sigue
+bloqueado sin una prueba real. Ajustes avanzados guarda parametros localmente y
+registra auditoria, con procesamiento de eventos pendiente de integracion.
+
+Documentacion vigente de estos flujos:
+
+- [Vistas y accesos](frontend/src/views/README.md).
+- [Editor de Variables](frontend/src/components/configuration/README.md).
+- [Persistencia y utilidades de Configuracion](frontend/src/utils/layout/README.md).
+- [Reglas y bandeja de alertas](frontend/src/components/alarms/README.md).
+- [Mantenciones](frontend/src/components/maintenance/README.md).
 
 Para produccion, la sesion, permisos, auditoria, activos visibles y
 exportaciones deben validarse tambien desde backend.
@@ -278,7 +297,7 @@ npm run validate      # test + lint + formato + build
 
 ## Documentacion interna
 
-Actualizacion de referencia: 2026-10-13. Los README de carpeta describen el
+Actualizacion de Configuracion y carpetas afectadas: 2026-11-04. Los README de carpeta describen el
 codigo vigente; el registro retrospectivo de mantenciones y rendimiento vive
 en `bitacora/modulos/mantenciones-y-rendimiento.md`. Los datos operativos
 siguen siendo locales/mock; una descarga Excel/PDF no implica backend.
@@ -302,4 +321,5 @@ Lectura recomendada:
 - Si una regla de reporte expone campos nuevos, tambien deben existir columnas
   configurables equivalentes.
 - Si cambia un flujo importante, actualizar la documentacion del modulo
-  afectado.
+  afectado en el mismo cambio. El README describe el estado actual; la bitacora
+  registra decisiones e iteraciones. Una entrada de bitacora no lo reemplaza.

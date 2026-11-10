@@ -1,5 +1,9 @@
 # Mantenciones: Cambios Y Traspaso A Produccion
 
+Entrega historica al 2026-10-13: no incluye Conductores ni ajustes posteriores.
+Consultar [pendientes generales](../CAMBIOS_PENDIENTES.md) y el
+[estado actual de Mantenciones](../../frontend/src/components/maintenance/README.md).
+
 Documento de entrega del **modulo de mantenciones**, actualizado el **2026-10-13**.
 
 ## 1. Alcance
