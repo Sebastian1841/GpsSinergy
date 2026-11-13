@@ -6,7 +6,70 @@ import {
   buildMaintenanceAnalysisIndex,
   maintenanceAnalysisMonthKey,
   parseMaintenanceAnalysisDate,
+  buildMaintenanceCalendarBuckets,
+  buildMaintenanceCycleRanking,
+  maintenanceAnalysisCostCeiling,
 } from "./maintenanceAnalysisData.js"
+
+test('all historical charts share the period cutoff and the same compliance result', () => {
+  const source = [
+    { vehicleId: 'a', status: 'finished', scheduledDate: '2026-11-01', closedAt: '2026-11-01T15:00:00-03:00', actualCost: 100, laborCost: 100 },
+    { vehicleId: 'a', status: 'finished', scheduledDate: '2026-11-01', closedAt: '2026-11-02T15:00:00-03:00', actualCost: 200, partsCost: 200 },
+    { vehicleId: 'a', status: 'finished', closedAt: '2035-11-01T15:00:00-03:00', actualCost: 999, partsCost: 999 },
+    { vehicleId: 'a', status: 'finished', closedAt: '2026-11-13T18:00:00-03:00', actualCost: 999, partsCost: 999 },
+  ]
+  const end = new Date('2026-11-13T12:00:00-03:00')
+  const result = aggregateMaintenanceAnalysisPeriod(buildMaintenanceAnalysisIndex(source), new Date(2026, 10, 1), end)
+  assert.equal(result.statistics.actualCost, 300)
+  assert.equal(result.statistics.onTimeRate, 50)
+  assert.equal(result.vehicles.get('a').onTime, 1)
+  assert.equal(result.vehicles.get('a').measurable, 2)
+  assert.equal(result.vehicles.get('a').cost, 300)
+  assert.deepEqual(result.composition, { labor: 100, parts: 200, other: 0 })
+  assert.equal([...result.monthlyCosts.values()].reduce((a, b) => a + b, 0), 300)
+})
+
+test('date parsing uses Chile calendar days for timestamps and rejects invalid dates', () => {
+  const closed = parseMaintenanceAnalysisDate('2026-11-02T01:00:00Z')
+  assert.equal(closed.getDate(), 1)
+  assert.equal(closed.getMonth(), 10)
+  assert.equal(parseMaintenanceAnalysisDate('2026-02-30'), null)
+  assert.equal(parseMaintenanceAnalysisDate('31/02/2026'), null)
+  assert.equal(parseMaintenanceAnalysisDate('2026-11-01').getDate(), 1)
+})
+
+test('calendar buckets never interpret kilometers or hours as days and include configured future dates', () => {
+  const plan = (source, remainingValue, status = 'current') => ({ readingSourceLabel: source, remainingValue, status })
+  const rows = buildMaintenanceCalendarBuckets([
+    plan('Odometro', 4, 'due'), plan('Horometro', 14, 'due'),
+    plan('Fecha/Hora', -2, 'overdue'), plan('Fecha/Hora', 0, 'overdue'),
+    plan('Fecha/Hora', 15), plan('Fecha/Hora', 16), plan('Fecha/Hora', 30),
+    plan('Fecha/Hora', 31), plan('Fecha/Hora', 60), plan('Fecha/Hora', 61), plan('Fecha/Hora', 90),
+    plan('Fecha/Hora', 91), plan('Fecha/Hora', null, 'unconfigured'), plan('Fecha/Hora', 5, 'renewal-pending'),
+  ])
+  assert.deepEqual(rows.map((row) => row.count), [2, 1, 2, 2, 2])
+})
+
+test('cycle priority uses actual progress, excludes missing readings and picks one plan per asset', () => {
+  const plan = (vehicleId, status, cycleProgressPercent, remainingValue) => ({ vehicleId, status, cycleProgressPercent, remainingValue })
+  const result = buildMaintenanceCycleRanking([
+    plan('a', 'current', 34, 6600), plan('a', 'due', 80, 20),
+    plan('b', 'due', 95, 5), plan('c', 'overdue', 120, -200),
+    plan('d', 'no-reading', null, null), plan('e', 'renewal-pending', 150, -500),
+  ])
+  assert.deepEqual(result.map((row) => row.id), ['c', 'b', 'a'])
+  assert.equal(result[0].percent, 100)
+  assert.equal(result[0].cycleProgressPercent, 120)
+  assert.equal(result[1].percent, 95)
+})
+
+test('cost chart ceiling never distorts values with a minimum visible bar', () => {
+  assert.equal(maintenanceAnalysisCostCeiling(0), 1)
+  assert.equal(maintenanceAnalysisCostCeiling(120000), 200000)
+  assert.equal(maintenanceAnalysisCostCeiling(600000), 1000000)
+  assert.equal(maintenanceAnalysisCostCeiling(1000000), 1000000)
+  assert.equal(maintenanceAnalysisCostCeiling(2630000), 3000000)
+})
 
 const orders = [
   { vehicleId: 1, status: "finished", closedAt: "02/10/2026", scheduledDate: "02/10/2026", actualCost: "$ 12.000", laborCost: "$ 5.000", partsCost: "$ 6.000", otherCost: "$ 1.000" },

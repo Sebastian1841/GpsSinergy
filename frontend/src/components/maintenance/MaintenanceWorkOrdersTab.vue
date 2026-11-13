@@ -8,7 +8,12 @@
       </article>
     </div>
 
-    <div class="orders-filters" :class="{ 'has-custom-range': deadlineFilter === 'custom' }">
+    <div class="orders-toolbar">
+    <div class="orders-filters" :class="{ 'is-history': isHistory }">
+      <nav class="orders-sections" aria-label="Consulta de ordenes">
+        <button type="button" :class="{ active: !isHistory }" :aria-pressed="!isHistory" @click="selectOrderList('open')">Ordenes abiertas <span class="order-count">{{ orderStatistics.openCount }}</span></button>
+        <button type="button" :class="{ active: isHistory }" :aria-pressed="isHistory" @click="selectOrderList('finished')">Historial</button>
+      </nav>
       <input
         v-model="pendingSearch"
         type="search"
@@ -21,29 +26,14 @@
           <option v-for="asset in assetOptions" :key="asset" :value="asset">{{ asset }}</option>
         </select></label
       >
-      <label
-        ><span>Fecha límite de ejecución</span
-        ><select v-model="deadlineFilter">
-          <option value="all">Todas las fechas límite</option>
-          <option value="overdue">Vencidas</option>
-          <option value="today">Vencen hoy</option>
-          <option value="next-7">Próximos 7 días</option>
-          <option value="next-30">Próximos 30 días</option>
-          <option value="none">Sin fecha límite de ejecución</option>
-          <option value="custom">Rango personalizado</option>
-        </select></label
-      >
-      <label v-if="deadlineFilter === 'custom'"
-        ><span>Desde</span><input v-model="deadlineFrom" type="date"
-      /></label>
-      <label v-if="deadlineFilter === 'custom'"
-        ><span>Hasta</span><input v-model="deadlineTo" type="date"
-      /></label>
+      <label v-if="isHistory"><span>Fecha de cierre desde</span><input v-model="deadlineFrom" type="date" :max="deadlineTo || undefined" :aria-invalid="invalidDeadlineRange" /></label>
+      <label v-if="isHistory"><span>Hasta</span><input v-model="deadlineTo" type="date" :min="deadlineFrom || undefined" :aria-invalid="invalidDeadlineRange" /></label>
       <button type="button" class="clear" @click="clearLocalFilters">Limpiar</button>
+      <p v-if="isHistory && invalidDeadlineRange" class="orders-date-error" role="alert">La fecha final debe ser igual o posterior a la inicial.</p>
     </div>
 
     <div class="orders-controls">
-      <nav aria-label="Estados de ordenes">
+      <nav v-if="!isHistory" aria-label="Estados de ordenes">
         <button
           v-for="tab in tabs"
           :key="tab.id"
@@ -51,7 +41,7 @@
           :class="{ active: activeList === tab.id }"
           @click="selectOrderList(tab.id)"
         >
-          {{ tab.label }} ({{ tab.count }})
+          {{ tab.label }} <span class="order-count">{{ tab.count }}</span>
         </button>
       </nav>
       <div class="orders-table-tools">
@@ -68,6 +58,7 @@
       </button>
       </div>
     </div>
+    </div>
 
     <div ref="ordersTableWrap" class="orders-table-wrap">
       <table>
@@ -77,7 +68,7 @@
             <th>Activo</th>
             <th>Mantencion</th>
             <th>Responsable</th>
-            <th>Fecha límite de ejecución</th>
+            <th>{{ isHistory ? 'Fecha de cierre' : 'Fecha limite de ejecucion' }}</th>
             <th>Estado</th>
             <th>Prioridad</th>
             <th>Costo real</th>
@@ -106,7 +97,8 @@
               ><small>{{ order.workshop }}</small>
             </td>
             <td>
-              <span>{{ order.scheduledDate || "Sin fecha" }}</span>
+              <span v-if="isHistory">{{ formatClosedDate(order.closedAt) }}</span>
+              <span v-else>{{ order.scheduledDate || "Sin fecha" }}</span>
               <small class="deadline-indicator" :class="getDeadlineStatus(order).className">
                 {{ getDeadlineStatus(order).label }}
               </small>
@@ -192,6 +184,7 @@ const emit = defineEmits([
   "update:selected-order-status",
 ])
 const activeList = ref("open")
+const isHistory = computed(() => activeList.value === "finished")
 const selectOrderList = (list) => {
   activeList.value = list
   emit("update:selected-order-status", "all")
@@ -200,9 +193,9 @@ watch(() => props.selectedOrderStatus, (status) => {
   if (status !== "all") activeList.value = status
 }, { immediate: true })
 const selectedAsset = ref("all")
-const deadlineFilter = ref("all")
 const deadlineFrom = ref("")
 const deadlineTo = ref("")
+const invalidDeadlineRange = computed(() => Boolean(deadlineFrom.value && deadlineTo.value && deadlineFrom.value > deadlineTo.value))
 const pendingSearch = ref(props.orderSearchTerm)
 const pageSize = ref(10)
 const currentPage = ref(1)
@@ -235,33 +228,18 @@ onBeforeUnmount(() => document.removeEventListener("keydown", closeExpandedTable
 const assetOptions = computed(() => [
   ...new Set(props.filteredWorkOrders.map(({ plate }) => plate)),
 ])
-const isOpenOrder = (order) => ["scheduled", "waiting", "in-progress"].includes(order.status)
 const matchesDeadlineFilter = (order) => {
-  if (deadlineFilter.value === "all") return true
-  const deadline = parseOrderDate(order.scheduledDate)
-  if (deadlineFilter.value === "none") return !deadline
+  if (!isHistory.value) return true
+  if (!deadlineFrom.value && !deadlineTo.value) return true
+  if (invalidDeadlineRange.value) return false
+  const deadline = parseOrderDate(order.closedAt)
   if (!deadline) return false
-
   deadline.setHours(0, 0, 0, 0)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  if (deadlineFilter.value === "overdue") return isOpenOrder(order) && deadline < today
-  if (deadlineFilter.value === "today")
-    return isOpenOrder(order) && deadline.getTime() === today.getTime()
-  if (["next-7", "next-30"].includes(deadlineFilter.value)) {
-    const days = deadlineFilter.value === "next-7" ? 7 : 30
-    const limit = new Date(today)
-    limit.setDate(limit.getDate() + days)
-    return isOpenOrder(order) && deadline >= today && deadline <= limit
-  }
-  if (deadlineFilter.value === "custom") {
-    const from = parseOrderDate(deadlineFrom.value)
-    const to = parseOrderDate(deadlineTo.value)
-    if (from) from.setHours(0, 0, 0, 0)
-    if (to) to.setHours(23, 59, 59, 999)
-    return (!from || deadline >= from) && (!to || deadline <= to)
-  }
-  return true
+  const from = parseOrderDate(deadlineFrom.value)
+  const to = parseOrderDate(deadlineTo.value)
+  if (from) from.setHours(0, 0, 0, 0)
+  if (to) to.setHours(23, 59, 59, 999)
+  return (!from || deadline >= from) && (!to || deadline <= to)
 }
 const assetFilteredOrders = computed(() =>
   props.filteredWorkOrders.filter(
@@ -273,12 +251,10 @@ const assetFilteredOrders = computed(() =>
 const orderStatistics = computed(() => summarizeMaintenanceOrders(assetFilteredOrders.value))
 const countStatus = (statuses) => statuses.reduce((sum, status) => sum + (orderStatistics.value.counts.get(status) || 0), 0)
 const tabs = computed(() => [
-  { id: "open", label: "Abiertas", count: countStatus(["scheduled", "waiting", "in-progress"]) },
-  { id: "scheduled", label: "Programadas", count: countStatus(["scheduled"]) },
-  { id: "waiting", label: "En espera", count: countStatus(["waiting"]) },
+  { id: "open", label: "Todas", count: countStatus(["scheduled", "waiting", "in-progress"]) },
+  { id: "scheduled", label: "Por iniciar", count: countStatus(["scheduled"]) },
   { id: "in-progress", label: "En ejecucion", count: countStatus(["in-progress"]) },
-  { id: "finished", label: "Finalizadas", count: countStatus(["finished"]) },
-  { id: "cancelled", label: "Canceladas", count: countStatus(["cancelled"]) },
+  { id: "waiting", label: "En espera", count: countStatus(["waiting"]) },
 ])
 const tabFilteredOrders = computed(() =>
   assetFilteredOrders.value.filter(
@@ -287,7 +263,7 @@ const tabFilteredOrders = computed(() =>
 )
 const pagination = computed(() => getWorkOrderPage(tabFilteredOrders.value, currentPage.value, pageSize.value))
 const displayedOrders = computed(() => pagination.value.rows)
-watch([activeList, selectedAsset, deadlineFilter, deadlineFrom, deadlineTo, pendingSearch, pageSize], () => { currentPage.value = 1 })
+watch([activeList, selectedAsset, deadlineFrom, deadlineTo, pendingSearch, pageSize], () => { currentPage.value = 1 })
 watch(() => pagination.value.pageCount, () => { currentPage.value = pagination.value.page })
 watch(currentPage, () => {
   if (ordersTableWrap.value) ordersTableWrap.value.scrollTop = 0
@@ -352,10 +328,9 @@ const getDeadlineStatus = (order) => {
 const clearLocalFilters = () => {
   pendingSearch.value = ""
   selectedAsset.value = "all"
-  deadlineFilter.value = "all"
   deadlineFrom.value = ""
   deadlineTo.value = ""
-  activeList.value = "open"
+  if (!isHistory.value) activeList.value = "open"
   emit("update:order-search-term", "")
   emit("update:selected-order-status", "all")
 }
@@ -367,6 +342,7 @@ const runNextOrderAction = (order) => {
 }
 const formatCreatedDate = (value) =>
   value ? new Date(value).toLocaleDateString("es-CL") : "17/08/2026"
+const formatClosedDate = (value) => parseOrderDate(value)?.toLocaleDateString("es-CL") || "Sin cierre registrado"
 watch(pendingSearch, (value) => emit("update:order-search-term", value))
 watch(
   () => props.focusedOrderId,
@@ -376,7 +352,7 @@ watch(
     clearLocalFilters()
     await nextTick()
     const target = props.workOrders.find((order) => String(order.id) === String(orderId)) || props.filteredWorkOrders.find((order) => String(order.id) === String(orderId))
-    if (target) activeList.value = ["finished", "cancelled"].includes(target.status) ? target.status : "open"
+    if (target) activeList.value = target.status === 'finished' ? 'finished' : 'open'
     pendingFocusOrderId.value = String(orderId)
   },
   { immediate: true },
@@ -425,6 +401,7 @@ watch(
   overflow: hidden;
 }
 .is-table-expanded .orders-metrics, .is-table-expanded .orders-filters { display: none; }
+.is-table-expanded .orders-toolbar { display: contents; }
 .is-table-expanded .orders-table-wrap { height: auto; min-height: 0; }
 .orders-view {
   display: grid;
@@ -462,20 +439,24 @@ watch(
   font-size: 11px;
   color: #536783;
 }
+.orders-toolbar { border: 1px solid #d8e0eb; border-radius: 8px; background: #fff; min-width: 0; }
+.order-count { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 20px; margin-left: 5px; padding: 0 5px; border-radius: 4px; background: #eef4ff; color: #345284; font-size: 11px; }
 .orders-filters {
   display: grid;
-  grid-template-columns: minmax(260px, 1.5fr) 0.7fr 0.9fr auto;
+  grid-template-columns: minmax(260px, 1.5fr) minmax(160px, .7fr) auto;
   align-items: end;
   gap: 10px;
-  border: 1px solid #d8e0eb;
-  border-radius: 8px;
   background: #fff;
   padding: 14px;
 }
-.orders-filters.has-custom-range {
-  grid-template-columns: minmax(240px, 1.3fr) 0.65fr 0.75fr 0.75fr 0.75fr auto;
-}
+.orders-filters.is-history { grid-template-columns: minmax(260px, 1.5fr) minmax(160px, .7fr) repeat(2, minmax(150px, .5fr)) auto; }
+.orders-sections { grid-column: 1 / -1; display: flex; gap: 20px; border-bottom: 1px solid #d8e0eb; margin-bottom: 4px; }
+.orders-filters .orders-sections button { border: 0; border-radius: 0; padding: 0 4px; background: transparent; cursor: pointer; }
+.orders-filters .orders-sections button.active { border-bottom: 2px solid #ff6600; }
+.orders-date-error { grid-column: 1 / -1; margin: 0; color: #b42318; font-size: 12px; }
+.orders-filters input[aria-invalid="true"] { border-color: #b42318; }
 .orders-filters label {
+  min-width: 0;
   display: grid;
   gap: 5px;
 }
@@ -486,6 +467,7 @@ watch(
 .orders-filters input,
 .orders-filters select,
 .orders-filters button {
+  min-width: 0;
   height: 40px;
   border: 1px solid #cfd8e6;
   border-radius: 6px;
@@ -503,8 +485,11 @@ watch(
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  padding: 0 14px 8px;
 }
-.orders-controls nav,
+.orders-controls nav { display: flex; align-items: center; gap: 6px; padding: 0; }
+.orders-controls nav button { white-space: nowrap; cursor: pointer; }
+.orders-table-tools { margin-left: auto; }
 .orders-controls button {
   height: 36px;
   border: 1px solid transparent;
@@ -521,7 +506,7 @@ watch(
 }
 .orders-controls nav button.active {
   border-color: transparent;
-  border-bottom-color: #102372;
+  border-bottom: 2px solid #ff6600;
   border-radius: 0;
   background: transparent;
 }
@@ -687,7 +672,7 @@ watch(
   .orders-view {
     height: 100%;
     min-height: 0;
-    grid-template-rows: auto auto auto minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
   }
   .orders-table-wrap {
     height: auto;
@@ -695,8 +680,7 @@ watch(
   }
 }
 @media (max-width: 1200px) {
-  .orders-filters,
-  .orders-filters.has-custom-range {
+  .orders-filters, .orders-filters.is-history {
     grid-template-columns: repeat(3, 1fr);
   }
 }
@@ -707,8 +691,7 @@ watch(
   .orders-metrics {
     grid-template-columns: repeat(2, 1fr);
   }
-  .orders-filters,
-  .orders-filters.has-custom-range {
+  .orders-filters, .orders-filters.is-history {
     grid-template-columns: 1fr;
   }
   .orders-controls {

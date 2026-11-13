@@ -45,6 +45,159 @@ const setup = () => {
     },
   }
 }
+
+test('corrections retain license identity, audit values and do not invent a renewal', () => {
+  const { store, options } = setup()
+  const original = store.save(data)
+  assert.throws(() => store.save({ ...data, expiresAt: '2026-10-21' }, { id: original.id, correction: { reason: ' ' } }), /motivo/)
+  const corrected = store.save({ ...data, expiresAt: '2026-10-21', classes: ['A4'] }, { id: original.id, correction: { reason: 'Fecha y clase mal digitadas' } })
+  assert.equal(corrected.licenseId, original.licenseId)
+  assert.equal(corrected.history.length, 0)
+  assert.equal(corrected.corrections[0].previous.expiresAt, original.expiresAt)
+  assert.equal(corrected.corrections[0].corrected.expiresAt, '2026-10-21')
+  const restored = createDriverLicenseStore(options)
+  restored.load()
+  assert.equal(restored.records.value[0].corrections[0].reason, 'Fecha y clase mal digitadas')
+})
+
+test('unchanged follow-up is rejected, while new observations are preserved', () => {
+  const { store } = setup()
+  const row = store.save(data)
+  store.addManagement(row.id, { result: 'notified' })
+  assert.throws(() => store.addManagement(row.id, { result: 'notified' }), /No hay cambios/)
+  assert.equal(store.records.value[0].managements.length, 1)
+  store.addManagement(row.id, { result: 'notified', observation: 'Segundo contacto confirmado' })
+  assert.equal(store.records.value[0].managements.length, 2)
+})
+
+test('correction rejects expiration before renewal without altering persisted data', () => {
+  const { store, options, memory } = setup()
+  const original = store.save(data)
+  const renewed = store.save({ ...data, expiresAt: '2030-10-20' }, { id: original.id, renewal: true, renewalDetails: { renewedOn: '2026-10-20' } })
+  const snapshot = JSON.stringify([...memory])
+  assert.throws(() => store.save({ ...renewed, expiresAt: '2026-10-19' }, { id: original.id, correction: { reason: 'Fecha incorrecta' } }), /anterior a la ultima renovacion/)
+  assert.equal(JSON.stringify([...memory]), snapshot)
+  assert.equal(store.records.value[0].expiresAt, renewed.expiresAt)
+  const corrected = store.save({ ...renewed, expiresAt: '2026-10-20' }, { id: original.id, correction: { reason: 'Fecha correcta' } })
+  assert.equal(corrected.licenseId, renewed.licenseId)
+  assert.equal(corrected.history.length, 1)
+  const restored = createDriverLicenseStore(options)
+  restored.load()
+  assert.equal(restored.records.value[0].expiresAt, '2026-10-20')
+})
+
+test('class corrections require an audit reason, but reordered classes do not', () => {
+  const { store } = setup()
+  const original = store.save({ ...data, classes: ['B', 'A4'] })
+  assert.throws(() => store.save({ ...original, classes: ['A5'] }, { id: original.id }), /motivo de correccion/)
+  const unchanged = store.save({ ...original, classes: ['A4', 'B'] }, { id: original.id })
+  assert.equal(unchanged.corrections.length, 0)
+  const corrected = store.save({ ...original, classes: ['A5'] }, { id: original.id, correction: { reason: 'Clase digitada incorrectamente' } })
+  assert.equal(corrected.licenseId, original.licenseId)
+  assert.deepEqual(corrected.corrections[0].previous.classes, ['A4', 'B'])
+  assert.deepEqual(corrected.corrections[0].corrected.classes, ['A5'])
+})
+
+test("renewal modal details and receipt survive reload alongside the previous license", () => {
+  const { store, options } = setup()
+  const original = store.save(data, { photos: { front: photo } })
+  const receipt = { storageId: 'renewal-receipt', name: 'licencia.pdf', type: 'application/pdf', size: 100 }
+  store.save({ ...data, expiresAt: '2030-10-20', classes: ['B', 'A4'] }, {
+    id: original.id, renewal: true,
+    renewalDetails: { renewedOn: '2026-10-19', notes: ' Renovada en Transito ', receipt },
+  })
+  const restored = createDriverLicenseStore(options)
+  restored.load()
+  const entry = restored.records.value[0].history[0]
+  assert.equal(entry.renewedAt, '2026-10-19T12:00:00Z')
+  assert.equal(entry.registeredAt, '2026-10-20T12:00:00Z')
+  assert.equal(entry.newExpiresAt, '2030-10-20')
+  assert.deepEqual(entry.newClasses, ['B', 'A4'])
+  assert.equal(entry.notes, 'Renovada en Transito')
+  assert.deepEqual(entry.receipt, receipt)
+  assert.deepEqual(entry.photos.front, photo)
+})
+
+test("invalid renewal date or receipt cannot modify driver records", () => {
+  const { store } = setup()
+  const original = store.save(data)
+  const before = store.records.value
+  for (const renewalDetails of [
+    { renewedOn: '2026-10-21' },
+    { renewedOn: '2026-02-30' },
+    { receipt: { storageId: 'bad', size: 100, type: 'text/html' } },
+    { receipt: { storageId: 'large', size: 6 * 1024 * 1024, type: 'application/pdf' } },
+    { notes: 'x'.repeat(1001) },
+  ]) {
+    assert.throws(() => store.save({ ...data, expiresAt: '2030-10-20' }, { id: original.id, renewal: true, renewalDetails }))
+    assert.equal(store.records.value, before)
+  }
+})
+
+test("renewal replaces front and back photos while archiving both previous photos", () => {
+  const { store } = setup()
+  const oldBack = { ...photo, storageId: 'old-back' }
+  const original = store.save(data, { photos: { front: photo, back: oldBack } })
+  const front = { ...photo, storageId: 'new-front' }
+  const back = { ...photo, storageId: 'new-back' }
+  const updated = store.save({ ...data, expiresAt: '2030-10-20' }, { id: original.id, renewal: true, photos: { front, back } })
+  assert.deepEqual(updated.photos, { front, back })
+  assert.deepEqual(updated.history[0].photos, { front: photo, back: oldBack })
+  assert.deepEqual(original.photos, { front: photo, back: oldBack })
+})
+
+test("successive renewals keep each new license snapshot and never reuse old photos when none are supplied", () => {
+  const { store, options } = setup()
+  const original = store.save(data, { photos: { front: photo } })
+  const firstPhoto = { ...photo, storageId: 'first-renewal-photo' }
+  store.save({ ...data, expiresAt: '2030-10-20' }, { id: original.id, renewal: true, photos: { front: firstPhoto } })
+  store.save({ ...data, expiresAt: '2035-10-20' }, { id: original.id, renewal: true })
+  const restored = createDriverLicenseStore(options)
+  restored.load()
+  const row = restored.records.value[0]
+  assert.equal(row.history[0].renewedLicense.photos.front.storageId, 'first-renewal-photo')
+  assert.equal(row.history[0].photos.front.storageId, photo.storageId)
+  assert.equal(row.history[1].photos.front.storageId, 'first-renewal-photo')
+  assert.deepEqual(row.history[1].renewedLicense.photos, { front: null, back: null })
+  assert.deepEqual(row.photos, { front: null, back: null })
+})
+
+test('advance notice survives edits and reload without manufacturing renewals', () => {
+  const { store, options } = setup()
+  const original = store.save({ ...data, warningDays: 15 })
+  store.save({ ...original, warningDays: 7 }, { id: original.id })
+  const restored = createDriverLicenseStore(options)
+  restored.load()
+  assert.equal(restored.records.value[0].warningDays, 7)
+  assert.equal(restored.records.value[0].history.length, 0)
+  assert.equal(restored.records.value[0].licenseId, original.licenseId)
+})
+
+test('notification settings persist through reload and edits without recipients being sent', () => {
+  const { store, options } = setup()
+  const notifications = { email: { enabled: true, address: 'correo@empresa.cl' }, whatsapp: { enabled: true, phone: '+56912345678' } }
+  const original = store.save({ ...data, notifications, warningDays: 15 })
+  store.save({ ...data, name: 'Nombre actualizado' }, { id: original.id })
+  const restored = createDriverLicenseStore(options)
+  restored.load()
+  assert.deepEqual(restored.records.value[0].notifications, notifications)
+  assert.equal(restored.records.value[0].warningDays, 15)
+  const before = store.records.value
+  assert.throws(() => store.save({ ...data, notifications: { email: { enabled: true, address: '' } } }, { id: original.id }), /correo valido/)
+  assert.equal(store.records.value, before)
+})
+
+test('store rejects renewal before latest registered renewal and preserves the original history', () => {
+  const { store } = setup()
+  const original = store.save(data)
+  store.save({ ...data, expiresAt: '2030-10-20' }, { id: original.id, renewal: true, renewalDetails: { renewedOn: '2026-10-19' } })
+  const before = store.records.value
+  assert.throws(() => store.save({ ...data, expiresAt: '2035-10-20' }, { id: original.id, renewal: true, renewalDetails: { renewedOn: '2026-10-18' } }), /ultima renovacion/)
+  assert.equal(store.records.value, before)
+  assert.equal(store.records.value[0].history.length, 1)
+  store.save({ ...data, expiresAt: '2035-10-20' }, { id: original.id, renewal: true, renewalDetails: { renewedOn: '2026-10-20' } })
+  assert.equal(store.records.value[0].history.length, 2)
+})
 test("management records capture contact results but never renew or modify the license", () => {
   const { store, options } = setup()
   const original = store.save(data, { photos: { front: photo } })
@@ -154,16 +307,16 @@ test("edits preserve current license photos without manufacturing renewal histor
   assert.equal(store.records.value, current)
 })
 
-test("a valid license cannot be renewed even when bypassing the UI", () => {
+test("early renewal is allowed and preserves the previous valid license", () => {
   const { store, memory } = setup()
   const original = store.save({ ...data, expiresAt: "2027-10-20" }, { photos: { front: photo } })
-  const snapshot = memory.get("sinergy-driver-licenses-v1:one")
-  assert.throws(
-    () => store.save({ ...original, expiresAt: "2029-10-20" }, { id: original.id, renewal: true }),
-    /por vencer o vencidas/,
-  )
-  assert.equal(memory.get("sinergy-driver-licenses-v1:one"), snapshot)
-  assert.equal(store.records.value[0], original)
+  const updated = store.save({ ...original, expiresAt: "2029-10-20" }, { id: original.id, renewal: true })
+  assert.equal(updated.expiresAt, '2029-10-20')
+  assert.equal(updated.history[0].expiresAt, original.expiresAt)
+  assert.deepEqual(updated.history[0].photos, original.photos)
+  assert.equal(updated.history[0].renewedLicense.expiresAt, '2029-10-20')
+  assert.equal(updated.history[0].renewedLicense.licenseId, updated.licenseId)
+  assert.equal(JSON.parse(memory.get("sinergy-driver-licenses-v1:one"))[0].expiresAt, '2029-10-20')
   assert.equal(original.history.length, 0)
 })
 test("failed writes and access denials keep the prior records intact", () => {

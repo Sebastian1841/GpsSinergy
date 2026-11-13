@@ -63,3 +63,8 @@ test("driver PDF paginates the complete filtered set and repeats headers and foo
   assert.ok((pdf.match(/REPORTE DE CONDUCTORES Y LICENCIAS/g) || []).length > 1)
   assert.ok(pdf.includes(`Pagina ${document.getNumberOfPages()} de ${document.getNumberOfPages()}`))
 })
+
+test('PDF respects the configured license warning window', async () => {
+  const document = await createDriverLicensePdf([{ name: 'Conductor', rut: '12.345.678-9', classes: ['B'], expiresAt: '2026-11-15', warningDays: 7, history: [] }], { today: '2026-11-01', brandImage: '' })
+  assert.ok(document.output().includes('Vigente'))
+})

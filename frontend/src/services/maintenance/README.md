@@ -1,5 +1,23 @@
 # Maintenance Services
 
+driverLicenseAlerts genera avisos por umbral de cada licencia y etapas 15/7,
+hoy/vencida. Tracker v2 por empresa/usuario separa shown (toast mostrado) de
+reviewed (revision explicita); pending no elimina un aviso por mostrarlo.
+Arrays antiguos migran a shown, nunca a reviewed. No envia correo ni ejecuta
+procesos fuera del navegador. Datos corruptos no se pisan.
+
+Contrato frontend para futura integracion n8n: cada conductor conserva id,
+companyId, licenseId, expiresAt, warningDays y notifications con dos canales:
+email: { enabled, address }; whatsapp: { enabled, phone } (formato internacional).
+No se crean estados de envio ni sentAt, ni se llama a un webhook. shown y
+reviewed son revisiones locales del usuario, no constancias de entrega.
+Estado de gestion reutiliza addManagement con permiso, fecha, autor y licenseId.
+
+Renovaciones de licencias guardan snapshot renewedLicense (id, clases,
+vencimiento y fotos nuevas), preservando campos anteriores para compatibilidad.
+Comprobantes, autor y registro permanecen asociados a la renovacion.
+Se admite renovacion anticipada con validacion compartida de fechas.
+
 Persistencia local, adjuntos y generacion de archivos. No hay backend de
 mantenciones ni sincronizacion entre navegadores.
 

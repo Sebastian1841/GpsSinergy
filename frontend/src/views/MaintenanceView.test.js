@@ -12,6 +12,7 @@ test("maintenance separates navigation from contextual actions and preserves act
   const nav = descriptor.template.content.split("</nav>")[0]
   assert.ok(!nav.includes("maintenance-module-actions"))
   assert.ok(source.includes('class="maintenance-context-toolbar"'))
-  for (const handler of ['@click="openFleetExport"', '@click="openMaintenanceModal(\'maintenance\')"', '@click="openCreateWorkOrder()"', 'v-model="analysisPeriod"']) assert.ok(source.includes(handler))
+  for (const handler of ['@click="openFleetExport"', '@click="openMaintenanceModal(\'maintenance\')"', '@create-work-order="openCreateWorkOrder"', 'v-model="analysisPeriod"']) assert.ok(source.includes(handler))
+  assert.doesNotMatch(source, /@click="openCreateWorkOrder\(\)"/)
   assert.match(source, /\.maintenance-header-button\s*\{[^}]*height: 38px/)
 })

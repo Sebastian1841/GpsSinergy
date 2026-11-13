@@ -167,7 +167,7 @@ export async function createDriverLicenseWorkbook(
       row.phone || "No registrado",
       row.classes.join(", "),
       licenseDateLabel(row.expiresAt),
-      licenseState(row.expiresAt, today).label,
+      licenseState(row.expiresAt, today, row.warningDays ?? 30).label,
       row.photos?.front ? "Adjunta" : "Sin foto",
       row.photos?.back ? "Adjunta" : "Sin foto",
     ]),

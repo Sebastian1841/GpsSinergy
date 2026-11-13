@@ -564,3 +564,13 @@ Mantenciones escucha fleetPlanFocus para desplegar los planes en la tabla al
 regresar. Edicion directa por plan reemplaza el modal de detalle del vehiculo;
 no cambia el detalle de OT ni su navegacion de regreso a Flota.
 
+# Avisos De Mantenciones
+
+Se retiro del cliente el boton y modal de registros antiguos de OT por
+revisar. Los datos historicos y su aislamiento interno se conservan.
+
+Los resultados de acciones se muestran como notificacion flotante con
+Teleport a body, sin desplazar tablas. Conservan cierre y accion contextual.
+Se ubica centrada bajo el encabezado, con borde superior corporativo y
+mensaje destacado para hacer visible el resultado sin desplazar la tabla.
+

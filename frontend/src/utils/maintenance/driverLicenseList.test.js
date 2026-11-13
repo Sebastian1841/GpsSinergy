@@ -4,7 +4,32 @@ import {
   buildDriverLicenseList,
   filterDriverLicenseList,
   sortDriverLicenseList,
+  countDriverLicenseFilters,
 } from "./driverLicenseList.js"
+
+test('expiry filters respect calendar boundaries and configured warning windows', () => {
+  const records = [
+    ['expired', '2026-11-11', 30], ['today', '2026-11-12', 30],
+    ['tomorrow', '2026-11-13', 30], ['seven', '2026-11-19', 30],
+    ['eight', '2026-11-20', 5], ['thirty', '2026-12-12', 30],
+    ['later', '2026-12-13', 30], ['unknown', '', 30],
+  ].map(([id, expiresAt, warningDays]) => ({ id, name: id, rut: id, classes: [id === 'seven' ? 'A4' : 'B'], expiresAt, warningDays }))
+  const { rows } = buildDriverLicenseList(records, '2026-11-12')
+  const ids = (key) => filterDriverLicenseList(rows, '', key).map((row) => row.id)
+  assert.deepEqual(ids('attention'), ['expired', 'today', 'tomorrow', 'seven', 'thirty'])
+  assert.deepEqual(ids('today'), ['today'])
+  assert.deepEqual(ids('next7'), ['tomorrow', 'seven'])
+  assert.deepEqual(ids('next30'), ['tomorrow', 'seven', 'eight', 'thirty'])
+  assert.deepEqual(ids('valid'), ['eight', 'later'])
+  const counts = countDriverLicenseFilters(rows)
+  assert.equal(counts.attention, 5)
+  assert.equal(counts.next7, 2)
+  assert.equal(counts.all, 8)
+  const matchingClass = filterDriverLicenseList(rows, '', 'all', 'A4')
+  assert.equal(countDriverLicenseFilters(matchingClass).next7, 1)
+  assert.equal(filterDriverLicenseList(rows, 'seven', 'next7', 'B').length, 0)
+  assert.equal(records[0].id, 'expired')
+})
 
 test("driver column sorting preserves default expiry order and supports all header keys", () => {
   const rows = buildDriverLicenseList(

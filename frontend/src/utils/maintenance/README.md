@@ -1,5 +1,9 @@
 # Maintenance Utils
 
+maintenancePendingPlanTable.js presenta objetivos de Planes sin OT: fechas
+completas calculadas desde referencia e intervalo, o etiquetas existentes
+normalizadas. No interpreta kilometros u horas como fechas.
+
 Orden de navegacion: Flota, Ordenes, Conductores, Analisis. Se conservan los IDs
 de las vistas y sus rutas; solo cambia la posicion de las pestanas.
 
@@ -80,8 +84,20 @@ usan para calcular vigencia ni para bloquear vehiculos.
 
 # Indice De La Lista De Conductores
 
-validateDriverRenewal exige estado por vencer o vencido (hasta30 dias inclusive),
-ademas de vencimiento nuevo posterior y no vencido. Vigentes no se renuevan.
+lastDriverRenewalDate obtiene el ultimo dia valido en calendario de Chile.
+validateDriverRenewalDetails compara contra el historial anterior, tanto en
+formulario como store. driverManagementStatus deriva needsFollowUp para citas
+pasadas sin modificar el registro. driverLicenseNotifications normaliza y
+valida canales Email/WhatsApp; no implementa transporte ni integra backend.
+
+licenseState admite warningDays opcional (30 por defecto). normalizeDriverLicense
+valida y conserva el umbral 0..3650 dias. driverManagementStatus extrae solo
+la gestion mas reciente del licenseId actual sin modificar la vigencia.
+
+validateDriverRenewal admite renovacion anticipada y exige vencimiento nuevo
+posterior al anterior y no vencido. validateDriverRenewalDetails valida fecha
+real, observaciones y comprobante. driverLicenseHistory resuelve la licencia
+renovada por snapshot o vigencia exacta, sin mezclar fotos de la anterior.
 
 La lista permite ordenar por nombre, clases, vencimiento y estado.
 El orden inicial reutiliza el indice; las ordenaciones manuales no mutan registros.

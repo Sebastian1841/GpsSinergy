@@ -5,6 +5,8 @@ import {
   DRIVER_MANAGEMENT_OPTIONS,
   validLicenseDate,
   validateDriverRenewal,
+  validateDriverRenewalDetails,
+  validateDriverLicenseCorrection,
 } from "../../utils/maintenance/driverLicenseUtils.js"
 
 export function createDriverLicenseStore({
@@ -107,18 +109,30 @@ export function createDriverLicenseStore({
     }
     records.value = updated
   }
-  const save = (data, { id = null, renewal = false, photos = {} } = {}) => {
+  const save = (data, { id = null, renewal = false, photos = {}, renewalDetails = {}, correction = null } = {}) => {
     requireAccess(true)
     if (!readable || (!storage && !repository))
       throw new Error("El almacenamiento de conductores no esta disponible.")
-    const normalized = normalizeDriverLicense(data)
     const previous = id ? records.value.find((row) => row.id === id) : null
     if (id && !previous) throw new Error("El conductor ya no esta disponible.")
-    if (previous && !renewal && normalized.expiresAt !== previous.expiresAt)
+    const normalized = normalizeDriverLicense({
+      ...data,
+      warningDays: data.warningDays === undefined ? previous?.warningDays : data.warningDays,
+      notifications: data.notifications === undefined ? previous?.notifications : data.notifications,
+    })
+    if (previous && !renewal && normalized.expiresAt !== previous.expiresAt && !correction)
       throw new Error("Para cambiar el vencimiento debes usar Renovar licencia.")
+    if (previous && !renewal && !correction && [...normalized.classes].sort().join(',') !== [...previous.classes].sort().join(','))
+      throw new Error('Para corregir las clases de licencia debes indicar un motivo de correccion.')
+    const correctionReason = String(correction?.reason || '').trim()
+    if (correction && (!previous || renewal || !correctionReason || correctionReason.length > 500))
+      throw new Error('Indica el motivo de la correccion (hasta 500 caracteres).')
+    if (correction) validateDriverLicenseCorrection(normalized.expiresAt, previous)
     if (records.value.some((row) => row.id !== id && row.rut === normalized.rut))
       throw new Error("Ya existe un conductor con este RUT en la empresa.")
     if (renewal) validateDriverRenewal(normalized.expiresAt, previous, driverToday(now()))
+    if (renewal) validateDriverRenewalDetails(renewalDetails, normalized.expiresAt, driverToday(now()), previous)
+    const receipt = renewalDetails.receipt
     const stamp = now()
     const photo = (side) => {
       const value = photos[side]
@@ -147,7 +161,10 @@ export function createDriverLicenseStore({
       updatedAt: stamp,
       updatedBy: author(),
       history: previous?.history || [],
+      corrections: previous?.corrections || [],
     }
+    if (correction)
+      next.corrections = [...next.corrections, { id: createId(), licenseId: next.licenseId, reason: correctionReason, createdAt: stamp, author: author(), previous: { expiresAt: previous.expiresAt, classes: [...previous.classes] }, corrected: { expiresAt: next.expiresAt, classes: [...next.classes] } }]
     if (renewal)
       next.history = [
         ...next.history,
@@ -157,8 +174,19 @@ export function createDriverLicenseStore({
           classes: previous.classes,
           expiresAt: previous.expiresAt,
           photos: previous.photos,
-          renewedAt: stamp,
+          renewedAt: renewalDetails.renewedOn ? `${renewalDetails.renewedOn}T12:00:00Z` : stamp,
           renewedBy: author(),
+          registeredAt: stamp,
+          newExpiresAt: normalized.expiresAt,
+          newClasses: [...normalized.classes],
+          renewedLicense: {
+            licenseId: next.licenseId,
+            classes: [...next.classes],
+            expiresAt: next.expiresAt,
+            photos: { front: next.photos.front, back: next.photos.back },
+          },
+          notes: String(renewalDetails.notes || '').trim(),
+          receipt: receipt ? { storageId: receipt.storageId, name: String(receipt.name || 'Comprobante'), type: receipt.type, size: receipt.size } : null,
         },
       ]
     const updated = previous
@@ -177,6 +205,9 @@ export function createDriverLicenseStore({
     if (observation.length > 500) throw new Error("La observacion admite hasta 500 caracteres.")
     const stamp = now()
     const appointmentDate = data.result === "appointment" ? String(data.appointmentDate || "") : ""
+    const latest = (row.managements || []).filter((item) => item.licenseId === (row.licenseId || row.createdAt)).at(-1)
+    if (latest?.result === data.result && (latest.appointmentDate || '') === appointmentDate && !observation)
+      throw new Error('No hay cambios en el seguimiento. Agrega una observacion o cambia el resultado.')
     if (
       data.result === "appointment" &&
       (!validLicenseDate(appointmentDate) || appointmentDate < driverToday(stamp))

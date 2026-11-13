@@ -70,6 +70,11 @@ test("driver Excel writes a valid empty history and exports more than one UI pag
   assert.ok((await workbook.xlsx.writeBuffer()).byteLength > 0)
 })
 
+test('Excel respects the configured license warning window', async () => {
+  const workbook = await createDriverLicenseWorkbook([{ name: 'Conductor', rut: '12.345.678-9', classes: ['B'], expiresAt: '2026-11-15', warningDays: 7, history: [] }], { today: '2026-11-01', brandImage: '' })
+  assert.equal(workbook.getWorksheet('Conductores').getCell('G7').value, 'Vigente')
+})
+
 test("report columns adapt to export viewport while preserving equal narrow gutters", async () => {
   const narrow = await createDriverLicenseWorkbook([], { brandImage: "", reportWidthPx: 1400 })
   const wide = await createDriverLicenseWorkbook([], { brandImage: "", reportWidthPx: 1900 })

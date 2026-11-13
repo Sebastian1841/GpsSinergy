@@ -63,65 +63,11 @@
             ><span class="text-slate-500">{{ activeCompanyLabel }}</span>
           </div>
           <div class="maintenance-context-actions flex flex-wrap items-center gap-2">
-            <button
-              v-if="activeTab === 'orders' && legacyOrderReviewRows.length"
-              type="button"
-              ref="legacyOrderTrigger"
-              class="maintenance-header-button legacy-order-toggle"
-              :title="`${legacyOrderReviewRows.length} referencias de OT antiguas sin identidad verificable. Revisar registros`"
-              :aria-label="`${showLegacyOrderReview ? 'Ocultar' : 'Revisar'} registros antiguos sin verificar: ${legacyOrderReviewRows.length}`"
-              :aria-expanded="showLegacyOrderReview"
-              aria-controls="legacy-order-review"
-              @click="showLegacyOrderReview = !showLegacyOrderReview"
-            ><SvgIcon name="limits-warning" /><span>{{ legacyOrderReviewRows.length }} OT por revisar</span></button>
-            <span class="mr-2 text-[12px] font-semibold text-slate-500"
+            <span v-if="orderSection === 'work-orders'" class="mr-2 text-[12px] font-semibold text-slate-500"
               >{{ activeTab === 'orders' && orderSection === 'work-orders' ? `${visibleWorkOrders.length} ordenes` : `${maintenanceItems.length} vehiculos` }}</span
             >
-            <button
-              type="button"
-              class="maintenance-header-button is-primary"
-              @click="openCreateWorkOrder()"
-            >
-              Nueva OT
-            </button>
           </div>
         </div>
-        <Teleport to="body">
-          <div v-if="activeTab === 'orders' && showLegacyOrderReview && legacyOrderReviewRows.length" class="legacy-review-backdrop" @click.self="showLegacyOrderReview = false" @keydown="handleLegacyReviewKey">
-            <section id="legacy-order-review" ref="legacyOrderDialog" class="legacy-review-dialog" role="dialog" aria-modal="true" aria-labelledby="legacy-review-title" aria-describedby="legacy-review-description">
-              <header>
-                <div class="legacy-review-heading">
-                  <span class="legacy-review-symbol"><SvgIcon name="limits-warning" /></span>
-                  <div>
-                    <h2 id="legacy-review-title">Registros de OT por revisar</h2>
-                    <div class="legacy-review-subtitle">Mantenciones <span>·</span> Datos antiguos</div>
-                  </div>
-                </div>
-                <button type="button" aria-label="Cerrar revision" @click="showLegacyOrderReview = false"><SvgIcon name="close" /></button>
-              </header>
-              <div class="legacy-review-body">
-                <div class="legacy-review-notice">
-                  <SvgIcon name="detail-info" />
-                  <p id="legacy-review-description">No se pudo confirmar a que vehiculo pertenecen estos registros. Los datos se conservaron, sin asignarlos a otro activo.</p>
-                </div>
-                <div class="legacy-review-list-heading">
-                  <h3>Registros conservados <span>{{ legacyOrderReviewRows.length }}</span></h3>
-                  <span class="legacy-review-state">Identidad pendiente</span>
-                </div>
-                <div class="legacy-order-review" tabindex="0" aria-label="Registros antiguos conservados">
-                  <table>
-                    <thead><tr><th>Referencia original</th><th>Datos conservados</th></tr></thead>
-                    <tbody><tr v-for="row in legacyOrderReviewRows" :key="row.id"><td><strong>{{ row.id }}</strong></td><td>{{ row.sources }}</td></tr></tbody>
-                  </table>
-                </div>
-              </div>
-              <footer>
-                <span>No se modificaron los registros.</span>
-                <button type="button" class="legacy-review-done" @click="showLegacyOrderReview = false">Entendido</button>
-              </footer>
-            </section>
-          </div>
-        </Teleport>
         <div
           v-if="activeTab === 'calendar' || activeTab === 'history'"
           class="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5"
@@ -230,15 +176,21 @@
         </div>
       </header>
 
+      <Teleport to="body">
       <div v-if="maintenanceFeedbackMessage" class="maintenance-result" role="status" aria-live="polite">
+        <div class="maintenance-result-icon" aria-hidden="true"><SvgIcon name="bell" /></div>
+        <div class="maintenance-result-content">
+        <strong>Mantenciones</strong>
         <span>{{ maintenanceFeedbackMessage }}</span>
-        <button v-if="maintenanceFeedbackAction" type="button" @click="continueMaintenanceResult">
+        <button v-if="maintenanceFeedbackAction" class="maintenance-result-action" type="button" @click="continueMaintenanceResult">
           {{ maintenanceFeedbackAction.label }}
         </button>
-        <button type="button" aria-label="Descartar mensaje" @click="dismissMaintenanceResult">
+        </div>
+        <button type="button" aria-label="Descartar mensaje" title="Cerrar notificacion" @click="dismissMaintenanceResult">
           <SvgIcon name="close" />
         </button>
       </div>
+      </Teleport>
       <div v-if="fleetOrderContext && activeTab === 'orders'" class="fleet-order-context">
         <button type="button" @click="returnToFleetPlan">Volver al plan en Flota</button>
         <span><strong>{{ fleetOrderContext.vehicle }}</strong> / {{ fleetOrderContext.plan }} / {{ fleetOrderContext.orderId }}</span>
@@ -254,6 +206,7 @@
                 {
                   'maintenance-drivers-main': activeTab === 'drivers',
                   'maintenance-analysis-main': activeTab === 'costs',
+                  'maintenance-pending-plans-main': activeTab === 'orders' && orderSection === 'without-order',
                   'maintenance-work-orders-main':
                     activeTab === 'orders' && orderSection === 'work-orders',
                 },
@@ -302,6 +255,7 @@
           @open-orders="activeTab = 'orders'"
           @open-vehicle-costs="openVehicleCosts"
           @open-vehicle-maintenance-plans="openVehicleMaintenancePlans"
+          @delete-maintenance-plan="openDeleteMaintenancePlan"
           @open-work-order="openLinkedOrder"
           @renew-maintenance="openRenewMaintenance"
           @update:search-term="searchTerm = $event"
@@ -507,27 +461,6 @@ const route = useRoute()
 const router = useRouter()
 const orderSection = ref("work-orders")
 const focusedOrderId = ref("")
-const showLegacyOrderReview = ref(false)
-const legacyOrderTrigger = ref(null)
-const legacyOrderDialog = ref(null)
-watch(showLegacyOrderReview, async (open) => {
-  await nextTick()
-  if (open) legacyOrderDialog.value?.querySelector('button')?.focus()
-  else legacyOrderTrigger.value?.focus({ preventScroll: true })
-})
-const handleLegacyReviewKey = (event) => {
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    event.stopPropagation()
-    showLegacyOrderReview.value = false
-  } else if (event.key === 'Tab') {
-    const elements = [...(legacyOrderDialog.value?.querySelectorAll('button, [tabindex="0"]') || [])]
-    const first = elements[0]
-    const last = elements.at(-1)
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
-  }
-}
 const maintenanceMain = ref(null)
 const analysisPeriod = ref(6)
 const fleetTable = ref(null)
@@ -619,7 +552,6 @@ const {
   getMaintenanceReadingAtDate,
   lifecycleSteps,
   maintenanceFeedbackMessage,
-  legacyOrderReviewRows,
   maintenanceFeedbackAction,
   maintenanceHistory,
   maintenanceItems,
@@ -762,7 +694,6 @@ const continueMaintenanceResult = () => {
   dismissMaintenanceResult()
 }
 watch(() => route.params.empresaId, dismissMaintenanceResult)
-watch(() => route.params.empresaId, () => { showLegacyOrderReview.value = false })
 
 watch(orderSection, async () => {
   await nextTick()
@@ -842,19 +773,34 @@ watch(activeTab, (value) => {
   .fleet-toolbar-summary { grid-column: 1 / -1; }
 }
 .maintenance-result {
+  position: fixed;
+  z-index: 3100;
+  top: 88px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(480px, calc(100vw - 32px));
   display: flex;
   flex-shrink: 0;
-  flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
-  padding: 10px 20px;
-  background: #eef4ff;
-  border-bottom: 1px solid #cad6ed;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #b8cbea;
+  border-top: 3px solid #102372;
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgb(16 35 114 / 16%);
   color: #102372;
   font-size: 12px;
 }
-.maintenance-result > span { flex: 1; min-width: 180px; overflow-wrap: anywhere; }
-.maintenance-result button { border: 1px solid #cad6ed; border-radius: 6px; padding: 6px 10px; background: white; }
+.maintenance-result-icon { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 36px; background: #eef4ff; color: #102372; border-radius: 8px; }
+.maintenance-result-content { flex: 1; min-width: 0; display: grid; gap: 5px; }
+.maintenance-result-content > strong { font-size: 13px; font-weight: 700; }
+.maintenance-result-content > span { color: #102372; font-size: 14px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.maintenance-result .maintenance-result-action { cursor: pointer; justify-self: start; margin-top: 5px; border: 0; padding: 0; background: transparent; font-size: 12px; font-weight: 700; color: #102372; text-decoration: underline; text-underline-offset: 3px; }
+.maintenance-result button[aria-label="Descartar mensaje"] { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; flex-shrink: 0; border: 0; border-radius: 4px; background: transparent; color: #7184a3; }
+.maintenance-result button[aria-label="Descartar mensaje"]:hover { background: #f3f7fc; color: #102372; }
+.maintenance-result button:focus-visible { outline: 2px solid #086cff; outline-offset: 3px; }
+@media (max-width: 600px) { .maintenance-result { top: 76px; } }
 .maintenance-result :deep(svg) { width: 16px; height: 16px; }
 .fleet-order-context {
   display: flex;
@@ -879,6 +825,7 @@ watch(activeTab, (value) => {
   padding-bottom: 12px;
   overflow: hidden;
 }
+.maintenance-pending-plans-main { overflow: hidden; }
 @media (max-width: 600px) {
   .maintenance-drivers-main {
     overflow-y: auto;

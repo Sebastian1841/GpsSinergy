@@ -14,7 +14,7 @@ test("create, close and renew offer the exact next target without automatic rene
     module.openMaintenanceModal("maintenance")
     module.modalDraft.value = {
       vehicleId: "a", name: "Prueba flujo", type: "Prueba flujo",
-      readingSourceLabel: "Odometro", intervalValue: 1000, alertValue: 100, lastReading: 1000,
+      readingSourceLabel: "Odometro", intervalValue: 1000, alertValue: 1000, lastReading: 1000,
     }
     module.submitMaintenanceModal()
     const plan = module.getVehicleMaintenancePlans(module.selectedVehicle.value).find((item) => item.name === "Prueba flujo")
@@ -51,7 +51,7 @@ test("results are outside conditional header, dismissible and have no expiry tim
   assert.match(source, /watch\(\(\) => route.params.empresaId, dismissMaintenanceResult\)/)
   const header = source.slice(source.indexOf("<header"), source.indexOf("</header>"))
   assert.match(header, /Planes sin OT/)
-  assert.match(header, /Nueva OT/)
+  assert.doesNotMatch(header, /Nueva OT/)
   assert.doesNotMatch(header, /Nuevo plan de mantenci/)
 })
 
@@ -63,12 +63,10 @@ test("fleet avoids duplicate due labels and open orders are not presented as clo
   assert.match(modal, /draft.status === 'finished' \? 'is-closed' : 'is-open'/)
 })
 
-test("legacy references are reviewed only under orders and never dominate fleet", () => {
+test("legacy references do not expose a review button or dialog in the client interface", () => {
   const source = readFileSync(new URL("../../views/MaintenanceView.vue", import.meta.url), "utf8")
   const toolbar = source.slice(source.indexOf('class="fleet-toolbar-summary"'), source.indexOf('@click="openFleetExport"'))
   assert.doesNotMatch(toolbar, /maintenanceItems.length/)
   assert.doesNotMatch(toolbar, /legacy|advertencia|maintenanceFeedbackMessage/)
-  assert.match(source, /activeTab === 'orders' && legacyOrderReviewRows.length/)
-  assert.match(source, /Revisar registros/)
-  assert.match(source, /aria-controls="legacy-order-review"/)
+  assert.doesNotMatch(source, /showLegacyOrderReview|OT por revisar|id="legacy-order-review"/)
 })

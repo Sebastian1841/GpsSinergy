@@ -178,6 +178,7 @@
                               <th>Restante</th>
                               <th>Estado</th>
                               <th>Siguiente acción</th>
+                              <th>Gestion</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -185,7 +186,7 @@
                               v-if="!vehicleMaintenances(item, index).length"
                               class="vehicle-plans-empty-row"
                             >
-                              <td colspan="7">
+                              <td colspan="8">
                                 <div class="vehicle-plans-empty">
                                   <span>Este vehículo aún no tiene planes de mantención.</span>
                                   <button
@@ -218,6 +219,7 @@
                                 >
                               </td>
                               <td>
+                                <div class="fleet-plan-actions">
                                 <span
                                   v-if="nextPlanAction(plan).type === 'none'"
                                   class="plan-no-action"
@@ -233,6 +235,17 @@
                                 >
                                   {{ nextPlanAction(plan).label }}
                                 </button>
+                                </div>
+                              </td>
+                              <td class="fleet-plan-tools-cell">
+                                <div class="fleet-plan-tools">
+                                <button type="button" class="fleet-plan-edit" :aria-label="`Editar ${plan.name}`" :title="`Editar ${plan.name}`" @click.stop="emit('open-vehicle-maintenance-plans', item.id, plan.id)">
+                                  <SvgIcon name="pencil" />
+                                </button>
+                                <button type="button" class="fleet-plan-delete" :aria-label="`Eliminar ${plan.name}`" :title="`Eliminar ${plan.name}`" @click.stop="emit('delete-maintenance-plan', { id: plan.id, name: plan.name, vehicleId: item.id, plate: item.plate })">
+                                  <SvgIcon name="trash" />
+                                </button>
+                                </div>
                               </td>
                             </tr>
                           </tbody>
@@ -301,6 +314,7 @@ const emit = defineEmits([
   "open-orders",
   "renew-maintenance",
   "open-vehicle-maintenance-plans",
+  "delete-maintenance-plan",
   "open-work-order",
   "update:search-term",
   "update:selected-status",
@@ -1294,8 +1308,13 @@ td small {
   width: 11%;
 }
 .vehicle-plans-table th:nth-child(7) {
-  width: 13%;
+  width: 110px;
 }
+.vehicle-plans-table th:nth-child(8) { width: 80px; }
+.vehicle-plans-table { min-width: 900px; }
+.vehicle-plans-table .plan-action-button,
+.vehicle-plans-table .plan-no-action { white-space: nowrap; }
+.vehicle-plans-table .fleet-plan-tools { justify-content: center; }
 .vehicle-plans-table .status-pill {
   padding: 0.3rem 0.6rem;
   font-size: 10px;

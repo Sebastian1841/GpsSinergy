@@ -20,13 +20,21 @@ test("odometer target and advance warning follow current readings without shifti
     const getPlan = () => module.getVehicleMaintenancePlans(module.maintenanceItems.value[0]).find((plan) => plan.name === "Prueba objetivo")
     assert.match(getPlan().nextLabel, /135[.,]?000/)
     assert.equal(getPlan().status, "current")
+    assert.equal(getPlan().remainingValue, 10000)
+    assert.equal(getPlan().remainingUnit, 'km')
+    assert.equal(getPlan().cycleProgressPercent, 0)
     assets.value = [{ ...assets.value[0], odometro: "134000" }]
     assert.equal(getPlan().status, "due")
+    assert.equal(getPlan().remainingValue, 1000)
+    assert.equal(getPlan().cycleProgressPercent, 90)
     assert.match(getPlan().nextLabel, /135[.,]?000/)
     assets.value = [{ ...assets.value[0], odometro: "135000" }]
     assert.equal(getPlan().status, "overdue")
+    assert.equal(getPlan().cycleProgressPercent, 100)
     assets.value = [{ id: "a", companyId: "c", patente: "AAAA11" }]
     assert.equal(getPlan().status, "no-reading")
+    assert.equal(getPlan().remainingValue, null)
+    assert.equal(getPlan().cycleProgressPercent, null)
     assert.equal(getPlan().actualLabel, "Sin lectura disponible")
     assert.match(getPlan().nextLabel, /135[.,]?000/)
     module.openMaintenanceModal("maintenance")

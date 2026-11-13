@@ -1,8 +1,184 @@
 # Maintenance Components
 
+Avisos pendientes: lista consultable desde cabecera. Mostrar/cerrar toast solo
+registra shown; reviewed requiere Marcar revisado o Marcar todos revisados.
+Se recuperan avisos del tracker anterior como mostrados, no revisados.
+Notificaciones por licencia en alta/edicion/renovacion: Email y WhatsApp con
+destinatarios validados. Configuracion local preparada para futura integracion
+n8n; no hay webhook, envios ni cambios de backend. Estado Integracion pendiente.
+Renovacion valida fecha no anterior a la ultima registrada (min en formulario
+y validacion en store). Horas pasadas muestran Confirmar resultado y filtro
+propio, conservando cita original; no se presume asistencia ni renovacion.
+
+Licencias incluye Gestion independiente de vigencia: Sin gestionar,
+Sin respuesta, Avisado, Hora agendada y En tramite. Registrar desde la celda
+abre formulario con observacion, fecha agendada cuando aplica e historial
+de la licencia actual. Consulta disponible en lectura; guardar requiere editar.
+Avisar con (dias) configurable en alta/edicion/renovacion, por defecto 30.
+Avisos internos al cargar o cambiar dia/datos, deduplicados por empresa,
+usuario, licencia, vencimiento y etapa (plazo configurado, 15/7 dias, hoy,
+vencida). Son avisos dentro de Conductores, no correos ni tareas en servidor.
+Gestion se reinicia con cada nueva licencia; conserva gestiones anteriores.
+
+Renovacion con frente y reverso nuevos guarda directamente, sin revision
+intermedia. Solo fotos faltantes activan confirmacion con Volver o Guardar
+con fotos pendientes. Validaciones preceden subida de archivos y persistencia.
+
+Renovaciones anticipadas permitidas para licencias vigentes, proximas o
+vencidas: nuevo vencimiento posterior al anterior y no vencido. Fotos nuevas
+se pueden cambiar/quitar antes de guardar; confirmacion enumera fotos faltantes.
+Historial usa snapshot de la licencia renovada y deja la anterior separada.
+Registros previos se resuelven por vencimiento exacto, sin reutilizar fotos
+anteriores como nuevas. Almacenamiento sigue local: este repo no incluye API.
+
+Registrar renovacion permite subir frente/reverso nuevos con vista previa,
+separados del comprobante. Actualizan fotos de licencia actual y archivan las
+anteriores; historial permite ver fotos incluso si existe un comprobante.
+
+Datos solicitados para probar Licencias: en desarrollo, Transportes San Pedro
+tambien carga los 15 conductores DEMO existentes, con clases variadas,
+vigentes/por vencer/vencidos e historial. Carga aditiva e idempotente, sin
+reemplazar conductores reales; requiere permiso de edicion. No en produccion.
+
+Espaciado de Licencias: controles con 20px interiores, 20px entre cabecera
+y filtros y 12px antes de tabla; filas de 64px y celdas de 12px/18px.
+Acciones separadas 12px, sin salto de linea en escritorio.
+
+Modales de referencia independientes: Registrar renovacion (800px) e
+Historial de renovaciones (900px), cabecera blanca sin borde exterior,
+icono y resumen del conductor. Renovacion en dos columnas con fecha real,
+nuevo vencimiento, clases, comprobante PDF/JPG/PNG hasta 5 MB y observaciones.
+Guarda metadatos y comprobante en historial; conserva licencia/fotos previas,
+autor, fecha de registro y confirmacion. Historial permite descargar recibo.
+Renovacion agrupa fechas y clase primero, luego Fotografias de la nueva
+licencia en dos paneles Frente/Reverso con preview y boton de carga; despues
+comprobante adicional en banda completa y observaciones. Conserva estilo
+blanco/navy existente sin decoracion de ondas ni encabezado sobredimensionado.
+
+Licencias de conducir: tabla con Conductor/RUT/Clase/Vencimiento/Dias
+restantes/Ultima renovacion/Estado/Acciones, siguiendo referencia visual.
+Ultima renovacion proviene del historial real, sin datos inventados.
+Historial abre directamente Licencias anteriores; pulsar el nombre abre
+la licencia. Solo Registrar renovacion e Historial en acciones, sin icono
+adicional ni tres puntos. Colgroup de nueve columnas con proporciones
+explicitas y RUT/estado/acciones sin saltos de linea en escritorio.
+Renovacion valida fechas y permisos, incluyendo licencias vigentes.
+
+Conductores agrupa titulo, acciones y filtros en una barra compacta.
+Estado desplegable Todos/Por vencer/Vencidos/Vigentes. Exportar junto a los
+filtros, tabla ajustada al contenido e historial tabular con fotos anteriores.
+Sin boton de renovacion en cabecera. Registrar renovacion esta disponible
+desde la fila para licencias con fecha valida y con permiso
+de edicion; reutiliza formulario, confirmacion y controles existentes.
+
+Barra de Ordenes agrupada: secciones Abiertas/Historial, filtros y estados
+en un bloque compacto. Estados: Todas, Por iniciar, En ejecucion, En espera;
+conteos separados y subrayado naranja para la seleccion activa.
+
+Ordenes abiertas separadas del Historial (solo finalizadas). Las abiertas
+no filtran por fecha. Historial muestra Fecha de cierre desde/Hasta y filtra
+closedAt, no scheduledDate; campos vacios incluyen todos los cierres.
+Limpiar mantiene la seccion y los extremos del rango son inclusivos.
+
+Planes sin OT incluye exclusivamente proximas y vencidas sin orden abierta.
+Pestanas Todas/Proximas/Vencidas, con conteos sobre ese mismo conjunto.
+Los planes al dia no aparecen aqui y se siguen consultando desde Flota.
+
+Crear OT solo esta disponible para planes reales proximos o vencidos.
+Selector y guardas del modulo rechazan cualquier otro estado del plan.
+
+Planes al dia no muestran Crear OT. La creacion esta bloqueada tambien
+en el modulo y en el selector de planes, no solo visualmente.
+
+Cabecera de Planes sin OT: titulo con conteo, filtros en fila propia y estados
+alineados al inicio con subrayado naranja. Sin Exportar ni datos de muestra.
+
+Planes sin OT pagina 10 filas por defecto, con opciones 10/25/50 y numeros
+de pagina. Pie visible y rango mostrado; solo el cuerpo de la tabla se desplaza
+si no cabe en la pantalla. Filtros/tamano reinician la pagina y bajas la ajustan.
+
+No hay boton Nueva OT superior; las acciones reales siguen en cada plan.
+
+Planes sin OT: titulo con conteo en primera fila; filtros debajo.
+Sin horizonte de 90 dias; lectura actual solo para km/horas. Vencimientos
+por tiempo con ano completo, filas compactas y pie sin controles innecesarios
+cuando los resultados caben en una pagina.
+
+Eliminar mantencion no tiene borde exterior; usa azul corporativo y boton
+naranja #ff6600. Advertencia de vinculacion naranja, sin superficies rojas.
+
+Confirmacion de eliminar mantencion con encabezado azul corporativo, fondo
+blanco y banda azul clara de identidad del plan
+y vehiculo con icono, aviso rojo solo con OT vinculadas y lista de sus estados.
+Sin panel rosado completo ni textos duplicados; conserva alcance y confirmacion.
+
+OT canceladas/anuladas se retiran de todas las listas y de la confirmacion
+de eliminar mantencion, incluyendo las antiguas. No hay pestana Canceladas.
+Se conserva constancia interna y sus costos dejan de mostrarse operativamente.
+
+Eliminar mantencion requiere confirmacion que enumera las OT vinculadas y
+sus estados. La eliminacion incluye todas esas OT y archiva sus costos,
+retirandolos de listas operativas. Datos internos conservados para auditoria;
+no afecta otras mantenciones. Si cambian las OT, exige confirmar de nuevo.
+
+Detalle de OT incluye Iniciar OT como accion primaria naranja, solo si esta
+programada y sin fecha de inicio. Usa el inicio directo existente y mantiene
+abierto el detalle actualizado de la misma orden; desaparece tras iniciar.
+
+Planes sin OT muestra solo la tabla a todo el ancho. Busqueda, filtros,
+exportacion y estados estan integrados en la cabecera; activo y mantencion
+comparten columna. Conserva prioridad por urgencia, lectura y objetivo reales,
+paginacion 20/50 y estado vacio. Sin indicadores, grafico ni datos de muestra.
+
+Eliminar OT solo aparece sin iniciar, sin evidencias/trabajo y sin costos
+registrados. Requiere motivo y confirmacion; la baja se conserva internamente
+sin aparecer en listas ni reutilizar el numero. Con actividad se ofrece
+Anular OT con motivo. Deshacer inicio se mantiene como accion independiente.
+
+Deshacer inicio en el detalle deshace un inicio accidental desde En
+proceso o En espera. Conserva la OT, asignacion, fechas y costos; limpia
+lectura/fecha de inicio y permite iniciarla de nuevo. No es una cancelacion.
+
+Cancelacion de OT: contexto de orden/vehiculo/trabajo visible, motivo vacio
+y obligatorio, Volver para salir y Cancelar OT en rojo. Sin selector de
+notificaciones no implementadas; los datos y costos se conservan.
+
+Iniciar/Reanudar trabajo aplica el cambio directamente desde el boton,
+sin confirmacion intermedia. Espera sigue requiriendo motivo; cierre y
+cancelacion conservan sus formularios. Se evita iniciar una OT ya iniciada.
+
+Detalle de OT: encabezado corporativo azul y resumen persistente arriba.
+Informacion general y costos se muestran juntos, sin pestanas ni scroll
+interno: cuatro columnas de datos y cinco de costos, adaptadas a movil.
+Se conservan evidencias, cierre/cancelacion y acciones operativas existentes.
+La trazabilidad no se muestra en el modal; los datos historicos se conservan.
+
+Editar plan abre Configuracion con los valores existentes, no el selector de
+creacion. Cancelar sale del editor; desde Confirmar se vuelve a Configuracion.
+
+Las herramientas editar/eliminar tienen su propia columna Gestion, separada
+de Siguiente accion. Botones sin salto de linea y ancho minimo de tabla.
+
+Editar tambien esta visible en cada fila mediante un lapiz junto a la
+papelera; ambos controles tienen etiqueta accesible y titulo al pasar el cursor.
+
+Cada fila de plan incluye una papelera con etiqueta accesible para eliminar
+directamente desde Flota. Reutiliza la confirmacion existente, sin abrir edicion.
+
+Nueva OT: contexto de vehiculo y mantencion arriba, campos en dos columnas
+y confirmacion agrupada por trabajo y programacion.
+
 Nueva OT comparte el estilo del asistente de mantencion: encabezado azul,
-contenido blanco, barra lateral de 250px y el mismo ancho de modal (900px).
-Los tres pasos y sus validaciones se mantienen sin cambios.
+contenido blanco y el mismo ancho de modal (900px).
+El flujo tiene tres pasos: Datos de la OT, Adicionales y Revisar y crear. Un indicador
+horizontal reemplaza la barra lateral para aprovechar el ancho. Trabajo,
+fechas y responsables se completan juntos en grupos de dos columnas.
+Ambos pasos validan todos los campos requeridos antes de avanzar o guardar.
+La confirmacion agrupa datos del trabajo y programacion en dos secciones,
+con encabezados claros, paso activo resaltado y opcionales compactos.
+Presupuesto y notas tienen pantalla propia sin desplegables que agranden
+la confirmacion. La altura base es 700px y no usa desplazamiento interno.
+En pantallas pequenas se desplaza el overlay completo, no paneles del modal.
 
 UI del modulo de mantenciones. `MaintenanceView.vue` conecta estas piezas con
 `useMaintenanceModule.js`; los datos y cambios operativos no se guardan en los
@@ -205,8 +381,8 @@ Adjuntar frente/reverso muestra vistas previas independientes junto a cada campo
 sin reemplazar la del otro lado. URLs temporales se liberan al cambiar archivos,
 cerrar formulario o desmontar; cancelar selector conserva la seleccion anterior.
 
-Renovar solo aparece para licencias por vencer (hasta 30 dias) o vencidas. La
-validacion compartida del guardado tambien rechaza renovar licencias vigentes.
+Renovar aparece tambien para licencias vigentes. La validacion compartida
+exige que el vencimiento nuevo sea posterior al anterior y no vencido.
 
 Tabla con columna Acciones de 170px, boton alineado a la derecha y espacio restante
 distribuido entre datos, sin reservar un porcentaje amplio para una sola accion.
@@ -407,4 +583,74 @@ para no reintroducir el indicador Cargando al navegar. Esto evita remontajes,
 pero no reduce por si solo el bundle inicial. Al desactivar se retiran listeners
 globales y se cierran menus o graficos expandidos. Conductores mantiene su cache
 independiente de una empresa y su ciclo de persistencia existente.
+
+### Simplificacion de licencias (2026-11-12)
+
+Avisos pendientes abre el modal de licencias por vencer o vencidas.
+Se revirtieron el filtro Requieren atencion y su franja superior.
+Vigencia automatica y Seguimiento manual se presentan como conceptos separados.
+Fecha agendada registra solo una fecha, no una hora. Las gestiones anteriores
+se consultan dentro del historial de la licencia a la que pertenecen.
+Renovar hereda anticipacion y destinatarios; solo pide los datos de la nueva
+licencia. Comprobante y observaciones quedan en Informacion adicional.
+Email/WhatsApp estan deshabilitados hasta completar la integracion; la
+anticipacion permanece editable al agregar o editar conductor. Sin backend.
+Los avisos flotantes recuerdan mostrados, no ocultan pendientes operativos.
+
+Ficha y renovacion usan el mismo contenedor de 800px y cabecera compacta.
+Desde ficha, cancelar vuelve a ella; guardar vuelve con los datos actualizados.
+Avisos permite abrir renovacion directamente, sin pasar por la ficha.
+Editar permite corregir fecha/clases con motivo y confirmacion: se conserva
+licenseId y se agrega auditoria en corrections, nunca una renovacion ficticia.
+Las correcciones se consultan en historial. Seguimientos identicos sin nueva
+observacion no se guardan. Canales de envio quedan deshabilitados y separados
+de la anticipacion operativa; no existe envio ni integracion de backend.
+
+Solo cinco vistas modales: Licencia actual, Registrar renovacion, Historial,
+Avisos pendientes y Agregar conductor. DriverCurrentLicense reemplaza la ficha
+antigua y presenta vencimiento, estado, plazos, fotos y seguimiento. Editar y
+gestionar son secciones internas de Licencia actual y vuelven a ella al guardar.
+Se eliminaron markup, tarjetas y estilos de la ficha antigua, no se oculta otra
+version del mismo modal. El visor de fotos sigue dentro del dialogo actual.
+
+Actualizacion: Avisos pendientes se retira a peticion del usuario. Quedan
+Licencia actual, Registrar renovacion, Historial y Agregar conductor. Se retiran
+columna y filtro Seguimiento de la tabla; sigue accesible dentro de la ficha.
+Un unico filtro Vencimiento combina estados y plazos con contadores calculados
+segun busqueda y clase. Por vencer respeta anticipacion configurada; proximos
+7/30 dias son plazos de calendario desde manana, excluyendo vencidas y hoy.
+Alertas flotantes aplican Requieren atencion en la tabla; sin franja ni modal.
+
+El nombre del conductor no es interactivo. Ver licencia es una accion visible
+por fila para consultar la licencia actual, tambien para usuarios de solo lectura.
+
+Las correcciones respetan la ultima fecha de renovacion. La misma validacion
+se aplica antes de subir documentos y al guardar; cambiar clases exige auditoria
+tambien en el store. Registros antiguos con fecha corregida resuelven documentos
+por la identidad registrada en corrections, no solo por coincidencia de fecha.
+
+### Logica De Analisis
+
+Avance del ciclo utiliza cycleProgressPercent y remainingValue calculados desde
+el intervalo y lectura del plan. Un plan por activo, vencidos primero; sin
+porcentajes de riesgo ficticios ni conversion de unidades a dias.
+Vencimientos por fecha incluye solo Fecha/Hora y rangos calendario hasta 90 dias,
+incluso fuera del umbral de aviso. Rangos informativos sin navegacion enganosa
+por un estado generico que no representa el rango.
+Todos los graficos historicos comparten periodAnalysis, con OT finalizadas entre
+el inicio del periodo y el corte actual, fechas Chile y exclusion de futuros.
+KPIs de flota y ciclos describen el estado actual; costos y cumplimiento son del
+periodo elegido. Las barras de costo comparten escala con el eje y cero es cero.
+
+Actualizacion de presentacion: Analisis conserva costo total registrado, cantidad
+de OT finalizadas y cumplimiento con cantidad de OT evaluadas. Debajo quedan
+costo mensual, composicion y ranking de activos con costo positivo. Se retiran
+indicadores operativos y graficos de avance, vencimientos y cumplimiento por
+activo de esta vista, sin alterar las otras pestanas. Periodo unico arriba.
+Vacios sin ejes ni leyendas ficticias; sin datos evaluables no se muestra 0%.
+
+En desarrollo, MaintenanceAnalysisPreviewControl activa datos ficticios para
+probar los graficos: ocho activos y doce meses con costos y cumplimiento variados.
+Al desmarcar vuelve a los datos reales. No persiste ni combina muestras con OT
+reales; tampoco cambia las fuentes de planes sin OT. Produccion no lo habilita.
 

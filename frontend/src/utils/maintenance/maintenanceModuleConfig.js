@@ -98,7 +98,6 @@ export const WORK_ORDER_STATUS_FILTERS = [
   { value: "in-progress", label: "En proceso" },
   { value: "waiting", label: "En espera" },
   { value: "finished", label: "Finalizadas" },
-  { value: "cancelled", label: "Canceladas" },
 ]
 
 export const WORK_ORDER_PRIORITY_OPTIONS = ["Alta", "Media", "Baja"]
@@ -175,7 +174,7 @@ export const MAINTENANCE_MODAL_COPY_BY_TYPE = {
   "delete-maintenance": {
     action: "Eliminar mantencion",
     description:
-      "Elimina la mantencion configurada del vehiculo. Las ordenes ya creadas quedan como historial.",
+      "Elimina el plan y sus OT vinculadas despues de confirmar los registros afectados.",
     kicker: "Plan de mantencion",
     title: "Eliminar mantencion",
   },

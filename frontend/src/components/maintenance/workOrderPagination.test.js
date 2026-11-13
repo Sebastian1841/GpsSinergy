@@ -32,7 +32,7 @@ test("UI wires real navigation, filter reset and contextual navigation beyond fi
   assert.match(source, /@click="currentPage = pagination.page - 1"/)
   assert.match(source, /@click="currentPage = pagination.page \+ 1"/)
   assert.match(source, /currentPage.value = Math.floor\(index \/ Number\(pageSize.value\)\) \+ 1/)
-  assert.match(source, /watch\(\[activeList, selectedAsset, deadlineFilter, deadlineFrom, deadlineTo, pendingSearch, pageSize\]/)
+  assert.match(source, /watch\(\[activeList, selectedAsset, deadlineFrom, deadlineTo, pendingSearch, pageSize\]/)
   assert.doesNotMatch(source, /pageSize.value = 50/)
   assert.match(source, /pendingFocusOrderId.value !== id/)
 })

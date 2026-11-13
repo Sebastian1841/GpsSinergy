@@ -4,7 +4,7 @@ export const createMaintenanceTestFixture = (module, vehicleId = 'a', withOrder 
   module.openMaintenanceModal('maintenance')
   Object.assign(module.modalDraft.value, {
     vehicleId, name, type: name, readingSourceLabel: 'Odometro',
-    lastReading: '1000', intervalValue: '1000', alertValue: '100',
+    lastReading: '1000', intervalValue: '1000', alertValue: '1000',
   })
   module.submitMaintenanceModal()
   const vehicle = module.maintenanceItems.value.find((item) => item.id === vehicleId)

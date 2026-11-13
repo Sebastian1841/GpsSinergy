@@ -270,6 +270,7 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
       actualLabel: "Sin lectura disponible", lastLabel: `${formatNumber(last)} ${getReadingUnit(source)}`,
       nextLabel: `${formatNumber(next)} ${getReadingUnit(source)}`, remainingLabel: "Sin lectura disponible",
       status: "no-reading", summaryLabel: "Sin lectura disponible",
+      remainingValue: null, remainingUnit: getReadingUnit(source), cycleProgressPercent: null,
     }
     const remaining = next - actual
     const unit = getReadingUnit(source)
@@ -284,6 +285,9 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
       lastLabel: `${formatNumber(last)} ${unit}`,
       nextLabel: `${formatNumber(next)} ${unit}`,
       remainingLabel: summaryLabel,
+      remainingValue: remaining,
+      remainingUnit: unit,
+      cycleProgressPercent: Math.max(0, ((actual - last) / interval) * 100),
       status,
       summaryLabel,
     }
@@ -300,6 +304,7 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
         remainingLabel: "Sin fecha",
         status: "unconfigured",
         summaryLabel: "Sin fecha configurada",
+        remainingValue: null, remainingUnit: 'dias', cycleProgressPercent: null,
       }
     }
 
@@ -311,6 +316,9 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
 
     return {
       actualLabel: formatDateLabel(today),
+      remainingValue: remaining,
+      remainingUnit: 'dias',
+      cycleProgressPercent: Math.max(0, ((interval - remaining) / interval) * 100),
       lastLabel: formatDateLabel(lastDate),
       nextLabel: formatDateLabel(dueDate),
       remainingLabel: summaryLabel,
@@ -710,9 +718,13 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
   )
   const ordersWithOverrides = computed(() =>
     [...extraWorkOrders.value, ...derivedWorkOrders.value]
-      .map(applyWorkOrderOverride),
+      .map(applyWorkOrderOverride)
+      .filter(order => !order.deletedAt && order.status !== 'cancelled'),
   )
-  const costsByOrder = computed(() => groupMaintenanceOrderCosts(extraCostRows.value))
+  const archivedOrderIds = computed(() => new Set([...extraWorkOrders.value, ...derivedWorkOrders.value]
+    .map(applyWorkOrderOverride).filter(order => order.deletedAt || order.status === 'cancelled').map(order => order.id)))
+  const activeCostRows = computed(() => extraCostRows.value.filter(row => !row.deletedAt && !archivedOrderIds.value.has(row.orderId)))
+  const costsByOrder = computed(() => groupMaintenanceOrderCosts(activeCostRows.value))
   const workOrders = computed(() =>
     ordersWithOverrides.value.map((order) => applyMaintenanceOrderCosts(order, costsByOrder.value)),
   )
@@ -817,7 +829,7 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
     upcomingOrders,
   } = useMaintenanceDerivedData({
     activeTab,
-    extraCostRows,
+    extraCostRows: activeCostRows,
     maintenanceSummaryMetrics,
     selectedVehicle,
     workOrders,
@@ -849,12 +861,18 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
     )
   }
 
+  const canDeleteWorkOrder = (order) => Boolean(order && order.status === 'scheduled' &&
+    !order.startedAt && !order.workPerformed && !order.closingReading && !order.evidence?.length &&
+    !extraCostRows.value.some(row => row.orderId === order.id) &&
+    !['actualCost', 'laborCost', 'partsCost', 'otherCost'].some(key => parseNumber(order[key]) > 0))
+
   const getSelectedOrderDraft = () => {
     const order = selectedOrder.value
     const vehicle = getVehicleById(order?.vehicleId || selectedVehicle.value?.id)
 
     return {
       ...order,
+      canDeleteOrder: canDeleteWorkOrder(order),
       description: order?.description || "",
       estimatedCost: order?.estimatedCost || formatCurrency(0),
       intervalLabel: order?.intervalLabel || vehicle?.intervalLabel || "Sin configurar",
@@ -1225,7 +1243,9 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
 
     if (type === "cancel-order") {
       return {
-        cancelReason: "Orden cancelada por reprogramacion operativa.",
+        cancelReason: "",
+        plate: orderDraft.plate,
+        job: orderDraft.job,
         notify: "Aviso interno",
         orderId: orderDraft.orderId,
       }
@@ -1383,6 +1403,18 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
     activeMaintenanceModal.value = "maintenance"
   }
 
+  const findPlanForDeletion = (planId, vehicleId) => {
+    const vehicle = maintenanceItems.value.find(vehicle => String(vehicle.id) === String(vehicleId))
+    if (!vehicle) return null
+    return manualMaintenancePlans.value.find(plan => String(plan.id) === String(planId) && String(plan.vehicleId) === String(vehicleId) &&
+      (!plan.companyId || !vehicle.companyId || String(plan.companyId) === String(vehicle.companyId)))
+  }
+  const getLinkedOrdersForDeletion = (plan) => workOrders.value.filter(order =>
+    String(order.maintenancePlanId) === String(plan.id) &&
+    String(order.vehicleId) === String(plan.vehicleId) &&
+    (!order.companyId || !plan.companyId || String(order.companyId) === String(plan.companyId)))
+  const deletionOrderSummary = (orders) => orders.map(order => ({ id: order.id, status: order.status }))
+
   const openDeleteMaintenancePlan = (plan) => {
     if (isBaseMaintenancePlan(plan)) {
       modalActionMessage.value =
@@ -1390,12 +1422,16 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
       return
     }
 
+    const savedPlan = findPlanForDeletion(plan?.id, plan?.vehicleId || selectedVehicle.value?.id)
+    if (!savedPlan) return
+    const linkedOrders = getLinkedOrdersForDeletion(savedPlan)
     modalActionMessage.value = ""
     modalDraft.value = {
-      name: plan?.name || "Mantencion",
-      planId: plan?.id || "",
-      plate: plan?.plate || selectedVehicle.value?.plate || "",
-      vehicleId: plan?.vehicleId || selectedVehicle.value?.id || "",
+      name: savedPlan.name || 'Mantencion',
+      planId: savedPlan.id,
+      plate: savedPlan.plate,
+      vehicleId: savedPlan.vehicleId,
+      linkedOrders: deletionOrderSummary(linkedOrders),
     }
     activeMaintenanceModal.value = "delete-maintenance"
   }
@@ -1519,6 +1555,8 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
     const vehicle = getVehicleById(plan.vehicleId)
     const existingOrder = findOpenOrderForMaintenancePlan(plan.vehicleId, plan.id)
     if (existingOrder) return { existing: true, order: existingOrder }
+    const savedPlan = getVehicleMaintenancePlans(vehicle).find(current => current.id === plan.id)
+    if (!savedPlan || !['due', 'overdue'].includes(savedPlan.status)) return { blocked: true }
 
     const newOrder = {
       companyId: plan.companyId || vehicle?.companyId || routeCompanyId.value,
@@ -1559,6 +1597,10 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
 
   const createWorkOrderFromMaintenancePlan = (plan) => {
     const result = addWorkOrderFromMaintenancePlan(plan)
+    if (result.blocked) {
+      setMaintenanceFeedback('Solo se pueden crear OT para mantenciones proximas o vencidas.')
+      return
+    }
     const newOrder = result.order
 
     activeTab.value = "orders"
@@ -1734,13 +1776,38 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
     }
 
     if (activeMaintenanceModal.value === "delete-maintenance") {
+      const plan = findPlanForDeletion(draft.planId, draft.vehicleId)
+      if (!plan) return
+      const linkedOrders = getLinkedOrdersForDeletion(plan)
+      const summary = deletionOrderSummary(linkedOrders)
+      if (JSON.stringify(summary) !== JSON.stringify(draft.linkedOrders || [])) {
+        modalDraft.value.linkedOrders = summary
+        modalActionMessage.value = 'Las OT vinculadas cambiaron. Revisa la lista y confirma nuevamente.'
+        return
+      }
+      const deletedAt = new Date().toISOString()
+      const linkedIds = new Set(linkedOrders.map(order => order.id))
+      for (const order of linkedOrders) updateWorkOrder(order.id, {
+        deletedAt,
+        deletedWithPlanId: plan.id,
+        audit: [...(order.audit || []), {
+          action: 'OT eliminada junto con su mantencion', at: deletedAt,
+          detail: `Eliminacion confirmada del plan ${plan.name}.`,
+        }],
+      })
+      extraCostRows.value = extraCostRows.value.map(row => linkedIds.has(row.orderId) &&
+        (!row.companyId || !plan.companyId || String(row.companyId) === String(plan.companyId)) &&
+        (!row.vehicleId || String(row.vehicleId) === String(plan.vehicleId))
+        ? { ...row, deletedAt, deletedWithPlanId: plan.id } : row)
+      const nextStates = { ...maintenancePlanOrderStates.value }
+      delete nextStates[plan.id]
+      maintenancePlanOrderStates.value = nextStates
+      if (closedPlanRenewal.value?.planId === plan.id) closedPlanRenewal.value = null
       const deletedPlanName = draft.name || "Mantencion"
 
-      manualMaintenancePlans.value = manualMaintenancePlans.value.filter((plan) => {
-        return plan.id !== draft.planId
-      })
+      manualMaintenancePlans.value = manualMaintenancePlans.value.filter(currentPlan => currentPlan !== plan)
       selectedVehicleId.value = draft.vehicleId || selectedVehicle.value?.id || ""
-      maintenanceFeedbackMessage.value = `${deletedPlanName} eliminada del vehiculo.`
+      maintenanceFeedbackMessage.value = `${deletedPlanName} eliminada${linkedOrders.length ? ` junto con ${linkedOrders.length} OT vinculada${linkedOrders.length === 1 ? '' : 's'}` : ' del vehiculo'}.`
       returnToMaintenanceDetail(maintenanceFeedbackMessage.value)
       return
     }
@@ -1770,7 +1837,7 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
     }
 
     if (activeMaintenanceModal.value === "create-order") {
-      const wizardError = validateMaintenanceOrderStep(draft, 3)
+      const wizardError = validateMaintenanceOrderStep(draft, 4)
       if (wizardError) { modalActionMessage.value = wizardError; return }
       const context = workOrderCreationContext.value
       if (context && (String(context.vehicleId) !== String(draft.vehicleId) || String(context.planId) !== String(draft.maintenancePlanId))) {
@@ -1784,6 +1851,10 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
 
       if (!vehicle || !maintenancePlan) {
         modalActionMessage.value = "Selecciona un vehiculo con una mantencion configurada."
+        return
+      }
+      if (!['due', 'overdue'].includes(maintenancePlan.status)) {
+        modalActionMessage.value = 'Solo se pueden crear OT para mantenciones proximas o vencidas.'
         return
       }
 
@@ -1962,12 +2033,22 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
     }
 
     if (activeMaintenanceModal.value === "cancel-order") {
-      const order = selectedOrder.value
+      const order = workOrders.value.find(order => order.id === draft.orderId)
+      if (!order || ['finished', 'cancelled'].includes(order.status)) return
+      const deleting = draft.deleteMode === true
+      if (deleting && !canDeleteWorkOrder(order)) {
+        modalActionMessage.value = 'Solo se puede eliminar una OT sin iniciar y sin trabajo ni costos registrados.'
+        return
+      }
+      if (!String(draft.cancelReason || '').trim()) {
+        modalActionMessage.value = 'Ingresa el motivo de cancelacion.'
+        return
+      }
       updateWorkOrder(draft.orderId, {
         audit: [
           ...(order?.audit || []),
           {
-            action: "OT cancelada",
+            action: deleting ? 'OT eliminada' : 'OT anulada',
             at: new Date().toISOString(),
             detail: draft.cancelReason,
             user: "Usuario actual",
@@ -1977,6 +2058,7 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
         cancelledAt: new Date().toISOString(),
         cancelledBy: "Usuario actual",
         status: "cancelled",
+        deletedAt: new Date().toISOString(),
       })
 
       if (order?.maintenancePlanId) {
@@ -1991,7 +2073,8 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
       }
 
       selectedOrderStatus.value = "all"
-      setMaintenanceFeedback(`Orden ${draft.orderId} cancelada.`)
+      setMaintenanceFeedback(`Orden ${draft.orderId} ${deleting ? 'eliminada' : 'anulada'}.`)
+      maintenanceTypeReturnModal.value = ''
       closeMaintenanceModal()
       return
     }
@@ -2140,7 +2223,35 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
   }
 
   const openWorkOrderActionModal = (orderId, modalType, requestedStatus = "", returnTo = "") => {
+    if (!workOrders.value.some(order => order.id === orderId)) return
     selectWorkOrder(orderId)
+    if (modalType === 'delete-order') {
+      if (!canDeleteWorkOrder(selectedOrder.value)) return
+      openMaintenanceModal('cancel-order', returnTo)
+      modalDraft.value.deleteMode = true
+      return
+    }
+    if (modalType === 'reset-order') {
+      const order = selectedOrder.value
+      if (!order || !['in-progress', 'waiting'].includes(order.status)) return
+      updateWorkOrder(order.id, {
+        status: 'scheduled',
+        startedAt: '',
+        openingReading: '',
+        waitingReason: '',
+        audit: [...(order.audit || []), {
+          action: 'Inicio deshecho',
+          at: new Date().toISOString(),
+          user: order.owner,
+          detail: 'La orden vuelve a programada sin eliminar sus datos ni costos.',
+        }],
+      })
+      if (activeMaintenanceModal.value === 'order-detail') openMaintenanceModal('order-detail')
+      setMaintenanceFeedback(`Inicio de ${order.id} deshecho. Puedes iniciarla nuevamente.`)
+      return
+    }
+    const directStart = modalType === 'assign-order' && requestedStatus === 'in-progress'
+    if (directStart && !['scheduled', 'waiting'].includes(selectedOrder.value?.status)) return
     openMaintenanceModal(modalType, returnTo)
     if (modalType === "assign-order" && requestedStatus) {
       modalDraft.value.status = requestedStatus
@@ -2148,6 +2259,7 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
         ? "Poner en espera"
         : selectedOrder.value?.status === "waiting" ? "Reanudar trabajo" : "Iniciar trabajo"
     }
+    if (directStart) submitMaintenanceModal()
   }
 
   const openWorkOrderCostModal = (orderId, returnTo = "") => {
@@ -2193,6 +2305,11 @@ export const useMaintenanceModule = ({ assets, companies, route }) => {
                 normalizeText(plan.name || plan.type) === normalizeText(maintenancePlanName),
             )
       if (selectedPlan) {
+        if (!['due', 'overdue'].includes(selectedPlan.status)) {
+          closeMaintenanceModal()
+          setMaintenanceFeedback('Solo se pueden crear OT para mantenciones proximas o vencidas.')
+          return
+        }
         workOrderCreationContext.value = { vehicleId: selectedVehicleId.value, planId: selectedPlan.id }
         modalDraft.value = {
           ...modalDraft.value,

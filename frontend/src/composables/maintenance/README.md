@@ -1,5 +1,10 @@
 # Maintenance Composables
 
+La eliminacion confirmada de un plan retira sus OT vinculadas (por plan,
+vehiculo y empresa) mediante deletedAt y archiva costos relacionados. Limpia
+estado de renovacion sin tocar otros planes. activeCostRows excluye archivos
+de vistas operativas; las secciones persistidas conservan los registros.
+
 Estado y coordinacion del prototipo de mantenciones.
 
 ## Archivos

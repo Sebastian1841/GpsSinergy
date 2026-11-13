@@ -4,7 +4,7 @@
       v-if="modalType"
       class="maintenance-action-modal fixed inset-0 z-[3000] flex items-end justify-center bg-slate-950/55 p-2"
       :class="
-        modalType === 'maintenance-type' ? 'sm:items-center sm:p-4' : 'sm:items-center sm:p-4'
+        ['create-order', 'order-detail'].includes(modalType) ? 'order-modal-overlay sm:p-4' : 'sm:items-center sm:p-4'
       "
       role="dialog"
       aria-modal="true"
@@ -16,6 +16,10 @@
         :class="
           isStartConfirmation
             ? 'work-order-transition-shell max-w-[900px]'
+            : modalType === 'cancel-order'
+            ? 'work-order-cancel-shell max-w-[900px]'
+            : modalType === 'delete-maintenance'
+            ? 'maintenance-delete-shell max-w-[900px]'
             : modalType === 'maintenance'
             ? 'maintenance-create-shell max-w-[900px]'
             : modalType === 'maintenance-type'
@@ -75,7 +79,7 @@
                       : "Nuevo plan de mantención"
                     : modalType === "maintenance-type"
                       ? "Tipos de mantención"
-                      : isStartConfirmation ? `${draft.transitionLabel} en ${draft.orderId}?` : modalType === 'assign-order' && draft.transitionLabel ? draft.transitionLabel : modalTitle
+                      : modalType === 'cancel-order' ? draft.deleteMode ? 'Eliminar OT' : 'Anular OT' : isStartConfirmation ? `${draft.transitionLabel} en ${draft.orderId}?` : modalType === 'assign-order' && draft.transitionLabel ? draft.transitionLabel : modalTitle
                 }}
               </h2>
               <div v-if="modalType === 'reprogram-order'" class="work-order-planning-identity">
@@ -97,7 +101,7 @@
                 class="mt-1 text-[12px] font-bold leading-5"
                 :class="modalType === 'close-order' ? 'text-blue-100' : 'text-slate-500'"
               >
-                {{ modalDescription }}
+                {{ modalType === 'cancel-order' ? draft.deleteMode ? 'Retira una orden creada por error, sin trabajo ni costos registrados.' : 'Registra por que no continuara el trabajo. Sus datos se conservaran.' : modalDescription }}
               </p>
             </div>
 
@@ -716,20 +720,19 @@
 
 
             <template v-else-if="modalType === 'delete-maintenance'">
-              <section class="sm:col-span-2 rounded-xl border border-rose-200 bg-rose-50 p-4">
-                <p class="text-[10px] font-black uppercase tracking-[0.12em] text-rose-600">
-                  Confirmar eliminacion
-                </p>
-
-                <h3 class="mt-2 text-[18px] font-black text-[#102372]">
-                  {{ draft.name }}
-                </h3>
-
-                <p class="mt-2 text-[12px] font-bold leading-5 text-slate-600">
-                  Esta mantencion se quitara del vehiculo
-                  {{ draft.plate || "seleccionado" }}. Las OT ya creadas se mantienen como historial
-                  operativo.
-                </p>
+              <section class="maintenance-delete-content sm:col-span-2">
+                <div class="maintenance-delete-identity">
+                  <span class="maintenance-delete-symbol" aria-hidden="true"><SvgIcon name="trash" /></span>
+                  <div><h3>{{ draft.name }}</h3><p>Vehiculo <strong>{{ draft.plate || 'seleccionado' }}</strong></p></div>
+                </div>
+                <template v-if="draft.linkedOrders?.length">
+                  <div class="maintenance-delete-warning"><SvgIcon name="limits-warning" /><p>{{ draft.linkedOrders.length === 1 ? 'Tambien se eliminara 1 OT vinculada.' : `Tambien se eliminaran ${draft.linkedOrders.length} OT vinculadas.` }} Esto incluye ordenes iniciadas o finalizadas.</p></div>
+                  <ul class="maintenance-delete-orders">
+                    <li v-for="order in draft.linkedOrders" :key="order.id"><strong>{{ order.id }}</strong><span>{{ getOrderStatusLabel(order.status) }}</span></li>
+                  </ul>
+                  <p class="maintenance-delete-note">La mantencion, sus OT y los costos asociados dejaran de aparecer en las listas. Se conservara una constancia interna.</p>
+                </template>
+                <div v-else class="maintenance-delete-note"><p>Se quitara el plan de este vehiculo.</p><p>No tiene ordenes de trabajo vinculadas.</p></div>
               </section>
             </template>
 
@@ -765,16 +768,15 @@
 
             <template v-else-if="modalType === 'create-order'">
               <section class="order-wizard-layout sm:col-span-2">
-                <aside class="maintenance-create-sidebar" aria-label="Pasos de nueva OT">
+                <nav class="order-progress" aria-label="Pasos de nueva OT">
                   <template v-for="(step, index) in orderWizardSteps" :key="step.title">
                     <div :class="{ active: orderWizardStep === index + 1 }" :aria-current="orderWizardStep === index + 1 ? 'step' : undefined">
-                      <b>{{ index + 1 }}</b><span><strong>{{ step.title }}</strong><small>{{ step.description }}</small></span>
+                      <b>{{ index + 1 }}</b><strong>{{ step.title }}</strong>
                     </div>
-                    <i v-if="index < 2"></i>
                   </template>
-                </aside>
+                </nav>
                 <div class="order-wizard-main">
-                  <p class="order-wizard-position">Paso {{ orderWizardStep }} de 3</p>
+                  <p class="order-wizard-position">Paso {{ orderWizardStep }} de {{ orderWizardSteps.length }}</p>
                   <h3 ref="orderWizardHeading" tabindex="-1">{{ orderWizardSteps[orderWizardStep - 1].title }}</h3>
                   <template v-if="orderWizardStep === 1">
                     <dl v-if="orderCreationContext" class="order-wizard-context">
@@ -789,27 +791,44 @@
                         </select></label>
                         <label><span>Mantencion *</span><select v-model="draft.maintenancePlanId" required @change="emit('sync-order-maintenance-plan-draft')">
                           <option value="" disabled>{{ modalVehicleMaintenancePlans.length ? 'Selecciona un plan' : 'Sin planes configurados' }}</option>
-                          <option v-for="plan in modalVehicleMaintenancePlans" :key="plan.id" :value="plan.id">{{ plan.name }}</option>
+                          <option v-for="plan in modalVehicleMaintenancePlans" :key="plan.id" :value="plan.id" :disabled="!['due', 'overdue'].includes(plan.status)">{{ plan.name }}{{ plan.status === 'current' ? ' - Al dia' : '' }}</option>
                         </select></label>
                       </template>
-                      <label class="order-wizard-wide"><span>Titulo del trabajo *</span><input v-model="draft.job" type="text" required /></label>
-                      <fieldset class="work-order-priority order-wizard-wide">
+                      <label><span>Titulo del trabajo *</span><input v-model="draft.job" type="text" required /></label>
+                      <fieldset class="work-order-priority">
                         <legend>Prioridad *</legend>
                         <div><button v-for="priority in orderPriorityOptions" :key="priority" type="button" :class="{ active: draft.priority === priority }" :aria-pressed="draft.priority === priority" @click="draft.priority = priority">{{ priority }}</button></div>
                       </fieldset>
                     </div>
-                  </template>
-                  <div v-else-if="orderWizardStep === 2" class="order-wizard-fields">
+                  <div class="order-wizard-groups">
+                    <fieldset class="order-wizard-group">
+                    <legend>Fechas</legend>
+                    <div class="order-wizard-fields">
                     <label><span>Fecha planificada *</span><input v-model="draft.plannedStartDate" type="date" required /></label>
                     <label><span>Fecha limite (opcional)</span><input v-model="draft.scheduledDate" type="date" :min="draft.plannedStartDate || undefined" /></label>
+                    </div>
+                    </fieldset>
+                    <fieldset class="order-wizard-group">
+                    <legend>Responsables</legend>
+                    <div class="order-wizard-fields">
                     <label><span>Responsable *</span><input v-model="draft.owner" type="text" required /></label>
                     <label><span>Taller / proveedor *</span><input v-model="draft.workshop" type="text" required /></label>
+                    </div>
+                    </fieldset>
                   </div>
-                  <template v-else>
+                  </template>
+                  <template v-else-if="orderWizardStep === 3">
+                    <section class="order-wizard-summary-section" aria-labelledby="order-work-summary-title">
+                    <h4 id="order-work-summary-title">Datos del trabajo</h4>
                     <dl class="order-wizard-summary">
                       <div><dt>Vehiculo</dt><dd>{{ draftVehicleLabel }}</dd></div>
                       <div><dt>Mantencion</dt><dd>{{ draftPlanLabel }}</dd></div>
                       <div class="order-wizard-wide"><dt>Trabajo</dt><dd>{{ draft.job }}</dd></div>
+                    </dl>
+                    </section>
+                    <section class="order-wizard-summary-section" aria-labelledby="order-schedule-summary-title">
+                    <h4 id="order-schedule-summary-title">Programacion y responsables</h4>
+                    <dl class="order-wizard-summary">
                       <div><dt>Prioridad</dt><dd>{{ draft.priority }}</dd></div>
                       <div><dt>Estado inicial</dt><dd>Programada</dd></div>
                       <div><dt>Fecha planificada</dt><dd>{{ draft.plannedStartDate.split('-').reverse().join('-') }}</dd></div>
@@ -817,21 +836,25 @@
                       <div><dt>Responsable</dt><dd>{{ draft.owner }}</dd></div>
                       <div><dt>Taller / proveedor</dt><dd>{{ draft.workshop }}</dd></div>
                     </dl>
-                    <details class="order-wizard-optional">
-                      <summary>Presupuesto estimado <small>(opcional)</small><strong>{{ formattedCreateOrderTotal }}</strong></summary>
-                      <div class="order-wizard-fields">
+                    </section>
+                    <p class="order-budget-total">Total estimado <strong>{{ formattedCreateOrderTotal }}</strong></p>
+                  </template>
+                  <template v-else>
+                    <section class="order-extras-section">
+                      <h4>Presupuesto estimado (opcional)</h4>
+                      <div class="order-wizard-fields order-budget-fields">
                         <label><span>Mano de obra ($)</span><input v-model="draft.estimatedLabor" type="text" inputmode="numeric" /></label>
                         <label><span>Repuestos ($)</span><input v-model="draft.estimatedParts" type="text" inputmode="numeric" /></label>
                         <label><span>Otros costos ($)</span><input v-model="draft.estimatedOther" type="text" inputmode="numeric" /></label>
                       </div>
-                    </details>
-                    <details class="order-wizard-optional">
-                      <summary>Descripcion y observaciones <small>(opcional)</small></summary>
+                    </section>
+                    <section class="order-extras-section">
+                      <h4>Descripcion y observaciones (opcional)</h4>
                       <div class="order-wizard-fields">
-                        <label class="order-wizard-wide"><span>Descripcion</span><textarea v-model="draft.description" maxlength="500" rows="3"></textarea></label>
-                        <label class="order-wizard-wide"><span>Observaciones</span><textarea v-model="draft.observations" maxlength="500" rows="3"></textarea></label>
+                        <label><span>Descripcion</span><textarea v-model="draft.description" maxlength="500" rows="3"></textarea></label>
+                        <label><span>Observaciones</span><textarea v-model="draft.observations" maxlength="500" rows="3"></textarea></label>
                       </div>
-                    </details>
+                    </section>
                   </template>
                   <p v-if="orderWizardError" class="order-wizard-error" role="status">{{ orderWizardError }}</p>
                 </div>
@@ -968,17 +991,15 @@
             </template>
 
             <template v-else-if="modalType === 'cancel-order'">
+              <section class="cancel-order-context sm:col-span-2">
+                <strong>{{ draft.orderId }} <span>{{ draft.plate }}</span></strong>
+                <p>{{ draft.job }}</p>
+              </section>
               <label class="maintenance-modal-field sm:col-span-2">
-                <span>Motivo de cancelacion</span>
-                <textarea v-model="draft.cancelReason" rows="4"></textarea>
+                <span>{{ draft.deleteMode ? 'Motivo de eliminacion *' : 'Motivo de anulacion *' }}</span>
+                <textarea v-model="draft.cancelReason" rows="3" maxlength="500" required placeholder="Indica el motivo..."></textarea>
               </label>
-              <label class="maintenance-modal-field">
-                <span>Notificacion</span>
-                <select v-model="draft.notify">
-                  <option value="No notificar">No notificar</option>
-                  <option value="Aviso interno">Aviso interno</option>
-                </select>
-              </label>
+              <p class="cancel-order-note sm:col-span-2">La OT y sus costos dejaran de aparecer en las listas. Se conservara una constancia interna.</p>
             </template>
 
             <template v-else-if="modalType === 'close-order'">
@@ -1207,33 +1228,23 @@
             <template v-else-if="modalType === 'order-detail'">
               <section class="order-detail-view sm:col-span-2">
                 <div v-if="!['finished', 'cancelled'].includes(draft.status)" class="order-detail-management">
-                  <strong>Gestion de la OT</strong>
+                  <strong>Detalle de la OT</strong>
                   <button type="button" @click="emit('manage-work-order', draft.orderId, 'reprogram-order')">Editar planificacion</button>
                   <button v-if="draft.status === 'in-progress'" type="button" @click="emit('manage-work-order', draft.orderId, 'assign-order', 'waiting')">Poner en espera</button>
+                  <button v-if="['in-progress', 'waiting'].includes(draft.status)" type="button" @click="emit('manage-work-order', draft.orderId, 'reset-order')">Deshacer inicio</button>
                 </div>
                 <div class="order-detail-columns">
                   <div class="order-detail-left">
                     <section class="order-detail-general">
-                      <h3>Trabajo y asignacion</h3>
-                      <dl>
-                        <dt>Responsable</dt>
-                        <dd>{{ draft.owner }}</dd>
-                        <dt>Taller</dt>
-                        <dd>{{ draft.workshop }}</dd>
-                        <dt>Prioridad</dt>
-                        <dd>{{ draft.priority }}</dd>
-                        <dt v-if="draft.plannedStartDate && draft.plannedStartDate !== draft.scheduledDate">Inicio planificado</dt>
-                        <dd v-if="draft.plannedStartDate && draft.plannedStartDate !== draft.scheduledDate">
-                          {{ formatDetailDate(draft.plannedStartDate) }}
-                        </dd>
-                        <dt v-if="draft.startedAt || draft.openingReading">Lectura al iniciar</dt>
-                        <dd v-if="draft.startedAt || draft.openingReading">{{ draft.openingReading || "Sin registro" }}</dd>
-                        <dt v-if="draft.status === 'finished'">Lectura final</dt>
-                        <dd v-if="draft.status === 'finished'">
-                          {{ draft.closingReading || "Sin registro" }}
-                        </dd>
-                        <dt>Descripcion registrada</dt>
-                        <dd>{{ draft.description || "Sin descripcion" }}</dd>
+                      <h3>Informacion general</h3>
+                      <dl class="order-general-facts">
+                        <div><dt>Responsable</dt><dd>{{ draft.owner }}</dd></div>
+                        <div><dt>Taller</dt><dd>{{ draft.workshop }}</dd></div>
+                        <div><dt>Prioridad</dt><dd><span class="order-priority-badge">{{ draft.priority }}</span></dd></div>
+                        <div><dt>Inicio planificado</dt><dd>{{ draft.plannedStartDate ? formatDetailDate(draft.plannedStartDate) : 'Sin fecha' }}</dd></div>
+                        <div v-if="draft.startedAt || draft.openingReading"><dt>Lectura al iniciar</dt><dd>{{ draft.openingReading || 'Sin registro' }}</dd></div>
+                        <div v-if="draft.status === 'finished'"><dt>Lectura final</dt><dd>{{ draft.closingReading || 'Sin registro' }}</dd></div>
+                        <div class="order-description-fact"><dt>Descripcion registrada</dt><dd>{{ draft.description || 'Sin descripcion' }}</dd></div>
                       </dl>
                     </section>
                     <section v-if="draft.evidence?.length" class="order-detail-evidence">
@@ -1297,30 +1308,14 @@
                         <h3>Costos</h3>
                         <button v-if="!['finished', 'cancelled'].includes(draft.status)" type="button" @click="emit('manage-work-order-cost', draft.orderId)">Agregar costos</button>
                       </div>
-                      <dl>
-                        <dt>Presupuesto estimado</dt><dd>{{ draft.estimatedCost || '$ 0' }}</dd>
-                        <dt>Mano de obra</dt><dd>{{ draft.laborCost || '$ 0' }}</dd>
-                        <dt>Repuestos</dt><dd>{{ draft.partsCost || '$ 0' }}</dd>
-                        <dt>Otros costos</dt><dd>{{ draft.otherCost || '$ 0' }}</dd>
-                        <dt class="order-cost-total">Total real registrado</dt><dd class="order-cost-total">{{ draft.actualCost || '$ 0' }}</dd>
+                      <dl class="order-cost-facts">
+                        <div><dt>Presupuesto estimado</dt><dd>{{ draft.estimatedCost || '$ 0' }}</dd></div>
+                        <div><dt>Mano de obra</dt><dd>{{ draft.laborCost || '$ 0' }}</dd></div>
+                        <div><dt>Repuestos</dt><dd>{{ draft.partsCost || '$ 0' }}</dd></div>
+                        <div><dt>Otros costos</dt><dd>{{ draft.otherCost || '$ 0' }}</dd></div>
+                        <div class="order-cost-total"><dt>Total real registrado</dt><dd>{{ draft.actualCost || '$ 0' }}</dd></div>
                       </dl>
                     </section>
-                    <section class="order-detail-trace">
-                      <h3>Trazabilidad de la orden</h3>
-                      <ol>
-                        <li
-                          v-for="event in orderTraceEvents"
-                          :key="event.key"
-                          :class="event.className"
-                        >
-                          <strong>{{ event.action }}</strong
-                          ><span>{{ formatDetailDate(event.at) }}</span>
-                          <small v-if="event.user">{{ event.user }}</small>
-                          <p v-if="event.detail">{{ event.detail }}</p>
-                        </li>
-                      </ol>
-                    </section>
-                    <p v-if="!orderTraceEvents.length" class="order-detail-empty-history">Sin movimientos registrados.</p>
                   </div>
                 </div>
               </section>
@@ -1395,15 +1390,15 @@
             v-if="modalType === 'order-detail' && !['finished', 'cancelled'].includes(draft.status)"
             type="button"
             class="order-detail-cancel"
-            @click="emit('manage-work-order', draft.orderId, 'cancel-order')"
-          >Cancelar OT</button>
+            @click="emit('manage-work-order', draft.orderId, draft.canDeleteOrder ? 'delete-order' : 'cancel-order')"
+          >{{ draft.canDeleteOrder ? 'Eliminar OT' : 'Anular OT' }}</button>
           <button
             class="h-9 rounded-lg border border-[#dfe5ed] px-4 text-[12px] font-black text-slate-500 transition hover:border-slate-400"
             type="button"
             @click="
               modalType === 'create-order' && orderWizardStep > 1
                 ? orderWizardStep--
-                : modalType === 'maintenance' && maintenanceWizardStep > 1
+                : modalType === 'maintenance' && maintenanceWizardStep > (draft.editMode ? 2 : 1)
                 ? maintenanceWizardStep--
                 : emit('close')
             "
@@ -1411,10 +1406,19 @@
             {{
               modalType === "order-detail"
                 ? "Cerrar"
-                : (modalType === 'create-order' && orderWizardStep > 1) || (modalType === "maintenance" && maintenanceWizardStep > 1)
+                : modalType === 'cancel-order' ? 'Volver'
+                : (modalType === 'create-order' && orderWizardStep > 1) || (modalType === "maintenance" && maintenanceWizardStep > (draft.editMode ? 2 : 1))
                   ? "Volver"
                   : "Cancelar"
             }}
+          </button>
+          <button
+            v-if="modalType === 'order-detail' && draft.status === 'scheduled' && !draft.startedAt"
+            type="button"
+            class="order-detail-start"
+            @click="emit('manage-work-order', draft.orderId, 'assign-order', 'in-progress')"
+          >
+            Iniciar OT <SvgIcon name="arrow-right" />
           </button>
           <button
             v-if="modalType === 'renew-maintenance'"
@@ -1428,9 +1432,11 @@
           <button
             v-if="modalType !== 'order-detail'"
             class="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#ff6600] px-4 text-[12px] font-black leading-none text-white transition hover:bg-[#e65c00] disabled:cursor-not-allowed disabled:bg-orange-300"
+            :class="['cancel-order', 'delete-maintenance'].includes(modalType) ? 'cancel-order-submit' : ''"
             type="button"
             :disabled="
               isUploadingEvidence ||
+              (modalType === 'cancel-order' && !String(draft.cancelReason || '').trim()) ||
               ((modalType === 'maintenance' && maintenanceWizardStep > 1 || modalType === 'edit-maintenance') && !isMaintenanceTargetValid) ||
               (modalType === 'create-order' && Boolean(orderWizardError)) ||
               (modalType === 'assign-order' &&
@@ -1451,16 +1457,16 @@
             @click="modalType === 'create-order' ? handleOrderWizardPrimary() : modalType === 'maintenance' ? handleMaintenanceWizardPrimary() : emit('submit')"
           >
             {{
-              modalType === 'create-order' ? orderWizardStep < 3 ? 'Siguiente' : 'Crear OT' : modalType === "maintenance"
+              modalType === 'create-order' ? orderWizardStep < orderWizardSteps.length ? 'Revisar OT' : 'Crear OT' : modalType === "maintenance"
                 ? maintenanceWizardStep < 3
                   ? "Siguiente"
                   : draft.editMode
                     ? "Guardar cambios"
                     : "Crear plan"
-                : modalType === 'assign-order' && draft.transitionLabel ? draft.transitionLabel : modalPrimaryAction
+                : modalType === 'delete-maintenance' ? draft.linkedOrders?.length ? 'Eliminar mantencion y OT' : 'Eliminar mantencion' : modalType === 'cancel-order' ? draft.deleteMode ? 'Eliminar OT' : 'Anular OT' : modalType === 'assign-order' && draft.transitionLabel ? draft.transitionLabel : modalPrimaryAction
             }}
             <SvgIcon
-              v-if="modalType === 'maintenance' && maintenanceWizardStep < 3 || modalType === 'create-order' && orderWizardStep < 3"
+              v-if="modalType === 'maintenance' && maintenanceWizardStep < 3 || modalType === 'create-order' && orderWizardStep < orderWizardSteps.length"
               name="arrow-right"
               class="inline-flex h-4 w-4 shrink-0 items-center justify-center [&_svg]:h-4 [&_svg]:w-4"
             />
@@ -1509,7 +1515,7 @@ import { createMaintenanceEvidenceSession } from "../../services/maintenance/mai
 import { useMaintenanceTypeCatalog } from "../../composables/maintenance/useMaintenanceTypeCatalog.js"
 import { useMaintenanceVehicleHistory } from "../../composables/maintenance/useMaintenanceVehicleHistory.js"
 
-import { formatOrderDetailDate as formatDetailDate, getOrderDetailEvents } from "../../utils/maintenance/maintenanceOrderDetail.js"
+import { formatOrderDetailDate as formatDetailDate } from "../../utils/maintenance/maintenanceOrderDetail.js"
 
 const props = defineProps({
   orderCreationContext: { type: Object, default: null },
@@ -1784,21 +1790,6 @@ const exportCurrentWorkOrder = async () => {
     isExportingOrder.value = false
   }
 }
-const orderTraceEvents = computed(() => getOrderDetailEvents(draft.value).map((event) => ({
-  ...event, className: getTraceEventClass(event.action),
-})))
-
-function getTraceEventClass(action = "") {
-  const normalizedAction = action.toLowerCase()
-  if (normalizedAction.includes("cancelada")) return "is-cancelled"
-  if (normalizedAction.includes("cerrada")) return "is-closed"
-  if (normalizedAction.includes("iniciado") || normalizedAction.includes("reanudado") || normalizedAction.includes("ejecucion")) {
-    return "is-progress"
-  }
-  if (normalizedAction.includes("espera")) return "is-waiting"
-  return ""
-}
-
 const typeCatalogMode = ref("empty")
 const selectedMaintenanceType = ref("")
 const selectedMaintenancePlanId = ref(props.modalDraft?.planId || "")
@@ -1837,24 +1828,26 @@ const formatHistoryDate = (value) => {
 const maintenanceTypeSearch = ref("")
 const maintenanceTypeCriterionFilter = ref("all")
 const openTypeMenu = ref("")
-const maintenanceWizardStep = ref(1)
+const maintenanceWizardStep = ref(props.modalType === 'maintenance' && draft.value.editMode ? 2 : 1)
 const orderWizardStep = ref(1)
 const orderWizardHeading = ref(null)
 const orderWizardSteps = [
-  { title: 'Trabajo', description: 'Vehiculo y mantencion' },
-  { title: 'Programacion', description: 'Fecha y responsables' },
-  { title: 'Confirmar', description: 'Revisa y crea la OT' },
+  { title: 'Datos de la OT' },
+  { title: 'Adicionales' },
+  { title: 'Revisar y crear' },
 ]
-const orderWizardError = computed(() => validateMaintenanceOrderStep(draft.value, orderWizardStep.value))
+const orderWizardError = computed(() => validateMaintenanceOrderStep(draft.value, 4))
 const handleOrderWizardPrimary = () => {
   if (orderWizardError.value) return
-  if (orderWizardStep.value < 3) orderWizardStep.value++
+  if (orderWizardStep.value < orderWizardSteps.length) orderWizardStep.value++
   else emit('submit')
 }
 watch(orderWizardStep, async () => {
   await nextTick()
   if (props.modalType !== 'create-order') return
   orderWizardHeading.value?.focus({ preventScroll: true })
+  const panel = orderWizardHeading.value?.closest('.order-wizard-main')
+  if (panel) panel.scrollTop = 0
   const body = orderWizardHeading.value?.closest('.maintenance-action-modal > section')?.children[1]
   if (body) body.scrollTop = 0
 })
@@ -2013,7 +2006,7 @@ const isCreateMaintenanceTypeDisabled = (type) => {
       .replace(/[\u0300-\u036f]/g, "")
       .trim()
       .toLowerCase()
-  if (props.modalType === 'edit-maintenance' && normalize(type) === normalize(draft.value.originalType)) return false
+  if ((props.modalType === 'edit-maintenance' || draft.value.editMode) && normalize(type) === normalize(draft.value.originalType)) return false
   const plans = draft.value.vehicleId
     ? props.modalVehicleMaintenancePlans
     : props.selectedVehicleMaintenancePlans
@@ -2024,7 +2017,7 @@ const isCreateMaintenanceTypeDisabled = (type) => {
   return exists || props.isMaintenanceTemplateUsed(vehicleId, type)
 }
 const isBlueHeader = computed(() =>
-  ["maintenance", "create-order", "close-order"].includes(props.modalType),
+  ["maintenance", "create-order", "close-order", "delete-maintenance"].includes(props.modalType),
 )
 const selectedVehicleImage = computed(() =>
   String(props.selectedVehicle?.assetName || "")
@@ -2204,11 +2197,11 @@ const typeVehicleCount = (type) =>
   props.maintenanceItems.filter((item) => item.type === type || item.nextJob === type).length
 
 watch(
-  () => props.modalType,
-  (modalType) => {
+  () => [props.modalType, props.modalDraft?.editMode, props.modalDraft?.planId],
+  ([modalType]) => {
     if (modalType === 'create-order') orderWizardStep.value = 1
     if (modalType === "maintenance") {
-      maintenanceWizardStep.value = 1
+      maintenanceWizardStep.value = draft.value.editMode ? 2 : 1
     }
     if (modalType === "maintenance-type") {
       typeCatalogMode.value = "empty"

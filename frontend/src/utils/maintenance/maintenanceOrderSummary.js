@@ -1,6 +1,9 @@
+import { maintenanceDay } from './maintenanceHistoricalReading.js'
+
 export const parseMaintenanceOrderDate = (value) => {
   if (!value) return null
-  const text = String(value).trim()
+  const raw = String(value).trim()
+  const text = /^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw) ? maintenanceDay(raw) : raw
   const parts = text.match(/^(\d{2})[/-](\d{2})[/-](\d{4})/)
   const isoParts = text.match(/^(\d{4})-(\d{2})-(\d{2})/)
   const date = parts
@@ -8,13 +11,16 @@ export const parseMaintenanceOrderDate = (value) => {
     : isoParts
       ? new Date(Number(isoParts[1]), Number(isoParts[2]) - 1, Number(isoParts[3]))
       : new Date(text)
-  return Number.isNaN(date.getTime()) ? null : date
+  if (Number.isNaN(date.getTime())) return null
+  const expected = parts ? [Number(parts[3]), Number(parts[2]), Number(parts[1])] : isoParts ? [Number(isoParts[1]), Number(isoParts[2]), Number(isoParts[3])] : null
+  if (expected && (date.getFullYear() !== expected[0] || date.getMonth() + 1 !== expected[1] || date.getDate() !== expected[2])) return null
+  return date
 }
 
 export const parseMaintenanceOrderCost = (value) => Number(String(value || "0").replace(/[^0-9]/g, "")) || 0
 
 export const summarizeMaintenanceOrders = (orders, now = new Date()) => {
-  const today = new Date(now)
+  const today = parseMaintenanceOrderDate(maintenanceDay(now))
   today.setHours(0, 0, 0, 0)
   const counts = new Map()
   let estimatedCost = 0
@@ -41,7 +47,7 @@ export const summarizeMaintenanceOrders = (orders, now = new Date()) => {
     const closed = parseMaintenanceOrderDate(order.closedAt)
     const created = parseMaintenanceOrderDate(order.createdAt)
     if (closed && created && closed >= created) {
-      durationDays += (closed - created) / 86400000
+      durationDays += (Date.UTC(closed.getFullYear(), closed.getMonth(), closed.getDate()) - Date.UTC(created.getFullYear(), created.getMonth(), created.getDate())) / 86400000
       durationCount += 1
     }
     if (closed && scheduled) {

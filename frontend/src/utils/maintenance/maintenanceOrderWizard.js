@@ -13,8 +13,10 @@ export const validateMaintenanceOrderStep = (draft, step) => {
   if (step === 2) {
     if (!validDate(draft.plannedStartDate)) return 'Ingresa una fecha planificada valida.'
     if (draft.scheduledDate && (!validDate(draft.scheduledDate) || draft.scheduledDate < draft.plannedStartDate)) return 'La fecha limite no puede ser anterior a la fecha planificada.'
+  }
+  if (step === 3) {
     if (!String(draft.owner || '').trim() || !String(draft.workshop || '').trim()) return 'Completa el responsable y el taller.'
   }
-  if (step === 3) return validateMaintenanceOrderStep(draft, 1) || validateMaintenanceOrderStep(draft, 2)
+  if (step === 4) return validateMaintenanceOrderStep(draft, 1) || validateMaintenanceOrderStep(draft, 2) || validateMaintenanceOrderStep(draft, 3)
   return ''
 }
